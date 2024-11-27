@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/quangshuynh.github.io/portfolio/static/css/main.fdb9d233.css",
-    "main.js": "/quangshuynh.github.io/portfolio/static/js/main.d6b883f4.js",
+    "main.css": "/quangshuynh.github.io/portfolio/static/css/main.f2b3977b.css",
+    "main.js": "/quangshuynh.github.io/portfolio/static/js/main.0e633190.js",
     "static/js/453.1407b060.chunk.js": "/quangshuynh.github.io/portfolio/static/js/453.1407b060.chunk.js",
     "index.html": "/quangshuynh.github.io/portfolio/index.html",
-    "main.fdb9d233.css.map": "/quangshuynh.github.io/portfolio/static/css/main.fdb9d233.css.map",
-    "main.d6b883f4.js.map": "/quangshuynh.github.io/portfolio/static/js/main.d6b883f4.js.map",
+    "main.f2b3977b.css.map": "/quangshuynh.github.io/portfolio/static/css/main.f2b3977b.css.map",
+    "main.0e633190.js.map": "/quangshuynh.github.io/portfolio/static/js/main.0e633190.js.map",
     "453.1407b060.chunk.js.map": "/quangshuynh.github.io/portfolio/static/js/453.1407b060.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.fdb9d233.css",
-    "static/js/main.d6b883f4.js"
+    "static/css/main.f2b3977b.css",
+    "static/js/main.0e633190.js"
   ]
 }
