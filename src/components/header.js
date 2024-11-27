@@ -19,6 +19,9 @@ function Header() {
       <p>
         Email me @ <a href="mailto:qth9368@rit.edu">qth9368@rit.edu</a>
       </p>
+      <a href="../../public/Quang_Huynh_Resume.pdf" target="_blank" rel="noopener noreferrer">
+        <button className="cv-button">Download CV</button>
+      </a>
     </div>
   );
 }

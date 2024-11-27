@@ -25,3 +25,20 @@ a {
 a:hover {
   text-decoration: underline;
 }
+
+.cv-button {
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  font-size: 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 20px;
+  transition: all 0.3s ease-in-out;
+}
+
+.cv-button:hover {
+  background-color: #a78bfa;
+  transform: scale(1.05);
+}

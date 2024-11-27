@@ -3,7 +3,7 @@ import '../styles/experience.css';
 
 function Experience() {
   const experiences = [
-    { company: 'Company A', role: 'Software Intern', timeline: '2024 - 2025' },
+    { company: 'KORE Wireless', role: 'Software Engineer Intern', timeline: 'Jan. 2025 - May 2025' },
     { company: 'People\'s Inc', role: 'Self Determination Assistant', timeline: 'Jul 2024 - Present' },
   ];
 
