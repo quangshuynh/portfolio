@@ -1,18 +1,16 @@
-import logo from './logo.svg';
 import './App.css';
 import React from 'react';
-import Header from './components/Header';
-import Experience from './components/Experience';
-import Education from './components/Education';
-import Projects from './components/Projects';
-import TechStack from './components/TechStack';
-import Socials from './components/Socials';
-import Footer from './components/Footer';
+import Header from './components/header';
+import Experience from './components/experience';
+import Education from './components/education';
+import Projects from './components/projects';
+import TechStack from './components/techstack';
+import Socials from './components/socials';
+import Footer from './components/footer';
 
 function App() {
   return (
     <div className="App">
-      <img src={logo} className="App-logo" alt="logo" />
       <Header />
       <div className="content">
         <Experience />
