@@ -1,5 +1,6 @@
 import React from 'react';
 import '../styles/header.css';
+import { FaLinkedin, FaGithub, FaEnvelope } from 'react-icons/fa';
 
 function Header() {
   return (
@@ -16,12 +17,33 @@ function Header() {
         I'm <span className="highlight">Quang Huynh</span>, a creative software
         engineer driven by impactful solutions.
       </h2>
-      <p>
-        Email me @ <a href="mailto:qth9368@rit.edu">qth9368@rit.edu</a>
-      </p>
-      <a href="../../public/Quang_Huynh_Resume.pdf" target="_blank" rel="noopener noreferrer">
+      <a href="Quang_Huynh_Resume.pdf" target="_blank" rel="noopener noreferrer">
         <button className="cv-button">Download CV</button>
       </a>
+      <div className="social-icons">
+        <a
+          href="https://linkedin.com/in/quangs"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="LinkedIn"
+        >
+          <FaLinkedin className="icon linkedin" />
+        </a>
+        <a
+          href="https://github.com/quangshuynh"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="GitHub"
+        >
+          <FaGithub className="icon github" />
+        </a>
+        <a
+          href="mailto:qth9368@rit.edu"
+          aria-label="Email"
+        >
+          <FaEnvelope className="icon email" />
+        </a>
+      </div>
     </div>
   );
 }

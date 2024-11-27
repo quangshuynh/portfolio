@@ -1,17 +1,21 @@
+/* hero */
 .header {
   background: linear-gradient(135deg, #1e293b, #4f46e5);
   text-align: center;
-  color: white;
+  color: rgb(230, 230, 230);
   padding: 50px;
   border-radius: 10px;
 }
 
 .profile-pic {
-  border-radius: 50%;
-  width: 120px;
-  height: 120px;
+  border-radius: 50%; 
+  width: 200px;      
+  height: 200px;
   margin: 20px auto;
+  border: 3px solid rgba(255, 255, 255, 0.8); 
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);   
 }
+
 
 .highlight {
   color: #a78bfa;
@@ -26,6 +30,8 @@ a:hover {
   text-decoration: underline;
 }
 
+
+/* cv button */
 .cv-button {
   background-color: #4f46e5;
   color: white;
@@ -41,4 +47,37 @@ a:hover {
 .cv-button:hover {
   background-color: #a78bfa;
   transform: scale(1.05);
+}
+
+/* socials */
+.social-icons {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.icon {
+  font-size: 1.8rem;
+  color: white;
+  -webkit-text-stroke: 1px white;
+  transition: transform 0.3s ease, color 0.3s ease, -webkit-text-stroke 0.3s ease;
+}
+
+.icon:hover {
+  transform: scale(1.2);
+  color: #a78bfa; 
+  -webkit-text-stroke: 1px #a78bfa; 
+}
+
+.linkedin {
+  color: #0077b5; /* LinkedIn Blue */
+}
+
+.github {
+  color: #333; /* GitHub Black */
+}
+
+.email {
+  color: #c71610; /* Gmail Red */
 }
