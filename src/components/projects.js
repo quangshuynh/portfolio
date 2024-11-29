@@ -1,20 +1,29 @@
 import React from 'react';
 import '../styles/projects.css';
 import { FaGithub } from 'react-icons/fa'; // Import GitHub icon
+import ai_cook from '../assets/ai_cook.jpg'
+import car_price_prediction from '../assets/car_price_prediction.png'
+import astro_game from '../assets/astro_game.png'
 
 function Projects() {
   const projects = [
     {
       name: 'AI Cooking Assistant',
       about: 'A Flask-based recipe generation app that uses machine learning to create unique meal ideas.',
-      logo: 'https://d112y698adiu2z.cloudfront.net/photos/production/software_photos/003/115/209/datas/gallery.jpg', 
+      logo: ai_cook, 
       github: 'https://github.com/quangshuynh/AI-Cooking-Assistant/', 
     },
     {
       name: 'Car Price Prediction',
       about: 'A machine learning model built with PyTorch to predict the price of used cars based on key features.',
-      logo: 'https://i.imgur.com/BW95ds4.png', 
-      github: 'https://github.com/quangshuynh/car-prices-prediction', 
+      logo: car_price_prediction, 
+      github: 'https://github.com/quangshuynh/car-prices-prediction/', 
+    },
+    {
+      name: 'Astro & Hoppers Game',
+      about: 'A 2D puzzle game inspired by Lunar Landing, built with JavaFX, PTUI, MVC design battern and BFS algorithms.',
+      logo: astro_game, 
+      github: 'https://github.com/quangshuynh/javafx-board-game/', 
     },
   ];
 

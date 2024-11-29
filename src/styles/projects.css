@@ -35,22 +35,6 @@
   background: linear-gradient(135deg, #64748b, #94a3b8); /* Slightly brighter gradient */
 }
 
-.project-card::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: rgba(255, 255, 255, 0.1);
-  opacity: 0;
-  transform: rotate(45deg);
-  transition: opacity 0.5s ease;
-}
-
-.project-card:hover::after {
-  opacity: 1;
-}
 
 /* Project Logo */
 .project-logo {
@@ -91,7 +75,7 @@
 
 /* GitHub Link */
 .github-link {
-  display: flex;
+  display: inline-flex; /* Ensures clickable area matches content */
   align-items: center;
   gap: 8px;
   color: white;
@@ -99,6 +83,7 @@
   font-weight: bold;
   font-size: 1rem;
   transition: color 0.3s ease, transform 0.3s ease;
+  cursor: pointer; /* Ensures the pointer changes on hover */
 }
 
 .github-link:hover {
