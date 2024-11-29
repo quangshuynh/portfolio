@@ -5,6 +5,7 @@ import ai_cook from '../assets/ai_cook.jpg'
 import car_price_prediction from '../assets/car_price_prediction.png'
 import astro_game from '../assets/astro_game.png'
 import ngram from '../assets/ngram.png'
+import ai_panel from '../assets/ai_panel.png'
 
 function Projects() {
   const projects = [
@@ -13,6 +14,12 @@ function Projects() {
       about: 'A Flask-based recipe generation app that uses an Ollama model and Weaviate DB to create unique meal ideas.',
       logo: ai_cook, 
       github: 'https://github.com/quangshuynh/AI-Cooking-Assistant/', 
+    },
+    {
+      name: 'AI Panel Game App',
+      about: 'A Tkinkter-based GUI app that simulates an interactive panel of AI agents with unique personalities, responding to user questions and engaging in multi-agent conversations using Ollama',
+      logo: ai_panel, 
+      github: 'https://github.com/quangshuynh/AI-Panelist-GUI', 
     },
     {
       name: 'Car Price Prediction',
