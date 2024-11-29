@@ -30,7 +30,7 @@ function TechStack() {
 
   return (
     <section id="tech-stack" className="techstack-section">
-      <h2>Tech Stack</h2>
+      <h2 id="tech">Tech Stack</h2>
       <div className="stack-container">
         {techStack.map((tech, index) => (
           <div key={index} className="tech-card">
@@ -44,7 +44,7 @@ function TechStack() {
         ))}
       </div>
 
-      <h2>Tools</h2>
+      <h2 id="tools">Tools</h2>
       <div className="tools-container">
         {tools.map((tool, index) => (
           <div key={index} className="tool-card">
