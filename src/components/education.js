@@ -9,6 +9,7 @@ function Education() {
       degree: 'Accelerated B.S./M.S. in Computer Science',
       timeline: 'Aug. 2023 - Dec. 2027',
       gpa: '3.61 / 4.00',
+      url: 'https://www.rit.edu',
       logo: rit_logo,
       honors: [
         'Presidential Scholarship Recipient',
@@ -33,36 +34,38 @@ function Education() {
         {education.map((edu, index) => (
           <div key={index} className="education-card">
             <div className="card-header">
+            <a href={edu.url} target="_blank" rel="noopener noreferrer">
               <img src={edu.logo} alt={`${edu.institution} logo`} className="institution-logo" />
-              <div className="institution-info">
-                <h3>{edu.institution}</h3>
-                <p><strong>{edu.degree}</strong></p>
-                <p>{edu.timeline}</p>
-                <p className="gpa">GPA: {edu.gpa}</p> 
-              </div>
-            </div>
-            <div className="education-subsections">
-              <div className="honors">
-                <h4>Honors</h4>
-                <ul>
-                  {edu.honors.map((honor, i) => (
-                    <li key={i}>{honor}</li>
-                  ))}
-                </ul>
-              </div>
-              <div className="activities">
-                <h4>Involvement</h4>
-                <ul>
-                  {edu.involvement.map((activity, i) => (
-                    <li key={i}>{activity}</li>
-                  ))}
-                </ul>
-              </div>
+            </a>
+            <div className="institution-info">
+              <h3>{edu.institution}</h3>
+              <p><strong>{edu.degree}</strong></p>
+              <p>{edu.timeline}</p>
+              <p className="gpa">GPA: {edu.gpa}</p> 
             </div>
           </div>
-        ))}
-      </div>
-    </section>
+          <div className="education-subsections">
+            <div className="honors">
+              <h4>Honors</h4>
+              <ul>
+                {edu.honors.map((honor, i) => (
+                  <li key={i}>{honor}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="activities">
+              <h4>Involvement</h4>
+              <ul>
+                {edu.involvement.map((activity, i) => (
+                  <li key={i}>{activity}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
   );
 }
 
