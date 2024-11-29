@@ -13,13 +13,13 @@ function Projects() {
   const projects = [
     {
       name: 'AI Cooking Assistant',
-      about: 'A Flask-based recipe generation app that uses Ollama LLM and Weaviate DB to create unique meal ideas.',
+      about: 'A Flask-based recipe generation app that uses Ollama LLM and Weaviate DB to create unique meal ideas',
       logo: ai_cook, 
       github: 'https://github.com/quangshuynh/AI-Cooking-Assistant/', 
     },
     {
       name: 'Personalized Budget Assistant',
-      about: 'A Flask-based web app to track expenses, categorize transactions and visualize spending with dark/light mode support.',
+      about: 'A Flask-based web app to track expenses, categorize transactions and visualize spending with dark/light mode support',
       logo: budget_assistant, 
       github: 'https://github.com/quangshuynh/Personalized-Budgeting-Assistant', 
     },
@@ -31,25 +31,25 @@ function Projects() {
     },
     {
       name: 'Password Manager',
-      about: 'Secure, GUI-based password manager using cryptography, and customtkinter. Built collaboratively with a focus on usability and encryption.',
+      about: 'Secure, GUI-based password manager using cryptography, and customtkinter. Built collaboratively with a focus on usability and encryption',
       logo: pw_manager, 
       github: 'https://github.com/quangshuynh/passwordmanager', 
     },
     {
       name: 'Car Price Prediction',
-      about: 'A machine learning model built with PyTorch to predict the price of used cars based on key features.',
+      about: 'A machine learning model built with PyTorch to predict the price of used cars based on key features',
       logo: car_price_prediction, 
       github: 'https://github.com/quangshuynh/car-prices-prediction/', 
     },
     {
       name: 'Astro & Hoppers Game',
-      about: 'A 2D puzzle game inspired by Lunar Landing, built with JavaFX, PTUI, MVC design pattern and BFS algorithms.',
+      about: 'A 2D puzzle game inspired by Lunar Landing, built with JavaFX, PTUI, MVC design pattern and BFS algorithms',
       logo: astro_game, 
       github: 'https://github.com/quangshuynh/javafx-board-game/', 
     },
     {
       name: 'Ngram Text Statistics',
-      about: 'Analyzed 4GB of Google Books Ngram data to visualize trends, compute word similarities and uncover linguistic insights using Matplotlib & NumPy.',
+      about: 'Analyzed 4GB of Google Books Ngram data to visualize trends, compute word similarities and uncover linguistic insights using Matplotlib & NumPy',
       logo: ngram, 
       github: 'https://github.com/quangshuynh/ngram/', 
     },
