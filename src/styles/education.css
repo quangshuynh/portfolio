@@ -22,7 +22,6 @@
 
 .education-card {
     background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
     color: white;
     padding: 20px;
     border-radius: 15px;
