@@ -38,7 +38,7 @@ function TechStack() {
             
             <div className="tech-details">
               <h3>{tech.name}</h3>
-              <p>{tech.proficiency}</p>
+              {/*<p>{tech.proficiency}</p>*/}
             </div>
           </div>
         ))}
