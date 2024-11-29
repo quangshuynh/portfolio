@@ -32,7 +32,7 @@
 .project-card:hover {
   transform: scale(1.05);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-  background: linear-gradient(135deg, #64748b, #94a3b8); /* Slightly brighter gradient */
+  background: linear-gradient(135deg, #161a20, #333b47); /* Slightly brighter gradient */
 }
 
 
