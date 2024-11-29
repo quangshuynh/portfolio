@@ -13,7 +13,7 @@ function Projects() {
   const projects = [
     {
       name: 'AI Cooking Assistant',
-      about: 'A Flask-based recipe generation app that uses an Ollama model and Weaviate DB to create unique meal ideas.',
+      about: 'A Flask-based recipe generation app that uses Ollama LLM and Weaviate DB to create unique meal ideas.',
       logo: ai_cook, 
       github: 'https://github.com/quangshuynh/AI-Cooking-Assistant/', 
     },
@@ -25,7 +25,7 @@ function Projects() {
     },
     {
       name: 'AI Panel Game App',
-      about: 'A Tkinkter-based GUI app that simulates an interactive panel of AI agents with unique personalities, responding to user questions and engaging in multi-agent conversations using Ollama',
+      about: 'A Tkinkter-based GUI app that simulates an interactive panel of AI agents with unique personalities, responding to user questions and engaging in multi-agent conversations using Ollama LLM',
       logo: ai_panel, 
       github: 'https://github.com/quangshuynh/AI-Panelist-GUI', 
     },
