@@ -10,12 +10,20 @@ function Experience() {
       role: 'Software Engineer Intern',
       timeline: 'Jan. 2025 - May 2025',
       logo: kore_logo, 
+      about: [
+        'Incoming Software Engineer Intern',
+      ],
     },
     {
       company: 'People Inc',
       role: 'Self Determination Assistant',
       timeline: 'Jul. 2024 - Present',
       logo: people_inc_logo, 
+      about: [
+        'Used service plans to assist mentally-disabled individuals with daily tasks, shown by progress toward personal goals.',
+        'Managed budgeting, transportation, and care tasks, ensuring high accuracy and satisfaction.',
+        'Documented improvements and maintained detailed records to ensure data accuracy and regulatory compliance.',
+      ],
     },
   ];
 
@@ -31,6 +39,11 @@ function Experience() {
                 <h3>{exp.company}</h3>
                 <p><strong>{exp.role}</strong></p>
                 <p>{exp.timeline}</p>
+                <ul className="about-list">
+                {exp.about.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
               </div>
             </div>
           </div>
