@@ -1,0 +1,116 @@
+.project-section {
+    background: linear-gradient(to bottom right, #1e293b, #0f172a);
+    color: white;
+    padding: 50px 20px;
+    text-align: center;
+}
+
+/* Projects Section */
+.projects-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+  justify-content: center;
+  padding: 20px;
+}
+
+.project-card {
+  display: flex;
+  align-items: flex-start;
+  background: linear-gradient(135deg, #334155, #64748b); /* Lighter version of Education background */
+  color: white;
+  padding: 20px;
+  border-radius: 15px;
+  width: 100%;
+  max-width: 600px;
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.5s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.project-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #64748b, #94a3b8); /* Slightly brighter gradient */
+}
+
+.project-card::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: rgba(255, 255, 255, 0.1);
+  opacity: 0;
+  transform: rotate(45deg);
+  transition: opacity 0.5s ease;
+}
+
+.project-card:hover::after {
+  opacity: 1;
+}
+
+/* Project Logo */
+.project-logo {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  margin-right: 20px;
+  transition: transform 0.3s ease;
+}
+
+.project-card:hover .project-logo {
+  transform: rotate(5deg) scale(1.1);
+}
+
+/* Project Details */
+.project-details {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.project-details h3 {
+  margin: 0 0 5px;
+  font-size: 1.8rem;
+  color: #a78bfa;
+  transition: color 0.3s ease;
+}
+
+.project-details h3:hover {
+  color: #9333ea;
+}
+
+.project-details p {
+  margin: 10px 0;
+  font-size: 1rem;
+  color: #e5e7eb;
+}
+
+/* GitHub Link */
+.github-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 1rem;
+  transition: color 0.3s ease, transform 0.3s ease;
+}
+
+.github-link:hover {
+  color: #a78bfa;
+  transform: scale(1.1);
+}
+
+.github-icon {
+  font-size: 1.5rem;
+  transition: transform 0.3s ease;
+}
+
+.github-link:hover .github-icon {
+  transform: rotate(360deg);
+}

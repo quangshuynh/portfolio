@@ -30,6 +30,7 @@
     width: 100%;
     box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    text-align: center;
 }
 
 .education-card:hover {
@@ -57,17 +58,20 @@
     margin: 0;
     font-size: 1.5rem;
     color: #ff9900;
+    text-align: center;
+    margin-left: 30px;
 }
 
 .institution-info p {
     margin: 5px 0;
     font-size: 1rem;
     color: #cbd5e1;
+    text-align: center;
 }
 
 .education-subsections {
     margin-top: 15px;
-    text-align: left;
+    text-align: center;
 }
 
 .honors h4, .activities h4 {
@@ -93,4 +97,11 @@
     background: #ff9900;
     color: black;
     cursor: pointer;
+}
+
+.gpa {
+    margin-top: 15px;
+    font-size: 1.2rem;
+    color: #ff9900;
+    font-weight: bold;
 }

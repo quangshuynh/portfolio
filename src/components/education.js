@@ -8,6 +8,7 @@ function Education() {
       institution: 'Rochester Institute of Technology',
       degree: 'Accelerated B.S./M.S. in Computer Science',
       timeline: 'Aug. 2023 - Dec. 2027',
+      gpa: '3.61 / 4.00',
       logo: rit_logo,
       honors: [
         'Presidential Scholarship Recipient',
@@ -36,6 +37,7 @@ function Education() {
                 <h3>{edu.institution}</h3>
                 <p><strong>{edu.degree}</strong></p>
                 <p>{edu.timeline}</p>
+                <p className="gpa">GPA: {edu.gpa}</p> 
               </div>
             </div>
             <div className="education-subsections">
