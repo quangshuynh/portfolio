@@ -1,7 +1,7 @@
 import React from 'react';
 import '../styles/experience.css';
-import kore_logo from '../assets/kore-logo.png'
-import people_inc_logo from '../assets/people-inc-logo.png'
+import kore_logo from '../assets/kore-logo.png';
+import people_inc_logo from '../assets/people-inc-logo.png';
 
 function Experience() {
   const experiences = [
@@ -20,16 +20,18 @@ function Experience() {
   ];
 
   return (
-    <section id="experience">
+    <section id="experience" className="experience-section">
       <h2>Experience</h2>
       <div className="experience-container">
         {experiences.map((exp, index) => (
           <div key={index} className="experience-card">
-            <img src={exp.logo} alt={`${exp.company} logo`} className="company-logo" />
-            <div className="experience-details">
-              <h3>{exp.company}</h3>
-              <p><strong>{exp.role}</strong></p>
-              <p>{exp.timeline}</p>
+            <div className="card-header">
+              <img src={exp.logo} alt={`${exp.company} logo`} className="company-logo" />
+              <div className="experience-details">
+                <h3>{exp.company}</h3>
+                <p><strong>{exp.role}</strong></p>
+                <p>{exp.timeline}</p>
+              </div>
             </div>
           </div>
         ))}
