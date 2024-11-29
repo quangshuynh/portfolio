@@ -16,9 +16,9 @@ function Education() {
         'Presidential Scholar',
         'Dean’s List (Fall 2023 - 2024)'
       ],
-      activities: [
+      involvement: [
         'RIT AI Club',
-        'Computing for Multicultural Students',
+        'Computing Organizationfor Multicultural Students',
         'Vietnamese Student Association',
         'RIT Car Club'
       ],
@@ -52,7 +52,7 @@ function Education() {
               <div className="activities">
                 <h4>Involvement</h4>
                 <ul>
-                  {edu.activities.map((activity, i) => (
+                  {edu.involvement.map((activity, i) => (
                     <li key={i}>{activity}</li>
                   ))}
                 </ul>
