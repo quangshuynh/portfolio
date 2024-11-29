@@ -21,7 +21,7 @@ function Projects() {
     },
     {
       name: 'Astro & Hoppers Game',
-      about: 'A 2D puzzle game inspired by Lunar Landing, built with JavaFX, PTUI, MVC design battern and BFS algorithms.',
+      about: 'A 2D puzzle game inspired by Lunar Landing, built with JavaFX, PTUI, MVC design pattern and BFS algorithms.',
       logo: astro_game, 
       github: 'https://github.com/quangshuynh/javafx-board-game/', 
     },
