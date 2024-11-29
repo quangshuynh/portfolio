@@ -16,8 +16,9 @@
 
 .project-card {
   display: flex;
-  align-items: flex-start;
-  background: linear-gradient(135deg, #334155, #64748b); /* Lighter version of Education background */
+  flex-direction: column; /* Change layout to vertical stack */
+  align-items: center; /* Center-align all children */
+  background: linear-gradient(135deg, #334155, #64748b);
   color: white;
   padding: 20px;
   border-radius: 15px;
@@ -38,8 +39,8 @@
 
 /* Project Logo */
 .project-logo {
-  width: 100px;
-  height: 100px;
+  width: 250px;
+  height: 250px;
   object-fit: contain;
   margin-right: 20px;
   transition: transform 0.3s ease;
@@ -73,17 +74,18 @@
   color: #e5e7eb;
 }
 
-/* GitHub Link */
 .github-link {
-  display: inline-flex; /* Ensures clickable area matches content */
+  margin-bottom: 15px; /* Add spacing between the GitHub link and the project details */
+  text-align: center; /* Center the GitHub link */
+  font-size: 1.2rem;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   color: white;
   text-decoration: none;
   font-weight: bold;
-  font-size: 1rem;
   transition: color 0.3s ease, transform 0.3s ease;
-  cursor: pointer; /* Ensures the pointer changes on hover */
 }
 
 .github-link:hover {
@@ -98,4 +100,30 @@
 
 .github-link:hover .github-icon {
   transform: rotate(360deg);
+}
+
+
+/** tech stack */
+.tech-stack {
+  margin-top: 10px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.tech-item {
+  background-color: #475569;
+  color: white;
+  font-size: 0.9rem;
+  padding: 5px 10px;
+  border-radius: 8px;
+  text-align: center;
+  transition: background-color 0.3s ease;
+}
+
+.tech-item:hover {
+  background-color: #a78bfa;
 }
