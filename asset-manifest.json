@@ -1,7 +1,7 @@
 {
   "files": {
-    "main.css": "/portfolio/static/css/main.b0753dc1.css",
-    "main.js": "/portfolio/static/js/main.6d8f24a6.js",
+    "main.css": "/portfolio/static/css/main.88bd87cf.css",
+    "main.js": "/portfolio/static/js/main.70417c27.js",
     "static/js/453.1407b060.chunk.js": "/portfolio/static/js/453.1407b060.chunk.js",
     "static/media/car_price_prediction.png": "/portfolio/static/media/car_price_prediction.6ac42caa6575584c86a6.png",
     "static/media/rit-logo.png": "/portfolio/static/media/rit-logo.5aba2786533ba2f5972e.png",
@@ -11,12 +11,12 @@
     "static/media/ai_cook.jpg": "/portfolio/static/media/ai_cook.c4a788f98fdbcf71a169.jpg",
     "static/media/people-inc-logo.png": "/portfolio/static/media/people-inc-logo.3dccc07c883d7b28ff66.png",
     "index.html": "/portfolio/index.html",
-    "main.b0753dc1.css.map": "/portfolio/static/css/main.b0753dc1.css.map",
-    "main.6d8f24a6.js.map": "/portfolio/static/js/main.6d8f24a6.js.map",
+    "main.88bd87cf.css.map": "/portfolio/static/css/main.88bd87cf.css.map",
+    "main.70417c27.js.map": "/portfolio/static/js/main.70417c27.js.map",
     "453.1407b060.chunk.js.map": "/portfolio/static/js/453.1407b060.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.b0753dc1.css",
-    "static/js/main.6d8f24a6.js"
+    "static/css/main.88bd87cf.css",
+    "static/js/main.70417c27.js"
   ]
 }
