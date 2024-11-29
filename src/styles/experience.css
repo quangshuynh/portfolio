@@ -60,6 +60,7 @@
 
 .experience-details {
   text-align: left;
+  width: 100%;
 }
 
 
@@ -75,6 +76,46 @@
   color: #cbd5e1;
 }
 
+
+
+.about-container {
+  margin-top: 20px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 10px;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.about-container:hover {
+  transform: scale(1.03);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
+}
+
+.about-container ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.about-container li {
+  margin-bottom: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  text-align: left;
+  color: white;
+  font-size: 1rem;
+}
+
+.about-container li:hover {
+  background: #ff9900;
+  color: rgb(255, 255, 255);
+  cursor: pointer;
+}
+
+
 .about-list {
   margin-top: 10px;
   padding-left: 20px; /* Indent for bullet points */
@@ -84,5 +125,5 @@
 .about-list li {
   margin-bottom: 5px; /* Spacing between bullet points */
   font-size: 0.9rem; /* Smaller font for the details */
-  color: #a7a7a7; /* Light gray for readability */
+  color: #d8cdcd; /* Light gray for readability */
 }
