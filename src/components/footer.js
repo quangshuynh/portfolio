@@ -7,6 +7,7 @@ function Footer() {
     <footer className="footer">
       <div className="footer-container">
         <p>© {new Date().getFullYear()} <strong>Quang Huynh</strong> | Built with ❤️ in React</p>
+        <p>I love my girlfriend!!</p>
         <div className="footer-icons">
           <a
             href="https://linkedin.com/in/quangs"

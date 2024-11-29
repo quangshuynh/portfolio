@@ -16,6 +16,7 @@
 
 #tech-stack h2 {
   font-size: 2.5rem;
+  margin-top: -10px;
   margin-bottom: 30px;
   color: #ff9900; /* Light purple for headings */
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
