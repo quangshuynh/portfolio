@@ -39,17 +39,18 @@
 
 .card-header {
   display: flex;
-  align-items: center;
+  flex-direction: column; 
+  align-items: flex-start; 
   border-bottom: 2px solid rgba(255, 255, 255, 0.2);
   padding-bottom: 15px;
   margin-bottom: 15px;
 }
 
 .company-logo {
-  width: 80px;
-  height: 80px;
+  width: 80px; 
+  height: 80px; 
   object-fit: contain;
-  margin-right: 15px;
+  margin-bottom: 10px; 
   border-radius: 10px;
   background-color: rgb(238, 236, 236); 
   padding: 1px; 
@@ -57,12 +58,10 @@
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); 
 }
 
-
 .experience-details {
   text-align: left;
-  display: flex;
-  flex-direction: column;
 }
+
 
 .experience-details h3 {
   margin: 0;
@@ -74,4 +73,16 @@
   margin: 5px 0;
   font-size: 1rem;
   color: #cbd5e1;
+}
+
+.about-list {
+  margin-top: 10px;
+  padding-left: 20px; /* Indent for bullet points */
+  list-style: disc; /* Display bullet points */
+}
+
+.about-list li {
+  margin-bottom: 5px; /* Spacing between bullet points */
+  font-size: 0.9rem; /* Smaller font for the details */
+  color: #a7a7a7; /* Light gray for readability */
 }
