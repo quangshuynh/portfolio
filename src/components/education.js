@@ -13,12 +13,13 @@ function Education() {
       honors: [
         'Presidential Scholarship Recipient',
         'Richard T. Cheng Endowed Scholarship',
+        'Farash Foundation’s First in Family Scholar',
         'Presidential Scholar',
         'Dean’s List (Fall 2023 - 2024)'
       ],
       involvement: [
         'RIT AI Club',
-        'Computing Organizationfor Multicultural Students',
+        'Computing Organization for Multicultural Students',
         'Vietnamese Student Association',
         'RIT Car Club'
       ],
