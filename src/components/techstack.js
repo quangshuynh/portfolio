@@ -6,7 +6,7 @@ function TechStack() {
     { name: 'Python', logo: 'https://cdn.svgporn.com/logos/python.svg', proficiency: 'Expert' },
     { name: 'Java', logo: 'https://cdn.svgporn.com/logos/java.svg', proficiency: 'Advanced' },
     { name: 'C', logo: 'https://cdn.svgporn.com/logos/c.svg', proficiency: 'Intermediate' },
-    { name: 'C++', logo: 'https://cdn.svgporn.com/logos/c-plusplus.svg', proficiency: 'Beginner' },
+    { name: 'C#', logo: 'https://cdn.svgporn.com/logos/c-sharp.svg', proficiency: 'Beginner' },
     { name: 'HTML', logo: 'https://cdn.svgporn.com/logos/html-5.svg', proficiency: 'Expert' },
     { name: 'CSS', logo: 'https://cdn.svgporn.com/logos/css-3.svg', proficiency: 'Expert' },
     { name: 'JavaScript', logo: 'https://cdn.svgporn.com/logos/javascript.svg', proficiency: 'Advanced' },
