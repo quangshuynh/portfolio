@@ -8,12 +8,12 @@ function Header() {
       <div className="profile">
         <img
           src="https://i.imgur.com/6QbgYeB.png"
-          alt="Quang profile picture"
+          alt="Quang Huynh"
           className="profile-pic"
         />
       </div>
-      <h1>Hey there! 👋</h1>
-      <h2>
+      <h1 className="header-title">Hey there! 👋</h1>
+      <h2 className="header-subtitle">
         I'm <span className="highlight">Quang Huynh</span>, a creative software
         engineer driven by impactful solutions.
       </h2>
@@ -37,10 +37,7 @@ function Header() {
         >
           <FaGithub className="icon github" />
         </a>
-        <a
-          href="mailto:qth9368@rit.edu"
-          aria-label="Email"
-        >
+        <a href="mailto:qth9368@rit.edu" aria-label="Email">
           <FaEnvelope className="icon email" />
         </a>
       </div>
