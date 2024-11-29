@@ -15,7 +15,7 @@ function Experience() {
       ],
     },
     {
-      company: 'People Inc',
+      company: 'People Inc.',
       role: 'Self Determination Assistant',
       timeline: 'Jul. 2024 - Present',
       logo: people_inc_logo, 
@@ -39,12 +39,14 @@ function Experience() {
                 <h3>{exp.company}</h3>
                 <p><strong>{exp.role}</strong></p>
                 <p>{exp.timeline}</p>
-                <ul className="about-list">
+              </div>
+            </div>
+            <div className="about-container">
+              <ul className="about-list">
                 {exp.about.map((item, i) => (
                   <li key={i}>{item}</li>
                 ))}
               </ul>
-              </div>
             </div>
           </div>
         ))}
