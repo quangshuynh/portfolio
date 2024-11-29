@@ -116,12 +116,12 @@
 
 .about-list {
   margin-top: 10px;
-  padding-left: 20px; /* Indent for bullet points */
-  list-style: disc; /* Display bullet points */
+  padding-left: 20px; 
+  list-style: disc; 
 }
 
 .about-list li {
-  margin-bottom: 5px; /* Spacing between bullet points */
-  font-size: 0.9rem; /* Smaller font for the details */
-  color: #ffffff; /* Light gray for readability */
+  margin-bottom: 5px; 
+  font-size: 0.9rem; 
+  color: #ffffff;
 }

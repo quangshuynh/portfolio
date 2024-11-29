@@ -12,7 +12,9 @@ function Header() {
           className="profile-pic"
         />
       </div>
-      <h1 className="header-title">Hey there! 👋</h1>
+      <h1 className="header-title">
+        Hey there! <span className="wave">👋</span>
+      </h1>
       <h2 className="header-subtitle">
         I'm <span className="highlight">Quang Huynh</span>, a creative software
         engineer driven by impactful solutions
