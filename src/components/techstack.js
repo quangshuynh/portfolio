@@ -4,18 +4,18 @@ import '../styles/techstack.css';
 function TechStack() {
   const techStack = [
     { name: 'Python', logo: 'https://cdn.svgporn.com/logos/python.svg', proficiency: 'Expert' },
-    { name: 'Java', logo: 'https://cdn.svgporn.com/logos/java.svg', proficiency: 'Advanced' },
-    { name: 'C', logo: 'https://cdn.svgporn.com/logos/c.svg', proficiency: 'Intermediate' },
-    { name: 'C#', logo: 'https://cdn.svgporn.com/logos/c-sharp.svg', proficiency: 'Beginner' },
+    { name: 'Flask', logo: 'https://cdn.svgporn.com/logos/flask.svg', proficiency: 'Expert' },
     { name: 'HTML', logo: 'https://cdn.svgporn.com/logos/html-5.svg', proficiency: 'Expert' },
     { name: 'CSS', logo: 'https://cdn.svgporn.com/logos/css-3.svg', proficiency: 'Expert' },
+    { name: 'Java', logo: 'https://cdn.svgporn.com/logos/java.svg', proficiency: 'Advanced' },
+    { name: 'React', logo: 'https://cdn.svgporn.com/logos/react.svg', proficiency: 'Advanced' },
     { name: 'JavaScript', logo: 'https://cdn.svgporn.com/logos/javascript.svg', proficiency: 'Advanced' },
+    { name: 'C', logo: 'https://cdn.svgporn.com/logos/c.svg', proficiency: 'Intermediate' },
     { name: 'LLMs', logo: 'https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files/dark/ollama.png', proficiency: 'Intermediate' },
     { name: 'Weaviate', logo: 'https://d11a6trkgmumsb.cloudfront.net/original/4X/8/1/1/811ef156e2525559c859ecdb7a5cd26d5e459e46.png', proficiency: 'Intermediate' },
-    { name: 'Flask', logo: 'https://cdn.svgporn.com/logos/flask.svg', proficiency: 'Expert' },
     { name: 'PyTorch', logo: 'https://cdn.svgporn.com/logos/pytorch-icon.svg', proficiency: 'Intermediate' },
-    { name: 'React', logo: 'https://cdn.svgporn.com/logos/react.svg', proficiency: 'Advanced' },
     { name: 'Computer Vision', logo: 'https://cdn.svgporn.com/logos/opencv.svg', proficiency: 'Beginner' },
+    { name: 'C#', logo: 'https://cdn.svgporn.com/logos/c-sharp.svg', proficiency: 'Beginner' },
   ];
 
   const tools = [
