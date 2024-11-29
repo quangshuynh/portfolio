@@ -11,7 +11,7 @@ function Experience() {
       timeline: 'Jan. 2025 - May 2025',
       logo: kore_logo, 
       about: [
-        'Incoming Software Engineer Intern',
+        'Incoming Software Engineer Intern for Spring 2025',
       ],
     },
     {
