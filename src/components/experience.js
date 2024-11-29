@@ -10,7 +10,7 @@ function Experience() {
       role: 'Software Engineer Intern',
       timeline: 'Jan. 2025 - May 2025',
       logo: kore_logo, 
-      url: 'https://www.people-inc.org/about/people-inc/',
+      url: 'https://www.korewireless.com/about-us',
       about: [
         'Incoming Software Engineer Intern for Spring 2025',
       ],
@@ -19,7 +19,7 @@ function Experience() {
       company: 'People Inc.',
       role: 'Self Determination Assistant',
       timeline: 'Jul. 2024 - Present',
-      url: 'https://www.korewireless.com/about-us',
+      url: 'https://www.people-inc.org/about/people-inc/',
       logo: people_inc_logo, 
       about: [
         'Used service plans to assist mentally-disabled individuals with daily tasks, shown by progress toward personal goals.',
