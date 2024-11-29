@@ -14,9 +14,14 @@ function TechStack() {
   const frameworks = [
     { name: 'Flask', logo: 'https://cdn.svgporn.com/logos/flask.svg', proficiency: 'Expert' },
     { name: 'React', logo: 'https://cdn.svgporn.com/logos/react.svg', proficiency: 'Advanced' },
+    { name: 'JavaFX', logo: 'https://cdn.svgporn.com/logos/java.svg', proficiency: 'Intermediate' },
+    { name: 'Tkinter', logo: 'https://i.imgur.com/g6am5XO.png', proficiency: 'Intermediate' },
     { name: 'PyTorch', logo: 'https://cdn.svgporn.com/logos/pytorch-icon.svg', proficiency: 'Intermediate' },
     { name: 'LLMs', logo: 'https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files/dark/ollama.png', proficiency: 'Intermediate' },
     { name: 'Weaviate', logo: 'https://d11a6trkgmumsb.cloudfront.net/original/4X/8/1/1/811ef156e2525559c859ecdb7a5cd26d5e459e46.png', proficiency: 'Intermediate' },
+    { name: 'NumPy', logo: 'https://cdn.svgporn.com/logos/numpy.svg', proficiency: 'Advanced' },
+    { name: 'Pandas', logo: 'https://cdn.svgporn.com/logos/pandas-icon.svg', proficiency: 'Advanced' },
+    { name: 'Matplotlib', logo: 'https://cdn.svgporn.com/logos/matplotlib.svg', proficiency: 'Advanced' },
     { name: 'Computer Vision', logo: 'https://cdn.svgporn.com/logos/opencv.svg', proficiency: 'Beginner' },
   ];
   const tools = [
