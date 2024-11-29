@@ -15,7 +15,7 @@ function Header() {
       <h1 className="header-title">Hey there! 👋</h1>
       <h2 className="header-subtitle">
         I'm <span className="highlight">Quang Huynh</span>, a creative software
-        engineer driven by impactful solutions.
+        engineer driven by impactful solutions
       </h2>
       <a href="Quang_Huynh_Resume.pdf" target="_blank" rel="noopener noreferrer">
         <button className="cv-button">Download CV</button>
