@@ -6,6 +6,8 @@ import car_price_prediction from '../assets/car_price_prediction.png'
 import astro_game from '../assets/astro_game.png'
 import ngram from '../assets/ngram.png'
 import ai_panel from '../assets/ai_panel.png'
+import pw_manager from '../assets/pw_manager.png'
+import budget_assistant from '../assets/budget_assistant.png'
 
 function Projects() {
   const projects = [
@@ -16,10 +18,22 @@ function Projects() {
       github: 'https://github.com/quangshuynh/AI-Cooking-Assistant/', 
     },
     {
+      name: 'Personalized Budget Assistant',
+      about: 'A Flask-based web app to track expenses, categorize transactions and visualize spending with dark/light mode support.',
+      logo: budget_assistant, 
+      github: 'https://github.com/quangshuynh/Personalized-Budgeting-Assistant', 
+    },
+    {
       name: 'AI Panel Game App',
       about: 'A Tkinkter-based GUI app that simulates an interactive panel of AI agents with unique personalities, responding to user questions and engaging in multi-agent conversations using Ollama',
       logo: ai_panel, 
       github: 'https://github.com/quangshuynh/AI-Panelist-GUI', 
+    },
+    {
+      name: 'Password Manager',
+      about: 'Secure, GUI-based password manager using cryptography, and customtkinter. Built collaboratively with a focus on usability and encryption.',
+      logo: pw_manager, 
+      github: 'https://github.com/quangshuynh/passwordmanager', 
     },
     {
       name: 'Car Price Prediction',
@@ -35,7 +49,7 @@ function Projects() {
     },
     {
       name: 'Ngram Text Statistics',
-      about: 'Analyzed 4GB of Google Books Ngram data to visualize trends, compute word similarities, and uncover linguistic insights using Matplotlib, and NumPy.',
+      about: 'Analyzed 4GB of Google Books Ngram data to visualize trends, compute word similarities and uncover linguistic insights using Matplotlib & NumPy.',
       logo: ngram, 
       github: 'https://github.com/quangshuynh/ngram/', 
     },
