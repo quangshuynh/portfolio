@@ -30,7 +30,7 @@ function Projects() {
       about: 'A Tkinkter-based GUI app that simulates an interactive panel of AI agents with unique personalities, responding to user questions and engaging in multi-agent conversations using Ollama LLM',
       logo: ai_panel, 
       github: 'https://github.com/quangshuynh/AI-Panelist-GUI',
-      techStack: ['Python', 'Tkinter', 'LLM'], 
+      techStack: ['Python', 'Tkinter', 'Ollama LLM'], 
     },
     {
       name: 'Password Manager',
