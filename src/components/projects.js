@@ -51,7 +51,7 @@ function Projects() {
       about: 'A 2D puzzle game inspired by Lunar Landing, built with JavaFX, PTUI, MVC design pattern and BFS algorithms',
       logo: astro_game, 
       github: 'https://github.com/quangshuynh/javafx-board-game/', 
-      techStack: ['Java', 'JavaFX', 'BFS Algorithm'],
+      techStack: ['Java', 'JavaFX', 'BFS Algorithm', 'MVC'],
     },
     {
       name: 'Ngram Text Statistics',
