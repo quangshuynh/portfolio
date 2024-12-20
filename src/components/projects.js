@@ -7,23 +7,23 @@ import astro_game from '../assets/astro_game.png'
 import ngram from '../assets/ngram.png'
 import ai_panel from '../assets/ai_panel.png'
 import pw_manager from '../assets/pw_manager.png'
-import budget_assistant from '../assets/budget_assistant.png'
+import ray_trace_sim from '../assets/ray_trace_sim.png'
 
 function Projects() {
   const projects = [
+    {
+      name: 'Ray Trace Simulator',
+      about: 'A Python-based GUI tool that simulates ray tracing through single lenses. It calculates lens power, effective focal length (EFL), and numerical aperture (NA), with interactive lens visualization using CustomTkinter and PyRayT',
+      logo: ray_trace_sim, 
+      github: 'https://github.com/tatefinger/learning/tree/main', 
+      techStack: ['Python', 'CustomTkinter', 'Matplotlib', 'PyRayT', 'Tinygfx'],
+    },
     {
       name: 'AI Cooking Assistant',
       about: 'A Flask-based recipe generation app that uses Ollama LLM and Weaviate DB to create unique meal ideas',
       logo: ai_cook, 
       github: 'https://github.com/quangshuynh/AI-Cooking-Assistant/', 
       techStack: ['Python', 'Flask', 'Ollama LLM', 'Weaviate DB', 'HTML', 'CSS', 'JavaScript'],
-    },
-    {
-      name: 'Personalized Budget Assistant',
-      about: 'A Flask-based web app to track expenses, categorize transactions and visualize spending with dark/light mode support',
-      logo: budget_assistant, 
-      github: 'https://github.com/quangshuynh/Personalized-Budgeting-Assistant', 
-      techStack: ['Python', 'Flask', 'JavaScript', 'HTML', 'CSS'],
     },
     {
       name: 'AI Panel Game App',
