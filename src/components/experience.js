@@ -8,7 +8,7 @@ function Experience() {
     {
       company: 'KORE Wireless',
       role: 'Software Engineer Intern',
-      timeline: 'Jan. 2025 - May 2025',
+      timeline: 'Jan. 2025 - Present',
       logo: kore_logo, 
       url: 'https://www.korewireless.com/about-us',
       about: [
