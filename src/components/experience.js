@@ -12,7 +12,7 @@ function Experience() {
       logo: kore_logo, 
       url: 'https://www.korewireless.com/about-us',
       about: [
-        'Incoming Software Engineer Intern for Spring 2025',
+        'Current Software Engineer Intern for Spring 2025',
       ],
     },
     {
