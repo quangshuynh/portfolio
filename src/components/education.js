@@ -8,14 +8,14 @@ function Education() {
       institution: 'Rochester Institute of Technology',
       degree: 'Accelerated B.S./M.S. in Computer Science',
       timeline: 'Aug. 2023 - Dec. 2027',
-      gpa: '3.61 / 4.00',
+      gpa: '3.63 / 4.00',
       url: 'https://www.rit.edu',
       logo: rit_logo,
       honors: [
         'Presidential Scholarship Recipient',
         'Richard T. Cheng Endowed Scholarship',
         'Farash Foundation’s First in Family Scholar',
-        'Dean’s List (Fall 2023 - 2024)'
+        'Dean’s List (Fall 2023 - 2025)'
       ],
       involvement: [
         'RIT AI Club',
