@@ -7,7 +7,7 @@ function Header() {
     <div className="header">
       <div className="profile">
         <img
-          src="https://i.imgur.com/6QbgYeB.png"
+          src="https://i.imgur.com/Ok3lkvw.jpeg"
           alt="Quang Huynh"
           className="profile-pic"
         />

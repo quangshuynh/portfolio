@@ -13,6 +13,7 @@ function Experience() {
       url: 'https://www.korewireless.com/about-us',
       about: [
         'Current Software Engineer Intern for Spring 2025',
+        'Enterprise Applications Team',
       ],
     },
     {
