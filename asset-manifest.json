@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/portfolio/static/css/main.5c6f9e2d.css",
-    "main.js": "/portfolio/static/js/main.6bc24fc9.js",
+    "main.js": "/portfolio/static/js/main.5b3122c3.js",
     "static/js/453.1407b060.chunk.js": "/portfolio/static/js/453.1407b060.chunk.js",
     "static/media/car_price_prediction.png": "/portfolio/static/media/car_price_prediction.6ac42caa6575584c86a6.png",
     "static/media/rit-logo.png": "/portfolio/static/media/rit-logo.5aba2786533ba2f5972e.png",
@@ -14,11 +14,11 @@
     "static/media/ray_trace_sim.png": "/portfolio/static/media/ray_trace_sim.a5624eea6d2247951725.png",
     "index.html": "/portfolio/index.html",
     "main.5c6f9e2d.css.map": "/portfolio/static/css/main.5c6f9e2d.css.map",
-    "main.6bc24fc9.js.map": "/portfolio/static/js/main.6bc24fc9.js.map",
+    "main.5b3122c3.js.map": "/portfolio/static/js/main.5b3122c3.js.map",
     "453.1407b060.chunk.js.map": "/portfolio/static/js/453.1407b060.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.5c6f9e2d.css",
-    "static/js/main.6bc24fc9.js"
+    "static/js/main.5b3122c3.js"
   ]
 }
