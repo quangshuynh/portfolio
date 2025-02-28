@@ -11,6 +11,7 @@
     margin-bottom: 20px;
     color: #ff9900; /* RIT Accent color */
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    font-family: 'circular-bold', sans-serif;
 }
 
 .education-container {

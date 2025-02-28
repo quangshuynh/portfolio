@@ -10,6 +10,12 @@
   overflow: hidden;
 }
 
+.highlight {
+  font-family: 'circular-bold', sans-serif;
+  font-size: 1.8rem
+}
+
+
 @keyframes gradientAnimation {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }

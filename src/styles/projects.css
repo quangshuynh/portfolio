@@ -14,6 +14,15 @@
   padding: 20px;
 }
 
+.experience-section h2 {
+  font-size: 2.5rem;
+  margin-top: -10px;
+  margin-bottom: 20px;
+  color: #ff9900;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  font-family: 'circular-bold', sans-serif;
+}
+
 .project-card {
   display: flex;
   flex-direction: column; /* Change layout to vertical stack */
