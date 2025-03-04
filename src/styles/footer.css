@@ -15,7 +15,6 @@
     gap: 10px;
   }
   
-  /* Add decorative lines */
   .footer::before, .footer::after {
     content: '';
     position: absolute;
@@ -63,7 +62,6 @@
     color: #d93025; 
   }
   
-  /* Typography */
   .footer-container p {
     margin: 0;
     font-size: 0.95rem;
@@ -71,13 +69,13 @@
   }
   
   .footer-container p strong {
-    color: #a78bfa; /* Highlight name */
+    color: #a78bfa;
   }
   
   /* Responsive Design */
   @media screen and (max-width: 768px) {
     .footer-icon {
-      font-size: 1.2rem; /* Smaller icons for small screens */
+      font-size: 1.2rem; 
     }
   
     .footer-container p {
