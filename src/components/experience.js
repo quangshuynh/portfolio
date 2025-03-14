@@ -41,7 +41,9 @@ function Experience() {
               <img src={exp.logo} alt={`${exp.company} logo`} className="company-logo" />
             </a>
             <div className="experience-details">
-              <h3>{exp.company}</h3>
+              <a href={exp.url} target="_blank" rel="noopener noreferrer">
+                <h3>{exp.company}</h3>
+              </a>
               <p><strong>{exp.role}</strong></p>
               <p>{exp.timeline}</p>
             </div>
