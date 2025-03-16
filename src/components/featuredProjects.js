@@ -1,15 +1,17 @@
 import React from 'react';
-import '../styles/projects.css';
-import { FaGithub } from 'react-icons/fa'; // Import GitHub icon
+import '../styles/featuredProjects.css';
+import { FaGithub } from 'react-icons/fa'; 
+import { Link } from 'react-router-dom';
+
 import ai_cook from '../assets/ai_cook.jpg'
 import car_price_prediction from '../assets/car_price_prediction.png'
 import astro_game from '../assets/astro_game.png'
 import ngram from '../assets/ngram.png'
-import ai_panel from '../assets/ai_panel.png'
 import pw_manager from '../assets/pw_manager.png'
 import ray_trace_sim from '../assets/ray_trace_sim.png'
 
-function Projects() {
+
+function FeaturedProjects() {
   const projects = [
     {
       name: 'Ray Trace Simulator',
@@ -24,13 +26,6 @@ function Projects() {
       logo: ai_cook, 
       github: 'https://github.com/quangshuynh/AI-Cooking-Assistant/', 
       techStack: ['Python', 'Flask', 'Ollama LLM', 'Weaviate DB', 'HTML', 'CSS', 'JavaScript'],
-    },
-    {
-      name: 'AI Panel Game App',
-      about: 'A Tkinkter-based GUI app that simulates an interactive panel of AI agents with unique personalities, responding to user questions and engaging in multi-agent conversations using Ollama LLM',
-      logo: ai_panel, 
-      github: 'https://github.com/quangshuynh/AI-Panelist-GUI',
-      techStack: ['Python', 'Tkinter', 'Ollama LLM'], 
     },
     {
       name: 'Password Manager',
@@ -64,7 +59,7 @@ function Projects() {
 
   return (
     <section id="projects" className="experience-section">
-      <h2>Projects</h2>
+      <h2>Featured Projects</h2>
       <div className="projects-container">
         {projects.map((project, index) => (
           <div key={index} className="project-card">
@@ -81,16 +76,21 @@ function Projects() {
               <h3>{project.name}</h3>
               <p>{project.about}</p>
               <ul className="tech-stack">
-                {project.techStack.map((tech, index) => (
-                  <li key={index} className="tech-item">{tech}</li>
+                {project.techStack.map((tech, idx) => (
+                  <li key={idx} className="tech-item">{tech}</li>
                 ))}
               </ul>
             </div>
           </div>
         ))}
       </div>
+      <div className="view-more-container">
+        <Link to="/projects" className="view-more-button">
+          View more of my projects!
+        </Link>
+      </div>
     </section>
   );
 }
 
-export default Projects;
+export default FeaturedProjects;

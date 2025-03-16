@@ -132,3 +132,25 @@
 .tech-item:hover {
   background-color: #a78bfa;
 }
+
+.view-more-container {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.view-more-button {
+  background: linear-gradient(135deg, #334155, #64748b);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  text-decoration: none;
+  transition: transform 0.3s ease, background 0.5s ease;
+  display: inline-block;
+}
+
+.view-more-button:hover {
+  transform: scale(1.05);
+  background: linear-gradient(135deg, #161a20, #333b47);
+}
