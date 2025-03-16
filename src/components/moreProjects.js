@@ -30,7 +30,7 @@ useEffect(() => {
 
   return (
     <section id="more-projects" className="more-projects-page experience-section">
-      <h1>All Featured Projects</h1>
+      <h1>More Projects</h1>
       <div className="projects-container">
         {Projects.map((project, index) => (
           <div key={index} className="project-card">
