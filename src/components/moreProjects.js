@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FaGithub } from 'react-icons/fa';
 import '../styles/moreProjects.css';
+import Footer from '../components/footer'
 
 import ai_panel from '../assets/ai_panel.png'
 import foody from '../assets/foody.png'
@@ -12,18 +13,18 @@ useEffect(() => {
     }, []);
   const Projects = [
     {
+      name: 'Foody',
+      description: "A modern React app to track, discover, and share restaurants with friends",
+      logo: foody,
+      github: 'https://github.com/quangshuynh/Foody',
+      techStack: ['React', 'Leaflet', 'JavaScript', 'CSS'],
+    },
+    {
     name: 'AI Panel Game App',
     about: 'A Tkinkter-based GUI app that simulates an interactive panel of AI agents with unique personalities, responding to user questions and engaging in multi-agent conversations using Ollama LLM',
     logo: ai_panel, 
     github: 'https://github.com/quangshuynh/AI-Panelist-GUI',
     techStack: ['Python', 'Tkinter', 'Ollama LLM'], 
-    },
-    {
-      name: 'Foody',
-      description: "A modern React app to track, discover, and share restaurants with friends",
-      logo: foody,
-      github: 'https://github.com/quangshuynh/Foody',
-      techStack: ['React', 'JavaScript', 'CSS'],
     },
   ];
 
@@ -63,6 +64,7 @@ useEffect(() => {
           ← Back
         </Link>
       </div>
+      {/* <Footer /> */}
     </section>
   );
 }

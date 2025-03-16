@@ -85,7 +85,7 @@ function FeaturedProjects() {
         ))}
       </div>
       <div className="view-more-container">
-        <Link to="/projects" className="view-more-button">
+        <Link to="/moreprojects" className="view-more-button">
           View more of my projects!
         </Link>
       </div>

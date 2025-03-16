@@ -29,7 +29,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/projects" element={<MoreProjects />} />
+        <Route path="/moreprojects" element={<MoreProjects />} />
       </Routes>
     </Router>
   );
