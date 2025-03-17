@@ -1,6 +1,7 @@
 import './App.css';
 import React from 'react';
 import { Route, HashRouter as Router, Routes } from "react-router-dom";
+import { FaGithub, FaLinkedin, FaEnvelope } from 'react-icons/fa';
 import Header from './components/header';
 import Experience from './components/experience';
 import Education from './components/education';
@@ -8,7 +9,6 @@ import FeaturedProjects from './components/featuredProjects';
 import MoreProjects from './components/moreProjects';
 import TechStack from './components/techstack';
 import Footer from './components/footer';
-import { FaGithub, FaLinkedin, FaEnvelope } from 'react-icons/fa';
 
 function Home() {
   return (
