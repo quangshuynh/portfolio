@@ -64,7 +64,9 @@ useEffect(() => {
           ← Back
         </Link>
       </div>
-      {/* <Footer /> */}
+      <footer>
+        <Footer />
+      </footer>
     </section>
   );
 }
