@@ -1,7 +1,7 @@
 .more-projects-page {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;  /* Ensures the page takes the full viewport height */
+  min-height: 100vh; 
   background: linear-gradient(to bottom right, #1e293b, #0f172a);
   color: white;
   padding: 50px 20px;
@@ -155,3 +155,6 @@
     background: linear-gradient(135deg, #161a20, #333b47);
   }
   
+  footer {
+    margin-top: auto;
+  }
