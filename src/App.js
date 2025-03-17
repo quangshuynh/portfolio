@@ -13,7 +13,7 @@ import { FaGithub, FaLinkedin, FaEnvelope } from 'react-icons/fa';
 function Home() {
   return (
     <div className="App">
-      <Header />
+      <Header icons={{ FaGithub, FaLinkedin, FaEnvelope }}/>
       <div className="content">
         <Experience />
         <Education />
