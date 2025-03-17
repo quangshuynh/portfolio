@@ -1,17 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import '../styles/featuredProjects.css';
 import { FaGithub } from 'react-icons/fa'; 
 import { Link } from 'react-router-dom';
 
-import ai_cook from '../assets/ai_cook.jpg'
-import car_price_prediction from '../assets/car_price_prediction.png'
-import astro_game from '../assets/astro_game.png'
-import ngram from '../assets/ngram.png'
-import pw_manager from '../assets/pw_manager.png'
-import ray_trace_sim from '../assets/ray_trace_sim.png'
-
+import ai_cook from '../assets/ai_cook.jpg';
+import car_price_prediction from '../assets/car_price_prediction.png';
+import astro_game from '../assets/astro_game.png';
+import ngram from '../assets/ngram.png';
+import pw_manager from '../assets/pw_manager.png';
+import ray_trace_sim from '../assets/ray_trace_sim.png';
 
 function FeaturedProjects() {
+  const [selectedImage, setSelectedImage] = useState(null);
+
+  const handleImageClick = (image) => {
+    setSelectedImage(image);
+  };
+
+  const closeModal = () => {
+    setSelectedImage(null);
+  };
+
   const projects = [
     {
       name: 'Ray Trace Simulator',
@@ -63,7 +72,12 @@ function FeaturedProjects() {
       <div className="projects-container">
         {projects.map((project, index) => (
           <div key={index} className="project-card">
-            <img src={project.logo} alt={`${project.name} logo`} className="project-logo" />
+            <img 
+              src={project.logo} 
+              alt={`${project.name} logo`} 
+              className="project-logo" 
+              onClick={() => handleImageClick(project.logo)}
+            />
             <a
               href={project.github}
               target="_blank"
@@ -84,6 +98,16 @@ function FeaturedProjects() {
           </div>
         ))}
       </div>
+
+      {selectedImage && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <img src={selectedImage} alt="Enlarged project logo" className="modal-image" />
+            <button className="close-modal" onClick={closeModal}>&times;</button>
+          </div>
+        </div>
+      )}
+
       <div className="view-more-container">
         <Link to="/moreprojects" className="view-more-button">
           View more of my projects!
