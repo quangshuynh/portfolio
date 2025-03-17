@@ -55,6 +55,7 @@
 
 .project-card:hover .project-logo {
   transform: rotate(5deg) scale(1.1);
+  cursor: pointer;
 }
 
 .project-details {
