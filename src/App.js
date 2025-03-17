@@ -5,9 +5,10 @@ import Header from './components/header';
 import Experience from './components/experience';
 import Education from './components/education';
 import FeaturedProjects from './components/featuredProjects';
-import MoreProjects from './components/moreProjects'
+import MoreProjects from './components/moreProjects';
 import TechStack from './components/techstack';
 import Footer from './components/footer';
+import { FaGithub, FaLinkedin, FaEnvelope } from 'react-icons/fa';
 
 function Home() {
   return (
@@ -19,7 +20,7 @@ function Home() {
         <FeaturedProjects />
         <TechStack />
       </div>
-      <Footer />
+      <Footer icons={{ FaGithub, FaLinkedin, FaEnvelope }} />
     </div>
   );
 }
@@ -29,7 +30,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/moreprojects" element={<MoreProjects />} />
+        <Route path="/moreprojects" element={<MoreProjects icons={{ FaGithub, FaLinkedin, FaEnvelope }} />} />
       </Routes>
     </Router>
   );

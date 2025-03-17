@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FaGithub } from 'react-icons/fa';
 import '../styles/moreProjects.css';
-import Footer from '../components/footer';
 
 import ai_panel from '../assets/ai_panel.png';
 import foody from '../assets/foody.png';
 
-function MoreProjects() {
+function MoreProjects({ icons }) {
+  const { FaGithub, FaLinkedin, FaEnvelope } = icons;
+
   const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
@@ -25,16 +25,14 @@ function MoreProjects() {
   const Projects = [
     {
       name: 'Foody',
-      description:
-        'A modern React app to track, discover, and share restaurants with friends',
+      description: 'A modern React app to track, discover, and share restaurants with friends',
       logo: foody,
       github: 'https://github.com/quangshuynh/Foody',
       techStack: ['React', 'Leaflet', 'JavaScript', 'CSS'],
     },
     {
       name: 'AI Panel Game App',
-      about:
-        'A Tkinter-based GUI app that simulates an interactive panel of AI agents with unique personalities, responding to user questions and engaging in multi-agent conversations using Ollama LLM',
+      about: 'A Tkinter-based GUI app that simulates an interactive panel of AI agents...',
       logo: ai_panel,
       github: 'https://github.com/quangshuynh/AI-Panelist-GUI',
       techStack: ['Python', 'Tkinter', 'Ollama LLM'],
@@ -53,12 +51,7 @@ function MoreProjects() {
               className="project-logo"
               onClick={() => handleImageClick(project.logo)}
             />
-            <a
-              href={project.github}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="github-link"
-            >
+            <a href={project.github} target="_blank" rel="noopener noreferrer" className="github-link">
               <FaGithub className="github-icon" /> GitHub Repo
             </a>
             <div className="project-details">
@@ -66,9 +59,7 @@ function MoreProjects() {
               <p>{project.description || project.about}</p>
               <ul className="tech-stack">
                 {project.techStack.map((tech, idx) => (
-                  <li key={idx} className="tech-item">
-                    {tech}
-                  </li>
+                  <li key={idx} className="tech-item">{tech}</li>
                 ))}
               </ul>
             </div>
@@ -79,26 +70,31 @@ function MoreProjects() {
       {selectedImage && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={selectedImage}
-              alt="Enlarged project logo"
-              className="modal-image"
-            />
-            <button className="close-modal" onClick={closeModal}>
-              &times;
-            </button>
+            <img src={selectedImage} alt="Enlarged project logo" className="modal-image" />
+            <button className="close-modal" onClick={closeModal}>&times;</button>
           </div>
         </div>
       )}
 
       <div className="back-button-container">
-        <Link to="/#projects" className="view-more-button back-button">
-          ← Back
-        </Link>
+        <Link to="/#projects" className="view-more-button back-button">← Back</Link>
       </div>
-      <footer>
-        <Footer />
-      </footer>
+      <footer className="footer2">
+      <div className="footer-container2">
+        <p>© {new Date().getFullYear()} <strong>Quang Huynh</strong> | Built with ❤️ in React</p>
+        <div className="footer-icons2">
+          <a href="https://linkedin.com/in/quangs" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+            <FaLinkedin className="footer-icon2 linkedin" />
+          </a>
+          <a href="https://github.com/quangshuynh" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+            <FaGithub className="footer-icon2 github" />
+          </a>
+          <a href="mailto:qth9368@rit.edu" aria-label="Email">
+            <FaEnvelope className="footer-icon2 email" />
+          </a>
+        </div>
+      </div>
+    </footer>
     </section>
   );
 }
