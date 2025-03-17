@@ -95,7 +95,6 @@
 .honors li:hover, .activities li:hover {
     background: #ff9900;
     color: black;
-    cursor: pointer;
 }
 
 .gpa {
