@@ -1,8 +1,8 @@
 import React from 'react';
 import '../styles/header.css';
-import { FaLinkedin, FaGithub, FaEnvelope } from 'react-icons/fa';
 
-function Header() {
+function Header({ icons }) {
+  const { FaGithub, FaLinkedin, FaEnvelope } = icons;
   return (
     <div className="header">
       <div className="profile">
