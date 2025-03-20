@@ -12,11 +12,13 @@ function TechStack() {
     { name: 'C', logo: 'https://cdn.svgporn.com/logos/c.svg', link: 'https://en.wikipedia.org/wiki/C_(programming_language)' },
     { name: 'C#', logo: 'https://cdn.svgporn.com/logos/c-sharp.svg', link: 'https://docs.microsoft.com/en-us/dotnet/csharp/' },
     { name: 'SQL', logo: 'https://i.imgur.com/0cgPCGd.png', link: 'https://en.wikipedia.org/wiki/SQL' },
+    { name: 'Visual Basic', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/VB.NET_Logo.svg/1280px-VB.NET_Logo.svg.png', link: 'https://en.wikipedia.org/wiki/Visual_Basic_(.NET)'}
   ];
 
   const frameworks = [
     { name: 'Flask', logo: 'https://cdn.svgporn.com/logos/flask.svg', link: 'https://flask.palletsprojects.com/' },
-    { name: 'React', logo: 'https://cdn.svgporn.com/logos/react.svg', link: 'https://react.dev/' },
+    { name: 'React.js', logo: 'https://cdn.svgporn.com/logos/react.svg', link: 'https://react.dev/' },
+    { name: 'Node.js', logo: 'https://cdn.svgporn.com/logos/nodejs-icon.svg', link: 'https://nodejs.org/en'},
     { name: 'JavaFX', logo: 'https://cdn.svgporn.com/logos/java.svg', link: 'https://openjfx.io' },
     { name: 'Tkinter', logo: 'https://i.imgur.com/g6am5XO.png', link: 'https://docs.python.org/3/library/tkinter.html' },
     { name: 'PyTorch', logo: 'https://cdn.svgporn.com/logos/pytorch-icon.svg', link: 'https://pytorch.org' },
