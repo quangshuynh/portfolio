@@ -42,7 +42,7 @@ function TechStack() {
     { name: 'MobaXterm', logo: 'https://onion.io/wp-content/uploads/2017/11/Moba-Logo.jpg', link: 'https://mobaxterm.mobatek.net' },
   ];
 
-  // wraps the image in an <a> tag if a link is provided
+  // helper function to render tech stack cards
   const renderCards = (items) =>
     items.map((item, index) => (
       <div key={index} className="tech-card">
