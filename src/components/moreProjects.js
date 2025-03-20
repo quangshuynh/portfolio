@@ -5,6 +5,7 @@ import '../styles/moreProjects.css';
 
 import ai_panel from '../assets/ai_panel.png';
 import foody from '../assets/foody.png';
+import moolah from '../assets/moolah.png'
 
 function MoreProjects({ icons }) {
   const { FaGithub, FaLinkedin, FaEnvelope } = icons;
@@ -77,6 +78,13 @@ function MoreProjects({ icons }) {
 
   const Projects = [
     {
+      name: 'Moolah',
+      description: 'React-based income and salary calculator that allows users to estimate their earnings based on hourly wages, worked hours, and customizable date ranges. It supports multiple job entries, automatic salary breakdowns, and dark mode for a user-friendly experience',
+      logo: moolah,
+      github: 'https://github.com/quangshuynh/moolah',
+      techStack: ['React', 'JavaScript', 'CSS'],
+    },
+    {
       name: 'Foody',
       description: 'A modern React app to track, discover, and share restaurants with friends',
       logo: foody,
@@ -85,7 +93,7 @@ function MoreProjects({ icons }) {
     },
     {
       name: 'AI Panel Game App',
-      about: 'A Tkinter-based GUI app that simulates an interactive panel of AI agents...',
+      about: 'A Tkinkter-based GUI app that simulates an interactive panel of AI agents with unique personalities, responding to user questions and engaging in multi-agent conversations using Ollama LLM',
       logo: ai_panel,
       github: 'https://github.com/quangshuynh/AI-Panelist-GUI',
       techStack: ['Python', 'Tkinter', 'Ollama LLM'],
