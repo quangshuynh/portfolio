@@ -78,6 +78,7 @@
   opacity: 0;
   transform: rotate(45deg);
   transition: opacity 0.5s ease;
+  pointer-events: none;
 }
 
 .tech-card:hover::after, .tool-card:hover::after {
