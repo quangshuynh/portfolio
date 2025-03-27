@@ -89,7 +89,7 @@ function MoreProjects({ icons }) {
       description: 'A modern React app to track, discover, and share restaurants with friends',
       logo: foody,
       github: 'https://github.com/quangshuynh/Foody',
-      techStack: ['React', 'Leaflet', 'JavaScript', 'CSS'],
+      techStack: ['React', 'Firebase', 'Leaflet', 'JavaScript', 'CSS'],
     },
     {
       name: 'AI Panel Game App',
