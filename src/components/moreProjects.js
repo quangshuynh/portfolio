@@ -86,10 +86,10 @@ function MoreProjects({ icons }) {
     },
     {
       name: 'Foody',
-      description: 'A modern React app to track, discover, and share restaurants with friends that uses Firebase for storing restaurants and user data',
+      description: 'An React app to track, discover, and share restaurants with friends. Uses Firebase for real-time user and restaurant data, Leaflet for interactive maps, and a responsive UI with smooth transitions',
       logo: foody,
       github: 'https://github.com/quangshuynh/Foody',
-      techStack: ['React', 'Firebase', 'Leaflet', 'JavaScript', 'CSS'],
+      techStack: ['React', 'Firebase', 'Leaflet', 'JavaScript', 'CSS', ],
     },
     {
       name: 'AI Panel Game App',
