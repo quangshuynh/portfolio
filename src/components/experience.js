@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CSSTransition, SwitchTransition } from 'react-transition-group';
 import '../styles/experience.css';
 import kore_logo from '../assets/kore-logo.png';
 import people_inc_logo from '../assets/people-inc-logo.png';
@@ -10,7 +11,7 @@ function Experience() {
     {
       company: 'KORE Wireless',
       role: 'Software Engineering Intern',
-      timeline: koreSeason === 'spring' ? 'Jan. 2025 - May 2025' : 'May 2025 - Aug. 2025',  //todo: add sliding transition
+      timeline: koreSeason === 'spring' ? 'Jan. 2025 - May 2025' : 'May 2025 - Aug. 2025', 
       team: 'Enterprise Applications Team',
       logo: kore_logo,
       url: 'https://www.korewireless.com/about-us',
@@ -55,7 +56,21 @@ function Experience() {
                   <h3>{exp.company}</h3>
                 </a>
                 <p><strong>{exp.role}</strong></p>
-                <p>{exp.timeline}</p>
+                {exp.company === 'KORE Wireless' ? (
+                  <SwitchTransition mode="out-in">
+                    <CSSTransition
+                      key={koreSeason}
+                      addEndListener={(node, done) =>
+                        node.addEventListener("transitionend", done, false)
+                      }
+                      classNames="slide"
+                    >
+                      <p>{exp.timeline}</p>
+                    </CSSTransition>
+                  </SwitchTransition>
+                ) : (
+                  <p>{exp.timeline}</p>
+                )}
                 {exp.team && <p><em>{exp.team}</em></p>}
 
                 {exp.company === 'KORE Wireless' && (
@@ -77,11 +92,29 @@ function Experience() {
               </div>
             </div>
             <div className="about-container">
-              <ul className="about-list">
-                {exp.about.map((item, i) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
+              {exp.company === 'KORE Wireless' ? (
+                <SwitchTransition mode="out-in">
+                  <CSSTransition
+                    key={koreSeason}
+                    addEndListener={(node, done) =>
+                      node.addEventListener("transitionend", done, false)
+                    }
+                    classNames="about-slide"
+                  >
+                    <ul className="about-list">
+                      {exp.about.map((item, i) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+                  </CSSTransition>
+                </SwitchTransition>
+              ) : (
+                <ul className="about-list">
+                  {exp.about.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         ))}
