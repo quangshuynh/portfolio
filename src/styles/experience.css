@@ -19,6 +19,7 @@
   flex-wrap: wrap;
   gap: 30px;
   justify-content: center;
+  align-items: flex-start;
 }
 
 .experience-card {
@@ -128,4 +129,33 @@
   margin-bottom: 5px; 
   font-size: 0.9rem; 
   color: #ffffff;
+}
+
+.toggle-button-group {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.season-button {
+  padding: 8px 14px;
+  background-color: #334155;
+  border: 2px solid #ff9900;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.season-button:hover {
+  background-color: #ff9900;
+}
+
+.season-button.active {
+  background-color: #ff9900;
+  transform: scale(1.05);
 }
