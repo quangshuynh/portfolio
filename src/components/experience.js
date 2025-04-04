@@ -5,26 +5,27 @@ import kore_logo from '../assets/kore-logo.png';
 import people_inc_logo from '../assets/people-inc-logo.png';
 
 function Experience() {
-  const [koreSeason, setKoreSeason] = useState('spring');
+  const [season, setSeason] = useState('spring');
+  const [direction, setDirection] = useState('right'); 
 
   const experiences = [
     {
       company: 'KORE Wireless',
       role: 'Software Engineering Intern',
-      timeline: koreSeason === 'spring' ? 'Jan. 2025 - May 2025' : 'May 2025 - Aug. 2025', 
+      timeline: season === 'spring' ? 'Jan. 2025 - May 2025' : 'May 2025 - Aug. 2025',
       team: 'Enterprise Applications Team',
       logo: kore_logo,
       url: 'https://www.korewireless.com/about-us',
       about:
-        koreSeason === 'spring'
-          ? [ // spring 2025
+      season === 'spring'
+          ? [
               'Developed and maintained .NET UI features in a large legacy codebase to streamline order processing workflows for internal users',
               'Designed and optimized SQL stored procedures to enhance database performance and support backend operations',
               'Integrated and automated data workflows using Boomi in an Agile Scrum environment, improving operational efficiency and cross-system communication',
               'Created dynamic RDL reports to provide real-time business insights and support decision-making across departments',
             ]
-          : [  // summer 2025
-              'Incoming Software Engineering Intern for Summer 2025',
+          : [
+              'Incoming Software Engineer Intern for Summer 2025',
             ],
     },
     {
@@ -40,6 +41,15 @@ function Experience() {
       ],
     },
   ];
+
+  const handleSeasonChange = (newSeason) => {
+    if (newSeason === 'summer') {
+      setDirection('left');
+    } else {
+      setDirection('right');
+    }
+    setSeason(newSeason);
+  };
 
   return (
     <section id="experience" className="experience-section">
@@ -59,11 +69,11 @@ function Experience() {
                 {exp.company === 'KORE Wireless' ? (
                   <SwitchTransition mode="out-in">
                     <CSSTransition
-                      key={koreSeason}
+                      key={season}
                       addEndListener={(node, done) =>
                         node.addEventListener("transitionend", done, false)
                       }
-                      classNames="slide"
+                      classNames={`slide-${direction}`}
                     >
                       <p>{exp.timeline}</p>
                     </CSSTransition>
@@ -76,14 +86,14 @@ function Experience() {
                 {exp.company === 'KORE Wireless' && (
                   <div className="toggle-button-group">
                     <button
-                      className={`season-button ${koreSeason === 'spring' ? 'active' : ''}`}
-                      onClick={() => setKoreSeason('spring')}
+                      className={`season-button ${season === 'spring' ? 'active' : ''}`}
+                      onClick={() => handleSeasonChange('spring')}
                     >
                       Spring
                     </button>
                     <button
-                      className={`season-button ${koreSeason === 'summer' ? 'active' : ''}`}
-                      onClick={() => setKoreSeason('summer')}
+                      className={`season-button ${season === 'summer' ? 'active' : ''}`}
+                      onClick={() => handleSeasonChange('summer')}
                     >
                       Summer
                     </button>
@@ -95,7 +105,7 @@ function Experience() {
               {exp.company === 'KORE Wireless' ? (
                 <SwitchTransition mode="out-in">
                   <CSSTransition
-                    key={koreSeason}
+                    key={season}
                     addEndListener={(node, done) =>
                       node.addEventListener("transitionend", done, false)
                     }
