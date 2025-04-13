@@ -6,6 +6,7 @@ import '../styles/moreProjects.css';
 import ai_panel from '../assets/ai_panel.png';
 import foody from '../assets/foody.png';
 import moolah from '../assets/moolah.png'
+import burgertype from '../assets/burgertype.png'
 
 function MoreProjects({ icons }) {
   const { FaGithub, FaLinkedin, FaEnvelope } = icons;
@@ -77,6 +78,13 @@ function MoreProjects({ icons }) {
   };
 
   const Projects = [
+    {
+      name: 'Burger Type',
+      description: 'A Tkinkter-based GUI engaging typing speed tester app, featuring real-time feedback, keyboard highlighting, and customizable modes including timed and word-based challenges',
+      logo: burgertype,
+      github: 'https://github.com/quangshuynh/burgertype',
+      techStack: ['Python', 'Tkinter', 'Pillow'],
+    },
     {
       name: 'Moolah',
       description: 'React-based income and salary calculator that allows users to estimate their earnings based on hourly wages, worked hours, and customizable date ranges. It supports multiple job entries, automatic salary breakdowns, and dark mode for a user-friendly experience',
