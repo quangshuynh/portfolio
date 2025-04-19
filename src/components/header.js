@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import emailjs from '@emailjs/browser';
 import '../styles/header.css';
+import useClickSound from '../hooks/useClickSound'
 
 function Header({ icons }) {
   const { FaGithub, FaLinkedin, FaEnvelope } = icons;
-
+  const { playOn, playOff, swoosh } = useClickSound();
   const [showModal, setShowModal] = useState(false);
-
   const [formData, setFormData] = useState({name: '', email: '', subject: '', message: '',});
   const [toast, setToast] = useState({ visible: false, message: '', type: '', });
 
@@ -24,10 +24,12 @@ function Header({ icons }) {
 
   const handleOpenModal = (e) => {
     e.preventDefault();
+    playOn()
     setShowModal(true);
   };
 
   const handleCloseModal = () => {
+    playOff()
     setShowModal(false);
   };
 
@@ -41,6 +43,7 @@ function Header({ icons }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    swoosh();
     const templateParams = {
       name: formData.name,
       email: formData.email,
@@ -73,14 +76,14 @@ function Header({ icons }) {
         I&apos;m <span className="highlight">Quang Huynh</span>, a creative software
         engineer driven by impactful solutions
       </h2>
-      <a href="Quang_Huynh_Resume.pdf" target="_blank" rel="noopener noreferrer">
+      <a href="Quang_Huynh_Resume.pdf" target="_blank" rel="noopener noreferrer" onClick={() => { playOn(); }}>
         <button className="cv-button">Download CV</button>
       </a>
       <div className="social-icons">
-        <a href="https://linkedin.com/in/quangs" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+        <a href="https://linkedin.com/in/quangs" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" onClick={() => { playOn(); }}>
           <FaLinkedin className="icon linkedin" />
         </a>
-        <a href="https://github.com/quangshuynh" target="_blank" rel="noopener noreferrer" aria-label="GitHub" >
+        <a href="https://github.com/quangshuynh" target="_blank" rel="noopener noreferrer" aria-label="GitHub" onClick={() => { playOn(); }}>
           <FaGithub className="icon github" />
         </a>
         <a href="/#" aria-label="Email" onClick={handleOpenModal}>
