@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import emailjs from '@emailjs/browser';
 import '../styles/footer.css';
+import useClickSound from '../hooks/useClickSound';
 
 function Footer({ icons }) {
   const { FaGithub, FaLinkedin, FaEnvelope } = icons;
-
   const [showModal, setShowModal] = useState(false);
-  
   const [formData, setFormData] = useState({name: '', email: '', subject: '', message: '',});
   const [toast, setToast] = useState({ visible: false, message: '', type: '', });
+  const { playOn, playOff, swoosh } = useClickSound();
 
   const serviceId = process.env.REACT_APP_CONTACT_FORM_EMAILJS_SERVICE_ID;
   const templateId = process.env.REACT_APP_CONTACT_FORM_EMAILJS_TEMPLATE;
@@ -22,11 +22,13 @@ function Footer({ icons }) {
   };
 
   const handleOpenModal = (e) => {
+    playOn();
     e.preventDefault();
     setShowModal(true);
   };
 
   const handleCloseModal = () => {
+    playOff();
     setShowModal(false);
   };
 
@@ -39,6 +41,7 @@ function Footer({ icons }) {
   };
 
   const handleSubmit = (e) => {
+    swoosh();
     e.preventDefault();
     const templateParams = {
       name: formData.name,
@@ -62,10 +65,10 @@ function Footer({ icons }) {
       <div className="footer-container">
         <p>© {new Date().getFullYear()} <strong>Quang Huynh</strong> | Built with ❤️ in React</p>
         <div className="footer-icons">
-          <a href="https://linkedin.com/in/quangs" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+          <a href="https://linkedin.com/in/quangs" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" onClick={playOn}>
             <FaLinkedin className="footer-icon linkedin" />
           </a>
-          <a href="https://github.com/quangshuynh" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+          <a href="https://github.com/quangshuynh" target="_blank" rel="noopener noreferrer" aria-label="GitHub" onClick={playOn}>
             <FaGithub className="footer-icon github" />
           </a>
           <a href="/#" aria-label="Email" onClick={handleOpenModal}>

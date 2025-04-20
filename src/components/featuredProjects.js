@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import '../styles/featuredProjects.css';
 import { FaGithub } from 'react-icons/fa'; 
 import { Link } from 'react-router-dom';
+import useClickSound from '../hooks/useClickSound';
 
 import ai_cook from '../assets/ai_cook.jpg';
 import car_price_prediction from '../assets/car_price_prediction.png';
@@ -20,6 +21,8 @@ function FeaturedProjects() {
   const closeModal = () => {
     setSelectedImage(null);
   };
+
+  const { playOn, playOff } = useClickSound();
 
   const projects = [
     {
@@ -76,14 +79,13 @@ function FeaturedProjects() {
               src={project.logo} 
               alt={`${project.name} logo`} 
               className="project-logo" 
-              onClick={() => handleImageClick(project.logo)}
-            />
+              onClick={() => {playOn(); handleImageClick(project.logo)}}/>
             <a
               href={project.github}
               target="_blank"
               rel="noopener noreferrer"
               className="github-link"
-            >
+              onClick={playOn}>
               <FaGithub className="github-icon" /> GitHub Repo
             </a>
             <div className="project-details">
@@ -100,16 +102,16 @@ function FeaturedProjects() {
       </div>
 
       {selectedImage && (
-        <div className="modal-overlay" onClick={closeModal}>
+        <div className="modal-overlay" onClick={() => {playOff(); closeModal();}}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <img src={selectedImage} alt="Enlarged project logo" className="modal-image" />
-            <button className="close-modal" onClick={closeModal}>&times;</button>
+            <button className="close-modal" onClick={() => {playOff(); closeModal();}}>&times;</button>
           </div>
         </div>
       )}
 
       <div className="view-more-container">
-        <Link to="/moreprojects" className="view-more-button">
+        <Link to="/moreprojects" className="view-more-button" onClick={playOn}>
           View more of my projects!
         </Link>
       </div>

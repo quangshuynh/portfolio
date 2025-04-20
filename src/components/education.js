@@ -1,8 +1,10 @@
 import React from 'react';
 import '../styles/education.css';
 import rit_logo from '../assets/rit-logo.png';
+import useClickSound from '../hooks/useClickSound';
 
 function Education() {
+  const { playOn } = useClickSound();
   const education = [
     {
       institution: 'Rochester Institute of Technology',
@@ -33,7 +35,7 @@ function Education() {
         {education.map((edu, index) => (
           <div key={index} className="education-card">
             <div className="card-header">
-            <a href={edu.url} target="_blank" rel="noopener noreferrer">
+            <a href={edu.url} target="_blank" rel="noopener noreferrer" onClick={playOn}>
               <img src={edu.logo} alt={`${edu.institution} logo`} className="institution-logo" />
             </a>
             <div className="institution-info">

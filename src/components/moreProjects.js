@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import emailjs from '@emailjs/browser';
 import '../styles/moreProjects.css';
+import useClickSound from '../hooks/useClickSound';
 
 import ai_panel from '../assets/ai_panel.png';
 import foody from '../assets/foody.png';
@@ -10,14 +11,11 @@ import burgertype from '../assets/burgertype.png'
 
 function MoreProjects({ icons }) {
   const { FaGithub, FaLinkedin, FaEnvelope } = icons;
-
   const [selectedImage, setSelectedImage] = useState(null);
-
   const [showModal, setShowModal] = useState(false);
-  
   const [formData, setFormData] = useState({name: '', email: '', subject: '', message: '',});
   const [toast, setToast] = useState({ visible: false, message: '', type: '', });
-
+  const { playOn, playOff, swoosh } = useClickSound();
   const serviceId = process.env.REACT_APP_CONTACT_FORM_EMAILJS_SERVICE_ID;
   const templateId = process.env.REACT_APP_CONTACT_FORM_EMAILJS_TEMPLATE;
   const publicKey = process.env.REACT_APP_CONTACT_FORM_EMAILJS_PUBLIC_KEY;
@@ -30,11 +28,13 @@ function MoreProjects({ icons }) {
   };
 
   const handleOpenModal = (e) => {
+    playOn();
     e.preventDefault();
     setShowModal(true);
   };
 
   const handleCloseModal = () => {
+    playOff();
     setShowModal(false);
   };
 
@@ -47,6 +47,7 @@ function MoreProjects({ icons }) {
   };
 
   const handleSubmit = (e) => {
+    swoosh();
     e.preventDefault();
     const templateParams = {
       name: formData.name,
@@ -70,10 +71,12 @@ function MoreProjects({ icons }) {
   }, []);
 
   const handleImageClick = (image) => {
+    playOn();
     setSelectedImage(image);
   };
 
   const closeModal = () => {
+    playOff();
     setSelectedImage(null);
   };
 
@@ -176,16 +179,16 @@ function MoreProjects({ icons }) {
       )}
 
       <div className="back-button-container">
-        <Link to="/#projects" className="view-more-button back-button">← Back</Link>
+        <Link to="/#projects" className="view-more-button back-button" onClick={playOn}>← Back</Link>
       </div>
       <footer className="footer2">
       <div className="footer-container2">
         <p>© {new Date().getFullYear()} <strong>Quang Huynh</strong> | Built with ❤️ in React</p>
         <div className="footer-icons2">
-          <a href="https://linkedin.com/in/quangs" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+          <a href="https://linkedin.com/in/quangs" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" onClick={playOn}>
             <FaLinkedin className="footer-icon2 linkedin" />
           </a>
-          <a href="https://github.com/quangshuynh" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+          <a href="https://github.com/quangshuynh" target="_blank" rel="noopener noreferrer" aria-label="GitHub" onClick={playOn}>
             <FaGithub className="footer-icon2 github" />
           </a>
           <a href="/#" aria-label="Email" onClick={handleOpenModal}>

@@ -3,10 +3,12 @@ import { CSSTransition, SwitchTransition } from 'react-transition-group';
 import '../styles/experience.css';
 import kore_logo from '../assets/kore-logo.png';
 import people_inc_logo from '../assets/people-inc-logo.png';
+import useClickSound from '../hooks/useClickSound';
 
 function Experience() {
   const [season, setSeason] = useState('spring');
   const [direction, setDirection] = useState('right'); 
+  const { playOn } = useClickSound();
 
   const experiences = [
     {
@@ -58,11 +60,11 @@ function Experience() {
         {experiences.map((exp, index) => (
           <div key={index} className="experience-card">
             <div className="card-header">
-              <a href={exp.url} target="_blank" rel="noopener noreferrer">
+              <a href={exp.url} target="_blank" rel="noopener noreferrer" onClick={playOn}>
                 <img src={exp.logo} alt={`${exp.company} logo`} className="company-logo" />
               </a>
               <div className="experience-details">
-                <a href={exp.url} target="_blank" rel="noopener noreferrer">
+                <a href={exp.url} target="_blank" rel="noopener noreferrer" onClick={playOn}>
                   <h3>{exp.company}</h3>
                 </a>
                 <p><strong>{exp.role}</strong></p>
@@ -87,14 +89,12 @@ function Experience() {
                   <div className="toggle-button-group">
                     <button
                       className={`season-button ${season === 'spring' ? 'active' : ''}`}
-                      onClick={() => handleSeasonChange('spring')}
-                    >
+                      onClick={() => {playOn(); handleSeasonChange('spring')}}>
                       Spring
                     </button>
                     <button
                       className={`season-button ${season === 'summer' ? 'active' : ''}`}
-                      onClick={() => handleSeasonChange('summer')}
-                    >
+                      onClick={() => {playOn(); handleSeasonChange('summer')}}>
                       Summer
                     </button>
                   </div>
