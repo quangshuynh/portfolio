@@ -1,7 +1,10 @@
 import React from 'react';
 import '../styles/techstack.css';
+import useClickSound from '../hooks/useClickSound';
 
 function TechStack() {
+  const { playOn } = useClickSound();
+
   // https://svglogos.dev/ (for logos)
   const languages = [
     { name: 'Python', logo: 'https://cdn.svgporn.com/logos/python.svg', link: 'https://www.python.org' },
@@ -47,7 +50,7 @@ function TechStack() {
     items.map((item, index) => (
       <div key={index} className="tech-card">
         {item.link ? (
-          <a href={item.link} target="_blank" rel="noopener noreferrer">
+          <a href={item.link} target="_blank" rel="noopener noreferrer" onClick={playOn}>
             <img src={item.logo} alt={`${item.name} logo`} className="tech-logo" />
           </a>
         ) : (
