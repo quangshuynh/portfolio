@@ -100,16 +100,16 @@ function Header({ icons }) {
             <h2>Contact Me</h2>
             <form className="contact-form" onSubmit={handleSubmit}>
             <label htmlFor="name">Name</label>
-              <input type="text" name="name" id="name" placeholder="Your name" value={formData.name} onChange={handleChange} required />
+              <input type="text" name="name" id="name" placeholder="Your name" value={formData.name} onChange={handleChange} required style={{ fontFamily: 'monospace'}}/>
 
               <label htmlFor="email">Email</label>
-              <input type="email" name="email" id="email" placeholder="your.email@example.com" value={formData.email} onChange={handleChange} required />
+              <input type="email" name="email" id="email" placeholder="your.email@example.com" value={formData.email} onChange={handleChange} required style={{ fontFamily: 'monospace'}}/>
 
               <label htmlFor="subject">Subject</label>
-              <input type="text" name="subject" id="subject" placeholder="What's this regarding?" value={formData.subject} onChange={handleChange} required />
+              <input type="text" name="subject" id="subject" placeholder="What's this regarding?" value={formData.subject} onChange={handleChange} required style={{ fontFamily: 'monospace'}}/>
 
               <label htmlFor="message">Message</label>
-              <textarea name="message" id="message" rows="5" placeholder="Your message here..." value={formData.message} onChange={handleChange} required ></textarea>
+              <textarea name="message" id="message" rows="5" placeholder="Your message here..." value={formData.message} onChange={handleChange} required style={{ fontFamily: 'monospace'}}></textarea>
 
               <button type="submit" className="send-button">Send Message</button>
             </form>
