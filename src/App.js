@@ -9,10 +9,13 @@ import FeaturedProjects from './components/featuredProjects';
 import MoreProjects from './components/moreProjects';
 import TechStack from './components/techstack';
 import Footer from './components/footer';
+import { SoundProvider } from './hooks/SoundProvider';
+import MuteButton from './components/muteButton';
 
 function Home() {
   return (
     <div className="App">
+      <MuteButton />
       <Header icons={{ FaGithub, FaLinkedin, FaEnvelope }}/>
       <div className="content">
         <Experience />
@@ -27,12 +30,14 @@ function Home() {
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/moreprojects" element={<MoreProjects icons={{ FaGithub, FaLinkedin, FaEnvelope }} />} />
-      </Routes>
-    </Router>
+    <SoundProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/moreprojects" element={<MoreProjects icons={{ FaGithub, FaLinkedin, FaEnvelope }} />} />
+        </Routes>
+      </Router>
+    </SoundProvider>
   );
 }
 
