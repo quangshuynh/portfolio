@@ -15,7 +15,6 @@ import MuteButton from './components/muteButton';
 function Home() {
   return (
     <div className="App">
-      <MuteButton />
       <Header icons={{ FaGithub, FaLinkedin, FaEnvelope }}/>
       <div className="content">
         <Experience />
@@ -32,6 +31,7 @@ function App() {
   return (
     <SoundProvider>
       <Router>
+      <MuteButton />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/moreprojects" element={<MoreProjects icons={{ FaGithub, FaLinkedin, FaEnvelope }} />} />
