@@ -13,7 +13,7 @@ function Experience() {
   const experiences = [
     {
       company: 'KORE Wireless',
-      role: 'Software Engineering Intern',
+      role: 'IoT Software Engineering Co-op',
       timeline: season === 'spring' ? 'Jan. 2025 - May 2025' : 'May 2025 - Aug. 2025',
       team: 'Enterprise Applications Team',
       logo: kore_logo,
