@@ -1,6 +1,6 @@
 import './App.css';
-import React from 'react';
-import { Route, HashRouter as Router, Routes } from "react-router-dom";
+import { React, useEffect } from 'react';
+import { useLocation, Route, HashRouter as Router, Routes } from "react-router-dom";
 import { FaGithub, FaLinkedin, FaEnvelope } from 'react-icons/fa';
 import Header from './components/header';
 import Experience from './components/experience';
@@ -13,6 +13,17 @@ import { SoundProvider } from './hooks/SoundProvider';
 import MuteButton from './components/muteButton';
 
 function Home() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if(location.state?.scrollTo === 'projects') {
+      const el = document.getElementById('projects');
+      if(el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [location.state]);
+
   return (
     <div className="App">
       <Header icons={{ FaGithub, FaLinkedin, FaEnvelope }}/>

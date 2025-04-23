@@ -179,7 +179,7 @@ function MoreProjects({ icons }) {
       )}
 
       <div className="back-button-container">
-        <Link to="/#projects" className="view-more-button back-button" onClick={playOn}>← Back</Link>
+        <Link to="/" state={{ scrollTo: 'projects' }} className="view-more-button back-button" onClick={playOn}>← Back</Link>
       </div>
       <footer className="footer2">
       <div className="footer-container2">
