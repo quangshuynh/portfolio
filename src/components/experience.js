@@ -8,7 +8,7 @@ import useClickSound from '../hooks/useClickSound';
 function Experience() {
   const [season, setSeason] = useState('spring');
   const [direction, setDirection] = useState('right'); 
-  const { playOn } = useClickSound();
+  const { playOn, hover } = useClickSound();
 
   const experiences = [
     {
@@ -113,7 +113,7 @@ function Experience() {
                   >
                     <ul className="about-list">
                       {exp.about.map((item, i) => (
-                        <li key={i}>{item}</li>
+                        <li key={i} onMouseEnter={hover}>{item}</li>
                       ))}
                     </ul>
                   </CSSTransition>
@@ -121,7 +121,7 @@ function Experience() {
               ) : (
                 <ul className="about-list">
                   {exp.about.map((item, i) => (
-                    <li key={i}>{item}</li>
+                    <li key={i} onMouseEnter={hover}>{item}</li>
                   ))}
                 </ul>
               )}

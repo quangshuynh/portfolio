@@ -22,7 +22,7 @@ function FeaturedProjects() {
     setSelectedImage(null);
   };
 
-  const { playOn, playOff } = useClickSound();
+  const { playOn, playOff, hover } = useClickSound();
 
   const projects = [
     {
@@ -75,25 +75,14 @@ function FeaturedProjects() {
       <div className="projects-container">
         {projects.map((project, index) => (
           <div key={index} className="project-card">
-            <img 
-              src={project.logo} 
-              alt={`${project.name} logo`} 
-              className="project-logo" 
-              onClick={() => {playOn(); handleImageClick(project.logo)}}/>
-            <a
-              href={project.github}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="github-link"
-              onClick={playOn}>
-              <FaGithub className="github-icon" /> GitHub Repo
-            </a>
+            <img src={project.logo} alt={`${project.name} logo`} className="project-logo" onClick={() => {playOn(); handleImageClick(project.logo)}}/>
+            <a href={project.github} target="_blank" rel="noopener noreferrer" className="github-link" onClick={playOn}> <FaGithub className="github-icon" /> GitHub Repo </a>
             <div className="project-details">
               <h3>{project.name}</h3>
               <p>{project.about}</p>
               <ul className="tech-stack">
                 {project.techStack.map((tech, idx) => (
-                  <li key={idx} className="tech-item">{tech}</li>
+                  <li key={idx} onMouseEnter={hover} className="tech-item">{tech}</li>
                 ))}
               </ul>
             </div>

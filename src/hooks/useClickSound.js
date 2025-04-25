@@ -3,6 +3,7 @@ import onMp3     from '../assets/sounds/on.mp3';
 import offMp3    from '../assets/sounds/off.mp3';
 import swooshMp3 from '../assets/sounds/swoosh.mp3';
 import unmuteMp3 from '../assets/sounds/unmute.mp3';
+import hoverMp3 from '../assets/sounds/hover.mp3'
 import { useSoundSettings } from './SoundProvider';
 
 export default function useClickSound() {
@@ -20,9 +21,13 @@ export default function useClickSound() {
     if (!muted) new Audio(swooshMp3).play();
   }, [muted]);
 
+  const hover = useCallback(() => {
+    if (!muted) new Audio(hoverMp3).play();
+  }, [muted]);
+
   const unmute = useCallback(() => {
     new Audio(unmuteMp3).play();
   }, []);
 
-  return { playOn, playOff, swoosh, unmute };
+  return { playOn, playOff, swoosh, hover, unmute };
 }

@@ -4,7 +4,7 @@ import rit_logo from '../assets/rit-logo.png';
 import useClickSound from '../hooks/useClickSound';
 
 function Education() {
-  const { playOn } = useClickSound();
+  const { playOn, hover } = useClickSound();
   const education = [
     {
       institution: 'Rochester Institute of Technology',
@@ -50,7 +50,7 @@ function Education() {
               <h4>Honors</h4>
               <ul>
                 {edu.honors.map((honor, i) => (
-                  <li key={i}>{honor}</li>
+                  <li key={i} onMouseEnter={hover}>{honor}</li>
                 ))}
               </ul>
             </div>
@@ -58,7 +58,7 @@ function Education() {
               <h4>Involvement</h4>
               <ul>
                 {edu.involvement.map((activity, i) => (
-                  <li key={i}>{activity}</li>
+                  <li key={i} onMouseEnter={hover}>{activity}</li>
                 ))}
               </ul>
             </div>
