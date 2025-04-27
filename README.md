@@ -2,8 +2,8 @@
 
 Welcome to the repository for my personal portfolio! This project showcases my skills, experience, and projects as a software engineer.
 
-![Portfolio Screenshot](https://i.imgur.com/geEn0ma.png) 
-(updated as of 04/17/2025)
+![Portfolio Screenshot](https://i.imgur.com/QHSO8td.png) 
+(updated as of 04/27/2025)
 
 ## ✨ Features
 
