@@ -21,7 +21,7 @@ function Experience() {
       about:
       season === 'spring'
           ? [
-              'Developed and maintained .NET UI features in a large legacy codebase to streamline order processing workflows for internal users',
+              'Developed and maintained .NET WPF UI features in a large legacy codebase to streamline order processing workflows for internal users using XAML & MVVM architecture',
               'Designed and optimized SQL stored procedures to enhance database performance and support backend operations',
               'Integrated and automated data workflows using Boomi in an Agile Scrum environment, improving operational efficiency and cross-system communication',
               'Created dynamic RDL reports to provide real-time business insights and support decision-making across departments',
