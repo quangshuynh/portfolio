@@ -27,7 +27,7 @@ function Experience() {
               'Created dynamic RDL reports to provide real-time business insights and support decision-making across departments',
             ]
           : [
-              'Software Engineer Intern offer for Summer 2025 rescinded because Rochester offices were closing. Unfortunate',
+              'Software Engineer co-op offer for Summer 2025 not able to be extended because Rochester, NY offices were closing',
             ],
     },
     {
