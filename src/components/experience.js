@@ -14,7 +14,7 @@ function Experience() {
     {
       company: 'KORE Wireless',
       role: 'IoT Software Engineering Co-op',
-      timeline: season === 'spring' ? 'Jan. 2025 - May 2025' : 'May 2025 - Aug. 2025',
+      timeline: season === 'spring' ? 'Jan. 2025 - May 2025' : 'Offer rescinded',
       team: 'Enterprise Applications Team',
       logo: kore_logo,
       url: 'https://www.korewireless.com/about-us',
