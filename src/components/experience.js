@@ -27,7 +27,7 @@ function Experience() {
               'Created dynamic RDL reports to provide real-time business insights and support decision-making across departments',
             ]
           : [
-              'Incoming Software Engineer Intern for Summer 2025',
+              'Software Engineer Intern offer for Summer 2025 rescinded because Rochester offices were closing. Unfortunate',
             ],
     },
     {
