@@ -33,7 +33,7 @@ function Experience() {
     {
       company: 'People Inc.',
       role: 'Self Determination Assistant',
-      timeline: 'Jul. 2024 - Present',
+      timeline: 'Jul. 2024 - Apr. 2025',
       url: 'https://www.people-inc.org/about/people-inc/',
       logo: people_inc_logo,
       about: [
