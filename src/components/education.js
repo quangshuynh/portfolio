@@ -15,8 +15,9 @@ function Education() {
       logo: rit_logo,
       honors: [
         'Presidential Scholarship Recipient',
-        'Richard T. Cheng Endowed Scholarship',
-        'Farash Foundation’s First in Family Scholar',
+        'Farash Foundation’s First in Family Scholar (2023)',
+        'Richard T. Cheng Endowed Scholarship Recipient (2024)',
+        'Patrick P. Lee Scholarship Recipient (2025)',
         'Dean’s List (Fall 2023 - 2025)'
       ],
       involvement: [
