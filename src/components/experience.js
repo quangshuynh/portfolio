@@ -29,7 +29,7 @@ function Experience() {
           : [
               <span key="kore-summer-note">
                 Software Engineer co-op accepted for Summer 2025 but not able to be extended because Rochester, NY offices are closing due to business reasons {' '}
-                <a href="https://www.rochesterfirst.com/news/business/local-business/kore-wireless-will-lay-off-pittsford-employees-by-july/" target="_blank" rel="noopener noreferrer">[Source]</a>
+                <a href="https://www.rochesterfirst.com/news/business/local-business/kore-wireless-will-lay-off-pittsford-employees-by-july/" target="_blank" rel="noopener noreferrer" onClick={playOn}>[Source]</a>
               </span>,
             ],
     },
