@@ -27,13 +27,16 @@ function Experience() {
               'Created dynamic RDL reports to provide real-time business insights and support decision-making across departments',
             ]
           : [
-              'Software Engineer co-op offer for Summer 2025 not able to be extended because Rochester, NY offices are closing due to business reasons',
+              <span key="kore-summer-note">
+                Software Engineer co-op accepted for Summer 2025 but not able to be extended because Rochester, NY offices are closing due to business reasons {' '}
+                <a href="https://www.rochesterfirst.com/news/business/local-business/kore-wireless-will-lay-off-pittsford-employees-by-july/" target="_blank" rel="noopener noreferrer">[Source]</a>
+              </span>,
             ],
     },
     {
       company: 'People Inc.',
       role: 'Self Determination Assistant',
-      timeline: 'Jul. 2024 - Apr. 2025',
+      timeline: 'Jul. 2024 - Present',
       url: 'https://www.people-inc.org/about/people-inc/',
       logo: people_inc_logo,
       about: [
