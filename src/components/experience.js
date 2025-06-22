@@ -33,18 +33,18 @@ function Experience() {
               </span>,
             ],
     },
-    {
-      company: 'People Inc.',
-      role: 'Self Determination Assistant',
-      timeline: 'Jul. 2024 - Apr. 2025',
-      url: 'https://www.people-inc.org/about/people-inc/',
-      logo: people_inc_logo,
-      about: [
-        'Used service plans to assist mentally-disabled individuals with daily tasks, shown by progress toward personal goals',
-        'Managed budgeting, transportation, and care tasks, ensuring high accuracy and satisfaction',
-        'Documented improvements and maintained detailed records to ensure data accuracy and regulatory compliance',
-      ],
-    },
+    // {
+    //   company: 'People Inc.',
+    //   role: 'Self Determination Assistant',
+    //   timeline: 'Jul. 2024 - Apr. 2025',
+    //   url: 'https://www.people-inc.org/about/people-inc/',
+    //   logo: people_inc_logo,
+    //   about: [
+    //     'Used service plans to assist mentally-disabled individuals with daily tasks, shown by progress toward personal goals',
+    //     'Managed budgeting, transportation, and care tasks, ensuring high accuracy and satisfaction',
+    //     'Documented improvements and maintained detailed records to ensure data accuracy and regulatory compliance',
+    //   ],
+    // },
   ];
 
   const handleSeasonChange = (newSeason) => {
