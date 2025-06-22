@@ -6,7 +6,6 @@ Welcome to the repository for my personal portfolio! This project showcases my s
 (updated as of 04/27/2025)
 
 ## ✨ Features
-
 - 💼 **Experience**: Learn about my professional journey.
 - 🎓 **Education**: See my academic background.
 - 🛠️ **Projects**: Discover my favorite work and contributions.
