@@ -10,7 +10,7 @@ function Education() {
       institution: 'Rochester Institute of Technology',
       degree: 'Accelerated B.S./M.S. in Computer Science',
       timeline: 'Expected Dec. 2027',
-      gpa: '3.63 / 4.00',
+      gpa: '3.68 / 4.00',
       url: 'https://www.rit.edu',
       logo: rit_logo,
       honors: [
