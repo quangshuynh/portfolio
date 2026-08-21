@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
-import foodyImage from '../assets/foody.png';
+import foodyImage from '../assets/foody-vert.png';
 import foodyLogo from '../assets/foody-logo.png';
 import dashboardImage from '../assets/business-data-dashboard.png';
 import steamLogo from '../assets/Steam-icon-logo.svg';
+import steamResults from '../assets/steam-value-lookup-vert.png';
 
 const projects = [
   {
@@ -18,9 +19,9 @@ const projects = [
   {
     name: 'Steam Value Lookup',
     label: 'Backend & API integration',
-    problem: 'Estimating a game library’s value requires combining account data with many separate pricing requests from an external service.',
-    built: 'A Flask application that analyzes Steam libraries, manages application data with SQLAlchemy, and uses ThreadPoolExecutor to make concurrent Steam Web API pricing requests before calculating sortable game and aggregate library metrics.',
-    engineering: ['Python', 'Flask', 'SQLAlchemy', 'Steam Web API', 'Concurrency'],
+    problem: 'Estimating a Steam account’s value requires combining library, achievement, Store pricing, and inventory data from multiple APIs while handling rate limits, private profiles, missing prices, and partial responses.',
+    built: 'A Flask application that analyzes public Steam libraries and estimates their current game and inventory value. It coordinates concurrent API requests, caches Store prices, retries transient failures, classifies provider errors, and presents sortable per-game results with aggregate playtime, achievement, and valuation metrics.',
+    engineering: ['Python', 'Flask', 'SQLAlchemy', 'Steam Web API', 'Concurrency', 'Caching', 'Error handling', 'Unit testing'],
     github: 'https://github.com/quangshuynh/steam-value-lookup',
     visual: 'steam',
   },
@@ -70,12 +71,37 @@ function FoodyGallery() {
         {slide === 'logo' ? (
           <img className="foody-logo" src={foodyLogo} alt="Foody project logo" loading="lazy" />
         ) : (
-          <img src={foodyImage} alt="Foody restaurant discovery and tracking dashboard" loading="lazy" />
+          <img className="vertical-project-shot" src={foodyImage} alt="Foody restaurant discovery and tracking homepage" loading="lazy" />
         )}
       </div>
       <div className="gallery-controls" aria-label="Foody gallery">
         <button type="button" aria-pressed={slide === 'logo'} onClick={() => setSlide('logo')}>Logo</button>
-        <button type="button" aria-pressed={slide === 'dashboard'} onClick={() => setSlide('dashboard')}>Dashboard</button>
+        <button type="button" aria-pressed={slide === 'homepage'} onClick={() => setSlide('homepage')}>Homepage</button>
+      </div>
+    </div>
+  );
+}
+
+function SteamGallery({ name }) {
+  const [slide, setSlide] = useState('value');
+
+  return (
+    <div className="project-visual steam gallery">
+      <div className="gallery-stage">
+        {slide === 'value' ? (
+          <>
+            <img className="steam-corner-logo" src={steamLogo} alt="" aria-hidden="true" />
+            <div className="steam-mark" aria-label={`${name} library value graphic`}>
+              <div><strong>∑</strong><span>Library value</span></div>
+            </div>
+          </>
+        ) : (
+          <img className="vertical-project-shot" src={steamResults} alt="Steam Value Lookup results showing library totals, achievements, game values, and sortable game data" loading="lazy" />
+        )}
+      </div>
+      <div className="gallery-controls" aria-label="Steam Value Lookup gallery">
+        <button type="button" aria-pressed={slide === 'value'} onClick={() => setSlide('value')}>Library value</button>
+        <button type="button" aria-pressed={slide === 'results'} onClick={() => setSlide('results')}>Results</button>
       </div>
     </div>
   );
@@ -88,14 +114,7 @@ function ProjectVisual({ type, name }) {
     );
   }
   if (type === 'steam') {
-    return (
-      <div className="project-visual steam">
-        <img className="steam-corner-logo" src={steamLogo} alt="" aria-hidden="true" />
-        <div className="steam-mark" aria-label={`${name} project graphic`}>
-          <div><strong>∑</strong><span>Library value</span></div>
-        </div>
-      </div>
-    );
+    return <SteamGallery name={name} />;
   }
   return <FoodyGallery />;
 }
