@@ -1,54 +1,49 @@
+import { useEffect, useState } from 'react';
 import './App.css';
-import { React, useEffect } from 'react';
-import { useLocation, Route, HashRouter as Router, Routes } from "react-router-dom";
-import { FaGithub, FaLinkedin, FaEnvelope } from 'react-icons/fa';
+import { FaMoon, FaSun } from 'react-icons/fa';
 import Header from './components/header';
 import Experience from './components/experience';
-import Education from './components/education';
 import FeaturedProjects from './components/featuredProjects';
-import MoreProjects from './components/moreProjects';
 import TechStack from './components/techstack';
+import MoreProjects from './components/moreProjects';
+import Education from './components/education';
 import Footer from './components/footer';
-import { SoundProvider } from './hooks/SoundProvider';
-import MuteButton from './components/muteButton';
-
-function Home() {
-  const location = useLocation();
-
-  useEffect(() => {
-    if(location.state?.scrollTo === 'projects') {
-      const el = document.getElementById('projects');
-      if(el) {
-        el.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  }, [location.state]);
-
-  return (
-    <div className="App">
-      <Header icons={{ FaGithub, FaLinkedin, FaEnvelope }}/>
-      <div className="content">
-        <Experience />
-        <Education />
-        <FeaturedProjects />
-        <TechStack />
-      </div>
-      <Footer icons={{ FaGithub, FaLinkedin, FaEnvelope }} />
-    </div>
-  );
-}
 
 function App() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('portfolio-theme') || 'dark');
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('portfolio-theme', theme);
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    themeColor?.setAttribute('content', theme === 'dark' ? '#0e1512' : '#f6f4ee');
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((current) => current === 'dark' ? 'light' : 'dark');
+
   return (
-    <SoundProvider>
-      <Router>
-      <MuteButton />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/moreprojects" element={<MoreProjects icons={{ FaGithub, FaLinkedin, FaEnvelope }} />} />
-        </Routes>
-      </Router>
-    </SoundProvider>
+    <div className="app-shell">
+      <a className="skip-link" href="#main-content">Skip to main content</a>
+      <Header />
+      <main id="main-content">
+        <Experience />
+        <FeaturedProjects />
+        <TechStack />
+        <MoreProjects />
+        <Education />
+      </main>
+      <Footer />
+      <button
+        className="theme-toggle"
+        type="button"
+        onClick={toggleTheme}
+        aria-pressed={theme === 'light'}
+        aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+      >
+        {theme === 'dark' ? <FaSun aria-hidden="true" /> : <FaMoon aria-hidden="true" />}
+        <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+      </button>
+    </div>
   );
 }
 

@@ -1,73 +1,40 @@
 import React from 'react';
-import '../styles/education.css';
-import rit_logo from '../assets/rit-logo.png';
-import useClickSound from '../hooks/useClickSound';
+import ritLogo from '../assets/rit-logo.png';
+
+const honors = [
+  'Farash Foundation First in Family Scholar',
+  'Richard T. Cheng Endowed Scholarship',
+  'Patrick P. Lee Scholarship',
+  'RIT Presidential Scholar',
+  "Dean's List",
+];
 
 function Education() {
-  const { playOn } = useClickSound();
-  const education = [
-    {
-      institution: 'Rochester Institute of Technology',
-      degree: 'Accelerated B.S./M.S. in Computer Science',
-      timeline: 'Expected Dec. 2027',
-      gpa: '3.68 / 4.00',
-      url: 'https://www.rit.edu',
-      logo: rit_logo,
-      honors: [
-        'Presidential Scholarship Recipient',
-        'Farash Foundation’s First in Family Scholar (2023)',
-        'Richard T. Cheng Endowed Scholarship Recipient (2024)',
-        'Patrick P. Lee Scholarship Recipient (2025)',
-        'Dean’s List (Fall 2023 - 2025)'
-      ],
-      involvement: [
-        'RIT AI Club',
-        'Computing Organization for Multicultural Students',
-        'Vietnamese Student Association',
-        'RIT Car Club'
-      ],
-    },
-  ];
-
   return (
-    <section id="education" className="education-section">
-      <h2>Education</h2>
-      <div className="education-container">
-        {education.map((edu, index) => (
-          <div key={index} className="education-card">
-            <div className="card-header">
-            <a href={edu.url} target="_blank" rel="noopener noreferrer" onClick={playOn}>
-              <img src={edu.logo} alt={`${edu.institution} logo`} className="institution-logo" />
-            </a>
-            <div className="institution-info">
-              <h3>{edu.institution}</h3>
-              <p><strong>{edu.degree}</strong></p>
-              <p>{edu.timeline}</p>
-              <p className="gpa">GPA: {edu.gpa}</p> 
-            </div>
-          </div>
-          <div className="education-subsections">
-            <div className="honors">
-              <h4>Honors</h4>
-              <ul>
-                {edu.honors.map((honor, i) => (
-                  <li key={i}>{honor}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="activities">
-              <h4>Involvement</h4>
-              <ul>
-                {edu.involvement.map((activity, i) => (
-                  <li key={i}>{activity}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
+    <section className="page-section" id="about" aria-labelledby="about-title">
+      <div className="section-inner">
+        <div className="section-heading">
+          <div><p className="eyebrow">Background</p><h2 id="about-title">About & education</h2></div>
+          <p>I enjoy the parts of software engineering where application logic, data, APIs, and real operational problems meet.</p>
         </div>
-      ))}
-    </div>
-  </section>
+        <div className="about-grid">
+          <div className="about-card">
+            <p>I’m a software developer based in Rochester, NY.</p>
+            <p>I gravitate toward practical projects: automation pipelines, internal tools, API integrations, databases, and software that turns messy inputs into something useful.</p>
+          </div>
+          <article className="education-card">
+            <div className="education-title">
+              <img className="institution-logo" src={ritLogo} alt="Rochester Institute of Technology" loading="lazy" />
+              <div><h3>Rochester Institute of Technology</h3><p className="degree">BS/MS Computer Science - Accelerated Program</p></div>
+            </div>
+            <div className="education-meta"><span>Expected graduation: 2028</span><span>GPA: 3.68 / 4.00</span></div>
+            <ul className="honors-list" aria-label="Academic honors">
+              {honors.map((honor) => <li key={honor}>{honor}</li>)}
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
   );
 }
 

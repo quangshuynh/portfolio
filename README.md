@@ -1,13 +1,36 @@
-# Quang Huynh's Portfolio 🚀
+# Quang Huynh — Software Engineering Portfolio
 
-Welcome to the repository for my personal portfolio! This project showcases my skills, experience, and projects as a software engineer
+Personal portfolio highlighting professional software engineering experience, backend and data-oriented projects, technical breadth, and education.
 
-![Portfolio Screenshot](https://i.imgur.com/QHSO8td.png) 
-(updated as of 04/27/2025)
+**Live site:** [quangshuynh.github.io/portfolio](https://quangshuynh.github.io/portfolio/)
 
-## ✨ Features
-- 💼 **Experience**: Learn about my professional journey.
-- 🎓 **Education**: See my academic background.
-- 🛠️ **Projects**: Discover my favorite work and contributions.
-- ⚙️ **Tech Stack**: Explore the tools and technologies I use.
-- 🌐 **Social Links**: Connect with me on LinkedIn, GitHub, or via email.
+## Stack
+
+- React 18 and Create React App
+- Plain CSS with responsive layouts and reduced-motion support
+- React Icons
+- GitHub Pages deployment through `gh-pages`
+
+## Local development
+
+```bash
+npm install
+npm start
+```
+
+Run the test suite or create a production build:
+
+```bash
+npm test -- --watchAll=false
+npm run build
+```
+
+## Deployment
+
+The `homepage` field in `package.json` configures production assets for the `/portfolio/` subpath. To build and publish the `build` directory to GitHub Pages:
+
+```bash
+npm run deploy
+```
+
+Portfolio content is curated locally in `src/components`, so featured work remains available without relying on the GitHub API at runtime.
