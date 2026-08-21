@@ -9,6 +9,10 @@ import MoreProjects from './components/moreProjects';
 import Education from './components/education';
 import Footer from './components/footer';
 
+/**
+ * renders the portfolio application
+ * :returns: portfolio application markup
+ */
 function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('portfolio-theme') || 'dark');
 
@@ -19,6 +23,10 @@ function App() {
     themeColor?.setAttribute('content', theme === 'dark' ? '#0e1512' : '#f6f4ee');
   }, [theme]);
 
+  /**
+   * toggles the active color theme
+   * :returns: no return value
+   */
   const toggleTheme = () => setTheme((current) => current === 'dark' ? 'light' : 'dark');
 
   return (

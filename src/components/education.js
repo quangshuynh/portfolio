@@ -9,6 +9,10 @@ const honors = [
   "Dean's List",
 ];
 
+/**
+ * renders the about and education section
+ * :returns: about and education markup
+ */
 function Education() {
   return (
     <section className="page-section" id="about" aria-labelledby="about-title">

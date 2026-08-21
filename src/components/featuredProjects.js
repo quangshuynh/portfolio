@@ -36,6 +36,10 @@ const projects = [
   },
 ];
 
+/**
+ * renders the business data automation image gallery
+ * :returns: business data automation gallery markup
+ */
 function BusinessGallery() {
   const [slide, setSlide] = useState('architecture');
 
@@ -62,6 +66,10 @@ function BusinessGallery() {
   );
 }
 
+/**
+ * renders the foody image gallery
+ * :returns: foody gallery markup
+ */
 function FoodyGallery() {
   const [slide, setSlide] = useState('logo');
 
@@ -82,6 +90,11 @@ function FoodyGallery() {
   );
 }
 
+/**
+ * renders the steam value lookup image gallery
+ * :param name: project name used for accessible image text
+ * :returns: steam value lookup gallery markup
+ */
 function SteamGallery({ name }) {
   const [slide, setSlide] = useState('value');
 
@@ -107,6 +120,12 @@ function SteamGallery({ name }) {
   );
 }
 
+/**
+ * selects and renders a project visual
+ * :param type: project visual type
+ * :param name: project name used for accessible image text
+ * :returns: selected project visual markup
+ */
 function ProjectVisual({ type, name }) {
   if (type === 'dashboard') {
     return (
@@ -119,6 +138,10 @@ function ProjectVisual({ type, name }) {
   return <FoodyGallery />;
 }
 
+/**
+ * renders the featured project collection
+ * :returns: featured projects section markup
+ */
 function FeaturedProjects() {
   return (
     <section className="page-section" id="projects" aria-labelledby="projects-title">

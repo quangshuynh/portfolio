@@ -7,6 +7,10 @@ const groups = [
   ['Tools & practices', 'Git · Docker · GitHub Actions · pytest · Linux · REST APIs · XAML · MVVM · Boomi · SSMS'],
 ];
 
+/**
+ * renders the curated engineering skill groups
+ * :returns: skills section markup
+ */
 function TechStack() {
   return (
     <section className="page-section" id="skills" aria-labelledby="skills-title">
