@@ -26,7 +26,7 @@ function Experience() {
           </div>
           <ul className="detail-list">
             <li>Maintained and enhanced UI functionality in a large-scale .NET/WPF application using C#, XAML, and MVVM architecture.</li>
-            <li>Developed and optimized SQL stored procedures supporting backend operations and database performance.</li>
+            <li>Developed and maintained SQL stored procedures supporting backend and database operations.</li>
             <li>Automated enterprise data workflows with Boomi and collaborated within an Agile/Scrum software engineering team.</li>
           </ul>
         </article>
