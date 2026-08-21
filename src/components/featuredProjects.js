@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
 import foodyImage from '../assets/foody.png';
+import dashboardImage from '../assets/business-data-dashboard.png';
+import steamLogo from '../assets/Steam-icon-logo.svg';
 
 const projects = [
   {
@@ -10,7 +12,7 @@ const projects = [
     built: 'A Python pipeline that validates datasets, quarantines bad records, reconciles exact-cent transactions, optionally persists validated data to PostgreSQL, and exposes shared logic through FastAPI and a lightweight dashboard.',
     engineering: ['Python', 'FastAPI', 'PostgreSQL', 'SQLAlchemy', 'pandas', 'Docker', 'pytest · 52 tests', 'GitHub Actions'],
     github: 'https://github.com/quangshuynh/business-data-automation',
-    visual: 'pipeline',
+    visual: 'dashboard',
   },
   {
     name: 'Steam Value Lookup',
@@ -32,22 +34,47 @@ const projects = [
   },
 ];
 
-function ProjectVisual({ type, name }) {
-  if (type === 'pipeline') {
-    return (
-      <div className="project-visual" role="img" aria-label="Business data pipeline from CSV inputs through validation and reconciliation to reports, PostgreSQL, FastAPI, and a dashboard">
-        <div className="pipeline" aria-hidden="true">
-          <div className="pipeline-row"><span>Customer CSV</span><span>Order CSV</span><span>Payment CSV</span></div>
-          <div className="pipeline-arrow">↓</div>
-          <div className="pipeline-row"><span>Validate</span><span>Quarantine</span><span>Reconcile</span></div>
-          <div className="pipeline-arrow">↓</div>
-          <div className="pipeline-row"><span>CSV Reports</span><span>PostgreSQL</span><span>API + Dashboard</span></div>
-        </div>
+function BusinessGallery() {
+  const [slide, setSlide] = useState('architecture');
+
+  return (
+    <div className="project-visual dashboard gallery">
+      <div className="gallery-stage">
+        {slide === 'architecture' ? (
+          <div className="pipeline" role="img" aria-label="Business data pipeline from CSV inputs through validation and reconciliation to reports, PostgreSQL, FastAPI, and a dashboard">
+            <div className="pipeline-row"><span>Customer CSV</span><span>Order CSV</span><span>Payment CSV</span></div>
+            <div className="pipeline-arrow" aria-hidden="true">↓</div>
+            <div className="pipeline-row"><span>Validate</span><span>Quarantine</span><span>Reconcile</span></div>
+            <div className="pipeline-arrow" aria-hidden="true">↓</div>
+            <div className="pipeline-row"><span>CSV Reports</span><span>PostgreSQL</span><span>API + Dashboard</span></div>
+          </div>
+        ) : (
+          <img src={dashboardImage} alt="Business Data Automation reconciliation dashboard showing financial totals, payment statuses, and flagged discrepancies" loading="lazy" />
+        )}
       </div>
+      <div className="gallery-controls" aria-label="Business Data Automation gallery">
+        <button type="button" aria-pressed={slide === 'architecture'} onClick={() => setSlide('architecture')}>Architecture</button>
+        <button type="button" aria-pressed={slide === 'dashboard'} onClick={() => setSlide('dashboard')}>Dashboard</button>
+      </div>
+    </div>
+  );
+}
+
+function ProjectVisual({ type, name }) {
+  if (type === 'dashboard') {
+    return (
+      <BusinessGallery />
     );
   }
   if (type === 'steam') {
-    return <div className="project-visual steam"><div className="steam-mark" aria-label={`${name} project graphic`}><div><strong>∑</strong><span>Library value</span></div></div></div>;
+    return (
+      <div className="project-visual steam">
+        <img className="steam-corner-logo" src={steamLogo} alt="" aria-hidden="true" />
+        <div className="steam-mark" aria-label={`${name} project graphic`}>
+          <div><strong>∑</strong><span>Library value</span></div>
+        </div>
+      </div>
+    );
   }
   return <div className="project-visual foody"><img src={foodyImage} alt="Foody restaurant tracking application interface" loading="lazy" /></div>;
 }
@@ -58,7 +85,7 @@ function FeaturedProjects() {
       <div className="section-inner">
         <div className="section-heading">
           <div><p className="eyebrow">Selected work</p><h2 id="projects-title">Featured projects</h2></div>
-          <p>Substantial projects selected for the engineering decisions behind them—not just the technologies used.</p>
+          <p>Substantial projects selected for the engineering decisions behind them and not just the technologies used.</p>
         </div>
         <div className="featured-list">
           {projects.map((project, index) => (
