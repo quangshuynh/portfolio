@@ -9,10 +9,10 @@ const projects = [
     github: 'https://github.com/quangshuynh/salonflow',
   },
   {
-    name: 'GitHub to Markdown',
-    description: 'Browser-based developer tool that exports public repository data to Markdown and audits repository names and descriptions with actionable suggestions.',
-    technologies: ['JavaScript', 'GitHub API', 'Developer tooling'],
-    github: 'https://github.com/quangshuynh/github-to-markdown',
+  name: 'GitProfileLens',
+  description: 'Browser-based GitHub profile analyzer that fetches public and pinned repositories, audits project metadata for presentation and discoverability issues, generates actionable recommendations, and exports repository data to Markdown.',
+  technologies: ['JavaScript', 'GitHub API', 'Developer Tooling'],
+  github: 'https://github.com/quangshuynh/gitprofilelens',
   },
   {
     name: 'AI Cooking Assistant',
