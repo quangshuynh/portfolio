@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/portfolio/static/css/main.54190630.css",
-    "main.js": "/portfolio/static/js/main.e61827ed.js",
+    "main.js": "/portfolio/static/js/main.a6db614b.js",
     "static/media/business-data-dashboard.png": "/portfolio/static/media/business-data-dashboard.7779458d3aa2d45ae38e.png",
     "static/media/rit-logo.png": "/portfolio/static/media/rit-logo.5aba2786533ba2f5972e.png",
     "static/media/chi-the-cat.png": "/portfolio/static/media/chi-the-cat.0a25a3abcbc2d76e79d6.png",
@@ -14,10 +14,10 @@
     "static/media/Steam-icon-logo.svg": "/portfolio/static/media/Steam-icon-logo.e715b67e134e835ca5983667aed34fce.svg",
     "index.html": "/portfolio/index.html",
     "main.54190630.css.map": "/portfolio/static/css/main.54190630.css.map",
-    "main.e61827ed.js.map": "/portfolio/static/js/main.e61827ed.js.map"
+    "main.a6db614b.js.map": "/portfolio/static/js/main.a6db614b.js.map"
   },
   "entrypoints": [
     "static/css/main.54190630.css",
-    "static/js/main.e61827ed.js"
+    "static/js/main.a6db614b.js"
   ]
 }
