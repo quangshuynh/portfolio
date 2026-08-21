@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
 import foodyImage from '../assets/foody.png';
+import foodyLogo from '../assets/foody-logo.png';
 import dashboardImage from '../assets/business-data-dashboard.png';
 import steamLogo from '../assets/Steam-icon-logo.svg';
 
@@ -60,6 +61,26 @@ function BusinessGallery() {
   );
 }
 
+function FoodyGallery() {
+  const [slide, setSlide] = useState('logo');
+
+  return (
+    <div className="project-visual foody gallery">
+      <div className="gallery-stage">
+        {slide === 'logo' ? (
+          <img className="foody-logo" src={foodyLogo} alt="Foody project logo" loading="lazy" />
+        ) : (
+          <img src={foodyImage} alt="Foody restaurant discovery and tracking dashboard" loading="lazy" />
+        )}
+      </div>
+      <div className="gallery-controls" aria-label="Foody gallery">
+        <button type="button" aria-pressed={slide === 'logo'} onClick={() => setSlide('logo')}>Logo</button>
+        <button type="button" aria-pressed={slide === 'dashboard'} onClick={() => setSlide('dashboard')}>Dashboard</button>
+      </div>
+    </div>
+  );
+}
+
 function ProjectVisual({ type, name }) {
   if (type === 'dashboard') {
     return (
@@ -76,7 +97,7 @@ function ProjectVisual({ type, name }) {
       </div>
     );
   }
-  return <div className="project-visual foody"><img src={foodyImage} alt="Foody restaurant tracking application interface" loading="lazy" /></div>;
+  return <FoodyGallery />;
 }
 
 function FeaturedProjects() {

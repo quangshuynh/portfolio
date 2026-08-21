@@ -42,12 +42,14 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .featured-project { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); min-height: 430px; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); overflow: hidden; box-shadow: var(--shadow); }
 .featured-project:nth-child(even) .project-visual { order: 2; }
 .project-visual { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; padding: clamp(1.5rem, 4vw, 3.5rem); background: #173c31; color: white; }
-.project-visual.dashboard { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 0.9rem; padding: 1rem; background: #071712; }
-.project-visual.foody { padding: 1rem; background: #ede2d2; }
+.project-visual.gallery { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 0.9rem; padding: 1rem; }
+.project-visual.dashboard { background: #071712; }
+.project-visual.foody { background: #0b1417; }
 .project-visual.steam { background: #173349; }
 .project-visual img { width: 100%; max-height: 380px; object-fit: contain; border-radius: 0.65rem; box-shadow: 0 14px 35px rgba(0,0,0,.18); }
 .gallery-stage { display: grid; place-items: center; width: 100%; min-height: 330px; overflow: hidden; }
 .gallery-stage > img { max-height: none; }
+.gallery-stage > .foody-logo { box-shadow: none; }
 .gallery-controls { display: flex; justify-content: center; gap: 0.5rem; }
 .gallery-controls button { min-height: 2.35rem; padding: 0.45rem 0.75rem; border: 1px solid rgba(255,255,255,.24); border-radius: 999px; background: transparent; color: #c9d8d1; cursor: pointer; font-size: 0.78rem; font-weight: 750; }
 .gallery-controls button[aria-pressed='true'] { background: #edf4f0; color: #122019; border-color: #edf4f0; }
