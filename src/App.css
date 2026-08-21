@@ -50,6 +50,9 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .gallery-stage { display: grid; place-items: center; width: 100%; min-height: 330px; overflow: hidden; }
 .gallery-stage > img { max-height: none; }
 .gallery-stage > .foody-logo { box-shadow: none; }
+.foody .gallery-stage { min-height: 520px; }
+.gallery-stage > .vertical-project-shot { width: auto; height: auto; max-width: 100%; max-height: 520px; }
+.steam .gallery-stage > .vertical-project-shot { max-height: 410px; }
 .gallery-controls { display: flex; justify-content: center; gap: 0.5rem; }
 .gallery-controls button { min-height: 2.35rem; padding: 0.45rem 0.75rem; border: 1px solid rgba(255,255,255,.24); border-radius: 999px; background: transparent; color: #c9d8d1; cursor: pointer; font-size: 0.78rem; font-weight: 750; }
 .gallery-controls button[aria-pressed='true'] { background: #edf4f0; color: #122019; border-color: #edf4f0; }
@@ -57,10 +60,10 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .pipeline-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
 .pipeline span { padding: 0.8rem 0.65rem; border: 1px solid rgba(255,255,255,.24); border-radius: 0.5rem; background: rgba(255,255,255,.08); text-align: center; font-size: 0.78rem; font-weight: 750; }
 .pipeline-arrow { color: #9cccb5; text-align: center; font-size: 1.2rem; }
-.steam-mark { width: min(100%, 280px); aspect-ratio: 1; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.2); border-radius: 50%; background: radial-gradient(circle at 35% 30%, #2f6f91, #10283a 68%); font-family: Circular, sans-serif; text-align: center; }
-.steam-mark strong { display: block; font-size: 4rem; line-height: 1; }
+.steam-mark { width: min(100%, 320px); aspect-ratio: 1; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.2); border-radius: 50%; background: radial-gradient(circle at 35% 30%, #2f6f91, #10283a 68%); font-family: Circular, sans-serif; text-align: center; }
+.steam-mark strong { display: block; font-size: 4.5rem; line-height: 1; }
 .steam-mark span { display: block; margin-top: .5rem; color: #c8dce8; letter-spacing: .12em; text-transform: uppercase; font-size: .74rem; }
-.project-visual .steam-corner-logo { position: absolute; top: 1rem; right: 1rem; width: 54px; height: 54px; border-radius: 50%; box-shadow: 0 8px 20px rgba(0,0,0,.24); }
+.project-visual .steam-corner-logo { position: absolute; top: 1rem; right: 1rem; width: 68px; height: 68px; border-radius: 50%; box-shadow: 0 8px 20px rgba(0,0,0,.24); }
 .project-copy { display: flex; flex-direction: column; justify-content: center; padding: clamp(2rem, 5vw, 4rem); }
 .project-number { color: var(--warm); font-size: 0.76rem; font-weight: 850; letter-spacing: 0.12em; text-transform: uppercase; }
 .project-copy h3 { margin: 0.6rem 0 1.1rem; font-family: Circular, sans-serif; font-size: clamp(2rem, 4vw, 3.15rem); line-height: 1; letter-spacing: -0.04em; }
@@ -116,6 +119,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
   .skills-grid, .more-grid { grid-template-columns: 1fr; }
   .pipeline-row { grid-template-columns: 1fr; }
   .gallery-stage { min-height: 300px; }
+  .foody .gallery-stage { min-height: 420px; }
+  .gallery-stage > .vertical-project-shot { max-height: 420px; }
   .project-visual { min-height: 260px; }
   .hero-actions .button { flex: 1 1 auto; }
   .footer-inner { flex-direction: column; }
