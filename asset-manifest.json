@@ -1,34 +1,19 @@
 {
   "files": {
-    "main.css": "/portfolio/static/css/main.d265fd21.css",
-    "main.js": "/portfolio/static/js/main.63403f2b.js",
-    "static/js/453.1407b060.chunk.js": "/portfolio/static/js/453.1407b060.chunk.js",
-    "static/media/car_price_prediction.png": "/portfolio/static/media/car_price_prediction.6ac42caa6575584c86a6.png",
+    "main.css": "/portfolio/static/css/main.ce37b1a8.css",
+    "main.js": "/portfolio/static/js/main.e8958146.js",
     "static/media/foody.png": "/portfolio/static/media/foody.5eedcdb60dc087649210.png",
     "static/media/rit-logo.png": "/portfolio/static/media/rit-logo.5aba2786533ba2f5972e.png",
-    "static/media/ngram.png": "/portfolio/static/media/ngram.27d29b29c16f83874e77.png",
+    "static/media/chi-the-cat.png": "/portfolio/static/media/chi-the-cat.0a25a3abcbc2d76e79d6.png",
     "static/media/CircularSpotifyText-Bold.otf": "/portfolio/static/media/CircularSpotifyText-Bold.f8952626140be9495d1b.otf",
-    "static/media/astro_game.png": "/portfolio/static/media/astro_game.55fba2641c35068d9c82.png",
     "static/media/kore-logo.png": "/portfolio/static/media/kore-logo.4ae9f68ff303bf73f9d4.png",
-    "static/media/ai_cook.jpg": "/portfolio/static/media/ai_cook.c4a788f98fdbcf71a169.jpg",
-    "static/media/burgertype.png": "/portfolio/static/media/burgertype.70a8b4f5b89a41a0ca68.png",
-    "static/media/people-inc-logo.png": "/portfolio/static/media/people-inc-logo.3dccc07c883d7b28ff66.png",
-    "static/media/ai_panel.png": "/portfolio/static/media/ai_panel.375518b94b6ed2da39d4.png",
-    "static/media/moolah.png": "/portfolio/static/media/moolah.484fea840ecdf0402612.png",
-    "static/media/ray_trace_sim.png": "/portfolio/static/media/ray_trace_sim.a5624eea6d2247951725.png",
-    "static/media/swoosh.mp3": "/portfolio/static/media/swoosh.6966b855d0222ee30248.mp3",
-    "static/media/unmute.mp3": "/portfolio/static/media/unmute.08e6d1357d231cd670fb.mp3",
-    "static/media/off.mp3": "/portfolio/static/media/off.ef54ba0710f25276cff7.mp3",
-    "static/media/on.mp3": "/portfolio/static/media/on.033469a0509e728fbe7d.mp3",
+    "static/media/quang.jpg": "/portfolio/static/media/quang.5a1084d4a9c11a73b14d.jpg",
     "index.html": "/portfolio/index.html",
-    "static/media/sfx_off.webp": "/portfolio/static/media/sfx_off.f54dedb67e25d2537b17.webp",
-    "static/media/sfx_on.webp": "/portfolio/static/media/sfx_on.7195ff5330af0ef7b746.webp",
-    "main.d265fd21.css.map": "/portfolio/static/css/main.d265fd21.css.map",
-    "main.63403f2b.js.map": "/portfolio/static/js/main.63403f2b.js.map",
-    "453.1407b060.chunk.js.map": "/portfolio/static/js/453.1407b060.chunk.js.map"
+    "main.ce37b1a8.css.map": "/portfolio/static/css/main.ce37b1a8.css.map",
+    "main.e8958146.js.map": "/portfolio/static/js/main.e8958146.js.map"
   },
   "entrypoints": [
-    "static/css/main.d265fd21.css",
-    "static/js/main.63403f2b.js"
+    "static/css/main.ce37b1a8.css",
+    "static/js/main.e8958146.js"
   ]
 }
