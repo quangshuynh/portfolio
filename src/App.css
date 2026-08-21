@@ -19,6 +19,7 @@
 .hero::after { content: ''; position: absolute; width: 28rem; height: 28rem; top: -13rem; right: -10rem; border: 5rem solid var(--accent-soft); border-radius: 50%; opacity: 0.65; pointer-events: none; }
 .hero-inner { position: relative; z-index: 1; }
 .eyebrow { margin: 0 0 1.25rem; color: var(--accent); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+.hero-intro { margin: 0 0 0.8rem; color: var(--detail-text); font-size: clamp(1.05rem, 2vw, 1.3rem); font-weight: 750; }
 .hero h1 { max-width: 900px; margin: 0; font-family: Circular, sans-serif; font-size: clamp(3rem, 8vw, 6.6rem); line-height: 0.98; letter-spacing: -0.055em; }
 .hero-lede { max-width: 740px; margin: 1.8rem 0 0; color: var(--muted); font-size: clamp(1.08rem, 2vw, 1.35rem); line-height: 1.7; }
 .hero-meta { display: flex; flex-wrap: wrap; gap: 0.65rem 1.4rem; margin-top: 1.5rem; color: var(--muted); font-size: 0.92rem; font-weight: 650; }
@@ -53,6 +54,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 /* featured projects and galleries */
 .featured-list { display: grid; gap: 1.5rem; }
 .featured-project { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); min-height: 430px; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); overflow: hidden; box-shadow: var(--shadow); }
+.flagship-project { grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); min-height: 520px; border: 2px solid var(--accent); box-shadow: 0 22px 60px rgba(0, 0, 0, 0.28); }
 .featured-project:nth-child(even) .project-visual { order: 2; }
 .project-visual { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; padding: clamp(1.5rem, 4vw, 3.5rem); background: #173c31; color: white; }
 .project-visual.gallery { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 0.9rem; padding: 1rem; }
@@ -82,6 +84,12 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .project-copy h3 { margin: 0.6rem 0 1.1rem; font-family: Circular, sans-serif; font-size: clamp(2rem, 4vw, 3.15rem); line-height: 1; letter-spacing: -0.04em; }
 .project-copy p { margin: 0 0 1rem; color: var(--muted); line-height: 1.7; }
 .project-copy p strong { color: var(--ink); }
+.project-copy .project-purpose { color: var(--detail-text); font-size: 1.02rem; }
+.project-highlights { display: grid; gap: 0.75rem; margin: 0.4rem 0 1.35rem; padding: 0; list-style: none; }
+.project-highlights li { position: relative; padding-left: 1.3rem; color: var(--detail-text); font-size: 0.92rem; line-height: 1.55; }
+.project-highlights li::before { content: ''; position: absolute; top: 0.58rem; left: 0; width: 0.42rem; height: 0.42rem; border-radius: 50%; background: var(--accent); }
+.project-copy .project-stack { margin-bottom: 0; color: var(--tag-text); font-size: 0.82rem; line-height: 1.6; }
+.project-stack strong { margin-right: 0.4rem; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; }
 .tag-list { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.6rem 0 0; padding: 0; list-style: none; }
 .tag-list li { padding: 0.38rem 0.62rem; border: 1px solid var(--line); border-radius: 999px; color: var(--tag-text); background: var(--paper); font-size: 0.78rem; font-weight: 700; }
 
@@ -94,8 +102,10 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .more-card { display: flex; flex-direction: column; min-width: 0; transition: transform 160ms ease, border-color 160ms ease; }
 .more-card:hover { transform: translateY(-3px); border-color: #aeb9b2; }
 .more-card p { flex: 1; margin: 0; color: var(--muted); line-height: 1.65; }
+.more-card .more-highlight { flex: 0 0 auto; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--detail-text); font-size: 0.88rem; }
 .more-card .tag-list { margin-top: 1.25rem; }
 .text-link { display: inline-flex; align-items: center; gap: 0.45rem; margin-top: 1.4rem; color: var(--accent-dark); font-weight: 800; text-decoration-thickness: 1px; text-underline-offset: 0.22em; }
+.more-links { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; }
 
 /* about and education */
 .about-grid { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 1rem; }
@@ -124,6 +134,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 /* tablet layout */
 @media (max-width: 820px) {
   .section-heading, .experience-card, .featured-project, .about-grid { grid-template-columns: 1fr; }
+  .flagship-project { min-height: 0; }
   .featured-project:nth-child(even) .project-visual { order: initial; }
   .featured-project { min-height: 0; }
   .project-visual { min-height: 300px; }

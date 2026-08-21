@@ -9,29 +9,45 @@ import steamResults from '../assets/steam-value-lookup-vert.png';
 const projects = [
   {
     name: 'Business Data Automation',
-    label: 'Featured · v1.0.0 portfolio release',
-    problem: 'Businesses receive related records from multiple sources, where malformed data and mismatched transactions make manual reconciliation unreliable.',
-    built: 'A Python pipeline that validates datasets, quarantines bad records, reconciles exact-cent transactions, optionally persists validated data to PostgreSQL, and exposes shared logic through FastAPI and a lightweight dashboard.',
-    engineering: ['Python', 'FastAPI', 'PostgreSQL', 'SQLAlchemy', 'pandas', 'Docker', 'pytest · 52 tests', 'GitHub Actions'],
+    label: 'Flagship project · Backend & data engineering',
+    purpose: 'Validates related business records and reconciles financial transactions without allowing isolated bad records to halt valid processing.',
+    highlights: [
+      'Fails fast on structural dataset errors while quarantining invalid rows with explainable validation_errors',
+      'Calculates payments, refunds, and signed adjustments with Decimal-based cent precision',
+      'Uses transactional PostgreSQL primary-key upserts, rollback handling, and FastAPI reporting endpoints',
+      'Covers validation, reconciliation, database, API, and end-to-end behavior with 52 pytest tests',
+    ],
+    stack: 'Python · FastAPI · PostgreSQL · SQLAlchemy · pandas · Docker · pytest · GitHub Actions',
     github: 'https://github.com/quangshuynh/business-data-automation',
     visual: 'dashboard',
   },
   {
     name: 'Steam Value Lookup',
-    label: 'Backend & API integration',
-    problem: 'Estimating a Steam account’s value requires combining library, achievement, Store pricing, and inventory data from multiple APIs while handling rate limits, private profiles, missing prices, and partial responses.',
-    built: 'A Flask application that analyzes public Steam libraries and estimates their current game and inventory value. It coordinates concurrent API requests, caches Store prices, retries transient failures, classifies provider errors, and presents sortable per-game results with aggregate playtime, achievement, and valuation metrics.',
-    engineering: ['Python', 'Flask', 'SQLAlchemy', 'Steam Web API', 'Concurrency', 'Caching', 'Error handling', 'Unit testing'],
+    label: 'External API & backend engineering',
+    purpose: 'Aggregates public Steam profile, library, pricing, achievement, and supported inventory data into one valuation dashboard.',
+    highlights: [
+      'Accepts SteamIDs and vanity names, then coordinates data from multiple external API endpoints',
+      'Parallelizes Store pricing requests with ThreadPoolExecutor to reduce lookup latency',
+      'Handles private profiles, empty libraries, missing prices, and unavailable API responses',
+      'Tests API integration, pricing behavior, database models, routes, and failure cases in GitHub Actions',
+    ],
+    stack: 'Python · Flask · SQLAlchemy · Steam Web API · pytest · GitHub Actions',
     github: 'https://github.com/quangshuynh/steam-value-lookup',
     visual: 'steam',
   },
   {
     name: 'Foody',
-    label: 'Full-stack application breadth',
-    problem: 'Restaurant lists, recommendations, visits, and location data are difficult to keep useful when they live across different tools.',
-    built: 'A restaurant discovery and tracking application with CRUD workflows, persistent data, audit logging, React Context and Hooks, plus interactive maps and geocoding through React-Leaflet and OpenStreetMap services.',
-    engineering: ['React', 'JavaScript', 'CRUD', 'Persistent data', 'React-Leaflet', 'Nominatim'],
+    label: 'React application engineering',
+    purpose: 'Keeps restaurant visits, ratings, saved places, and nearby recommendations organized in a responsive mapping application.',
+    highlights: [
+      'Implements authenticated, persistent CRUD with Firebase Authentication and Cloud Firestore',
+      'Integrates React Leaflet, OpenStreetMap, Nominatim, Overpass API, and Zippopotam.us',
+      'Synchronizes map and list interactions through Context API state while retaining guest access',
+      'Runs 15 React and service tests plus a production build in GitHub Actions',
+    ],
+    stack: 'React · Firebase Authentication · Cloud Firestore · React Leaflet · Jest · GitHub Actions',
     github: 'https://github.com/quangshuynh/Foody',
+    live: 'https://foody-rit.web.app/',
     visual: 'foody',
   },
 ];
@@ -152,19 +168,20 @@ function FeaturedProjects() {
         </div>
         <div className="featured-list">
           {projects.map((project, index) => (
-            <article className="featured-project" key={project.name}>
+            <article className={`featured-project${index === 0 ? ' flagship-project' : ''}`} key={project.name}>
               <ProjectVisual type={project.visual} name={project.name} />
               <div className="project-copy">
                 <span className="project-number">{String(index + 1).padStart(2, '0')} · {project.label}</span>
                 <h3>{project.name}</h3>
-                <p><strong>Problem.</strong> {project.problem}</p>
-                <p><strong>Built.</strong> {project.built}</p>
-                <ul className="tag-list" aria-label={`${project.name} technologies`}>
-                  {project.engineering.map((item) => <li key={item}>{item}</li>)}
+                <p className="project-purpose">{project.purpose}</p>
+                <ul className="project-highlights" aria-label={`${project.name} engineering highlights`}>
+                  {project.highlights.map((item) => <li key={item}>{item}</li>)}
                 </ul>
+                <p className="project-stack"><strong>Stack</strong> {project.stack}</p>
                 <div className="project-actions">
-                  <a className="button" href={project.github} target="_blank" rel="noreferrer">View code <FaGithub aria-hidden="true" /></a>
-                  {index === 0 && <a className="button button-secondary" href={`${project.github}#architecture`} target="_blank" rel="noreferrer">Architecture <FaExternalLinkAlt aria-hidden="true" /></a>}
+                  <a className="button" href={project.github} target="_blank" rel="noreferrer" aria-label={`View ${project.name} code`}>View code <FaGithub aria-hidden="true" /></a>
+                  {index === 0 && <a className="button button-secondary" href={`${project.github}#architecture`} target="_blank" rel="noreferrer" aria-label="Read Business Data Automation architecture">Read architecture <FaExternalLinkAlt aria-hidden="true" /></a>}
+                  {project.live && <a className="button button-secondary" href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live demo`}>Live demo <FaExternalLinkAlt aria-hidden="true" /></a>}
                 </div>
               </div>
             </article>

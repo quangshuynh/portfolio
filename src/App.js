@@ -36,8 +36,8 @@ function App() {
       <main id="main-content">
         <Experience />
         <FeaturedProjects />
-        <TechStack />
         <MoreProjects />
+        <TechStack />
         <Education />
       </main>
       <Footer />
