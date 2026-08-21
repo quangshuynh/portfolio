@@ -17,7 +17,7 @@ function Experience() {
             <img className="company-logo" src={koreLogo} alt="KORE Wireless" />
             <h3>KORE Wireless</h3>
             <p className="experience-role">IoT Software Engineering Co-op</p>
-            <p><time dateTime="2025-01">Jan 2025</time> – <time dateTime="2025-05">May 2025</time></p>
+            <p><time dateTime="2025-01">Jan 2025</time> - <time dateTime="2025-05">May 2025</time></p>
             <p>Rochester, NY</p>
           </div>
           <ul className="detail-list">
