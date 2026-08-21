@@ -10,7 +10,7 @@ const projects = [
   },
   {
   name: 'GitProfileLens',
-  description: 'Browser-based GitHub profile analyzer that fetches public and pinned repositories, audits project metadata for presentation and discoverability issues, generates actionable recommendations, and exports repository data to Markdown.',
+  description: 'A browser-based tool that turns any public GitHub profile into an actionable portfolio audit. It evaluates repository presentation, README quality, discoverability, maintenance, and portfolio focus, then explains each score and recommends practical improvements.',
   technologies: ['JavaScript', 'GitHub API', 'Developer Tooling'],
   github: 'https://github.com/quangshuynh/gitprofilelens',
   },
