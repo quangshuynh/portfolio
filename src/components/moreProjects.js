@@ -10,8 +10,8 @@ const projects = [
   },
   {
   name: 'GitProfileLens',
-  description: 'A browser-based tool that turns any public GitHub profile into an actionable portfolio audit. It evaluates repository presentation, README quality, discoverability, maintenance, and portfolio focus, then explains each score and recommends practical improvements.',
-  technologies: ['JavaScript', 'GitHub API', 'Developer Tooling'],
+  description: 'A browser-based GitHub portfolio auditor that evaluates repository presentation, documentation, discoverability, maintenance, and portfolio focus. It provides explainable scores, prioritized recommendations, Markdown exports, and a public JSON API for external integrations.',
+  technologies: ['JavaScript', 'GitHub REST and GraphQL APIs', 'Serverless APIs', 'Developer Tooling', 'Browser Automation Testing'],
   github: 'https://github.com/quangshuynh/gitprofilelens',
   },
   {
