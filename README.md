@@ -1,4 +1,4 @@
-# Quang Huynh — Software Engineering Portfolio
+# Quang Huynh - Software Engineering Portfolio
 
 Personal portfolio highlighting professional software engineering experience, backend and data-oriented projects, technical breadth, and education.
 
