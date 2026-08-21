@@ -1,6 +1,10 @@
 import React from 'react';
 import koreLogo from '../assets/kore-logo.png';
 
+/**
+ * renders professional software engineering experience
+ * :returns: experience section markup
+ */
 function Experience() {
   return (
     <section className="page-section" id="experience" aria-labelledby="experience-title">

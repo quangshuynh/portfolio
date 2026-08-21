@@ -1,6 +1,10 @@
 import React from 'react';
 import { FaEnvelope, FaGithub, FaLinkedin } from 'react-icons/fa';
 
+/**
+ * renders contact links and site attribution
+ * :returns: contact section and footer markup
+ */
 function Footer() {
   return (
     <>

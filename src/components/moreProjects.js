@@ -22,6 +22,10 @@ const projects = [
   },
 ];
 
+/**
+ * renders the additional project collection
+ * :returns: additional projects section markup
+ */
 function MoreProjects() {
   return (
     <section className="page-section" id="more-projects" aria-labelledby="more-projects-title">

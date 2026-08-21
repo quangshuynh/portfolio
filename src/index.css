@@ -1,3 +1,4 @@
+/* typography */
 @font-face {
   font-family: 'Circular';
   src: url('../public/fonts/CircularSpotifyText-Bold.otf') format('opentype');
@@ -6,6 +7,7 @@
   font-display: swap;
 }
 
+/* dark theme tokens */
 :root {
   color-scheme: dark;
   --ink: #edf4f0;
@@ -31,6 +33,7 @@
   font-synthesis: none;
 }
 
+/* light theme tokens */
 :root[data-theme='light'] {
   color-scheme: light;
   --ink: #17221d;
@@ -54,6 +57,7 @@
   --shadow: 0 18px 50px rgba(29, 43, 35, 0.08);
 }
 
+/* global element defaults */
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; background: var(--paper); color: var(--ink); transition: background 180ms ease, color 180ms ease; }
@@ -63,6 +67,7 @@ img { display: block; max-width: 100%; }
 a { color: inherit; }
 ::selection { background: var(--accent-soft); }
 
+/* reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }

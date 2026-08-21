@@ -3,6 +3,10 @@ import { FaArrowRight, FaFilePdf, FaMapMarkerAlt } from 'react-icons/fa';
 import quangPhoto from '../assets/quang.jpg';
 import chiTheCat from '../assets/chi-the-cat.png';
 
+/**
+ * renders the primary navigation and portfolio introduction
+ * :returns: header markup
+ */
 function Header() {
   return (
     <header>
