@@ -1,5 +1,6 @@
 import React from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
+import gitProfileLensLogo from '../assets/gitprofilelens-logo.png';
 
 const projects = [
   {
@@ -11,11 +12,12 @@ const projects = [
   },
   {
     name: 'GitProfileLens',
-    description: 'Developer tool that audits public GitHub portfolios with deterministic scoring, explainable recommendations, repository exploration, and Markdown export.',
-    highlight: 'Paginated REST retrieval, optional GraphQL metadata, shareable reports, and explicit unknown-data handling',
-    technologies: ['JavaScript', 'GitHub APIs', 'Serverless'],
+    description: 'Developer tool that turns GitHub repository metadata into an explainable portfolio audit with practical recommendations for improving project presentation and discoverability.',
+    highlight: 'Supports public profiles and authorized private repositories through a read-only GitHub App, with encrypted sessions, three-scope Markdown exports, and 55 automated tests.',
+    technologies: ['JavaScript', 'GitHub APIs', 'Node.js', 'Vercel'],
     github: 'https://github.com/quangshuynh/gitprofilelens',
     live: 'https://gitprofilelens.vercel.app/',
+    logo: gitProfileLensLogo,
   },
   {
     name: 'AI Cooking Assistant',
@@ -40,7 +42,8 @@ function MoreProjects() {
         </div>
         <div className="more-grid">
           {projects.map((project) => (
-            <article className="more-card" key={project.name}>
+            <article className={`more-card${project.logo ? ' has-logo' : ''}`} key={project.name}>
+              {project.logo && <img className="more-card-logo" src={project.logo} alt="" aria-hidden="true" loading="lazy" />}
               <h3>{project.name}</h3>
               <p>{project.description}</p>
               <p className="more-highlight">{project.highlight}</p>
