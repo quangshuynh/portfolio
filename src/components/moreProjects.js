@@ -13,7 +13,7 @@ const projects = [
   {
     name: 'GitProfileLens',
     description: 'Developer tool that turns GitHub repository metadata into an explainable portfolio audit with practical recommendations for improving project presentation and discoverability.',
-    highlight: 'Supports public profiles and authorized private repositories through a read-only GitHub App, with encrypted sessions, three-scope Markdown exports, and 55 automated tests.',
+    highlight: 'Supports public profiles and authorized private repositories through a read-only GitHub App, with encrypted sessions, three-scope Markdown exports, and 56 automated tests.',
     technologies: ['JavaScript', 'GitHub APIs', 'Node.js', 'Vercel'],
     github: 'https://github.com/quangshuynh/gitprofilelens',
     live: 'https://gitprofilelens.vercel.app/',
