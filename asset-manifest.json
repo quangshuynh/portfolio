@@ -1,6 +1,6 @@
 {
   "files": {
-    "main.css": "/portfolio/static/css/main.a378b6e8.css",
+    "main.css": "/portfolio/static/css/main.eef76d3a.css",
     "main.js": "/portfolio/static/js/main.490ecc5e.js",
     "static/media/gitprofilelens-logo.png": "/portfolio/static/media/gitprofilelens-logo.96fa00004074869dbb34.png",
     "static/media/business-data-dashboard.png": "/portfolio/static/media/business-data-dashboard.7779458d3aa2d45ae38e.png",
@@ -14,11 +14,11 @@
     "static/media/quang.jpg": "/portfolio/static/media/quang.5a1084d4a9c11a73b14d.jpg",
     "static/media/Steam-icon-logo.svg": "/portfolio/static/media/Steam-icon-logo.e715b67e134e835ca5983667aed34fce.svg",
     "index.html": "/portfolio/index.html",
-    "main.a378b6e8.css.map": "/portfolio/static/css/main.a378b6e8.css.map",
+    "main.eef76d3a.css.map": "/portfolio/static/css/main.eef76d3a.css.map",
     "main.490ecc5e.js.map": "/portfolio/static/js/main.490ecc5e.js.map"
   },
   "entrypoints": [
-    "static/css/main.a378b6e8.css",
+    "static/css/main.eef76d3a.css",
     "static/js/main.490ecc5e.js"
   ]
 }
