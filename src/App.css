@@ -99,8 +99,10 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .skill-group h3, .more-card h3, .education-card h3 { margin: 0 0 1rem; font-family: Circular, sans-serif; font-size: 1.25rem; letter-spacing: -0.02em; }
 .skill-group p { margin: 0; color: var(--muted); line-height: 1.9; }
 .more-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-.more-card { display: flex; flex-direction: column; min-width: 0; transition: transform 160ms ease, border-color 160ms ease; }
+.more-card { position: relative; display: flex; flex-direction: column; min-width: 0; transition: transform 160ms ease, border-color 160ms ease; }
 .more-card:hover { transform: translateY(-3px); border-color: #aeb9b2; }
+.more-card.has-logo h3 { padding-right: 5.5rem; }
+.more-card-logo { position: absolute; top: 1.15rem; right: 1.15rem; width: 76px; height: 76px; object-fit: contain; }
 .more-card p { flex: 1; margin: 0; color: var(--muted); line-height: 1.65; }
 .more-card .more-highlight { flex: 0 0 auto; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--detail-text); font-size: 0.88rem; }
 .more-card .tag-list { margin-top: 1.25rem; }
