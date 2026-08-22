@@ -33,6 +33,7 @@ const projects = [
     ],
     stack: 'Python · Flask · SQLAlchemy · Steam Web API · pytest · GitHub Actions',
     github: 'https://github.com/quangshuynh/steam-value-lookup',
+    live: 'https://steam-value-lookup.onrender.com/',
     visual: 'steam',
   },
   {
