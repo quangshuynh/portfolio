@@ -153,6 +153,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
   .hero h1 { font-size: clamp(2.65rem, 13vw, 3.8rem); overflow-wrap: break-word; }
   .hero-lede { font-size: 1rem; }
   .skills-grid, .more-grid { grid-template-columns: 1fr; }
+  .more-card.has-logo h3 { padding-right: 0; }
+  .more-card-logo { position: static; align-self: flex-end; width: 88px; height: 88px; margin-bottom: 0.75rem; }
   .pipeline-row { grid-template-columns: 1fr; }
   .gallery-stage { min-height: 300px; }
   .foody .gallery-stage { min-height: 420px; }
