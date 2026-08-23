@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import App from './App';
 
 test('renders Quang Huynh’s software engineering portfolio', () => {
@@ -7,10 +7,21 @@ test('renders Quang Huynh’s software engineering portfolio', () => {
   expect(screen.getByRole('heading', { name: /i build backend, automation, data, and full-stack systems/i })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Business Data Automation' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Experience' })).toBeInTheDocument();
+  expect(screen.getAllByRole('heading', { name: 'Business Data Automation' })).toHaveLength(1);
+  expect(screen.getAllByRole('heading', { name: 'GitProfileLens' })).toHaveLength(1);
+  expect(screen.getAllByRole('heading', { name: 'Steam Value Lookup' })).toHaveLength(1);
+  expect(screen.getAllByRole('heading', { name: 'Foody' })).toHaveLength(1);
+  expect(screen.getByRole('heading', { name: 'Repo Radar' })).toBeInTheDocument();
   expect(screen.getByText(/52 pytest tests/i)).toBeInTheDocument();
   expect(screen.getByText(/firebase authentication and cloud firestore/i)).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Open Foody live demo' })).toHaveAttribute('href', 'https://foody-rit.web.app/');
   expect(screen.getByRole('link', { name: 'Open GitProfileLens live demo' })).toHaveAttribute('href', 'https://gitprofilelens.vercel.app/');
+  expect(screen.getByRole('link', { name: 'View GitProfileLens code' })).toHaveAttribute('href', 'https://github.com/quangshuynh/gitprofilelens');
+  expect(screen.getByRole('img', { name: 'GitProfileLens project logo' })).toBeInTheDocument();
+  fireEvent.click(within(screen.getByLabelText('GitProfileLens gallery')).getByRole('button', { name: 'Results' }));
+  expect(screen.getByRole('img', { name: /GitProfileLens audit dashboard/i })).toBeInTheDocument();
+  expect(screen.getByRole('img', { name: 'Foody project logo' })).toBeInTheDocument();
+  expect(screen.getByRole('img', { name: 'Repo Radar project logo' })).toBeInTheDocument();
   const themeToggle = screen.getByRole('button', { name: 'Switch to light mode' });
   fireEvent.click(themeToggle);
   expect(document.documentElement).toHaveAttribute('data-theme', 'light');

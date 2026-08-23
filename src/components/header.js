@@ -31,8 +31,8 @@ function Header() {
           <p className="hero-intro">Hi, I’m Quang.</p>
           <h1 id="hero-title">I build backend, automation, data, and full-stack systems.</h1>
           <p className="hero-lede">
-            I’m a computer science student with professional software engineering experience building
-            .NET applications, SQL functionality, enterprise workflows, Python services, and practical web products.
+            I’m a software developer with professional engineering experience across .NET applications, databases,
+            enterprise workflows, Python services, and practical web products.
           </p>
           <div className="hero-meta" aria-label="Location and focus">
             <span><FaMapMarkerAlt aria-hidden="true" /> Rochester, NY</span>

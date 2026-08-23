@@ -1,6 +1,7 @@
 import React from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
-import gitProfileLensLogo from '../assets/gitprofilelens-logo.png';
+import foodyLogo from '../assets/foody-logo.png';
+import repoRadarLogo from '../assets/repo-radar-logo.png';
 
 const projects = [
   {
@@ -11,13 +12,21 @@ const projects = [
     github: 'https://github.com/quangshuynh/salonflow',
   },
   {
-    name: 'GitProfileLens',
-    description: 'Developer tool that turns GitHub repository metadata into an explainable portfolio audit with practical recommendations for improving project presentation and discoverability.',
-    highlight: 'Supports public profiles and authorized private repositories through a read-only GitHub App, with encrypted sessions, three-scope Markdown exports, and 56 automated tests.',
-    technologies: ['JavaScript', 'GitHub APIs', 'Node.js', 'Vercel'],
-    github: 'https://github.com/quangshuynh/gitprofilelens',
-    live: 'https://gitprofilelens.vercel.app/',
-    logo: gitProfileLensLogo,
+    name: 'Foody',
+    description: 'Restaurant visit, rating, saved-place, and nearby-recommendation tracking in a responsive mapping application.',
+    highlight: 'Authenticated, persistent CRUD with Firebase Authentication and Cloud Firestore, plus React Leaflet and public location APIs.',
+    technologies: ['React', 'Firebase Authentication', 'Cloud Firestore', 'React Leaflet'],
+    github: 'https://github.com/quangshuynh/Foody',
+    live: 'https://foody-rit.web.app/',
+    logo: foodyLogo,
+  },
+  {
+    name: 'Repo Radar',
+    description: 'Personalized GitHub repository discovery tool that learns from starred repositories and explicit feedback to rank candidates by relevance, quality, activity, and novelty.',
+    highlight: 'Combines preference signals, discovery history, exclusions, and feedback with inspectable ranking behavior; currently in recommendation-quality validation mode.',
+    technologies: ['Python', 'FastAPI', 'GitHub API', 'Recommendation Systems'],
+    github: 'https://github.com/quangshuynh/repo-radar',
+    logo: repoRadarLogo,
   },
   {
     name: 'AI Cooking Assistant',
@@ -43,7 +52,7 @@ function MoreProjects() {
         <div className="more-grid">
           {projects.map((project) => (
             <article className={`more-card${project.logo ? ' has-logo' : ''}`} key={project.name}>
-              {project.logo && <img className="more-card-logo" src={project.logo} alt="" aria-hidden="true" loading="lazy" />}
+              {project.logo && <img className="more-card-logo" src={project.logo} alt={`${project.name} project logo`} loading="lazy" />}
               <h3>{project.name}</h3>
               <p>{project.description}</p>
               <p className="more-highlight">{project.highlight}</p>

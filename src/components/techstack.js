@@ -1,10 +1,10 @@
 import React from 'react';
 
 const groups = [
-  ['Languages', 'Python · C# · Java · JavaScript · SQL · C · HTML/CSS'],
-  ['Frameworks & libraries', '.NET · WPF · FastAPI · Flask · React · SQLAlchemy · pandas · PyTorch'],
-  ['Data', 'PostgreSQL · SQL Server · Firebase · Weaviate'],
-  ['Tools & practices', 'Git · Docker · GitHub Actions · pytest · Linux · REST APIs · XAML · MVVM · Boomi · SSMS'],
+  ['Languages', 'Python · TypeScript · JavaScript · C# · Java · SQL · C · HTML/CSS'],
+  ['Frameworks & libraries', 'FastAPI · Flask · React · Next.js · .NET/WPF · SQLAlchemy · pandas'],
+  ['Data', 'PostgreSQL · SQL Server · Firebase'],
+  ['Tools & practices', 'Git · Docker · GitHub Actions · pytest · Ruff · Linux · REST APIs · Boomi'],
 ];
 
 /**
