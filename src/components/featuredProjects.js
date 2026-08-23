@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
-import foodyImage from '../assets/foody-vert.png';
-import foodyLogo from '../assets/foody-logo.png';
 import dashboardImage from '../assets/business-data-dashboard.png';
+import gitProfileLensLogo from '../assets/gitprofilelens-logo.png';
+import gitProfileLensResults from '../assets/gitprofilelens-results-vert.png';
 import steamLogo from '../assets/Steam-icon-logo.svg';
 import steamResults from '../assets/steam-value-lookup-vert.png';
 
@@ -22,6 +22,21 @@ const projects = [
     visual: 'dashboard',
   },
   {
+    name: 'GitProfileLens',
+    label: 'Developer tooling · GitHub APIs & authenticated data',
+    purpose: 'Audits GitHub profiles and repositories using explainable scoring to identify presentation and discoverability improvements without claiming to measure developer ability.',
+    highlights: [
+      'Analyzes public repository metadata with GitHub REST/GraphQL APIs and deterministic category scoring',
+      'Supports authorized private repositories through a read-only GitHub App with encrypted session material and isolated caching',
+      'Handles repository pagination and filtering while separating private data from public and shareable audit output',
+      'Includes automated tests/CI, shareable audit exports, and a deployed web application',
+    ],
+    stack: 'JavaScript · Node.js · GitHub REST/GraphQL APIs · Vercel · Playwright',
+    github: 'https://github.com/quangshuynh/gitprofilelens',
+    live: 'https://gitprofilelens.vercel.app/',
+    visual: 'gitprofilelens',
+  },
+  {
     name: 'Steam Value Lookup',
     label: 'External API & backend engineering',
     purpose: 'Aggregates public Steam profile, library, pricing, achievement, and supported inventory data into one valuation dashboard.',
@@ -35,21 +50,6 @@ const projects = [
     github: 'https://github.com/quangshuynh/steam-value-lookup',
     live: 'https://steam-value-lookup.onrender.com/',
     visual: 'steam',
-  },
-  {
-    name: 'Foody',
-    label: 'React application engineering',
-    purpose: 'Keeps restaurant visits, ratings, saved places, and nearby recommendations organized in a responsive mapping application.',
-    highlights: [
-      'Implements authenticated, persistent CRUD with Firebase Authentication and Cloud Firestore',
-      'Integrates React Leaflet, OpenStreetMap, Nominatim, Overpass API, and Zippopotam.us',
-      'Synchronizes map and list interactions through Context API state while retaining guest access',
-      'Runs 15 React and service tests plus a production build in GitHub Actions',
-    ],
-    stack: 'React · Firebase Authentication · Cloud Firestore · React Leaflet · Jest · GitHub Actions',
-    github: 'https://github.com/quangshuynh/Foody',
-    live: 'https://foody-rit.web.app/',
-    visual: 'foody',
   },
 ];
 
@@ -72,7 +72,7 @@ function BusinessGallery() {
             <div className="pipeline-row"><span>CSV Reports</span><span>PostgreSQL</span><span>API + Dashboard</span></div>
           </div>
         ) : (
-          <img src={dashboardImage} alt="Business Data Automation reconciliation dashboard showing financial totals, payment statuses, and flagged discrepancies" loading="lazy" />
+          <img className="project-result-image" src={dashboardImage} alt="Business Data Automation reconciliation dashboard showing financial totals, payment statuses, and flagged discrepancies" loading="lazy" />
         )}
       </div>
       <div className="gallery-controls" aria-label="Business Data Automation gallery">
@@ -84,24 +84,24 @@ function BusinessGallery() {
 }
 
 /**
- * renders the foody image gallery
- * :returns: foody gallery markup
+ * renders the GitProfileLens project visual
+ * :returns: GitProfileLens visual markup
  */
-function FoodyGallery() {
+function GitProfileLensVisual() {
   const [slide, setSlide] = useState('logo');
 
   return (
-    <div className="project-visual foody gallery">
+    <div className="project-visual gallery">
       <div className="gallery-stage">
         {slide === 'logo' ? (
-          <img className="foody-logo" src={foodyLogo} alt="Foody project logo" loading="lazy" />
+          <img src={gitProfileLensLogo} alt="GitProfileLens project logo" loading="lazy" />
         ) : (
-          <img className="vertical-project-shot" src={foodyImage} alt="Foody restaurant discovery and tracking homepage" loading="lazy" />
+          <img className="project-result-image" src={gitProfileLensResults} alt="GitProfileLens audit dashboard showing presentation and discoverability scores with prioritized recommendations" loading="lazy" />
         )}
       </div>
-      <div className="gallery-controls" aria-label="Foody gallery">
+      <div className="gallery-controls" aria-label="GitProfileLens gallery">
         <button type="button" aria-pressed={slide === 'logo'} onClick={() => setSlide('logo')}>Logo</button>
-        <button type="button" aria-pressed={slide === 'homepage'} onClick={() => setSlide('homepage')}>Homepage</button>
+        <button type="button" aria-pressed={slide === 'results'} onClick={() => setSlide('results')}>Results</button>
       </div>
     </div>
   );
@@ -126,7 +126,7 @@ function SteamGallery({ name }) {
             </div>
           </>
         ) : (
-          <img className="vertical-project-shot" src={steamResults} alt="Steam Value Lookup results showing library totals, achievements, game values, and sortable game data" loading="lazy" />
+          <img className="project-result-image vertical-project-shot" src={steamResults} alt="Steam Value Lookup results showing library totals, achievements, game values, and sortable game data" loading="lazy" />
         )}
       </div>
       <div className="gallery-controls" aria-label="Steam Value Lookup gallery">
@@ -152,7 +152,7 @@ function ProjectVisual({ type, name }) {
   if (type === 'steam') {
     return <SteamGallery name={name} />;
   }
-  return <FoodyGallery />;
+  return <GitProfileLensVisual />;
 }
 
 /**
