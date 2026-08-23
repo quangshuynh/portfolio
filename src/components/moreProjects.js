@@ -2,6 +2,7 @@ import React from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
 import foodyLogo from '../assets/foody-logo.png';
 import repoRadarLogo from '../assets/repo-radar-logo.png';
+import moverGitLogo from '../assets/git-mover-logo.png';
 
 const projects = [
   {
@@ -29,11 +30,12 @@ const projects = [
     logo: repoRadarLogo,
   },
   {
-    name: 'AI Cooking Assistant',
-    description: 'Full-stack cooking assistant built for HACK.COMS 2024, combining a Flask application with Ollama and Weaviate-powered recipe generation and vector search.',
-    highlight: 'Modular model providers with ingredient filters and recipe-similarity search',
-    technologies: ['Python', 'Flask', 'Ollama', 'Weaviate'],
-    github: 'https://github.com/quangshuynh/AI-Cooking-Assistant',
+    name: 'Mover Git',
+    description: 'Python desktop utility for safely previewing, organizing, and moving files into Git repositories with automated batch commits and pushes.',
+    highlight: 'Blocks moves when the destination repository has pending changes, stages with explicit pathspecs instead of blanket adds, and splits work into batches that respect GitHub file-size limits.',
+    technologies: ['Python', 'Tkinter', 'Git', 'pytest'],
+    github: 'https://github.com/quangshuynh/mover-git',
+    logo: moverGitLogo,
   },
 ];
 
