@@ -47,6 +47,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .experience-company h3 { margin: 1.25rem 0 0.35rem; font-family: Circular, sans-serif; font-size: 1.65rem; letter-spacing: -0.025em; }
 .experience-company p { margin: 0.25rem 0; color: var(--muted); line-height: 1.5; }
 .experience-role { color: var(--accent-dark) !important; font-weight: 800; }
+.experience-tech { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.7rem 0 1.1rem; padding: 0; list-style: none; }
+.experience-tech li { padding: 0.36rem 0.7rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--tag-text); font-size: 0.76rem; font-weight: 700; line-height: 1.4; }
 .detail-list { display: grid; gap: 1.2rem; margin: 0; padding: 0; list-style: none; }
 .detail-list li { position: relative; padding-left: 2rem; color: var(--detail-text); line-height: 1.7; }
 .detail-list li::before { content: ''; position: absolute; top: 0.68rem; left: 0; width: 0.65rem; height: 0.65rem; background: var(--accent); border-radius: 50%; box-shadow: 0 0 0 5px var(--accent-soft); }
