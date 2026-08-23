@@ -28,8 +28,8 @@ const projects = [
     highlights: [
       'Analyzes public repository metadata with GitHub REST/GraphQL APIs and deterministic category scoring',
       'Supports authorized private repositories through a read-only GitHub App with encrypted session material and isolated caching',
-      'Handles repository pagination and filtering while separating private data from public and shareable audit output',
-      'Includes automated tests/CI, shareable audit exports, and a deployed web application',
+      'Separates private data from public/shareable audit output while handling repository pagination, filtering, and authenticated metadata',
+      'Validates scoring and recommendations against an evaluation corpus of 13 representative profiles and 185 repositories, with regression baselines designed to expose unintended behavior changes',
     ],
     stack: 'JavaScript · Node.js · GitHub REST/GraphQL APIs · Vercel · Playwright',
     github: 'https://github.com/quangshuynh/gitprofilelens',
