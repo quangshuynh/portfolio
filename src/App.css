@@ -112,6 +112,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .more-card .tag-list { margin-top: 1.25rem; }
 .text-link { display: inline-flex; align-items: center; gap: 0.45rem; margin-top: 1.4rem; color: var(--accent-dark); font-weight: 800; text-decoration-thickness: 1px; text-underline-offset: 0.22em; }
 .more-links { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; }
+.more-toggle { display: flex; justify-content: center; margin-top: 2rem; }
 
 /* about and education */
 .about-grid { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 1rem; }
