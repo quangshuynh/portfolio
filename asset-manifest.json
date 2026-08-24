@@ -1,7 +1,7 @@
 {
   "files": {
-    "main.css": "/portfolio/static/css/main.3e0ebff0.css",
-    "main.js": "/portfolio/static/js/main.f5c2cf6b.js",
+    "main.css": "/portfolio/static/css/main.ed8c97a4.css",
+    "main.js": "/portfolio/static/js/main.242fc635.js",
     "static/media/git-mover-logo.png": "/portfolio/static/media/git-mover-logo.a1918c6e1322396925d8.png",
     "static/media/gitprofilelens-logo.png": "/portfolio/static/media/gitprofilelens-logo.96fa00004074869dbb34.png",
     "static/media/business-data-dashboard.png": "/portfolio/static/media/business-data-dashboard.7779458d3aa2d45ae38e.png",
@@ -12,15 +12,16 @@
     "static/media/gitprofilelens-results-vert.png": "/portfolio/static/media/gitprofilelens-results-vert.a277b63d02b5494c0c50.png",
     "static/media/foody-logo.png": "/portfolio/static/media/foody-logo.498ea891958077c47e63.png",
     "static/media/CircularSpotifyText-Bold.otf": "/portfolio/static/media/CircularSpotifyText-Bold.f8952626140be9495d1b.otf",
+    "static/media/hymical-forms-logo.png": "/portfolio/static/media/hymical-forms-logo.31b82b36d33445b387b5.png",
     "static/media/kore-logo.png": "/portfolio/static/media/kore-logo.4ae9f68ff303bf73f9d4.png",
     "static/media/quang.jpg": "/portfolio/static/media/quang.5a1084d4a9c11a73b14d.jpg",
     "static/media/Steam-icon-logo.svg": "/portfolio/static/media/Steam-icon-logo.e715b67e134e835ca5983667aed34fce.svg",
     "index.html": "/portfolio/index.html",
-    "main.3e0ebff0.css.map": "/portfolio/static/css/main.3e0ebff0.css.map",
-    "main.f5c2cf6b.js.map": "/portfolio/static/js/main.f5c2cf6b.js.map"
+    "main.ed8c97a4.css.map": "/portfolio/static/css/main.ed8c97a4.css.map",
+    "main.242fc635.js.map": "/portfolio/static/js/main.242fc635.js.map"
   },
   "entrypoints": [
-    "static/css/main.3e0ebff0.css",
-    "static/js/main.f5c2cf6b.js"
+    "static/css/main.ed8c97a4.css",
+    "static/js/main.242fc635.js"
   ]
 }
