@@ -1,25 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
 import foodyLogo from '../assets/foody-logo.png';
+import hymicalFormsLogo from '../assets/hymical-forms-logo.png';
 import repoRadarLogo from '../assets/repo-radar-logo.png';
 import moverGitLogo from '../assets/git-mover-logo.png';
 
 const projects = [
   {
-    name: 'SalonFlow',
-    description: 'UI-complete salon-management SaaS frontend for scheduling, staff, customers, services, and reporting. It currently uses realistic mock data; Supabase persistence is not yet implemented.',
-    highlight: '14 Vitest tests with CI checks for lint, test, and production build',
-    technologies: ['Next.js', 'TypeScript', 'Vitest'],
-    github: 'https://github.com/quangshuynh/salonflow',
-  },
-  {
-    name: 'Foody',
-    description: 'Restaurant visit, rating, saved-place, and nearby-recommendation tracking in a responsive mapping application.',
-    highlight: 'Authenticated, persistent CRUD with Firebase Authentication and Cloud Firestore, plus React Leaflet and public location APIs.',
-    technologies: ['React', 'Firebase Authentication', 'Cloud Firestore', 'React Leaflet'],
-    github: 'https://github.com/quangshuynh/Foody',
-    live: 'https://foody-rit.web.app/',
-    logo: foodyLogo,
+    name: 'Hymical Forms',
+    description: 'Self-hostable form ingestion service with durable, signed webhook delivery and production-minded failure handling.',
+    highlight: 'Uses idempotent submissions, a transactional PostgreSQL outbox, worker leases, exponential retries, HMAC-signed webhooks, Alembic migrations, and real PostgreSQL concurrency tests.',
+    technologies: ['Python', 'FastAPI', 'PostgreSQL', 'SQLAlchemy'],
+    github: 'https://github.com/hymical/forms',
+    logo: hymicalFormsLogo,
   },
   {
     name: 'Repo Radar',
@@ -37,6 +30,22 @@ const projects = [
     github: 'https://github.com/quangshuynh/mover-git',
     logo: moverGitLogo,
   },
+  {
+    name: 'Foody',
+    description: 'Restaurant visit, rating, saved-place, and nearby-recommendation tracking in a responsive mapping application.',
+    highlight: 'Authenticated, persistent CRUD with Firebase Authentication and Cloud Firestore, plus React Leaflet and public location APIs.',
+    technologies: ['React', 'Firebase Authentication', 'Cloud Firestore', 'React Leaflet'],
+    github: 'https://github.com/quangshuynh/Foody',
+    live: 'https://foody-rit.web.app/',
+    logo: foodyLogo,
+  },
+  {
+    name: 'SalonFlow',
+    description: 'UI-complete salon-management SaaS frontend for scheduling, staff, customers, services, and reporting. It currently uses realistic mock data; Supabase persistence is not yet implemented.',
+    highlight: '14 Vitest tests with CI checks for lint, test, and production build',
+    technologies: ['Next.js', 'TypeScript', 'Vitest'],
+    github: 'https://github.com/quangshuynh/salonflow',
+  },
 ];
 
 /**
@@ -44,6 +53,9 @@ const projects = [
  * :returns: additional projects section markup
  */
 function MoreProjects() {
+  const [showAllProjects, setShowAllProjects] = useState(false);
+  const visibleProjects = showAllProjects ? projects : projects.slice(0, 3);
+
   return (
     <section className="page-section" id="more-projects" aria-labelledby="more-projects-title">
       <div className="section-inner">
@@ -51,8 +63,8 @@ function MoreProjects() {
           <div><p className="eyebrow">Additional work</p><h2 id="more-projects-title">More projects</h2></div>
           <p>Supporting projects that add product, developer-tooling, and applied AI breadth without competing with the featured work.</p>
         </div>
-        <div className="more-grid">
-          {projects.map((project) => (
+        <div className="more-grid" id="more-projects-grid">
+          {visibleProjects.map((project) => (
             <article className={`more-card${project.logo ? ' has-logo' : ''}`} key={project.name}>
               {project.logo && <img className="more-card-logo" src={project.logo} alt={`${project.name} project logo`} loading="lazy" />}
               <h3>{project.name}</h3>
@@ -68,6 +80,19 @@ function MoreProjects() {
             </article>
           ))}
         </div>
+        {projects.length > 3 && (
+          <div className="more-toggle">
+            <button
+              className="button button-secondary"
+              type="button"
+              aria-expanded={showAllProjects}
+              aria-controls="more-projects-grid"
+              onClick={() => setShowAllProjects((isExpanded) => !isExpanded)}
+            >
+              {showAllProjects ? 'Show fewer projects' : 'View more projects'}
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );
