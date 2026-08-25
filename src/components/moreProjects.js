@@ -17,7 +17,7 @@ const projects = [
   {
     name: 'Repo Radar',
     description: 'Personalized GitHub repository discovery tool that learns from starred repositories and explicit feedback to rank candidates by relevance, quality, activity, and novelty.',
-    highlight: 'Combines preference signals, discovery history, exclusions, and feedback with inspectable ranking behavior; currently in recommendation-quality validation mode.',
+    highlight: 'Combines preference signals, discovery history, exclusions, and explicit feedback with inspectable ranking behavior, with current work focused on measuring recommendation quality and reducing repetitive or popularity-dominated results.',
     technologies: ['Python', 'FastAPI', 'GitHub API', 'Recommendation Systems'],
     github: 'https://github.com/quangshuynh/repo-radar',
     logo: repoRadarLogo,
@@ -41,8 +41,8 @@ const projects = [
   },
   {
     name: 'SalonFlow',
-    description: 'UI-complete salon-management SaaS frontend for scheduling, staff, customers, services, and reporting. It currently uses realistic mock data; Supabase persistence is not yet implemented.',
-    highlight: '14 Vitest tests with CI checks for lint, test, and production build',
+    description: 'Salon-management SaaS interface for scheduling, staff, customers, services, and reporting, built around a multi-tenant product model.',
+    highlight: 'Structured as a Next.js/TypeScript application with tested feature flows and CI checks for linting, tests, and production builds; Supabase-backed persistence is the next major milestone.',
     technologies: ['Next.js', 'TypeScript', 'Vitest'],
     github: 'https://github.com/quangshuynh/salonflow',
   },
