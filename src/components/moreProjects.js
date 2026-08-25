@@ -15,7 +15,7 @@ const projects = [
     github: 'https://github.com/hymical/forms',
     logo: hymicalFormsLogo,
   },
-{
+  {
     name: 'Repo Radar',
     description:
       'Personalized GitHub repository discovery tool that learns from starred repositories and explicit feedback to rank candidates by relevance, quality, activity, and novelty.',
@@ -24,6 +24,7 @@ const projects = [
     technologies: ['Python', 'FastAPI', 'GitHub API', 'Recommendation Systems'],
     github: 'https://github.com/quangshuynh/repo-radar',
     logo: repoRadarLogo,
+    logoClass: 'repo-radar-logo',
   },
   {
     name: 'Mover Git',
@@ -70,7 +71,16 @@ function MoreProjects() {
         <div className="more-grid" id="more-projects-grid">
           {visibleProjects.map((project) => (
             <article className={`more-card${project.logo ? ' has-logo' : ''}`} key={project.name}>
-              {project.logo && <img className="more-card-logo" src={project.logo} alt={`${project.name} project logo`} loading="lazy" />}
+              {project.logo && (
+                <img
+                  className={`more-card-logo ${
+                    project.name === 'Repo Radar' ? 'repo-radar-logo' : ''
+                  }`}
+                  src={project.logo}
+                  alt={`${project.name} project logo`}
+                  loading="lazy"
+                />
+              )}
               <h3>{project.name}</h3>
               <p>{project.description}</p>
               <p className="more-highlight">{project.highlight}</p>
