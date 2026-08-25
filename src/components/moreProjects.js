@@ -4,6 +4,7 @@ import foodyLogo from '../assets/foody-logo.png';
 import hymicalFormsLogo from '../assets/hymical-forms-logo.png';
 import repoRadarLogo from '../assets/repo-radar-logo.png';
 import moverGitLogo from '../assets/git-mover-logo.png';
+import salonFlowLogo from '../assets/salonflow-logo.png';
 
 const projects = [
   {
@@ -45,6 +46,7 @@ const projects = [
     highlight: 'Structured as a Next.js/TypeScript application with tested feature flows and CI checks for linting, tests, and production builds; Supabase-backed persistence is the next major milestone.',
     technologies: ['Next.js', 'TypeScript', 'Vitest'],
     github: 'https://github.com/quangshuynh/salonflow',
+    logo: salonFlowLogo,
   },
 ];
 
