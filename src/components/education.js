@@ -1,5 +1,5 @@
 import React from 'react';
-import ritLogo from '../assets/rit-logo.png';
+import ritLogo from '../assets/logos/rit-logo.png';
 
 const honors = [
   'Farash Foundation First in Family Scholar',

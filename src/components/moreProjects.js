@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
-import foodyLogo from '../assets/foody-logo.png';
-import hymicalFormsLogo from '../assets/hymical-forms-logo.png';
-import repoRadarLogo from '../assets/repo-radar-logo.png';
-import moverGitLogo from '../assets/git-mover-logo.png';
-import salonFlowLogo from '../assets/salonflow-logo.png';
+import foodyLogo from '../assets/logos/foody-logo.png';
+import hymicalFormsLogo from '../assets/logos/hymical-forms-logo.png';
+import repoRadarLogo from '../assets/logos/repo-radar-logo.png';
+import moverGitLogo from '../assets/logos/git-mover-logo.png';
+import salonFlowLogo from '../assets/logos/salonflow-logo.png';
 
 const projects = [
   {

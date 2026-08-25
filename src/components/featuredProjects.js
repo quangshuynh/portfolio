@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
 import dashboardImage from '../assets/business-data-dashboard.png';
-import gitProfileLensLogo from '../assets/gitprofilelens-logo.png';
+import gitProfileLensLogo from '../assets/logos/gitprofilelens-logo.png';
 import gitProfileLensResults from '../assets/gitprofilelens-results-vert.png';
-import steamLogo from '../assets/Steam-icon-logo.svg';
+import steamLogo from '../assets/logos/Steam-icon-logo.svg';
 import steamResults from '../assets/steam-value-lookup-vert.png';
 
 const projects = [
