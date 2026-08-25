@@ -63,7 +63,7 @@ function MoreProjects() {
       <div className="section-inner">
         <div className="section-heading">
           <div><p className="eyebrow">Additional work</p><h2 id="more-projects-title">More projects</h2></div>
-          <p>Supporting projects that add product, developer-tooling, and applied AI breadth without competing with the featured work.</p>
+          <p>Supporting projects that add system-design, developer-tooling, automation, and product breadth without competing with the featured case studies.</p>
         </div>
         <div className="more-grid" id="more-projects-grid">
           {visibleProjects.map((project) => (
