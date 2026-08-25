@@ -1,5 +1,5 @@
 import React from 'react';
-import koreLogo from '../assets/kore-logo.png';
+import koreLogo from '../assets/logos/kore-logo.png';
 
 /**
  * renders professional software engineering experience
