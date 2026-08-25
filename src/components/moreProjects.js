@@ -9,7 +9,7 @@ const projects = [
   {
     name: 'Hymical Forms',
     description: 'Self-hostable form ingestion service with durable, signed webhook delivery and production-minded failure handling.',
-    highlight: 'Uses idempotent submissions, a transactional PostgreSQL outbox, worker leases, exponential retries, HMAC-signed webhooks, Alembic migrations, and real PostgreSQL concurrency tests.',
+    highlight: 'Built around idempotent submissions, a transactional PostgreSQL outbox, worker leases and retries, HMAC-signed webhooks, and real PostgreSQL concurrency tests.',
     technologies: ['Python', 'FastAPI', 'PostgreSQL', 'SQLAlchemy'],
     github: 'https://github.com/hymical/forms',
     logo: hymicalFormsLogo,
