@@ -15,10 +15,12 @@ const projects = [
     github: 'https://github.com/hymical/forms',
     logo: hymicalFormsLogo,
   },
-  {
+{
     name: 'Repo Radar',
-    description: 'Personalized GitHub repository discovery tool that learns from starred repositories and explicit feedback to rank candidates by relevance, quality, activity, and novelty.',
-    highlight: 'Combines preference signals, discovery history, exclusions, and explicit feedback with inspectable ranking behavior, with current work focused on measuring recommendation quality and reducing repetitive or popularity-dominated results.',
+    description:
+      'Personalized GitHub repository discovery tool that learns from starred repositories and explicit feedback to rank candidates by relevance, quality, activity, and novelty.',
+    highlight:
+      'Uses inspectable ranking heuristics with deterministic scoring, redundancy handling, and reproducible evaluation against graded scenarios and held-out real-world preference signals.',
     technologies: ['Python', 'FastAPI', 'GitHub API', 'Recommendation Systems'],
     github: 'https://github.com/quangshuynh/repo-radar',
     logo: repoRadarLogo,
