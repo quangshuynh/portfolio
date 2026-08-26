@@ -9,8 +9,10 @@ import salonFlowLogo from '../assets/logos/salonflow-logo.png';
 const projects = [
   {
     name: 'Hymical Forms',
-    description: 'Self-hostable form ingestion service with durable, signed webhook delivery and production-minded failure handling.',
-    highlight: 'Built around idempotent submissions, a transactional PostgreSQL outbox, worker leases and retries, HMAC-signed webhooks, and real PostgreSQL concurrency tests.',
+    description:
+      'Self-hostable form ingestion service with durable, signed webhook delivery and production-minded failure handling.',
+    highlight:
+      'Built around idempotent submissions, a transactional PostgreSQL outbox, leased workers with ownership fencing, HMAC-signed webhooks, and real PostgreSQL concurrency tests.',
     technologies: ['Python', 'FastAPI', 'PostgreSQL', 'SQLAlchemy'],
     github: 'https://github.com/hymical/forms',
     logo: hymicalFormsLogo,
@@ -28,16 +30,20 @@ const projects = [
   },
   {
     name: 'Mover Git',
-    description: 'Python desktop utility for safely previewing, organizing, and moving files into Git repositories with automated batch commits and pushes.',
-    highlight: 'Blocks moves when the destination repository has pending changes, stages with explicit pathspecs instead of blanket adds, and splits work into batches that respect GitHub file-size limits.',
+    description: 
+      'Python desktop utility for safely previewing, organizing, and moving files into Git repositories with automated batch commits and pushes.',
+    highlight: 
+      'Blocks moves when the destination repository has pending changes, stages with explicit pathspecs instead of blanket adds, and splits work into batches that respect GitHub file-size limits.',
     technologies: ['Python', 'Tkinter', 'Git', 'pytest'],
     github: 'https://github.com/quangshuynh/mover-git',
     logo: moverGitLogo,
   },
   {
     name: 'Foody',
-    description: 'Restaurant visit, rating, saved-place, and nearby-recommendation tracking in a responsive mapping application.',
-    highlight: 'Authenticated, persistent CRUD with Firebase Authentication and Cloud Firestore, plus React Leaflet and public location APIs.',
+    description: 
+      'Restaurant visit, rating, saved-place, and nearby-recommendation tracking in a responsive mapping application.',
+    highlight: 
+      'Authenticated, persistent CRUD with Firebase Authentication and Cloud Firestore, plus React Leaflet and public location APIs.',
     technologies: ['React', 'Firebase Authentication', 'Cloud Firestore', 'React Leaflet'],
     github: 'https://github.com/quangshuynh/Foody',
     live: 'https://foody-rit.web.app/',
@@ -45,8 +51,10 @@ const projects = [
   },
   {
     name: 'SalonFlow',
-    description: 'Multi-tenant salon-management SaaS for scheduling, staff, customers, services, and reporting.',
-    highlight: 'Backed by Supabase authentication and PostgreSQL persistence with database-enforced tenant isolation, tenant-scoped relational integrity, and integration tests that validate RLS behavior against real PostgreSQL.',
+    description: 
+      'Multi-tenant salon-management SaaS for scheduling, staff, customers, services, and reporting.',
+    highlight: 
+      'Backed by Supabase authentication and PostgreSQL persistence with database-enforced tenant isolation, tenant-scoped relational integrity, and integration tests that validate RLS behavior against real PostgreSQL.',
     technologies: ['Next.js', 'TypeScript', 'Supabase', 'PostgreSQL'],
     github: 'https://github.com/quangshuynh/salonflow',
     logo: salonFlowLogo,
