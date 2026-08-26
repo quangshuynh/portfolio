@@ -20,9 +20,9 @@ const projects = [
   {
     name: 'Repo Radar',
     description:
-      'Personalized GitHub repository discovery tool that learns from starred repositories and explicit feedback to rank candidates by relevance, quality, activity, and novelty.',
+      'Personalized GitHub discovery tool that recommends relevant repositories and open-source contribution opportunities using preference signals, feedback, and discovery history.',
     highlight:
-      'Uses inspectable ranking heuristics with deterministic scoring, redundancy handling, and reproducible evaluation against graded scenarios and held-out real-world preference signals.',
+      'Uses deterministic, explainable ranking to balance relevance, quality, activity, novelty, and diversity, with bounded GitHub issue discovery and reproducible offline evaluation.',
     technologies: ['Python', 'FastAPI', 'GitHub API', 'Recommendation Systems'],
     github: 'https://github.com/quangshuynh/repo-radar',
     logo: repoRadarLogo,
