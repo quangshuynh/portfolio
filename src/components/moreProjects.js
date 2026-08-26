@@ -45,9 +45,9 @@ const projects = [
   },
   {
     name: 'SalonFlow',
-    description: 'Salon-management SaaS interface for scheduling, staff, customers, services, and reporting, built around a multi-tenant product model.',
-    highlight: 'Structured as a Next.js/TypeScript application with tested feature flows and CI checks for linting, tests, and production builds; Supabase-backed persistence is the next major milestone.',
-    technologies: ['Next.js', 'TypeScript', 'Vitest'],
+    description: 'Multi-tenant salon-management SaaS for scheduling, staff, customers, services, and reporting.',
+    highlight: 'Backed by Supabase authentication and PostgreSQL persistence with database-enforced tenant isolation, tenant-scoped relational integrity, and integration tests that validate RLS behavior against real PostgreSQL.',
+    technologies: ['Next.js', 'TypeScript', 'Supabase', 'PostgreSQL'],
     github: 'https://github.com/quangshuynh/salonflow',
     logo: salonFlowLogo,
   },
