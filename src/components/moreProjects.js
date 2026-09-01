@@ -5,6 +5,8 @@ import hymicalFormsLogo from '../assets/logos/hymical-forms-logo.png';
 import repoRadarLogo from '../assets/logos/repo-radar-logo.png';
 import moverGitLogo from '../assets/logos/git-mover-logo.png';
 import salonFlowLogo from '../assets/logos/salonflow-logo.png';
+import caseNotesLogo from '../assets/logos/casenotes-logo.png';
+import steamLogo from '../assets/logos/Steam-icon-logo.svg';
 
 const projects = [
   {
@@ -18,6 +20,18 @@ const projects = [
     logo: hymicalFormsLogo,
   },
   {
+    name: 'CaseNotes',
+    description:
+      'Local-first native iOS notes app built with SwiftUI and SwiftData for Markdown writing, nested organization, drawings, version history, and export.',
+    highlight:
+      'Uses draft-based Save/Cancel editing, SwiftData persistence and migration coverage, safe nested-folder deletion, PencilKit drawings, real-text PDF export, interface gating, privacy shielding, and accessibility support.',
+    technologies: ['Swift', 'SwiftUI', 'SwiftData', 'PencilKit'],
+    github: 'https://github.com/quangshuynh/casenotes',
+    live: 'https://quangshuynh.github.io/casenotes/',
+    liveLabel: 'Documentation',
+    logo: caseNotesLogo,
+  },
+  {
     name: 'Repo Radar',
     description:
       'Personalized GitHub discovery tool that recommends relevant repositories and open-source contribution opportunities using preference signals, feedback, and discovery history.',
@@ -29,7 +43,17 @@ const projects = [
     logoClass: 'repo-radar-logo',
   },
   {
-    name: 'Mover Git',
+    name: 'SalonFlow',
+    description:
+      'Multi-tenant salon-management SaaS for scheduling, staff, customers, services, and reporting.',
+    highlight:
+      'Backed by Supabase authentication and PostgreSQL persistence with database-enforced tenant isolation, tenant-scoped relational integrity, and integration tests that validate RLS behavior against real PostgreSQL.',
+    technologies: ['Next.js', 'TypeScript', 'Supabase', 'PostgreSQL'],
+    github: 'https://github.com/quangshuynh/salonflow',
+    logo: salonFlowLogo,
+  },
+  {
+    name: 'mover-git',
     description: 
       'Python desktop utility for safely previewing, organizing, and moving files into Git repositories with automated batch commits and pushes.',
     highlight: 
@@ -37,6 +61,17 @@ const projects = [
     technologies: ['Python', 'Tkinter', 'Git', 'pytest'],
     github: 'https://github.com/quangshuynh/mover-git',
     logo: moverGitLogo,
+  },
+  {
+    name: 'Steam Value Lookup',
+    description:
+      'Aggregates public Steam profile, library, pricing, achievement, and supported inventory data into a single valuation dashboard.',
+    highlight:
+      'Coordinates multiple Steam APIs, parallelizes Store pricing lookups, handles private or incomplete account data, and covers API, pricing, database, route, and failure behavior with automated tests.',
+    technologies: ['Python', 'Flask', 'SQLAlchemy', 'Steam Web API'],
+    github: 'https://github.com/quangshuynh/steam-value-lookup',
+    live: 'https://steam-value-lookup.onrender.com/',
+    logo: steamLogo,
   },
   {
     name: 'Foody',
@@ -48,16 +83,6 @@ const projects = [
     github: 'https://github.com/quangshuynh/Foody',
     live: 'https://foody-rit.web.app/',
     logo: foodyLogo,
-  },
-  {
-    name: 'SalonFlow',
-    description: 
-      'Multi-tenant salon-management SaaS for scheduling, staff, customers, services, and reporting.',
-    highlight: 
-      'Backed by Supabase authentication and PostgreSQL persistence with database-enforced tenant isolation, tenant-scoped relational integrity, and integration tests that validate RLS behavior against real PostgreSQL.',
-    technologies: ['Next.js', 'TypeScript', 'Supabase', 'PostgreSQL'],
-    github: 'https://github.com/quangshuynh/salonflow',
-    logo: salonFlowLogo,
   },
 ];
 
@@ -97,7 +122,7 @@ function MoreProjects() {
               </ul>
               <div className="more-links">
                 <a className="text-link" href={project.github} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} repository`}>Repository <FaGithub aria-hidden="true" /></a>
-                {project.live && <a className="text-link" href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live demo`}>Live demo <FaExternalLinkAlt aria-hidden="true" /></a>}
+                {project.live && <a className="text-link" href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} ${project.liveLabel ? project.liveLabel.toLowerCase() : 'live demo'}`}>{project.liveLabel || 'Live demo'} <FaExternalLinkAlt aria-hidden="true" /></a>}
               </div>
             </article>
           ))}

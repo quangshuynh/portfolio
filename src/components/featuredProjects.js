@@ -3,13 +3,14 @@ import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
 import dashboardImage from '../assets/business-data-dashboard.png';
 import gitProfileLensLogo from '../assets/logos/gitprofilelens-logo.png';
 import gitProfileLensResults from '../assets/gitprofilelens-results-vert.png';
-import steamLogo from '../assets/logos/Steam-icon-logo.svg';
-import steamResults from '../assets/steam-value-lookup-vert.png';
+import scribeKitLogo from '../assets/logos/scribekit-logo.png';
+import scribeKitApp from '../assets/scribekit-app.png';
+import scribeKitTranscript from '../assets/scribekit-md.png';
 
 const projects = [
   {
     name: 'Business Data Automation',
-    label: 'Flagship project · Backend & data engineering',
+    label: 'Backend & data engineering',
     purpose: 'Validates related business records and reconciles financial transactions without allowing isolated bad records to halt valid processing.',
     highlights: [
       'Fails fast on structural dataset errors while quarantining invalid rows with explainable validation_errors',
@@ -37,19 +38,19 @@ const projects = [
     visual: 'gitprofilelens',
   },
   {
-    name: 'Steam Value Lookup',
-    label: 'External API & backend engineering',
-    purpose: 'Aggregates public Steam profile, library, pricing, achievement, and supported inventory data into one valuation dashboard.',
+    name: 'ScribeKit',
+    label: 'Native macOS · Audio, transcription & reliability',
+    purpose: 'A native macOS app for background-first meeting transcription that captures audio from selected applications, transcribes it locally with Apple speech frameworks, and durably writes timestamped Markdown transcripts.',
     highlights: [
-      'Accepts SteamIDs and vanity names, then coordinates data from multiple external API endpoints',
-      'Parallelizes Store pricing requests with ThreadPoolExecutor to reduce lookup latency',
-      'Handles private profiles, empty libraries, missing prices, and unavailable API responses',
-      'Tests API integration, pricing behavior, database models, routes, and failure cases in GitHub Actions',
+      'Captures only user-selected application audio through ScreenCaptureKit rather than recording all system audio or the microphone',
+      'Uses Apple’s on-device SpeechAnalyzer and SpeechTranscriber stack with no network fallback',
+      'Appends finalized speech to Markdown during a meeting and supports pause/resume, background operation, interruptions, and crash recovery',
+      'Keeps transcription and storage local, with transcript history, uncertainty review, and explicit failure semantics',
     ],
-    stack: 'Python · Flask · SQLAlchemy · Steam Web API · pytest · GitHub Actions',
-    github: 'https://github.com/quangshuynh/steam-value-lookup',
-    live: 'https://steam-value-lookup.onrender.com/',
-    visual: 'steam',
+    stack: 'Swift · SwiftUI · ScreenCaptureKit · Speech · AVFoundation · macOS · Swift Testing',
+    github: 'https://github.com/quangshuynh/scribekit',
+    documentation: 'https://quangshuynh.github.io/scribekit/',
+    visual: 'scribekit',
   },
 ];
 
@@ -108,30 +109,23 @@ function GitProfileLensVisual() {
 }
 
 /**
- * renders the steam value lookup image gallery
- * :param name: project name used for accessible image text
- * :returns: steam value lookup gallery markup
+ * renders the ScribeKit image gallery
+ * :returns: ScribeKit gallery markup
  */
-function SteamGallery({ name }) {
-  const [slide, setSlide] = useState('value');
+function ScribeKitGallery() {
+  const [slide, setSlide] = useState('logo');
 
   return (
-    <div className="project-visual steam gallery">
+    <div className="project-visual gallery">
       <div className="gallery-stage">
-        {slide === 'value' ? (
-          <>
-            <img className="steam-corner-logo" src={steamLogo} alt="" aria-hidden="true" />
-            <div className="steam-mark" aria-label={`${name} library value graphic`}>
-              <div><strong>∑</strong><span>Library value</span></div>
-            </div>
-          </>
-        ) : (
-          <img className="project-result-image vertical-project-shot" src={steamResults} alt="Steam Value Lookup results showing library totals, achievements, game values, and sortable game data" loading="lazy" />
-        )}
+        {slide === 'logo' && <img src={scribeKitLogo} alt="ScribeKit app logo" loading="lazy" />}
+        {slide === 'app' && <img className="project-result-image vertical-project-shot" src={scribeKitApp} alt="ScribeKit macOS meeting window showing selected application audio, on-device transcription status, and a live transcript" loading="lazy" />}
+        {slide === 'transcript' && <img className="project-result-image vertical-project-shot" src={scribeKitTranscript} alt="ScribeKit timestamped Markdown transcript output" loading="lazy" />}
       </div>
-      <div className="gallery-controls" aria-label="Steam Value Lookup gallery">
-        <button type="button" aria-pressed={slide === 'value'} onClick={() => setSlide('value')}>Library value</button>
-        <button type="button" aria-pressed={slide === 'results'} onClick={() => setSlide('results')}>Results</button>
+      <div className="gallery-controls" aria-label="ScribeKit gallery">
+        <button type="button" aria-pressed={slide === 'logo'} onClick={() => setSlide('logo')}>Logo</button>
+        <button type="button" aria-pressed={slide === 'app'} onClick={() => setSlide('app')}>App</button>
+        <button type="button" aria-pressed={slide === 'transcript'} onClick={() => setSlide('transcript')}>Transcript</button>
       </div>
     </div>
   );
@@ -140,17 +134,16 @@ function SteamGallery({ name }) {
 /**
  * selects and renders a project visual
  * :param type: project visual type
- * :param name: project name used for accessible image text
  * :returns: selected project visual markup
  */
-function ProjectVisual({ type, name }) {
+function ProjectVisual({ type }) {
   if (type === 'dashboard') {
     return (
       <BusinessGallery />
     );
   }
-  if (type === 'steam') {
-    return <SteamGallery name={name} />;
+  if (type === 'scribekit') {
+    return <ScribeKitGallery />;
   }
   return <GitProfileLensVisual />;
 }
@@ -170,7 +163,7 @@ function FeaturedProjects() {
         <div className="featured-list">
           {projects.map((project, index) => (
             <article className={`featured-project${index === 0 ? ' flagship-project' : ''}`} key={project.name}>
-              <ProjectVisual type={project.visual} name={project.name} />
+              <ProjectVisual type={project.visual} />
               <div className="project-copy">
                 <span className="project-number">{String(index + 1).padStart(2, '0')} · {project.label}</span>
                 <h3>{project.name}</h3>
@@ -183,6 +176,7 @@ function FeaturedProjects() {
                   <a className="button" href={project.github} target="_blank" rel="noreferrer" aria-label={`View ${project.name} code`}>View code <FaGithub aria-hidden="true" /></a>
                   {index === 0 && <a className="button button-secondary" href={`${project.github}#architecture`} target="_blank" rel="noreferrer" aria-label="Read Business Data Automation architecture">Read architecture <FaExternalLinkAlt aria-hidden="true" /></a>}
                   {project.live && <a className="button button-secondary" href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live demo`}>Live demo <FaExternalLinkAlt aria-hidden="true" /></a>}
+                  {project.documentation && <a className="button button-secondary" href={project.documentation} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} documentation`}>Documentation <FaExternalLinkAlt aria-hidden="true" /></a>}
                 </div>
               </div>
             </article>
