@@ -45,9 +45,9 @@ const projects = [
   {
     name: 'SalonFlow',
     description:
-      'Multi-tenant salon-management SaaS for scheduling, staff, customers, services, and reporting.',
+      'Responsive mapping application for tracking restaurant visits, ratings, saved places, and nearby recommendations.',
     highlight:
-      'Backed by Supabase authentication and PostgreSQL persistence with database-enforced tenant isolation, tenant-scoped relational integrity, and integration tests that validate RLS behavior against real PostgreSQL.',
+      'Backed by Supabase authentication and PostgreSQL persistence with database-enforced tenant isolation, tenant-scoped relational integrity, and integration tests that validate RLS behavior.',
     technologies: ['Next.js', 'TypeScript', 'Supabase', 'PostgreSQL'],
     github: 'https://github.com/quangshuynh/salonflow',
     logo: salonFlowLogo,
@@ -99,7 +99,7 @@ function MoreProjects() {
       <div className="section-inner">
         <div className="section-heading">
           <div><p className="eyebrow">Additional work</p><h2 id="more-projects-title">More projects</h2></div>
-          <p>Supporting projects that add system-design, developer-tooling, automation, and product breadth without competing with the featured case studies.</p>
+          <p>Additional projects spanning system design, developer tooling, automation, native applications, and product engineering.</p>
         </div>
         <div className="more-grid" id="more-projects-grid">
           {visibleProjects.map((project) => (
