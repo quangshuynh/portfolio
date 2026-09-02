@@ -24,12 +24,16 @@ function Education() {
         <div className="about-grid">
           <div className="about-card">
             <p>I’m a software developer based in Rochester, NY.</p>
-            <p>I gravitate toward practical projects: automation pipelines, internal tools, API integrations, databases, and software that turns messy inputs into something useful.</p>
+            <p>
+              I gravitate toward practical software: backend systems, developer tools,
+              automation, native applications, and projects where reliability and
+              thoughtful engineering matter.
+            </p>
           </div>
           <article className="education-card">
             <div className="education-title">
               <img className="institution-logo" src={ritLogo} alt="Rochester Institute of Technology" loading="lazy" />
-              <div><h3>Rochester Institute of Technology</h3><p className="degree">BS/MS Computer Science - Accelerated Program</p></div>
+              <div><h3>Rochester Institute of Technology</h3><p className="degree">BS/MS Computer Science – Accelerated Program</p></div>
             </div>
             <div className="education-meta"><span>Expected graduation: 2028</span><span>GPA: 3.42 / 4.00</span></div>
             <ul className="honors-list" aria-label="Academic honors">
