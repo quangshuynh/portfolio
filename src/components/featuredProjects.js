@@ -40,12 +40,12 @@ const projects = [
   {
     name: 'ScribeKit',
     label: 'Native macOS · Audio, transcription & reliability',
-    purpose: 'A native macOS app for background-first meeting transcription that captures audio from selected applications, transcribes it locally with Apple speech frameworks, and durably writes timestamped Markdown transcripts.',
+    purpose: 'Native macOS meeting transcription that captures audio from selected applications, transcribes it on-device with Apple speech frameworks, and durably writes timestamped Markdown.',
     highlights: [
       'Captures only user-selected application audio through ScreenCaptureKit rather than recording all system audio or the microphone',
       'Uses Apple’s on-device SpeechAnalyzer and SpeechTranscriber stack with no network fallback',
-      'Appends finalized speech to Markdown during a meeting and supports pause/resume, background operation, interruptions, and crash recovery',
-      'Keeps transcription and storage local, with transcript history, uncertainty review, and explicit failure semantics',
+      'Preserves finalized speech during recording with pause/resume, background operation, interruption handling, and crash recovery',
+      'Validated with 703 automated tests, fault injection, a real 60-minute capture soak, and manual keyboard and VoiceOver release testing',
     ],
     stack: 'Swift · SwiftUI · ScreenCaptureKit · Speech · AVFoundation · macOS · Swift Testing',
     github: 'https://github.com/quangshuynh/scribekit',
