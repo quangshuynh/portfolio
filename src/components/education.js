@@ -31,7 +31,7 @@ function Education() {
               <img className="institution-logo" src={ritLogo} alt="Rochester Institute of Technology" loading="lazy" />
               <div><h3>Rochester Institute of Technology</h3><p className="degree">BS/MS Computer Science - Accelerated Program</p></div>
             </div>
-            <div className="education-meta"><span>Expected graduation: 2028</span><span>GPA: 3.68 / 4.00</span></div>
+            <div className="education-meta"><span>Expected graduation: 2028</span><span>GPA: 3.42 / 4.00</span></div>
             <ul className="honors-list" aria-label="Academic honors">
               {honors.map((honor) => <li key={honor}>{honor}</li>)}
             </ul>

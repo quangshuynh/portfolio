@@ -27,9 +27,9 @@ function Header() {
 
       <section className="hero" id="top" aria-labelledby="hero-title">
         <div className="hero-inner">
-          <p className="eyebrow">Software Engineering | Backend | Automation | APIs</p>
+          <p className="eyebrow">Software Engineering | Backend | Developer Tools | Native Apps</p>
           <p className="hero-intro">Hi, I’m Quang.</p>
-          <h1 id="hero-title">I build backend, automation, data, and full-stack systems.</h1>
+          <h1 id="hero-title">I build reliable backend systems, developer tools, automation, and native applications.</h1>
           <p className="hero-lede">
             I’m a software developer with professional engineering experience across .NET applications, databases,
             enterprise workflows, Python services, and practical web products.
@@ -37,8 +37,8 @@ function Header() {
           <div className="hero-meta" aria-label="Location and focus">
             <span><FaMapMarkerAlt aria-hidden="true" /> Rochester, NY</span>
             <span>Backend systems</span>
-            <span>Data workflows</span>
-            <span>Full-stack development</span>
+            <span>Developer tools</span>
+            <span>Native applications</span>
           </div>
           <div className="hero-actions">
             <a className="button" href="#projects">View my work <FaArrowRight aria-hidden="true" /></a>
