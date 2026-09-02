@@ -39,7 +39,7 @@ const projects = [
   },
   {
     name: 'ScribeKit',
-    label: 'Native macOS · On-device transcription & reliability',
+    label: 'Native macOS · Audio, transcription & reliability',
     purpose: 'Native macOS meeting transcription that captures audio from selected applications, transcribes it on-device with Apple speech frameworks, and durably writes timestamped Markdown.',
     highlights: [
       'Captures only user-selected application audio through ScreenCaptureKit rather than recording all system audio or the microphone',
@@ -158,7 +158,7 @@ function FeaturedProjects() {
       <div className="section-inner">
         <div className="section-heading">
           <div><p className="eyebrow">Selected work</p><h2 id="projects-title">Featured projects</h2></div>
-          <p>Substantial projects selected for the engineering decisions behind them and not just the technologies used.</p>
+          <p>Selected projects highlighting engineering decisions, reliability, system design, and practical problem solving.</p>
         </div>
         <div className="featured-list">
           {projects.map((project, index) => (
