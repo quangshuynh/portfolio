@@ -4,7 +4,11 @@ import App from './App';
 test('renders Quang Huynh’s software engineering portfolio', () => {
   render(<App />);
   expect(screen.getByText('Hi, I’m Quang.')).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: /i build backend, automation, data, and full-stack systems/i })).toBeInTheDocument();
+  expect(
+  screen.getByRole('heading', {
+    name: 'I build reliable backend systems, developer tools, automation, and native applications.'
+  })
+).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Business Data Automation' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Experience' })).toBeInTheDocument();
   expect(screen.getByText('GPA: 3.42 / 4.00')).toBeInTheDocument();
