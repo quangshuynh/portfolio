@@ -49,9 +49,14 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .experience-role { color: var(--accent-dark) !important; font-weight: 800; }
 .experience-tech { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.7rem 0 1.1rem; padding: 0; list-style: none; }
 .experience-tech li { padding: 0.36rem 0.7rem; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--tag-text); font-size: 0.76rem; font-weight: 700; line-height: 1.4; }
+.experience-details { min-width: 0; }
 .detail-list { display: grid; gap: 1.2rem; margin: 0; padding: 0; list-style: none; }
 .detail-list li { position: relative; padding-left: 2rem; color: var(--detail-text); line-height: 1.7; }
 .detail-list li::before { content: ''; position: absolute; top: 0.68rem; left: 0; width: 0.65rem; height: 0.65rem; background: var(--accent); border-radius: 50%; box-shadow: 0 0 0 5px var(--accent-soft); }
+.employer-feedback { margin: 1.5rem 0 0; padding: 1rem 0 0 1.25rem; border-top: 1px solid var(--line); border-left: 3px solid var(--accent-soft); color: var(--muted); }
+.employer-feedback p { margin: 0; line-height: 1.65; }
+.employer-feedback footer { margin-top: 0.55rem; color: var(--tag-text); font-size: 0.78rem; font-weight: 750; }
+.employer-feedback cite { font-style: normal; }
 
 /* featured projects and galleries */
 .featured-list { display: grid; gap: 1.5rem; }

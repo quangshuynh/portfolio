@@ -50,25 +50,34 @@ function Experience() {
             </ul>
           </div>
 
-          <ul className="detail-list">
-            <li>
-              Developed production features for a large .NET/WPF application
-              using C#, XAML, and MVVM, including search workflows and
-              configurable XML generation for business data imports.
-            </li>
+          <div className="experience-details">
+            <ul className="detail-list">
+              <li>
+                Developed production features for a large .NET/WPF application
+                using C#, XAML, and MVVM, including search workflows and
+                configurable XML generation for business data imports.
+              </li>
 
-            <li>
-              Built and modified SQL Server stored procedures and queries
-              supporting order automation, validation, reporting accuracy,
-              and bulk data workflows.
-            </li>
+              <li>
+                Built and modified SQL Server stored procedures and queries
+                supporting order automation, validation, reporting accuracy,
+                and bulk data workflows.
+              </li>
 
-            <li>
-              Improved Boomi and NetSuite integration workflows through
-              enhanced error tracking, resolution tooling, QA test harnesses,
-              and production-failure investigation.
-            </li>
-          </ul>
+              <li>
+                Improved Boomi and NetSuite integration workflows through
+                enhanced error tracking, resolution tooling, QA test harnesses,
+                and production-failure investigation.
+              </li>
+            </ul>
+
+            <blockquote className="employer-feedback">
+              <p>“He was able to work with greater independence than is expected of co-ops.”</p>
+              <footer>
+                <cite>Matt Telesky, Director of Software Engineering</cite>
+              </footer>
+            </blockquote>
+          </div>
         </article>
       </div>
     </section>

@@ -7,6 +7,11 @@ test('renders Quang Huynh’s software engineering portfolio', () => {
   expect(screen.getByRole('heading', { name: /i build backend, automation, data, and full-stack systems/i })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Business Data Automation' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Experience' })).toBeInTheDocument();
+  expect(screen.getByText('GPA: 3.42 / 4.00')).toBeInTheDocument();
+  expect(screen.queryByText(/GPA: 3\.68/)).not.toBeInTheDocument();
+  const employerFeedback = screen.getByText('“He was able to work with greater independence than is expected of co-ops.”');
+  expect(employerFeedback.closest('blockquote')).toBeInTheDocument();
+  expect(screen.getByText('KORE Wireless supervisor').closest('cite')).toBeInTheDocument();
   expect(screen.getAllByRole('heading', { name: 'Business Data Automation' })).toHaveLength(1);
   expect(screen.getAllByRole('heading', { name: 'GitProfileLens' })).toHaveLength(1);
   expect(screen.getAllByRole('heading', { name: 'ScribeKit' })).toHaveLength(1);

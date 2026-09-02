@@ -39,7 +39,7 @@ const projects = [
   },
   {
     name: 'ScribeKit',
-    label: 'Native macOS · Audio, transcription & reliability',
+    label: 'Native macOS · On-device transcription & reliability',
     purpose: 'Native macOS meeting transcription that captures audio from selected applications, transcribes it on-device with Apple speech frameworks, and durably writes timestamped Markdown.',
     highlights: [
       'Captures only user-selected application audio through ScreenCaptureKit rather than recording all system audio or the microphone',
