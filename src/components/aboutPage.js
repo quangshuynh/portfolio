@@ -33,12 +33,12 @@ import Footer from './footer';
 import SiteNav, { homeHref } from './siteNav';
 
 const interests = [
-  [FaCamera, 'Photography', 'I enjoy photography and learning how composition, lighting, and equipment affect the final image.'],
+  [FaCamera, 'Photography', 'I enjoy photography and experimenting with how composition, lighting, and perspective shape an image.'],
   [FaMountain, 'Hiking', 'I enjoy getting outside, exploring new places, and taking a break from screens.'],
   [FaMusic, 'Music', 'I enjoy listening to music, discovering new artists, and playing guitar recreationally.'],
   [FaCar, 'Cars & technology', 'I’ve always been interested in technology beyond computers, including cars and how mechanical and electronic systems work.'],
   [FaGamepad, 'Gaming', 'Gaming is one of the ways I relax and was also part of what originally made computers interesting to me.'],
-  [FaUsers, 'Family & friends', 'Spending time with family and friends is an important part of my life. Especially over a meal, a game, or a shared activity.']
+  [FaUsers, 'Family & friends', 'Spending time with family and friends is an important part of my life, especially over a meal, a game, or a shared activity.']
 ];
 
 const interestPhotos = {
