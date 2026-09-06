@@ -4,6 +4,7 @@ import quangPhoto from '../assets/about/quang/quang-about-portrait-web.jpg';
 import photographySunset from '../assets/about/photography/quang-photography-sunset-web.jpg';
 import hikingOverlook from '../assets/about/hiking/quang-hiking-overlook-web.jpg';
 import minecraftWorld from '../assets/about/gaming/quang-minecraft-survival-world-web.jpg';
+import csgoScreenshot from '../assets/about/gaming/csgo.jpg';
 import carsPhoto from '../assets/about/cars-tech/quang-cars-web.jpg';
 import techPhoto from '../assets/about/cars-tech/quang-tech-web.jpg';
 import carShowPorsche from '../assets/about/cars-tech/car-show-porsche-web.jpg';
@@ -105,6 +106,10 @@ const technologyGallery = [
   [graphicsCard, 1050, 1400, 'An RTX 3080 Ti graphics card held above a work surface', 'Getting an RTX 3080 Ti ready for an upgrade', 'portrait'],
   [carShowPorsche, 1400, 984, 'A black Singer Porsche 930 displayed at Little Speed Shop Cars  & Coffee', 'A Singer Porsche 930 at The Little Speed Shop’s Cars & Coffee'],
   [carShowSubaruEngine, 1400, 889, 'Modified blue Blobeye STI with its engine bay open at a car show', 'Taking a closer look under the hood of this Blobeye STI']
+];
+
+const gamingGallery = [
+  [csgoScreenshot, 1920, 1080, 'Counter-Strike: Global Offensive menu screenshot', 'CS:GO menu screen 2022']
 ];
 
 function AboutPage() {
@@ -244,8 +249,8 @@ function AboutPage() {
                     )}
                     <h3><Icon aria-hidden="true" />{title}</h3>
                     <p>{copy}</p>
-                    {(title === 'Photography' || title === 'Cars & technology') && (
-                      <button className="interest-view-more" type="button" aria-haspopup="dialog" onClick={(event) => openGallery(title === 'Photography' ? 'photography' : 'technology', event.currentTarget)}>View more</button>
+                    {(title === 'Photography' || title === 'Cars & technology' || title === 'Gaming') && (
+                      <button className="interest-view-more" type="button" aria-haspopup="dialog" onClick={(event) => openGallery(title === 'Photography' ? 'photography' : title === 'Gaming' ? 'gaming' : 'technology', event.currentTarget)}>View more</button>
                     )}
                   </article>
                 );
@@ -255,8 +260,28 @@ function AboutPage() {
               <div className="photography-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeGallery(); }}>
                 <section className="photography-modal" role="dialog" aria-modal="true" aria-labelledby="interest-modal-title">
                   <div className="photography-modal-header">
-                    <div><p className="eyebrow">{activeGallery === 'photography' ? 'Behind the lens' : activeGallery === 'personal' ? 'Beyond the résumé' : 'Under the hood'}</p><h3 id="interest-modal-title">{activeGallery === 'photography' ? 'Photography by Quang' : activeGallery === 'personal' ? 'More about Quang' : 'Cars & technology'}</h3></div>
-                    <button className="photography-modal-close" type="button" onClick={closeGallery} ref={closeGalleryButton} aria-label={`Close ${activeGallery === 'photography' ? 'photography gallery' : activeGallery === 'personal' ? 'personal photo gallery' : 'cars and technology gallery'}`}><FaTimes aria-hidden="true" /></button>
+                    <div>
+                      <p className="eyebrow">
+                        {activeGallery === 'photography'
+                          ? 'Behind the lens'
+                          : activeGallery === 'personal'
+                            ? 'Beyond the résumé'
+                            : activeGallery === 'gaming'
+                              ? 'In the game'
+                              : 'Under the hood'}
+                      </p>
+
+                      <h3 id="interest-modal-title">
+                        {activeGallery === 'photography'
+                          ? 'Photography by Quang'
+                          : activeGallery === 'personal'
+                            ? 'More about Quang'
+                            : activeGallery === 'gaming'
+                              ? 'Gaming'
+                              : 'Cars & technology'}
+                      </h3>
+                    </div>
+                    <button className="photography-modal-close" type="button" onClick={closeGallery} ref={closeGalleryButton} aria-label={`Close ${activeGallery === 'photography' ? 'photography gallery' : activeGallery === 'personal' ? 'personal photo gallery' : activeGallery === 'gaming' ? 'gaming gallery' : 'cars and technology gallery'}`}><FaTimes aria-hidden="true" /></button>
                   </div>
                   {activeGallery === 'personal' ? <div className="photography-gallery personal-gallery" aria-label="More photos of Quang">
                     {personalGallery.map(([src, width, height, alt, caption, shape]) => <figure className={shape === 'portrait' ? 'photography-gallery-portrait' : undefined} key={src}>
@@ -273,12 +298,50 @@ function AboutPage() {
                       ))}
                     </div>
                     {!showAllPhotography && <button className="button photography-view-all" type="button" onClick={() => setShowAllPhotography(true)}>View all</button>}
-                  </> : <div className="photography-gallery technology-gallery" aria-label="More cars and technology photos">
-                    {technologyGallery.map(([src, width, height, alt, caption, shape]) => <figure className={shape === 'portrait' ? 'photography-gallery-portrait' : undefined} key={src}>
-                      <img src={src} width={width} height={height} alt={alt} loading="lazy" />
-                      <figcaption>{caption}</figcaption>
-                    </figure>)}
-                  </div>}
+                    </> : activeGallery === 'gaming' ? (
+                      <div
+                        className="photography-gallery gaming-gallery"
+                        aria-label="More gaming screenshots"
+                      >
+                        {gamingGallery.map(([src, width, height, alt, caption]) => (
+                          <figure key={src}>
+                            <img
+                              src={src}
+                              width={width}
+                              height={height}
+                              alt={alt}
+                              loading="lazy"
+                            />
+                            <figcaption>{caption}</figcaption>
+                          </figure>
+                        ))}
+                      </div>
+                    ) : (
+                      <div
+                        className="photography-gallery technology-gallery"
+                        aria-label="More cars and technology photos"
+                      >
+                        {technologyGallery.map(([src, width, height, alt, caption, shape]) => (
+                          <figure
+                            className={
+                              shape === 'portrait'
+                                ? 'photography-gallery-portrait'
+                                : undefined
+                            }
+                            key={src}
+                          >
+                            <img
+                              src={src}
+                              width={width}
+                              height={height}
+                              alt={alt}
+                              loading="lazy"
+                            />
+                            <figcaption>{caption}</figcaption>
+                          </figure>
+                        ))}
+                      </div>
+                    )}
                 </section>
               </div>
             )}
