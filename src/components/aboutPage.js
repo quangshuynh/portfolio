@@ -2,10 +2,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import { FaArrowRight, FaCamera, FaCar, FaGamepad, FaMapMarkerAlt, FaMountain, FaMusic, FaTimes, FaUsers } from 'react-icons/fa';
 import quangPhoto from '../assets/about/quang/quang-about-portrait-web.jpg';
 import photographySunset from '../assets/about/photography/quang-photography-sunset-web.jpg';
-import hikingOverlook from '../assets/about/quang-hiking-overlook-web.jpg';
-import minecraftWorld from '../assets/about/quang-minecraft-survival-world-web.jpg';
-import carsPhoto from '../assets/about/quang-cars-web.jpg';
-import techPhoto from '../assets/about/quang-tech-web.jpg';
+import hikingOverlook from '../assets/about/hiking/quang-hiking-overlook-web.jpg';
+import minecraftWorld from '../assets/about/gaming/quang-minecraft-survival-world-web.jpg';
+import carsPhoto from '../assets/about/cars-tech/quang-cars-web.jpg';
+import techPhoto from '../assets/about/cars-tech/quang-tech-web.jpg';
+import carShowPorsche from '../assets/about/cars-tech/car-show-porsche-web.jpg';
+import carShowSubaruEngine from '../assets/about/cars-tech/car-show-subaru-engine-web.jpg';
+import customPcGreen from '../assets/about/cars-tech/custom-pc-green-web.jpg';
+import graphicsCard from '../assets/about/cars-tech/graphics-card-rtx-3080-ti-web.jpg';
+import quangBeachSunset from '../assets/about/quang/quang-beach-sunset-web.jpg';
+import quangArtSpace from '../assets/about/quang/quang-art-space-web.jpg';
+import quangWaterfront from '../assets/about/quang/quang-waterfront-web.jpg';
 import architectureSpire from '../assets/about/photography/optimized/architecture-spire-web.jpg';
 import birdOnLawn from '../assets/about/photography/optimized/bird-on-lawn-web.jpg';
 import blueCactusSign from '../assets/about/photography/optimized/blue-cactus-sign-web.jpg';
@@ -67,28 +74,48 @@ const photographyGallery = [
 ];
 
 const photographyCaptions = {
-  [architectureSpire]: 'Lines, brick, and a break in the Cornell skyline.',
-  [birdOnLawn]: 'A quiet pause in the grass at Cornell.',
-  [libraryReadingRoom]: 'Warm light inside Rush Rhees Library.',
-  [riversideBridge]: 'Steel geometry over the Genesee River.',
-  [horizonSunset]: 'The last light at the horizon.',
-  [riversideWaterfall]: 'Water in motion at Bristol Mountain.',
-  [lakesideSunset]: 'Pastel skies over Irondequoit Bay.',
-  [niagaraOverlook]: 'City and mist from Niagara Falls.',
-  [forestCanopy]: 'Looking up beneath the canopy at Bristol Mountain.',
-  [waterfallCliffs]: 'Layers of rock, water, and light in Ithaca.',
-  [woodlandStream]: 'A small stream finding its way through Cornell.',
-  [historicBuilding]: 'Rush Rhees Library through winter branches.',
-  [hilltopCastle]: 'A stone landmark above the valley at Cornell.',
-  [blueCactusSign]: 'Color and character near the University of Rochester.',
-  [woodlandFence]: 'Where the open lawn meets the woods at Durand Eastman Park.',
-  [whiteCarAtNight]: 'A late-night portrait of a 2011 Subaru WRX.'
+  [architectureSpire]: 'Looking up through Cornell’s brick architecture',
+  [birdOnLawn]: 'A quiet moment on the grass at Cornell',
+  [libraryReadingRoom]: 'Warm light inside Rush Rhees Library',
+  [riversideBridge]: 'Red steel over the Genesee River',
+  [horizonSunset]: 'Watching the last light disappear over the water',
+  [riversideWaterfall]: 'Summer at Bristol Mountain',
+  [lakesideSunset]: 'Pastel skies over Irondequoit Bay',
+  [niagaraOverlook]: 'Mist and skyline at Niagara Falls',
+  [forestCanopy]: 'Looking up through the trees at Bristol Mountain',
+  [waterfallCliffs]: 'Water carving through the rock in Ithaca',
+  [woodlandStream]: 'Following a stream through the woods at Cornell',
+  [historicBuilding]: 'Rush Rhees Library through bare winter branches',
+  [hilltopCastle]: 'Looking out from Cornell’s stone architecture',
+  [blueCactusSign]: 'A little color near the University of Rochester',
+  [woodlandFence]: 'At the edge of the woods in Durand Eastman Park',
+  [whiteCarAtNight]: 'My 2011 Subaru WRX after dark'
 };
+
+const personalGallery = [
+  [quangBeachSunset, 927, 1400, 'Quang standing at the shoreline at sunset', 'Sunset at Charlotte Beach', 'portrait'],
+  [quangArtSpace, 927, 1400, 'Quang seated on a large illuminated sphere in a modern interior', 'Exploring Cornell’s architecture', 'portrait'],
+  [quangWaterfront, 933, 1400, 'Quang standing beside a wide body of water at dusk', 'An evening at Webster Park', 'portrait']
+];
+
+const technologyGallery = [
+  [techPhoto, 1050, 1400, 'Computer hardware and a custom desktop PC during a hands-on build', 'Building a PC from the ground up', 'portrait'],
+  [customPcGreen, 1050, 1400, 'A custom desktop PC illuminated by green lighting', 'My finished RTX 4070 Ti build', 'portrait'],
+  [graphicsCard, 1050, 1400, 'An RTX 3080 Ti graphics card held above a work surface', 'Getting an RTX 3080 Ti ready for an upgrade', 'portrait'],
+  [carShowPorsche, 1400, 984, 'A black Singer Porsche 930 displayed at Little Speed Shop Cars  & Coffee', 'A Singer Porsche 930 at The Little Speed Shop’s Cars & Coffee'],
+  [carShowSubaruEngine, 1400, 889, 'Modified blue Blobeye STI with its engine bay open at a car show', 'Taking a closer look under the hood of this Blobeye STI']
+];
 
 function AboutPage() {
   const [activeGallery, setActiveGallery] = useState(null);
   const [showAllPhotography, setShowAllPhotography] = useState(false);
   const closeGalleryButton = useRef(null);
+  const galleryTrigger = useRef(null);
+
+  const openGallery = (gallery, trigger) => {
+    galleryTrigger.current = trigger;
+    setActiveGallery(gallery);
+  };
 
   const closeGallery = () => {
     setActiveGallery(null);
@@ -127,6 +154,7 @@ function AboutPage() {
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', handleKeyDown);
+      galleryTrigger.current?.focus();
     };
   }, [activeGallery]);
 
@@ -151,7 +179,12 @@ function AboutPage() {
                 <a className="button button-secondary" href={homeHref('#contact')}>Get in touch</a>
               </div>
             </div>
-            <figure className="about-portrait"><img src={quangPhoto} width="1000" height="1000" alt="Quang Huynh relaxing on a bench" /></figure>
+            <figure className="about-portrait">
+              <button className="about-portrait-button" type="button" aria-label="View more photos of Quang" aria-haspopup="dialog" onClick={(event) => openGallery('personal', event.currentTarget)}>
+                <img src={quangPhoto} width="1000" height="1000" alt="Quang Huynh relaxing on a bench" />
+                <span>View photos</span>
+              </button>
+            </figure>
           </div>
         </section>
 
@@ -182,7 +215,7 @@ function AboutPage() {
                     <h3><Icon aria-hidden="true" />{title}</h3>
                     <p>{copy}</p>
                     {(title === 'Photography' || title === 'Cars & technology') && (
-                      <button className="interest-view-more" type="button" aria-haspopup="dialog" onClick={() => setActiveGallery(title === 'Photography' ? 'photography' : 'technology')}>View more</button>
+                      <button className="interest-view-more" type="button" aria-haspopup="dialog" onClick={(event) => openGallery(title === 'Photography' ? 'photography' : 'technology', event.currentTarget)}>View more</button>
                     )}
                   </article>
                 );
@@ -192,10 +225,15 @@ function AboutPage() {
               <div className="photography-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeGallery(); }}>
                 <section className="photography-modal" role="dialog" aria-modal="true" aria-labelledby="interest-modal-title">
                   <div className="photography-modal-header">
-                    <div><p className="eyebrow">{activeGallery === 'photography' ? 'Behind the lens' : 'Under the hood'}</p><h3 id="interest-modal-title">{activeGallery === 'photography' ? 'Photography by Quang' : 'Cars & technology'}</h3></div>
-                    <button className="photography-modal-close" type="button" onClick={closeGallery} ref={closeGalleryButton} aria-label={`Close ${activeGallery === 'photography' ? 'photography gallery' : 'cars and technology gallery'}`}><FaTimes aria-hidden="true" /></button>
+                    <div><p className="eyebrow">{activeGallery === 'photography' ? 'Behind the lens' : activeGallery === 'personal' ? 'Beyond the résumé' : 'Under the hood'}</p><h3 id="interest-modal-title">{activeGallery === 'photography' ? 'Photography by Quang' : activeGallery === 'personal' ? 'More about Quang' : 'Cars & technology'}</h3></div>
+                    <button className="photography-modal-close" type="button" onClick={closeGallery} ref={closeGalleryButton} aria-label={`Close ${activeGallery === 'photography' ? 'photography gallery' : activeGallery === 'personal' ? 'personal photo gallery' : 'cars and technology gallery'}`}><FaTimes aria-hidden="true" /></button>
                   </div>
-                  {activeGallery === 'photography' ? <>
+                  {activeGallery === 'personal' ? <div className="photography-gallery personal-gallery" aria-label="More photos of Quang">
+                    {personalGallery.map(([src, width, height, alt, caption, shape]) => <figure className={shape === 'portrait' ? 'photography-gallery-portrait' : undefined} key={src}>
+                      <img src={src} width={width} height={height} alt={alt} loading="lazy" />
+                      <figcaption>{caption}</figcaption>
+                    </figure>)}
+                  </div> : activeGallery === 'photography' ? <>
                     <div className="photography-gallery" id="photography-gallery" aria-label="More photographs by Quang">
                       {(showAllPhotography ? photographyGallery : photographyGallery.slice(0, 3)).map(([src, width, height, alt, shape]) => (
                         <figure className={shape === 'portrait' ? 'photography-gallery-portrait' : undefined} key={src}>
@@ -205,10 +243,12 @@ function AboutPage() {
                       ))}
                     </div>
                     {!showAllPhotography && <button className="button photography-view-all" type="button" onClick={() => setShowAllPhotography(true)}>View all</button>}
-                  </> : <figure className="technology-modal-photo">
-                    <img src={techPhoto} width="1050" height="1400" alt="Computer hardware and a custom desktop PC during a hands-on build" />
-                    <figcaption>A hands-on PC build</figcaption>
-                  </figure>}
+                  </> : <div className="photography-gallery technology-gallery" aria-label="More cars and technology photos">
+                    {technologyGallery.map(([src, width, height, alt, caption, shape]) => <figure className={shape === 'portrait' ? 'photography-gallery-portrait' : undefined} key={src}>
+                      <img src={src} width={width} height={height} alt={alt} loading="lazy" />
+                      <figcaption>{caption}</figcaption>
+                    </figure>)}
+                  </div>}
                 </section>
               </div>
             )}

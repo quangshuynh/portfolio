@@ -43,7 +43,11 @@
 .about-location { display: flex; align-items: center; gap: .5rem; margin: 1.25rem 0 1.8rem; color: var(--accent-dark); font-weight: 750; }
 .about-prose p { color: var(--muted); font-size: 1.03rem; line-height: 1.78; }
 .about-portrait { width: 100%; max-width: 360px; aspect-ratio: 1; justify-self: end; margin: 0; overflow: hidden; border: 8px solid var(--surface); border-radius: 1rem; box-shadow: var(--shadow); transform: rotate(2deg); }
-.about-portrait img { width: 100%; height: 100%; object-fit: cover; }
+.about-portrait-button { position: relative; display: block; width: 100%; height: 100%; padding: 0; overflow: hidden; border: 0; background: transparent; color: white; cursor: pointer; }
+.about-portrait-button img { width: 100%; height: 100%; object-fit: cover; transition: transform 180ms ease, filter 180ms ease; }
+.about-portrait-button span { position: absolute; right: .8rem; bottom: .8rem; padding: .48rem .7rem; border: 1px solid rgba(255,255,255,.3); border-radius: 999px; background: rgba(7,12,10,.72); font-size: .72rem; font-weight: 800; letter-spacing: .02em; backdrop-filter: blur(6px); transition: background 180ms ease, transform 180ms ease; }
+.about-portrait-button:hover img, .about-portrait-button:focus-visible img { transform: scale(1.025); filter: brightness(.92); }
+.about-portrait-button:hover span, .about-portrait-button:focus-visible span { background: rgba(21,86,65,.92); transform: translateY(-2px); }
 .about-story { display: grid; grid-template-columns: minmax(15rem, .75fr) 1.25fr; gap: clamp(3rem, 9vw, 8rem); }
 .about-story h2, .about-cta h2 { margin: 0; font-family: Circular, sans-serif; font-size: clamp(2.4rem, 5vw, 4rem); line-height: 1.05; letter-spacing: -.045em; }
 .about-quote { margin: 2rem 0 0; padding: 1.2rem 0 0 1.4rem; border-top: 1px solid var(--line); border-left: 3px solid var(--accent); }
@@ -70,7 +74,12 @@
 .photography-gallery figure { position: relative; margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: .8rem; background: var(--surface); }
 .photography-gallery .photography-gallery-portrait { grid-row: span 2; }
 .photography-gallery img { width: 100%; height: 100%; object-fit: cover; }
-.photography-gallery figcaption { position: absolute; right: .65rem; bottom: .65rem; left: .65rem; padding: .65rem .75rem; border-radius: .55rem; background: linear-gradient(90deg, rgba(7, 12, 10, .88), rgba(7, 12, 10, .68)); color: #f5f7f6; font-size: .78rem; font-weight: 650; line-height: 1.35; backdrop-filter: blur(6px); }
+.photography-gallery figcaption { position: absolute; right: .65rem; bottom: .65rem; left: .65rem; padding: .65rem .75rem; border-radius: .55rem; background: linear-gradient(90deg, rgba(7, 12, 10, .88), rgba(7, 12, 10, .68)); color: #f5f7f6; font-size: .78rem; font-weight: 650; line-height: 1.35; opacity: .78; backdrop-filter: blur(6px); }
+.personal-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.personal-gallery .photography-gallery-portrait { grid-row: auto; }
+.personal-gallery figure:first-child img,
+.personal-gallery figure:nth-child(3) img { object-position: center 65%; }
+.technology-gallery { grid-auto-rows: 220px; }
 .photography-view-all { display: flex; margin: 1.5rem auto 0; cursor: pointer; font: inherit; }
 .technology-modal-photo { max-width: 620px; margin: 1.5rem auto 0; }
 .technology-modal-photo img { display: block; width: 100%; max-height: min(64vh, 680px); object-fit: cover; border-radius: .8rem; }
@@ -227,6 +236,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
   .photography-modal-backdrop { align-items: stretch; padding: .75rem; }
   .photography-modal { max-height: calc(100vh - 1.5rem); padding: 1rem; }
   .photography-gallery { grid-template-columns: 1fr; grid-auto-rows: 260px; }
+  .personal-gallery { grid-template-columns: 1fr; }
   .photography-gallery .photography-gallery-portrait { grid-row: auto; min-height: 360px; }
   .pipeline-row { grid-template-columns: 1fr; }
   .gallery-stage { min-height: 300px; }
