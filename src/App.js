@@ -29,7 +29,7 @@ function App() {
   const isAbout = path === `${basePath}/about` || path === '/about';
 
   useEffect(() => {
-    const title = isAbout ? 'About Quang | Quang Huynh' : 'Quang Huynh | Software Engineer';
+    const title = isAbout ? 'Quang Huynh | About Quang' : 'Quang Huynh | Software Engineer';
     const description = isAbout
       ? 'Learn more about Quang Huynh, a software developer and Computer Science student in Rochester, NY, including his background, interests, and approach to engineering.'
       : 'Computer science student with professional software engineering experience building backend, automation, data, API, and full-stack systems.';
