@@ -240,7 +240,12 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
   .about-hero-grid, .about-story { grid-template-columns: 1fr; }
   .about-portrait { width: min(300px, 75%); justify-self: start; }
   .interest-grid { grid-template-columns: repeat(2, 1fr); }
-  .photography-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .photography-gallery { grid-template-columns: 1fr; grid-auto-rows: auto; }
+  .photography-gallery figure { display: flex; flex-direction: column; height: auto; min-height: 0; overflow: hidden; }
+  .photography-gallery img { display: block; width: 100%; height: auto; max-height: none; aspect-ratio: auto; object-fit: contain; flex: none; background: var(--section-alt); }
+  .photography-gallery figcaption { position: static; display: block; width: 100%; padding: .8rem .9rem; border-radius: 0; background: var(--surface); color: var(--muted); font-size: .82rem; line-height: 1.45; opacity: 1; backdrop-filter: none; }
+  .photography-gallery .photography-gallery-portrait { grid-row: auto; min-height: 0; }
+  .personal-gallery { grid-template-columns: 1fr; }
   .kore-team-photo { width: min(100%, 440px); margin-top: 1.5rem; }
 }
 
@@ -255,13 +260,6 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
   .interest-grid, .values-grid { grid-template-columns: 1fr; }
   .photography-modal-backdrop { align-items: stretch; padding: .75rem; }
   .photography-modal { max-height: calc(100dvh - 1.5rem); padding: 1rem; }
-  .photography-gallery { grid-template-columns: 1fr; grid-auto-rows: auto; }
-  .personal-gallery { grid-template-columns: 1fr; }
-  .photography-gallery figure { display: flex; flex-direction: column; overflow: hidden; }
-  .photography-gallery img { width: 100%; height: 260px; flex: 0 0 auto; object-fit: cover; }
-  .photography-gallery figcaption { position: static; padding: .8rem .9rem; border-radius: 0; background: var(--surface); color: var(--muted); font-size: .82rem; line-height: 1.45; opacity: 1; backdrop-filter: none; }
-  .photography-gallery .photography-gallery-portrait { grid-row: auto; min-height: 0; }
-  .photography-gallery .photography-gallery-portrait img { height: 360px; }
   .pipeline-row { grid-template-columns: 1fr; }
   .gallery-stage { min-height: 300px; }
   .foody .gallery-stage { min-height: 420px; }
