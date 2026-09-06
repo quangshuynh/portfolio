@@ -1,7 +1,7 @@
 import React from 'react';
 import { FaArrowRight, FaFilePdf, FaMapMarkerAlt } from 'react-icons/fa';
 import quangPhoto from '../assets/quang.jpg';
-import chiTheCat from '../assets/chi-the-cat.png';
+import SiteNav, { aboutHref } from './siteNav';
 
 /**
  * renders the primary navigation and portfolio introduction
@@ -10,20 +10,7 @@ import chiTheCat from '../assets/chi-the-cat.png';
 function Header() {
   return (
     <header>
-      <nav className="site-nav" aria-label="Primary navigation">
-        <div className="nav-inner">
-          <a className="brand brand-cat" href="#top" aria-label="Chi the cat, back to top">
-            <img src={chiTheCat} alt="" aria-hidden="true" />
-          </a>
-          <div className="nav-links">
-            <a href="#experience">Experience</a>
-            <a href="#projects">Projects</a>
-            <a href="#skills">Skills</a>
-            <a href="#about">About</a>
-            <a href="#contact">Contact</a>
-          </div>
-        </div>
-      </nav>
+      <SiteNav />
 
       <section className="hero" id="top" aria-labelledby="hero-title">
         <div className="hero-inner">
@@ -47,7 +34,14 @@ function Header() {
               View résumé <FaFilePdf aria-hidden="true" />
             </a>
           </div>
-          <img className="hero-photo" src={quangPhoto} alt="Quang Huynh" />
+          <div className="hero-photo-wrap">
+            <a className="hero-photo-link" href={aboutHref} aria-label="About Quang">
+              <img className="hero-photo" src={quangPhoto} alt="Quang Huynh" />
+            </a>
+            <a className="about-float-link" href={aboutHref}>
+              <span>Meet Quang</span><FaArrowRight aria-hidden="true" />
+            </a>
+          </div>
         </div>
       </section>
     </header>

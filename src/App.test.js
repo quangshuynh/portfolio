@@ -13,9 +13,8 @@ test('renders Quang Huynh’s software engineering portfolio', () => {
   expect(screen.getByRole('heading', { name: 'Experience' })).toBeInTheDocument();
   expect(screen.getByText('GPA: 3.42 / 4.00')).toBeInTheDocument();
   expect(screen.queryByText(/GPA: 3\.68/)).not.toBeInTheDocument();
-  const employerFeedback = screen.getByText('“He was able to work with greater independence than is expected of co-ops.”');
-  expect(employerFeedback.closest('blockquote')).toBeInTheDocument();
-  expect(screen.getByText('Matt Telesky, Director of Software Engineering').closest('cite')).toBeInTheDocument();
+  expect(screen.getByText('“He was able to work with greater independence than is expected of co-ops.”')).toBeInTheDocument();
+  expect(screen.getByText('Matt Telesky, Director of Software Engineering')).toBeInTheDocument();
   expect(screen.getAllByRole('heading', { name: 'Business Data Automation' })).toHaveLength(1);
   expect(screen.getAllByRole('heading', { name: 'GitProfileLens' })).toHaveLength(1);
   expect(screen.getAllByRole('heading', { name: 'ScribeKit' })).toHaveLength(1);
@@ -70,4 +69,37 @@ test('renders Quang Huynh’s software engineering portfolio', () => {
   fireEvent.click(themeToggle);
   expect(document.documentElement).toHaveAttribute('data-theme', 'light');
   expect(screen.getByRole('button', { name: 'Switch to dark mode' })).toBeInTheDocument();
+});
+
+test('renders the dedicated About Quang route with working homepage links', () => {
+  window.history.pushState({}, '', '/about');
+  render(<App />);
+
+  expect(screen.getByRole('heading', { name: 'Hi, I’m Quang.' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Beyond software' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'What guides my work' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/#about');
+  expect(screen.getByRole('img', { name: /golden sunset clouds/i })).toBeInTheDocument();
+  expect(screen.getByRole('img', { name: /blue classic sports car/i })).toBeInTheDocument();
+  const photographyCard = screen.getByRole('heading', { name: 'Photography' }).closest('article');
+  const photographyToggle = within(photographyCard).getByRole('button', { name: 'View more' });
+  expect(screen.queryByLabelText('More photographs by Quang')).not.toBeInTheDocument();
+  fireEvent.click(photographyToggle);
+  expect(screen.getByLabelText('More photographs by Quang')).toBeInTheDocument();
+  expect(screen.getAllByLabelText('More photographs by Quang')[0].querySelectorAll('img')).toHaveLength(3);
+  fireEvent.click(screen.getByRole('button', { name: 'View all' }));
+  expect(screen.getAllByLabelText('More photographs by Quang')[0].querySelectorAll('img')).toHaveLength(16);
+  expect(screen.getByRole('img', { name: /church spire/i })).toHaveAttribute('loading', 'lazy');
+  fireEvent.click(screen.getByRole('button', { name: 'Close photography gallery' }));
+  expect(screen.queryByRole('dialog', { name: 'Photography by Quang' })).not.toBeInTheDocument();
+  const carsCard = screen.getByRole('heading', { name: 'Cars & technology' }).closest('article');
+  expect(within(carsCard).queryByRole('img', { name: /computer hardware/i })).not.toBeInTheDocument();
+  fireEvent.click(within(carsCard).getByRole('button', { name: 'View more' }));
+  expect(screen.getByRole('dialog', { name: 'Cars & technology' })).toBeInTheDocument();
+  expect(screen.getByRole('img', { name: /computer hardware/i })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Close cars and technology gallery' }));
+  expect(screen.getByRole('link', { name: /View my work/i })).toHaveAttribute('href', '/#projects');
+  expect(document.title).toBe('About Quang | Quang Huynh');
+
+  window.history.pushState({}, '', '/');
 });

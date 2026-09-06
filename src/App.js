@@ -8,6 +8,7 @@ import TechStack from './components/techstack';
 import MoreProjects from './components/moreProjects';
 import Education from './components/education';
 import Footer from './components/footer';
+import AboutPage from './components/aboutPage';
 
 /**
  * renders the portfolio application
@@ -23,11 +24,33 @@ function App() {
     themeColor?.setAttribute('content', theme === 'dark' ? '#0e1512' : '#f6f4ee');
   }, [theme]);
 
+  const basePath = process.env.PUBLIC_URL || '';
+  const path = window.location.pathname.replace(/\/$/, '');
+  const isAbout = path === `${basePath}/about` || path === '/about';
+
+  useEffect(() => {
+    const title = isAbout ? 'About Quang | Quang Huynh' : 'Quang Huynh | Software Engineer';
+    const description = isAbout
+      ? 'Learn more about Quang Huynh, a software developer and Computer Science student in Rochester, NY, including his background, interests, and approach to engineering.'
+      : 'Computer science student with professional software engineering experience building backend, automation, data, API, and full-stack systems.';
+    const canonicalUrl = `https://quangshuynh.github.io/portfolio${isAbout ? '/about' : '/'}`;
+    document.title = title;
+    document.querySelector('meta[name="description"]')?.setAttribute('content', description);
+    document.querySelector('meta[property="og:title"]')?.setAttribute('content', title);
+    document.querySelector('meta[property="og:description"]')?.setAttribute('content', description);
+    document.querySelector('meta[property="og:url"]')?.setAttribute('content', canonicalUrl);
+    document.querySelector('link[rel="canonical"]')?.setAttribute('href', canonicalUrl);
+  }, [isAbout]);
+
   /**
    * toggles the active color theme
    * :returns: no return value
    */
   const toggleTheme = () => setTheme((current) => current === 'dark' ? 'light' : 'dark');
+
+  if (isAbout) {
+    return <><AboutPage /><ThemeToggle theme={theme} toggleTheme={toggleTheme} /></>;
+  }
 
   return (
     <div className="app-shell">
@@ -41,18 +64,15 @@ function App() {
         <Education />
       </main>
       <Footer />
-      <button
-        className="theme-toggle"
-        type="button"
-        onClick={toggleTheme}
-        aria-pressed={theme === 'light'}
-        aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-      >
-        {theme === 'dark' ? <FaSun aria-hidden="true" /> : <FaMoon aria-hidden="true" />}
-        <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-      </button>
+      <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
     </div>
   );
+}
+
+function ThemeToggle({ theme, toggleTheme }) {
+  return <button className="theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === 'light'} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+    {theme === 'dark' ? <FaSun aria-hidden="true" /> : <FaMoon aria-hidden="true" />}<span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+  </button>;
 }
 
 export default App;
