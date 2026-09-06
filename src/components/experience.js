@@ -20,8 +20,8 @@ function Experience() {
           </div>
 
           <p>
-            Production software engineering across desktop applications,
-            SQL-backed workflows, and enterprise integrations.
+            Production software engineering across .NET desktop applications, 
+            SQL Server workflows, and Boomi/NetSuite enterprise integrations.
           </p>
         </div>
 
@@ -53,21 +53,15 @@ function Experience() {
           <div className="experience-details">
             <ul className="detail-list">
               <li>
-                Developed production features for a large .NET/WPF application
-                using C#, XAML, and MVVM, including search workflows and
-                configurable XML generation for business data imports.
+                Developed C#/.NET WPF features for internal business applications using XAML and MVVM, including a configurable XML-generation workflow for Excel imports and a partial-match search interface for maintenance tooling.
               </li>
 
               <li>
-                Built and modified SQL Server stored procedures and queries
-                supporting order automation, validation, reporting accuracy,
-                and bulk data workflows.
+                Built and modified SQL Server queries and stored procedures for order automation, validation, reporting, and data-quality workflows, including logic that automatically updated shipping methods, order comments, and processing status based on business rules.
               </li>
 
               <li>
-                Improved Boomi and NetSuite integration workflows through
-                enhanced error tracking, resolution tooling, QA test harnesses,
-                and production-failure investigation.
+                Improved Boomi/NetSuite integration reliability and supportability by extending centralized error tracking and manual resolution workflows, building reusable transaction test harnesses, and reproducing production integration failures in QA.
               </li>
             </ul>
 

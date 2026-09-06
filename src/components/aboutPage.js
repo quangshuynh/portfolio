@@ -29,6 +29,7 @@ import waterfallCliffs from '../assets/about/photography/optimized/waterfall-cli
 import whiteCarAtNight from '../assets/about/photography/optimized/white-car-at-night-web.jpg';
 import woodlandFence from '../assets/about/photography/optimized/woodland-fence-web.jpg';
 import woodlandStream from '../assets/about/photography/optimized/woodland-stream-web.jpg';
+import koreTeamLunch from '../assets/about/kore/mission-bbq-kore-team-lunch.jpg';
 import Footer from './footer';
 import SiteNav, { homeHref } from './siteNav';
 
@@ -190,11 +191,40 @@ function AboutPage() {
 
         <section className="page-section" aria-labelledby="path-title">
           <div className="section-inner about-story">
-            <div><p className="eyebrow">My path into software</p><h2 id="path-title">From the classroom to production.</h2></div>
+            <div className="about-story-intro">
+              <p className="eyebrow">My path into software</p>
+              <h2 id="path-title">From the classroom to production.</h2>
+
+              <figure className="kore-team-photo">
+                <img
+                  src={koreTeamLunch}
+                  alt="Quang with members of the KORE Wireless engineering team"
+                  loading="lazy"
+                />
+                <figcaption>
+                  Team lunch near the end of my software engineering co-op at KORE Wireless
+                </figcaption>
+              </figure>
+            </div>
             <div className="about-prose">
-              <p>My first professional software engineering role was at KORE Wireless through RIT’s co-op program. It was the first time I could take what I’d learned in school and apply it to production software used by other people.</p>
-              <p>I worked with C#, .NET/WPF, SQL Server, integrations, automation, testing, and production issue investigation. Being trusted with increasingly independent work confirmed that software engineering was the career I wanted to pursue.</p>
-              <blockquote className="about-quote"><p>“He was able to work with greater independence than is expected of co-ops.”</p><footer><cite>Matt Telesky, Director of Software Engineering</cite></footer></blockquote>
+              <p>
+                My first professional software engineering role was at KORE Wireless through RIT’s co-op program. It was my first opportunity to move beyond coursework and contribute to production systems used to support real business operations.
+              </p>
+
+              <p>
+                Over five months, I went from learning an unfamiliar enterprise codebase and integration environment to taking on increasingly independent engineering work. I learned how much of professional software development happens beyond writing the initial feature: understanding existing systems, tracing failures across applications and databases, testing changes safely, working with other engineers, and maintaining software that people already depend on.
+              </p>
+
+              <p>
+                That experience changed how I approach my own projects. I became much more interested in reliability, failure handling, data correctness, and what happens outside the happy path.
+              </p>
+
+              <blockquote className="about-quote">
+                <p>“He was able to work with greater independence than is expected of co-ops.”</p>
+                <footer>
+                  <cite>Matt Telesky, Director of Software Engineering</cite>
+                </footer>
+              </blockquote>
             </div>
           </div>
         </section>
