@@ -159,10 +159,6 @@ function AboutPage() {
     setLightboxPosition({ x: 0, y: 0 });
   };
 
-  const clampScale = (scale) => {
-    return Math.min(5, Math.max(1, scale));
-  };
-
   const zoomLightbox = useCallback((amount) => {
     setLightboxScale((currentScale) => {
       const nextScale = Math.min(
