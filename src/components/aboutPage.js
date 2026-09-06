@@ -185,9 +185,10 @@ function AboutPage() {
   const handleLightboxWheel = (event) => {
     event.preventDefault();
 
-    zoomLightbox(
-      event.deltaY < 0 ? 0.25 : -0.25
-    );
+    const delta = Math.max(-100, Math.min(100, event.deltaY));
+    const zoomAmount = -delta * 0.0025;
+
+    zoomLightbox(zoomAmount);
   };
 
   const handleLightboxPointerDown = (event) => {
