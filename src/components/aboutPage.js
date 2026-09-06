@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { FaArrowRight, FaCamera, FaCar, FaGamepad, FaMapMarkerAlt, FaMountain, FaMusic, FaTimes, FaUsers } from 'react-icons/fa';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { FaArrowRight, FaCamera, FaCar, FaGamepad, FaMapMarkerAlt, FaMountain, FaMusic, FaTimes, FaUsers, FaMinus, FaPlus, FaSearchPlus } from 'react-icons/fa';
 import quangPhoto from '../assets/about/quang/quang-about-portrait-web.jpg';
 import photographySunset from '../assets/about/photography/quang-photography-sunset-web.jpg';
 import hikingOverlook from '../assets/about/hiking/quang-hiking-overlook-web.jpg';
@@ -115,8 +115,18 @@ const gamingGallery = [
 function AboutPage() {
   const [activeGallery, setActiveGallery] = useState(null);
   const [showAllPhotography, setShowAllPhotography] = useState(false);
+
+  const [lightboxImage, setLightboxImage] = useState(null);
+  const [lightboxScale, setLightboxScale] = useState(1);
+  const [lightboxPosition, setLightboxPosition] = useState({
+    x: 0,
+    y: 0
+  });
+
   const closeGalleryButton = useRef(null);
+  const closeLightboxButton = useRef(null);
   const galleryTrigger = useRef(null);
+  const lightboxDrag = useRef(null);
 
   const openGallery = (gallery, trigger) => {
     galleryTrigger.current = trigger;
@@ -124,45 +134,280 @@ function AboutPage() {
   };
 
   const closeGallery = () => {
+    setLightboxImage(null);
+    setLightboxScale(1);
+    setLightboxPosition({ x: 0, y: 0 });
+
     setActiveGallery(null);
     setShowAllPhotography(false);
   };
 
-  useEffect(() => {
-    if (!activeGallery) return undefined;
+  const openLightbox = (src, alt, caption) => {
+    setLightboxImage({
+      src,
+      alt,
+      caption
+    });
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    closeGalleryButton.current?.focus();
+    setLightboxScale(1);
+    setLightboxPosition({ x: 0, y: 0 });
+  };
 
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        setActiveGallery(null);
-        setShowAllPhotography(false);
+  const closeLightbox = () => {
+    setLightboxImage(null);
+    setLightboxScale(1);
+    setLightboxPosition({ x: 0, y: 0 });
+  };
+
+  const clampScale = (scale) => {
+    return Math.min(5, Math.max(1, scale));
+  };
+
+  const zoomLightbox = useCallback((amount) => {
+    setLightboxScale((currentScale) => {
+      const nextScale = Math.min(
+        5,
+        Math.max(
+          1,
+          Number((currentScale + amount).toFixed(2))
+        )
+      );
+
+      if (nextScale === 1) {
+        setLightboxPosition({ x: 0, y: 0 });
       }
-      if (event.key !== 'Tab') return;
 
-      const modal = closeGalleryButton.current?.closest('.photography-modal');
-      const controls = modal?.querySelectorAll('button:not([disabled])');
-      if (!controls?.length) return;
+      return nextScale;
+    });
+  }, []);
+
+  const resetLightbox = () => {
+    setLightboxScale(1);
+    setLightboxPosition({ x: 0, y: 0 });
+  };
+
+  const handleLightboxWheel = (event) => {
+    event.preventDefault();
+
+    zoomLightbox(
+      event.deltaY < 0 ? 0.25 : -0.25
+    );
+  };
+
+  const handleLightboxPointerDown = (event) => {
+    if (lightboxScale <= 1 || event.button === 2) {
+      return;
+    }
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    lightboxDrag.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: lightboxPosition.x,
+      originY: lightboxPosition.y
+    };
+  };
+
+  const handleLightboxPointerMove = (event) => {
+    const drag = lightboxDrag.current;
+
+    if (
+      !drag ||
+      drag.pointerId !== event.pointerId ||
+      lightboxScale <= 1
+    ) {
+      return;
+    }
+
+    setLightboxPosition({
+      x: drag.originX + event.clientX - drag.startX,
+      y: drag.originY + event.clientY - drag.startY
+    });
+  };
+
+  const handleLightboxPointerUp = (event) => {
+    if (lightboxDrag.current?.pointerId === event.pointerId) {
+      lightboxDrag.current = null;
+
+      if (
+        event.currentTarget.hasPointerCapture(event.pointerId)
+      ) {
+        event.currentTarget.releasePointerCapture(
+          event.pointerId
+        );
+      }
+    }
+  };
+
+  const handleLightboxDoubleClick = () => {
+    if (lightboxScale > 1) {
+      resetLightbox();
+    } else {
+      setLightboxScale(2);
+    }
+  };
+
+useEffect(() => {
+  if (!activeGallery) {
+    return undefined;
+  }
+
+  const previousOverflow =
+    document.body.style.overflow;
+
+  document.body.style.overflow = 'hidden';
+  closeGalleryButton.current?.focus();
+
+  const handleTabKey = (event) => {
+    if (
+      event.key !== 'Tab' ||
+      document.querySelector('.photo-lightbox-backdrop')
+    ) {
+      return;
+    }
+
+    const modal =
+      closeGalleryButton.current?.closest(
+        '.photography-modal'
+      );
+
+    const controls = modal?.querySelectorAll(
+      'button:not([disabled])'
+    );
+
+    if (!controls?.length) {
+      return;
+    }
+
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+
+    if (
+      event.shiftKey &&
+      document.activeElement === first
+    ) {
+      event.preventDefault();
+      last.focus();
+    } else if (
+      !event.shiftKey &&
+      document.activeElement === last
+    ) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  document.addEventListener(
+    'keydown',
+    handleTabKey
+  );
+
+  return () => {
+    document.body.style.overflow =
+      previousOverflow;
+
+    document.removeEventListener(
+      'keydown',
+      handleTabKey
+    );
+
+    galleryTrigger.current?.focus();
+  };
+}, [activeGallery]);
+
+useEffect(() => {
+  if (!activeGallery) {
+    return undefined;
+  }
+
+  const handleKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      if (lightboxImage) {
+        closeLightbox();
+      } else {
+        closeGallery();
+      }
+
+      return;
+    }
+
+    if (!lightboxImage) {
+      return;
+    }
+
+    if (event.key === 'Tab') {
+      const lightbox = document.querySelector(
+        '.photo-lightbox-backdrop'
+      );
+
+      const controls =
+        lightbox?.querySelectorAll(
+          'button:not([disabled])'
+        );
+
+      if (!controls?.length) {
+        return;
+      }
+
       const first = controls[0];
-      const last = controls[controls.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
+      const last =
+        controls[controls.length - 1];
+
+      if (
+        event.shiftKey &&
+        document.activeElement === first
+      ) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
+      } else if (
+        !event.shiftKey &&
+        document.activeElement === last
+      ) {
         event.preventDefault();
         first.focus();
       }
-    };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', handleKeyDown);
-      galleryTrigger.current?.focus();
-    };
-  }, [activeGallery]);
+      return;
+    }
+
+    if (
+      event.key === '+' ||
+      event.key === '='
+    ) {
+      event.preventDefault();
+      zoomLightbox(0.25);
+    } else if (
+      event.key === '-' ||
+      event.key === '_'
+    ) {
+      event.preventDefault();
+      zoomLightbox(-0.25);
+    } else if (event.key === '0') {
+      event.preventDefault();
+      resetLightbox();
+    }
+  };
+
+  document.addEventListener(
+    'keydown',
+    handleKeyDown
+  );
+
+  return () => {
+    document.removeEventListener(
+      'keydown',
+      handleKeyDown
+    );
+  };
+}, [activeGallery, lightboxImage, zoomLightbox]);
+
+useEffect(() => {
+  if (lightboxImage) {
+    closeLightboxButton.current?.focus();
+  }
+}, [lightboxImage]);
 
   return (
     <div className="app-shell about-page">
@@ -284,16 +529,86 @@ function AboutPage() {
                     <button className="photography-modal-close" type="button" onClick={closeGallery} ref={closeGalleryButton} aria-label={`Close ${activeGallery === 'photography' ? 'photography gallery' : activeGallery === 'personal' ? 'personal photo gallery' : activeGallery === 'gaming' ? 'gaming gallery' : 'cars and technology gallery'}`}><FaTimes aria-hidden="true" /></button>
                   </div>
                   {activeGallery === 'personal' ? <div className="photography-gallery personal-gallery" aria-label="More photos of Quang">
-                    {personalGallery.map(([src, width, height, alt, caption, shape]) => <figure className={shape === 'portrait' ? 'photography-gallery-portrait' : undefined} key={src}>
-                      <img src={src} width={width} height={height} alt={alt} loading="lazy" />
-                      <figcaption>{caption}</figcaption>
-                    </figure>)}
+                    {personalGallery.map(
+                      ([src, width, height, alt, caption, shape]) => (
+                        <figure
+                          className={
+                            shape === 'portrait'
+                              ? 'photography-gallery-portrait'
+                              : undefined
+                          }
+                          key={src}
+                        >
+                          <button
+                            className="photography-gallery-image-button"
+                            type="button"
+                            onClick={() =>
+                              openLightbox(src, alt, caption)
+                            }
+                            aria-label={`Open image: ${caption}`}
+                          >
+                            <img
+                              src={src}
+                              width={width}
+                              height={height}
+                              alt={alt}
+                              loading="lazy"
+                            />
+
+                            <span
+                              className="photography-gallery-zoom-hint"
+                              aria-hidden="true"
+                            >
+                              <FaSearchPlus />
+                            </span>
+                          </button>
+
+                          <figcaption>{caption}</figcaption>
+                        </figure>
+                      )
+                    )}
                   </div> : activeGallery === 'photography' ? <>
                     <div className="photography-gallery" id="photography-gallery" aria-label="More photographs by Quang">
                       {(showAllPhotography ? photographyGallery : photographyGallery.slice(0, 3)).map(([src, width, height, alt, shape]) => (
-                        <figure className={shape === 'portrait' ? 'photography-gallery-portrait' : undefined} key={src}>
-                          <img src={src} width={width} height={height} alt={alt} loading="lazy" />
-                          <figcaption>{photographyCaptions[src]}</figcaption>
+                        <figure
+                          className={
+                            shape === 'portrait'
+                              ? 'photography-gallery-portrait'
+                              : undefined
+                          }
+                          key={src}
+                        >
+                          <button
+                            className="photography-gallery-image-button"
+                            type="button"
+                            onClick={() =>
+                              openLightbox(
+                                src,
+                                alt,
+                                photographyCaptions[src]
+                              )
+                            }
+                            aria-label={`Open image: ${photographyCaptions[src]}`}
+                          >
+                            <img
+                              src={src}
+                              width={width}
+                              height={height}
+                              alt={alt}
+                              loading="lazy"
+                            />
+
+                            <span
+                              className="photography-gallery-zoom-hint"
+                              aria-hidden="true"
+                            >
+                              <FaSearchPlus />
+                            </span>
+                          </button>
+
+                          <figcaption>
+                            {photographyCaptions[src]}
+                          </figcaption>
                         </figure>
                       ))}
                     </div>
@@ -305,13 +620,28 @@ function AboutPage() {
                       >
                         {gamingGallery.map(([src, width, height, alt, caption]) => (
                           <figure key={src}>
-                            <img
-                              src={src}
-                              width={width}
-                              height={height}
-                              alt={alt}
-                              loading="lazy"
-                            />
+                            <button
+                              className="photography-gallery-image-button"
+                              type="button"
+                              onClick={() => openLightbox(src, alt, caption)}
+                              aria-label={`Open image: ${caption}`}
+                            >
+                              <img
+                                src={src}
+                                width={width}
+                                height={height}
+                                alt={alt}
+                                loading="lazy"
+                              />
+
+                              <span
+                                className="photography-gallery-zoom-hint"
+                                aria-hidden="true"
+                              >
+                                <FaSearchPlus />
+                              </span>
+                            </button>
+
                             <figcaption>{caption}</figcaption>
                           </figure>
                         ))}
@@ -330,19 +660,128 @@ function AboutPage() {
                             }
                             key={src}
                           >
-                            <img
-                              src={src}
-                              width={width}
-                              height={height}
-                              alt={alt}
-                              loading="lazy"
-                            />
+                            <button
+                              className="photography-gallery-image-button"
+                              type="button"
+                              onClick={() => openLightbox(src, alt, caption)}
+                              aria-label={`Open image: ${caption}`}
+                            >
+                              <img
+                                src={src}
+                                width={width}
+                                height={height}
+                                alt={alt}
+                                loading="lazy"
+                              />
+
+                              <span
+                                className="photography-gallery-zoom-hint"
+                                aria-hidden="true"
+                              >
+                                <FaSearchPlus />
+                              </span>
+                            </button>
+
                             <figcaption>{caption}</figcaption>
                           </figure>
                         ))}
                       </div>
                     )}
                 </section>
+              </div>
+            )}
+
+            {lightboxImage && (
+              <div
+                className="photo-lightbox-backdrop"
+                role="dialog"
+                aria-modal="true"
+                aria-label={
+                  lightboxImage.caption
+                    ? `Image viewer: ${lightboxImage.caption}`
+                    : 'Image viewer'
+                }
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) {
+                    closeLightbox();
+                  }
+                }}
+              >
+                <div className="photo-lightbox-toolbar">
+                  <div
+                    className="photo-lightbox-zoom-controls"
+                    aria-label="Image zoom controls"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => zoomLightbox(-0.25)}
+                      disabled={lightboxScale <= 1}
+                      aria-label="Zoom out"
+                    >
+                      <FaMinus aria-hidden="true" />
+                    </button>
+
+                    <button
+                      className="photo-lightbox-scale"
+                      type="button"
+                      onClick={resetLightbox}
+                      aria-label="Reset zoom"
+                    >
+                      {Math.round(lightboxScale * 100)}%
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => zoomLightbox(0.25)}
+                      disabled={lightboxScale >= 5}
+                      aria-label="Zoom in"
+                    >
+                      <FaPlus aria-hidden="true" />
+                    </button>
+                  </div>
+
+                  <button
+                    className="photo-lightbox-close"
+                    type="button"
+                    onClick={closeLightbox}
+                    ref={closeLightboxButton}
+                    aria-label="Close image viewer"
+                  >
+                    <FaTimes aria-hidden="true" />
+                  </button>
+                </div>
+
+                <div
+                  className={`photo-lightbox-stage${
+                    lightboxScale > 1 ? ' is-zoomed' : ''
+                  }`}
+                  onWheel={handleLightboxWheel}
+                  onPointerDown={handleLightboxPointerDown}
+                  onPointerMove={handleLightboxPointerMove}
+                  onPointerUp={handleLightboxPointerUp}
+                  onPointerCancel={handleLightboxPointerUp}
+                  onDoubleClick={handleLightboxDoubleClick}
+                >
+                  <img
+                    src={lightboxImage.src}
+                    alt={lightboxImage.alt}
+                    draggable="false"
+                    style={{
+                      transform: `translate3d(${lightboxPosition.x}px, ${lightboxPosition.y}px, 0) scale(${lightboxScale})`
+                    }}
+                  />
+                </div>
+
+                {lightboxImage.caption && (
+                  <p className="photo-lightbox-caption">
+                    {lightboxImage.caption}
+                  </p>
+                )}
+
+                <p className="photo-lightbox-help">
+                  Scroll or use + and − to zoom. Drag to pan.
+                  Double-click to zoom. Press 0 to reset.
+                </p>
               </div>
             )}
           </div>
