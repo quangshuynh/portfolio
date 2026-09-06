@@ -107,7 +107,7 @@ test('renders the dedicated About Quang route with working homepage links', () =
   expect(screen.getByRole('img', { name: /Singer Porsche/i })).toHaveAttribute('loading', 'lazy');
   fireEvent.click(screen.getByRole('button', { name: 'Close cars and technology gallery' }));
   expect(screen.getByRole('link', { name: /View my work/i })).toHaveAttribute('href', '/#projects');
-  expect(document.title).toBe('About Quang | Quang Huynh');
+  expect(document.title).toBe('Quang Huynh | About Quang');
 
   window.history.pushState({}, '', '/');
 });
