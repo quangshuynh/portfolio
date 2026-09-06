@@ -2,6 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <script>
+      (function () {
+        var requestedUrl = sessionStorage.getItem('portfolio-spa-path');
+        if (requestedUrl) {
+          sessionStorage.removeItem('portfolio-spa-path');
+          var url = new URL(requestedUrl);
+          window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+        }
+      }());
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0e1512" />
     <meta name="description" content="Computer science student with professional software engineering experience building backend, automation, data, API, and full-stack systems." />
