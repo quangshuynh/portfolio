@@ -81,6 +81,12 @@ test('renders the dedicated About Quang route with working homepage links', () =
   expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/#about');
   expect(screen.getByRole('img', { name: /golden sunset clouds/i })).toBeInTheDocument();
   expect(screen.getByRole('img', { name: /blue classic sports car/i })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'View more photos of Quang' }));
+  const personalGallery = screen.getByLabelText('More photos of Quang');
+  expect(personalGallery.querySelectorAll('img')).toHaveLength(3);
+  expect(within(personalGallery).getByRole('img', { name: /shoreline at sunset/i })).toHaveAttribute('loading', 'lazy');
+  fireEvent.click(screen.getByRole('button', { name: 'Close personal photo gallery' }));
+  expect(screen.queryByRole('dialog', { name: 'More about Quang' })).not.toBeInTheDocument();
   const photographyCard = screen.getByRole('heading', { name: 'Photography' }).closest('article');
   const photographyToggle = within(photographyCard).getByRole('button', { name: 'View more' });
   expect(screen.queryByLabelText('More photographs by Quang')).not.toBeInTheDocument();
@@ -97,6 +103,8 @@ test('renders the dedicated About Quang route with working homepage links', () =
   fireEvent.click(within(carsCard).getByRole('button', { name: 'View more' }));
   expect(screen.getByRole('dialog', { name: 'Cars & technology' })).toBeInTheDocument();
   expect(screen.getByRole('img', { name: /computer hardware/i })).toBeInTheDocument();
+  expect(screen.getByLabelText('More cars and technology photos').querySelectorAll('img')).toHaveLength(5);
+  expect(screen.getByRole('img', { name: /Singer Porsche/i })).toHaveAttribute('loading', 'lazy');
   fireEvent.click(screen.getByRole('button', { name: 'Close cars and technology gallery' }));
   expect(screen.getByRole('link', { name: /View my work/i })).toHaveAttribute('href', '/#projects');
   expect(document.title).toBe('About Quang | Quang Huynh');
