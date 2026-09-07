@@ -23,12 +23,18 @@ function Education() {
         </div>
         <div className="about-grid">
           <div className="about-card">
-            <p>I’m a software developer based in Rochester, NY.</p>
+            <p>
+              I’m a software developer and computer science student based in Rochester, NY.
+            </p>
             <p>
               I gravitate toward practical software: backend systems, developer tools,
               automation, native applications, and projects where reliability and
               thoughtful engineering matter.
             </p>
+
+            <a className="text-link" href="/portfolio/about">
+              More about me →
+            </a>
           </div>
           <article className="education-card">
             <div className="education-title">
