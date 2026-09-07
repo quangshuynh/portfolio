@@ -190,12 +190,46 @@ export function SpotifyListening() {
   }, [requestAttempt]);
 
   const retry = () => {
+    spotifyTracksCache = null;
+    spotifyTracksCachedAt = null;
+    spotifyRequest = null;
+
     setStatus('loading');
     setRequestAttempt((attempt) => attempt + 1);
   };
 
   if (status === 'loading') return <div className="spotify-listening"><p>Loading recent listening...</p></div>;
-  if (status === 'error') return <div className="spotify-listening"><div className="spotify-listening-status"><p>Couldn’t load my recent listening right now.</p><button className="interest-view-more" type="button" onClick={retry}>Retry</button><a className="interest-view-more" href={SPOTIFY_PROFILE} target="_blank" rel="noreferrer">View my Spotify</a></div></div>;
+  if (status === 'error') {
+    return (
+      <div className="spotify-listening">
+        <div className="spotify-listening-status" role="status">
+          <div className="spotify-listening-status-copy">
+            <strong>Couldn’t load recent listening</strong>
+            <p>Spotify activity is temporarily unavailable.</p>
+          </div>
+
+          <div className="spotify-listening-actions">
+            <button
+              className="spotify-retry-button"
+              type="button"
+              onClick={retry}
+            >
+              Retry
+            </button>
+
+            <a
+              className="spotify-profile-link spotify-profile-link-error"
+              href={SPOTIFY_PROFILE}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View my Spotify ↗
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (!tracks.length) return <div className="spotify-listening"><p>No recent listening activity to show.</p></div>;
 
   const sortedTracks = [...tracks].sort((first, second) => {
