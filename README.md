@@ -2,9 +2,11 @@
 
 Personal portfolio highlighting professional software engineering experience, backend and data-oriented projects, technical breadth, and education.
 
+[![CI](https://github.com/quangshuynh/portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/quangshuynh/portfolio/actions/workflows/ci.yml)
+
 **Live site:** [quanghuynh.com](https://quanghuynh.com/)
-[quangshuynh.github.io/portfolio](https://quangshuynh.github.io/portfolio/)
-[quangs.vercel.app](https://quangs.vercel.app/)
+
+Also deployed to [GitHub Pages](https://quangshuynh.github.io/portfolio/) and [Vercel](https://quangs.vercel.app/).
 
 ## Stack
 
@@ -12,7 +14,7 @@ Personal portfolio highlighting professional software engineering experience, ba
 - Plain CSS with responsive layouts and reduced-motion support
 - React Icons
 - GitHub Pages deployment through GitHub Actions
-- Vercel deployment from the same production build
+- Vercel deployment from the same repository
 
 ## Local development
 
@@ -30,10 +32,10 @@ npm run build
 
 ## Deployment
 
-- Every pull request and push runs CI (`.github/workflows/ci.yml`): install, test, and production build.
-- Every push to `main` also runs the Pages deployment workflow (`.github/workflows/deploy-pages.yml`). That workflow sets `PUBLIC_URL=/portfolio`, builds the site, and publishes the `build` directory to GitHub Pages.
-- Vercel uses the normal `npm run build` command without `PUBLIC_URL`, so assets and routes are generated for the domain root. `vercel.json` rewrites application routes such as `/about` to the SPA entry point.
+- CI runs on every pull request and push, installing dependencies, running tests, and verifying a production build.
+- Pushes to `main` also deploy to GitHub Pages through `.github/workflows/deploy-pages.yml`. The workflow builds with `PUBLIC_URL=/portfolio` so assets resolve correctly under the GitHub Pages subpath.
+- Vercel builds the same repository with the standard `npm run build` command for root deployment. `vercel.json` provides SPA rewrites so routes such as `/about` work when opened or refreshed directly.
 
-No manual deploy step is needed — merging to `main` is enough.
+No manual deployment step is required after merging to `main`.
 
-Portfolio content is curated locally in `src/components`, so featured work remains available without relying on the GitHub API at runtime.
+Portfolio content is maintained locally in `src/components`, keeping featured project information available without depending on the GitHub API at runtime.
