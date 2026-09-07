@@ -6,7 +6,7 @@ Personal portfolio highlighting professional software engineering experience, ba
 
 ## Stack
 
-- React 18 and Create React App
+- React 19 and Create React App
 - Plain CSS with responsive layouts and reduced-motion support
 - React Icons
 - GitHub Pages deployment through GitHub Actions
