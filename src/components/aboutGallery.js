@@ -137,6 +137,7 @@ export function SpotifyListening() {
 export function PhotoLightbox({ image, onClose }) {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const dialogRef = useRef(null);
   const closeButton = useRef(null);
   const stage = useRef(null);
   const imageElement = useRef(null);
@@ -171,7 +172,7 @@ export function PhotoLightbox({ image, onClose }) {
       else if (event.key === '+' || event.key === '=') { event.preventDefault(); zoom(.25); }
       else if (event.key === '-' || event.key === '_') { event.preventDefault(); zoom(-.25); }
       else if (event.key === '0') { event.preventDefault(); reset(); }
-      else trapTabKey(event, event.currentTarget.querySelector('.photo-lightbox-backdrop'));
+      else trapTabKey(event, dialogRef.current);
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
@@ -190,13 +191,13 @@ export function PhotoLightbox({ image, onClose }) {
   };
 
   return (
-    <div className="photo-lightbox-backdrop" role="dialog" aria-modal="true" aria-label={image.caption ? `Image viewer: ${image.caption}` : 'Image viewer'} aria-describedby={helpId} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div ref={dialogRef} className="photo-lightbox-backdrop" role="dialog" aria-modal="true" aria-label={image.caption ? `Image viewer: ${image.caption}` : 'Image viewer'} aria-describedby={helpId} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div className="photo-lightbox-toolbar"><div className="photo-lightbox-zoom-controls" aria-label="Image zoom controls"><button type="button" onClick={() => zoom(-.25)} disabled={scale <= 1} aria-label="Zoom out"><FaMinus aria-hidden="true" /></button><button className="photo-lightbox-scale" type="button" onClick={reset} aria-label="Reset zoom">{Math.round(scale * 100)}%</button><button type="button" onClick={() => zoom(.25)} disabled={scale >= 5} aria-label="Zoom in"><FaPlus aria-hidden="true" /></button></div><button className="photo-lightbox-close" type="button" onClick={onClose} ref={closeButton} aria-label="Close image viewer"><FaTimes aria-hidden="true" /></button></div>
       <div ref={stage} className={`photo-lightbox-stage${scale > 1 ? ' is-zoomed' : ''}`} onWheel={(event) => { event.preventDefault(); zoom(-Math.max(-100, Math.min(100, event.deltaY)) * .0025); }} onPointerDown={(event) => { if (scale <= 1 || event.button === 2) return; event.currentTarget.setPointerCapture(event.pointerId); drag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, origin: position }; }} onPointerMove={(event) => { const current = drag.current; if (!current || current.pointerId !== event.pointerId || scale <= 1) return; setPosition(clampPosition({ x: current.origin.x + event.clientX - current.startX, y: current.origin.y + event.clientY - current.startY })); }} onPointerUp={endDrag} onPointerCancel={endDrag} onDoubleClick={() => scale > 1 ? reset() : zoom(1)}>
         <img ref={imageElement} src={image.src} alt={image.alt} draggable="false" style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})` }} />
       </div>
       {image.caption && <p className="photo-lightbox-caption">{image.caption}</p>}
-      <p className="photo-lightbox-help" id={helpId}>Scroll or use + and − to zoom. Drag to pan. Double-click to zoom. Press 0 to reset.</p>
+      <p className="photo-lightbox-help" id={helpId}>Scroll to zoom · Drag to pan · 0 to reset</p>
     </div>
   );
 }
@@ -234,5 +235,49 @@ export function InterestGalleryModal({ activeGallery, galleries, photographyCapt
   else if (activeGallery === 'photography') content = <><PhotoGallery items={showAllPhotography ? galleries.photography : galleries.photography.slice(0, 3)} label="More photographs by Quang" captions={photographyCaptions} onOpen={openLightbox} />{!showAllPhotography && <button className="button photography-view-all" type="button" onClick={() => setShowAllPhotography(true)}>View all</button>}</>;
   else content = <PhotoGallery items={galleries[activeGallery]} label={galleryLabels[activeGallery]} className={`${activeGallery}-gallery`} onOpen={openLightbox} />;
 
-  return <div className="photography-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="photography-modal" role="dialog" aria-modal={lightboxImage ? undefined : 'true'} aria-hidden={lightboxImage ? 'true' : undefined} inert={Boolean(lightboxImage)} aria-labelledby="interest-modal-title"><div className="photography-modal-header"><div><p className="eyebrow">{eyebrow}</p><h3 id="interest-modal-title">{title}</h3></div><button className="photography-modal-close" type="button" onClick={onClose} ref={closeButton} aria-label={closeLabel}><FaTimes aria-hidden="true" /></button></div>{content}</section>{lightboxImage && <PhotoLightbox image={lightboxImage} onClose={closeLightbox} />}</div>;
+  return (
+    <div
+      className="photography-modal-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <section
+        className="photography-modal"
+        role="dialog"
+        aria-modal={lightboxImage ? undefined : "true"}
+        aria-hidden={lightboxImage ? "true" : undefined}
+        inert={Boolean(lightboxImage)}
+        aria-labelledby="interest-modal-title"
+      >
+        <div className="photography-modal-header">
+          <div>
+            <p className="eyebrow">{eyebrow}</p>
+            <h3 id="interest-modal-title">{title}</h3>
+          </div>
+
+          <button
+            className="photography-modal-close"
+            type="button"
+            onClick={onClose}
+            ref={closeButton}
+            aria-label={closeLabel}
+          >
+            <FaTimes aria-hidden="true" />
+          </button>
+        </div>
+
+        {content}
+      </section>
+
+      {lightboxImage && (
+        <PhotoLightbox
+          image={lightboxImage}
+          onClose={closeLightbox}
+        />
+      )}
+    </div>
+  );
 }
