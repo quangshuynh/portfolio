@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FaArrowRight, FaCamera, FaCar, FaGamepad, FaMapMarkerAlt, FaMountain, FaMusic, FaTimes, FaUsers, FaMinus, FaPlus, FaSearchPlus } from 'react-icons/fa';
+import { FaArrowRight, FaCamera, FaCar, FaGamepad, FaMapMarkerAlt, FaMountain, FaMusic, FaTimes, FaUsers, FaMinus, FaPlus, FaSearchPlus, FaGithub } from 'react-icons/fa';
 import quangPhoto from '../assets/about/quang/quang-about-portrait-web.jpg';
 import photographySunset from '../assets/about/photography/quang-photography-sunset-web.jpg';
 import hikingOverlook from '../assets/about/hiking/quang-hiking-overlook-web.jpg';
@@ -87,7 +87,7 @@ const photographyCaptions = {
   [lakesideSunset]: 'Pastel skies over Irondequoit Bay',
   [niagaraOverlook]: 'Mist and skyline at Niagara Falls',
   [forestCanopy]: 'Looking up through the trees at Bristol Mountain',
-  [waterfallCliffs]: 'Water carving through the rock in Ithaca',
+  [waterfallCliffs]: 'Ithaca Falls in the summer',
   [woodlandStream]: 'Following a stream through the woods at Cornell',
   [historicBuilding]: 'Rush Rhees Library through bare winter branches',
   [hilltopCastle]: 'Looking out from Cornell’s stone architecture',
@@ -934,7 +934,7 @@ useEffect(() => {
           </div>
         </section>
 
-        <section className="about-cta" aria-labelledby="about-cta-title"><div className="section-inner"><p className="eyebrow">Selected work</p><h2 id="about-cta-title">Want to see what I’ve been building?</h2><div className="hero-actions"><a className="button" href={homeHref('#projects')}>View projects <FaArrowRight aria-hidden="true" /></a><a className="button button-secondary" href="https://github.com/quangshuynh" target="_blank" rel="noreferrer">GitHub</a></div></div></section>
+        <section className="about-cta" aria-labelledby="about-cta-title"><div className="section-inner"><p className="eyebrow">Selected work</p><h2 id="about-cta-title">Want to see what I’ve been building?</h2><div className="hero-actions"><a className="button" href={homeHref('#projects')}>View projects <FaArrowRight aria-hidden="true" /></a><a className="button button-secondary" href="https://github.com/quangshuynh" target="_blank" rel="noreferrer"><FaGithub aria-hidden="true" /> GitHub</a></div></div></section>
       </main>
       <Footer />
     </div>
