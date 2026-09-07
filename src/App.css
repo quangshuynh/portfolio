@@ -68,6 +68,12 @@
 .interest-card h3 svg { flex: 0 0 auto; color: var(--accent); font-size: 1.05rem; }
 .interest-card p, .value-card p { margin: 0; color: var(--muted); line-height: 1.65; }
 .interest-card-media { height: 170px; margin: calc(0px - clamp(1.35rem, 3vw, 2rem)) calc(0px - clamp(1.35rem, 3vw, 2rem)) 1.3rem; overflow: hidden; border-radius: .75rem .75rem 0 0; }
+.interest-card-media-button, .kore-team-photo-button { position: relative; display: block; width: 100%; padding: 0; overflow: hidden; border: 0; background: transparent; cursor: zoom-in; text-align: inherit; }
+.interest-card-media-button { margin: calc(0px - clamp(1.35rem, 3vw, 2rem)) calc(0px - clamp(1.35rem, 3vw, 2rem)) 1.3rem; width: calc(100% + 2 * clamp(1.35rem, 3vw, 2rem)); border-radius: .75rem .75rem 0 0; }
+.interest-card-media-button .interest-card-media { margin: 0; }
+.interest-card-media-button:hover img, .interest-card-media-button:focus-visible img, .kore-team-photo-button:hover img, .kore-team-photo-button:focus-visible img { transform: scale(1.025); filter: brightness(.9); }
+.interest-card-media-button img, .kore-team-photo-button img { transition: transform 180ms ease, filter 180ms ease; }
+.interest-card-media-button .photography-gallery-zoom-hint, .kore-team-photo-button .photography-gallery-zoom-hint { opacity: .82; transform: translateY(0); }
 .interest-card-media img { width: 100%; height: 100%; object-fit: cover; }
 .interest-card-media-photography img { object-position: center 67%; }
 .interest-card-media-hiking img { object-position: center 70%; }
@@ -159,6 +165,18 @@
 .spotify-track small {
   display: block;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spotify-track .spotify-track-time {
+  display: block;
+  margin-top: .35rem;
+  overflow: hidden;
+  color: var(--tag-text);
+  font-size: .7rem;
+  font-weight: 650;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -477,6 +495,7 @@
 .about-cta h2 { max-width: 760px; }
 .kore-team-photo { width: min(100%, 390px); margin: 2rem 0 0; overflow: hidden; border: 1px solid var(--line); border-radius: .8rem; background: var(--surface); box-shadow: var(--shadow); } 
 .kore-team-photo img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; object-position: center 80%; } 
+.kore-team-photo-button { border-radius: .8rem .8rem 0 0; }
 .kore-team-photo figcaption { margin: 0; padding: .75rem .9rem .85rem; color: var(--muted); background: var(--surface); font-size: .78rem; line-height: 1.45; } 
 @media (max-width: 700px) {
   .kore-team-photo {
@@ -740,6 +759,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 
   .about-portrait-button img,
   .about-portrait-button span,
+  .interest-card-media-button img,
+  .kore-team-photo-button img,
   .photography-gallery-image-button img,
   .photography-gallery-zoom-hint,
   .spotify-track,

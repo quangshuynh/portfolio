@@ -25,6 +25,7 @@ function getSpotifyTracks() {
 
 const galleryMetadata = {
   photography: ['Behind the lens', 'Photography by Quang', 'Close photography gallery'],
+  hiking: ['On the trail', 'Hiking', 'Close hiking gallery'],
   personal: ['Beyond the résumé', 'More about Quang', 'Close personal photo gallery'],
   gaming: ['In the game', 'Gaming', 'Close gaming gallery'],
   family: ['Close to home', 'Family & friends', 'Close family and friends gallery'],
@@ -40,14 +41,6 @@ const focusableSelector = [
   'textarea:not([disabled])',
   '[tabindex]:not([tabindex="-1"])'
 ].join(',');
-const interestGalleries = {
-  Photography: 'photography',
-  'Cars & technology': 'technology',
-  Gaming: 'gaming',
-  Music: 'music',
-  'Time with family & friends': 'family'
-};
-
 const galleryLabels = {
   personal: 'More photos of Quang',
   gaming: 'More gaming screenshots',
@@ -70,19 +63,35 @@ function trapTabKey(event, container) {
   }
 }
 
-export function InterestCard({ icon: Icon, title, copy, photos, onOpen }) {
-  const gallery = interestGalleries[title];
+export function ImageTrigger({ children, className, label, onOpen }) {
+  return (
+    <button className={className} type="button" aria-label={label} aria-haspopup="dialog" onClick={(event) => onOpen(event.currentTarget)}>
+      {children}
+      <span className="photography-gallery-zoom-hint" aria-hidden="true"><FaSearchPlus /></span>
+    </button>
+  );
+}
+
+export function InterestCard({ icon: Icon, title, copy, photos, gallery, galleryItems, hasNonPhotoContent = false, onOpen, onOpenImage }) {
+  const visibleSources = new Set((photos ?? []).map(({ src }) => src));
+  const hasAdditionalContent = hasNonPhotoContent || Boolean(
+    gallery && galleryItems?.some(({ src }) => !visibleSources.has(src))
+  );
+  const featuredImage = photos?.[0];
+  const media = photos && (
+    <div className={`interest-card-media${photos.length > 1 ? ' interest-card-media-pair' : ''}${title === 'Photography' ? ' interest-card-media-photography' : ''}${title === 'Music' ? ' interest-card-media-music' : ''}${title === 'Hiking' ? ' interest-card-media-hiking' : ''}${title === 'Time with family & friends' ? ' interest-card-media-family' : ''}`}>
+      {photos.map(({ src, width, height, alt }) => <img src={src} width={width} height={height} alt={alt} key={src} />)}
+    </div>
+  );
 
   return (
     <article className="interest-card">
-      {photos && (
-        <div className={`interest-card-media${photos.length > 1 ? ' interest-card-media-pair' : ''}${title === 'Photography' ? ' interest-card-media-photography' : ''}${title === 'Music' ? ' interest-card-media-music' : ''}${title === 'Hiking' ? ' interest-card-media-hiking' : ''}${title === 'Time with family & friends' ? ' interest-card-media-family' : ''}`}>
-          {photos.map(([src, width, height, alt]) => <img src={src} width={width} height={height} alt={alt} key={src} />)}
-        </div>
-      )}
+      {featuredImage
+        ? <ImageTrigger className="interest-card-media-button" label={`Open featured ${title} image`} onOpen={(trigger) => onOpenImage(featuredImage, trigger)}>{media}</ImageTrigger>
+        : media}
       <h3><Icon aria-hidden="true" />{title}</h3>
       <p>{copy}</p>
-      {gallery && (
+      {hasAdditionalContent && (
         <button className="interest-view-more" type="button" aria-haspopup="dialog" onClick={(event) => onOpen(gallery, event.currentTarget)}>
           {gallery === 'music' ? 'View listening' : 'View more'}
         </button>
@@ -91,24 +100,51 @@ export function InterestCard({ icon: Icon, title, copy, photos, onOpen }) {
   );
 }
 
-function PhotoGallery({ items, label, className = '', captions, onOpen }) {
+function PhotoGallery({ items, label, className = '', onOpen }) {
   return (
     <div className={`photography-gallery${className ? ` ${className}` : ''}`} id={label === 'More photographs by Quang' ? 'photography-gallery' : undefined} aria-label={label}>
-      {items.map(([src, width, height, alt, itemCaption, shape]) => {
-        const caption = captions?.[src] ?? itemCaption;
-        const portrait = captions ? itemCaption === 'portrait' : shape === 'portrait';
+      {items.map(({ src, width, height, alt, caption, shape }) => {
+        const portrait = shape === 'portrait';
         return (
           <figure className={portrait ? 'photography-gallery-portrait' : undefined} key={src}>
-            <button className="photography-gallery-image-button" type="button" onClick={(event) => onOpen(src, alt, caption, event.currentTarget)} aria-label={`Open image: ${caption}`}>
+            <ImageTrigger className="photography-gallery-image-button" onOpen={(trigger) => onOpen(src, alt, caption, trigger)} label={`Open image: ${caption}`}>
               <img src={src} width={width} height={height} alt={alt} loading="lazy" />
-              <span className="photography-gallery-zoom-hint" aria-hidden="true"><FaSearchPlus /></span>
-            </button>
+            </ImageTrigger>
             <figcaption>{caption}</figcaption>
           </figure>
         );
       })}
     </div>
   );
+}
+
+export function formatRelativePlayTime(playedAt, now = Date.now()) {
+  const playedDate = new Date(playedAt);
+  const nowDate = new Date(now);
+  if (!playedAt || Number.isNaN(playedDate.getTime()) || Number.isNaN(nowDate.getTime())) return null;
+
+  const elapsedSeconds = Math.max(0, Math.floor((nowDate.getTime() - playedDate.getTime()) / 1000));
+  if (elapsedSeconds < 60) return 'Just now';
+  const minutes = Math.floor(elapsedSeconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  if (hours < 48) return 'Yesterday';
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} days ago`;
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    ...(playedDate.getFullYear() !== nowDate.getFullYear() ? { year: 'numeric' } : {})
+  }).format(playedDate);
+}
+
+function TrackPlayTime({ playedAt }) {
+  const relativeTime = formatRelativePlayTime(playedAt);
+  if (!relativeTime) return null;
+  const playedDate = new Date(playedAt);
+  const exactTime = playedDate.toLocaleString();
+  return <time className="spotify-track-time" dateTime={playedDate.toISOString()} title={exactTime} aria-label={`Played ${exactTime}`}>{relativeTime}</time>;
 }
 
 export function SpotifyListening() {
@@ -131,7 +167,7 @@ export function SpotifyListening() {
   if (status === 'error') return <div className="spotify-listening"><div className="spotify-listening-status"><p>Couldn’t load my recent listening right now.</p><a className="interest-view-more" href={SPOTIFY_PROFILE} target="_blank" rel="noreferrer">View my Spotify</a></div></div>;
   if (!tracks.length) return <div className="spotify-listening"><p>No recent listening activity to show.</p></div>;
 
-  return <div className="spotify-listening"><div className="spotify-track-list">{tracks.map((track) => <a className="spotify-track" href={track.url} target="_blank" rel="noreferrer" key={`${track.id}-${track.playedAt}`}>{track.image && <img src={track.image} alt="" loading="lazy" />}<div><strong>{track.name}</strong><span>{track.artist}</span><small>{track.album}</small></div></a>)}</div><a className="interest-view-more spotify-profile-link" href={SPOTIFY_PROFILE} target="_blank" rel="noreferrer">View my Spotify</a></div>;
+  return <div className="spotify-listening"><div className="spotify-track-list">{tracks.map((track) => <a className="spotify-track" href={track.url} target="_blank" rel="noreferrer" key={`${track.id}-${track.playedAt}`}>{track.image && <img src={track.image} alt="" loading="lazy" />}<div><strong>{track.name}</strong><span>{track.artist}</span><small>{track.album}</small><TrackPlayTime playedAt={track.playedAt} /></div></a>)}</div><a className="interest-view-more spotify-profile-link" href={SPOTIFY_PROFILE} target="_blank" rel="noreferrer">View my Spotify</a></div>;
 }
 
 export function PhotoLightbox({ image, onClose }) {
@@ -146,10 +182,9 @@ export function PhotoLightbox({ image, onClose }) {
 
   const clampPosition = useCallback((next, nextScale = scale) => {
     const stageRect = stage.current?.getBoundingClientRect();
-    const imageRect = imageElement.current?.getBoundingClientRect();
-    if (!stageRect || !imageRect || nextScale <= 1) return { x: 0, y: 0 };
-    const baseWidth = imageRect.width / scale;
-    const baseHeight = imageRect.height / scale;
+    const baseWidth = imageElement.current?.offsetWidth;
+    const baseHeight = imageElement.current?.offsetHeight;
+    if (!stageRect || !baseWidth || !baseHeight || nextScale <= 1) return { x: 0, y: 0 };
     const maxX = Math.max(0, (baseWidth * nextScale - stageRect.width) / 2);
     const maxY = Math.max(0, (baseHeight * nextScale - stageRect.height) / 2);
     return { x: Math.max(-maxX, Math.min(maxX, next.x)), y: Math.max(-maxY, Math.min(maxY, next.y)) };
@@ -202,7 +237,7 @@ export function PhotoLightbox({ image, onClose }) {
   );
 }
 
-export function InterestGalleryModal({ activeGallery, galleries, photographyCaptions, onClose }) {
+export function InterestGalleryModal({ activeGallery, galleries, onClose }) {
   const [showAllPhotography, setShowAllPhotography] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
   const lightboxTrigger = useRef(null);
@@ -232,7 +267,7 @@ export function InterestGalleryModal({ activeGallery, galleries, photographyCapt
   const openLightbox = (src, alt, caption, trigger) => { lightboxTrigger.current = trigger; lightboxOpen.current = true; setLightboxImage({ src, alt, caption }); };
   let content;
   if (activeGallery === 'music') content = <SpotifyListening />;
-  else if (activeGallery === 'photography') content = <><PhotoGallery items={showAllPhotography ? galleries.photography : galleries.photography.slice(0, 3)} label="More photographs by Quang" captions={photographyCaptions} onOpen={openLightbox} />{!showAllPhotography && <button className="button photography-view-all" type="button" onClick={() => setShowAllPhotography(true)}>View all</button>}</>;
+  else if (activeGallery === 'photography') content = <><PhotoGallery items={showAllPhotography ? galleries.photography : galleries.photography.slice(0, 3)} label="More photographs by Quang" onOpen={openLightbox} />{!showAllPhotography && <button className="button photography-view-all" type="button" onClick={() => setShowAllPhotography(true)}>View all</button>}</>;
   else content = <PhotoGallery items={galleries[activeGallery]} label={galleryLabels[activeGallery]} className={`${activeGallery}-gallery`} onOpen={openLightbox} />;
 
   return (

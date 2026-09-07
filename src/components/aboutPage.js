@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FaArrowRight, FaCamera, FaCar, FaGamepad, FaMapMarkerAlt, FaMountain, FaMusic, FaUsers, FaGithub } from 'react-icons/fa';
 import quangPhoto from '../assets/about/quang/quang-about-portrait-web.jpg';
 import photographySunset from '../assets/about/photography/quang-photography-sunset-web.jpg';
@@ -35,7 +35,7 @@ import woodlandStream from '../assets/about/photography/optimized/woodland-strea
 import koreTeamLunch from '../assets/about/kore/mission-bbq-kore-team-lunch-web.jpg';
 import Footer from './footer';
 import SiteNav, { homeHref } from './siteNav';
-import { InterestCard, InterestGalleryModal } from './aboutGallery';
+import { ImageTrigger, InterestCard, InterestGalleryModal, PhotoLightbox } from './aboutGallery';
 
 const interests = [
   [
@@ -71,12 +71,12 @@ const interests = [
 ];
 
 const interestPhotos = {
-  Photography: [[photographySunset, 1200, 1500, 'Golden sunset clouds reflected across waves at the edge of a lake']],
-  Hiking: [[hikingOverlook, 1600, 1150, 'Quang standing with arms outstretched at a scenic lake overlook']],
-  Music: [[musicPhoto, 1200, 1600, 'Quang playing guitar']],
-  'Cars & technology': [[carsPhoto, 1400, 933, 'A blue classic sports car displayed behind a fence']],
-  Gaming: [[minecraftWorld, 1600, 861, 'A detailed Minecraft survival world with a castle, village, farms, and modern buildings at sunset']],
-  'Time with family & friends': [[familyPhoto, 1400, 1050, 'Family gathering during a visit to Vietnam']]
+  Photography: [{ src: photographySunset, width: 1200, height: 1500, alt: 'Golden sunset clouds reflected across waves at the edge of a lake' }],
+  Hiking: [{ src: hikingOverlook, width: 1600, height: 1150, alt: 'Quang standing with arms outstretched at a scenic lake overlook' }],
+  Music: [{ src: musicPhoto, width: 1200, height: 1600, alt: 'Quang playing guitar' }],
+  'Cars & technology': [{ src: carsPhoto, width: 1400, height: 933, alt: 'A blue classic sports car displayed behind a fence' }],
+  Gaming: [{ src: minecraftWorld, width: 1600, height: 861, alt: 'A detailed Minecraft survival world with a castle, village, farms, and modern buildings at sunset' }],
+  'Time with family & friends': [{ src: familyPhoto, width: 1400, height: 1050, alt: 'Family gathering during a visit to Vietnam' }]
 };
 
 const values = [
@@ -95,68 +95,54 @@ const values = [
 ];
 
 const photographyGallery = [
-  [architectureSpire, 933, 1400, 'A church spire rising between brick buildings at Cornell', 'portrait'],
-  [birdOnLawn, 933, 1400, 'A small bird standing in vivid green grass at Cornell', 'portrait'],
-  [libraryReadingRoom, 1400, 933, 'Warm reading lamps glowing inside the wood-paneled Rush Rhees Library'],
-  [riversideBridge, 1050, 1400, 'A red metal bridge crossing the Genesee River', 'portrait'],
-  [horizonSunset, 1050, 1400, 'The sun meeting a dark lake at the horizon', 'portrait'],
-  [riversideWaterfall, 1400, 1050, 'A broad waterfall surrounded by summer greenery at Rochester Lower Falls'],
-  [lakesideSunset, 1400, 1050, 'Pink sunset clouds above a calm lakeshore in Irondequoit Bay'],
-  [niagaraOverlook, 1050, 1400, 'A distant city skyline beyond a misty waterfall at Niagara Falls', 'portrait'],
-  [forestCanopy, 927, 1400, 'Looking upward through a dense green forest canopy at Bristol Mountain', 'portrait'],
-  [waterfallCliffs, 927, 1400, 'Layered waterfalls flowing over a rocky cliff in Ithaca', 'portrait'],
-  [woodlandStream, 933, 1400, 'A narrow stream winding through a sunlit woodland at Cornell', 'portrait'],
-  [historicBuilding, 1400, 933, 'Rush Rhees Library framed by bare winter branches'],
-  [hilltopCastle, 933, 1400, 'A stone building overlooking a wide valley at Cornell', 'portrait'],
-  [blueCactusSign, 1400, 933, 'A colorful Blue Cactus sign on a brick street at the University of Rochester'],
-  [woodlandFence, 1400, 1050, 'A wooden fence bordering a green woodland'],
-  [whiteCarAtNight, 1400, 1050, '2011 Subaru WRX at night']
+  { src: architectureSpire, width: 933, height: 1400, alt: 'A church spire rising between brick buildings at Cornell', caption: "Looking up through Cornell's brick architecture", shape: 'portrait' },
+  { src: birdOnLawn, width: 933, height: 1400, alt: 'A small bird standing in vivid green grass at Cornell', caption: 'A quiet moment on the grass at Cornell', shape: 'portrait' },
+  { src: libraryReadingRoom, width: 1400, height: 933, alt: 'Warm reading lamps glowing inside the wood-paneled Rush Rhees Library', caption: 'Warm light inside Rush Rhees Library', shape: 'landscape' },
+  { src: riversideBridge, width: 1050, height: 1400, alt: 'A red metal bridge crossing the Genesee River', caption: 'Red steel bridge over the Genesee River', shape: 'portrait' },
+  { src: horizonSunset, width: 1050, height: 1400, alt: 'The sun meeting a dark lake at the horizon', caption: 'Watching the last light disappear over the water', shape: 'portrait' },
+  { src: riversideWaterfall, width: 1400, height: 1050, alt: 'A broad waterfall surrounded by summer greenery at Rochester Lower Falls', caption: 'Rochester Lower Falls overlook', shape: 'landscape' },
+  { src: lakesideSunset, width: 1400, height: 1050, alt: 'Pink sunset clouds above a calm lakeshore in Irondequoit Bay', caption: 'Pastel skies over Irondequoit Bay', shape: 'landscape' },
+  { src: niagaraOverlook, width: 1050, height: 1400, alt: 'A distant city skyline beyond a misty waterfall at Niagara Falls', caption: 'Mist and skyline at Niagara Falls', shape: 'portrait' },
+  { src: forestCanopy, width: 927, height: 1400, alt: 'Looking upward through a dense green forest canopy at Bristol Mountain', caption: 'Looking up through the trees at Bristol Mountain', shape: 'portrait' },
+  { src: waterfallCliffs, width: 927, height: 1400, alt: 'Layered waterfalls flowing over a rocky cliff in Ithaca', caption: 'Ithaca Falls in the summer', shape: 'portrait' },
+  { src: woodlandStream, width: 933, height: 1400, alt: 'A narrow stream winding through a sunlit woodland at Cornell', caption: 'Following a stream through the woods at Cornell', shape: 'portrait' },
+  { src: historicBuilding, width: 1400, height: 933, alt: 'Rush Rhees Library framed by bare winter branches', caption: 'Rush Rhees Library through bare winter branches', shape: 'landscape' },
+  { src: hilltopCastle, width: 933, height: 1400, alt: 'A stone building overlooking a wide valley at Cornell', caption: 'Looking out from Cornell stone architecture', shape: 'portrait' },
+  { src: blueCactusSign, width: 1400, height: 933, alt: 'A colorful Blue Cactus sign on a brick street at the University of Rochester', caption: 'A little color near the University of Rochester', shape: 'landscape' },
+  { src: woodlandFence, width: 1400, height: 1050, alt: 'A wooden fence bordering a green woodland', caption: 'At the edge of the woods in Durand Eastman Park', shape: 'landscape' },
+  { src: whiteCarAtNight, width: 1400, height: 1050, alt: '2011 Subaru WRX at night', caption: 'My 2011 Subaru WRX after dark', shape: 'landscape' }
 ];
 
-const photographyCaptions = {
-  [architectureSpire]: 'Looking up through Cornell’s brick architecture',
-  [birdOnLawn]: 'A quiet moment on the grass at Cornell',
-  [libraryReadingRoom]: 'Warm light inside Rush Rhees Library',
-  [riversideBridge]: 'Red steel bridge over the Genesee River',
-  [horizonSunset]: 'Watching the last light disappear over the water',
-  [riversideWaterfall]: 'Rochester Lower Falls overlook',
-  [lakesideSunset]: 'Pastel skies over Irondequoit Bay',
-  [niagaraOverlook]: 'Mist and skyline at Niagara Falls',
-  [forestCanopy]: 'Looking up through the trees at Bristol Mountain',
-  [waterfallCliffs]: 'Ithaca Falls in the summer',
-  [woodlandStream]: 'Following a stream through the woods at Cornell',
-  [historicBuilding]: 'Rush Rhees Library through bare winter branches',
-  [hilltopCastle]: 'Looking out from Cornell’s stone architecture',
-  [blueCactusSign]: 'A little color near the University of Rochester',
-  [woodlandFence]: 'At the edge of the woods in Durand Eastman Park',
-  [whiteCarAtNight]: 'My 2011 Subaru WRX after dark'
-};
-
 const personalGallery = [
-  [quangBeachSunset, 927, 1400, 'Quang standing at the shoreline at sunset', 'Sunset at Charlotte Beach', 'portrait'],
-  [quangArtSpace, 927, 1400, 'Quang seated on a large illuminated sphere in a modern interior', 'Exploring Cornell’s architecture', 'portrait'],
-  [quangWaterfront, 933, 1400, 'Quang standing beside a wide body of water at dusk', 'An evening at Webster Park', 'portrait']
+  { src: quangBeachSunset, width: 927, height: 1400, alt: 'Quang standing at the shoreline at sunset', caption: 'Sunset at Charlotte Beach', shape: 'portrait' },
+  { src: quangArtSpace, width: 927, height: 1400, alt: 'Quang seated on a large illuminated sphere in a modern interior', caption: 'Exploring Cornell architecture', shape: 'portrait' },
+  { src: quangWaterfront, width: 933, height: 1400, alt: 'Quang standing beside a wide body of water at dusk', caption: 'An evening at Webster Park', shape: 'portrait' }
 ];
 
 const technologyGallery = [
-  [techPhoto, 1050, 1400, 'Computer hardware and a custom desktop PC during a hands-on build', 'Building a PC from the ground up', 'portrait'],
-  [customPcGreen, 1050, 1400, 'A custom desktop PC illuminated by green lighting', 'My finished RTX 4070 Ti build', 'portrait'],
-  [graphicsCard, 1050, 1400, 'An RTX 3080 Ti graphics card held above a work surface', 'Getting an RTX 3080 Ti Founders Edition ready for its next build', 'portrait'],
-  [carShowPorsche, 1400, 984, 'A black Singer Porsche 930 displayed at Little Speed Shop Cars & Coffee', 'A Singer Porsche 930 at The Little Speed Shop’s Cars & Coffee'],
-  [carShowSubaruEngine, 1400, 889, 'Modified blue Blobeye STI with its engine bay open at a car show', 'Taking a closer look under the hood of this Blobeye STI']
+  { src: techPhoto, width: 1050, height: 1400, alt: 'Computer hardware and a custom desktop PC during a hands-on build', caption: 'Building a PC from the ground up', shape: 'portrait' },
+  { src: customPcGreen, width: 1050, height: 1400, alt: 'A custom desktop PC illuminated by green lighting', caption: 'My finished RTX 4070 Ti build', shape: 'portrait' },
+  { src: graphicsCard, width: 1050, height: 1400, alt: 'An RTX 3080 Ti graphics card held above a work surface', caption: 'Getting an RTX 3080 Ti Founders Edition ready for its next build', shape: 'portrait' },
+  { src: carShowPorsche, width: 1400, height: 984, alt: 'A black Singer Porsche 930 displayed at Little Speed Shop Cars & Coffee', caption: 'A Singer Porsche 930 at The Little Speed Shop Cars & Coffee', shape: 'landscape' },
+  { src: carShowSubaruEngine, width: 1400, height: 889, alt: 'Modified blue Blobeye STI with its engine bay open at a car show', caption: 'Taking a closer look under the hood of this Blobeye STI', shape: 'landscape' }
 ];
 
 const gamingGallery = [
-  [csgoScreenshot, 1152, 864, 'Counter-Strike: Global Offensive menu screenshot', 'CS:GO, 2022']
+  { src: csgoScreenshot, width: 1152, height: 864, alt: 'Counter-Strike: Global Offensive menu screenshot', caption: 'CS:GO, 2022', shape: 'landscape' }
 ];
 
 const familyGallery = [
-  [familyPhoto, 1400, 1050, 'Family gathering during a visit to Vietnam', 'Visiting family in Vietnam, 2023']
+  { src: familyPhoto, width: 1400, height: 1050, alt: 'Family gathering during a visit to Vietnam', caption: 'Visiting family in Vietnam, 2023', shape: 'landscape' }
 ];
+
+const galleries = { personal: personalGallery, photography: photographyGallery, technology: technologyGallery, gaming: gamingGallery, family: familyGallery };
+const interestGalleryKeys = { Photography: 'photography', Music: 'music', 'Cars & technology': 'technology', Gaming: 'gaming', 'Time with family & friends': 'family' };
 
 function AboutPage() {
   const [activeGallery, setActiveGallery] = useState(null);
+  const [directLightbox, setDirectLightbox] = useState(null);
   const galleryTrigger = useRef(null);
+  const lightboxTrigger = useRef(null);
 
   const openGallery = useCallback((gallery, trigger) => {
     galleryTrigger.current = trigger;
@@ -167,6 +153,23 @@ function AboutPage() {
     setActiveGallery(null);
     requestAnimationFrame(() => galleryTrigger.current?.focus());
   }, []);
+
+  const openDirectLightbox = useCallback((image, trigger) => {
+    lightboxTrigger.current = trigger;
+    setDirectLightbox(image);
+  }, []);
+
+  const closeDirectLightbox = useCallback(() => {
+    setDirectLightbox(null);
+    requestAnimationFrame(() => lightboxTrigger.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    if (!directLightbox) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [directLightbox]);
 
   return (
     <div className="app-shell about-page">
@@ -219,11 +222,9 @@ function AboutPage() {
               <h2 id="path-title">From coursework to production software</h2>
 
               <figure className="kore-team-photo">
-                <img
-                  src={koreTeamLunch}
-                  alt="Quang with members of the KORE Wireless engineering team"
-                  loading="lazy"
-                />
+                <ImageTrigger className="kore-team-photo-button" label="Open KORE Wireless team lunch photo" onOpen={(trigger) => openDirectLightbox({ src: koreTeamLunch, alt: 'Quang seated at lunch with members of the KORE Wireless engineering team', caption: 'Team lunch near the end of my software engineering co-op at KORE Wireless' }, trigger)}>
+                  <img src={koreTeamLunch} alt="Quang seated at lunch with members of the KORE Wireless engineering team" loading="lazy" />
+                </ImageTrigger>
                 <figcaption>
                   Team lunch near the end of my software engineering co-op at KORE Wireless
                 </figcaption>
@@ -268,21 +269,18 @@ function AboutPage() {
                   title={title}
                   copy={copy}
                   photos={interestPhotos[title]}
+                  gallery={interestGalleryKeys[title]}
+                  galleryItems={galleries[interestGalleryKeys[title]]}
+                  hasNonPhotoContent={interestGalleryKeys[title] === 'music'}
                   onOpen={openGallery}
+                  onOpenImage={(image, trigger) => openDirectLightbox({ src: image.src, alt: image.alt, caption: image.caption ?? title }, trigger)}
                 />
               ))}
             </div>
             {activeGallery && (
               <InterestGalleryModal
                 activeGallery={activeGallery}
-                galleries={{
-                  personal: personalGallery,
-                  photography: photographyGallery,
-                  technology: technologyGallery,
-                  gaming: gamingGallery,
-                  family: familyGallery
-                }}
-                photographyCaptions={photographyCaptions}
+                galleries={galleries}
                 onClose={closeGallery}
               />
             )}
@@ -312,6 +310,7 @@ function AboutPage() {
           </div>
         </section>
       </main>
+      {directLightbox && <PhotoLightbox image={directLightbox} onClose={closeDirectLightbox} />}
       <Footer />
     </div>
   );

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import AboutPage from './aboutPage';
+import { formatRelativePlayTime } from './aboutGallery';
 
 function renderAboutPage() {
   window.history.pushState({}, '', '/about');
@@ -11,40 +12,64 @@ function photographyTrigger() {
     .getByRole('button', { name: 'View more' });
 }
 
-test('family card opens its gallery and existing lightbox accessibly', async () => {
+test('only interests with additional content render actions while every featured image opens directly', () => {
   renderAboutPage();
   const familyCard = screen.getByRole('heading', {
     name: 'Time with family & friends'
   }).closest('article');
-  const preview = within(familyCard).getByRole('img', {
-    name: 'Family gathering during a visit to Vietnam'
-  });
-  const trigger = within(familyCard).getByRole('button', { name: 'View more' });
+  const hikingCard = screen.getByRole('heading', { name: 'Hiking' }).closest('article');
+  expect(within(familyCard).queryByRole('button', { name: 'View more' })).not.toBeInTheDocument();
+  expect(within(hikingCard).queryByRole('button', { name: 'View more' })).not.toBeInTheDocument();
+  expect(within(familyCard).getByRole('button', { name: 'Open featured Time with family & friends image' })).toBeInTheDocument();
+  expect(within(hikingCard).getByRole('button', { name: 'Open featured Hiking image' })).toBeInTheDocument();
 
-  expect(preview.getAttribute('src')).toContain('vietnam2023-web.jpg');
+  for (const title of ['Photography', 'Cars & technology', 'Gaming']) {
+    const card = screen.getByRole('heading', { name: title }).closest('article');
+    expect(within(card).getAllByRole('button')).toHaveLength(2);
+    expect(within(card).getByRole('button', { name: 'View more' })).toBeInTheDocument();
+  }
+  const musicCard = screen.getByRole('heading', { name: 'Music' }).closest('article');
+  expect(within(musicCard).getByRole('button', { name: 'View listening' })).toBeInTheDocument();
+});
+
+test.each([
+  ['Photography', 'Photography'],
+  ['Gaming', 'Gaming'],
+  ['Hiking', 'Hiking']
+])('clicking the %s featured image opens that image in the lightbox', (title, caption) => {
+  renderAboutPage();
+  const card = screen.getByRole('heading', { name: title }).closest('article');
+  fireEvent.click(within(card).getByRole('button', { name: `Open featured ${title} image` }));
+  expect(screen.getByRole('dialog', { name: `Image viewer: ${caption}` })).toBeInTheDocument();
+});
+
+test('formats recent play times and handles invalid timestamps', () => {
+  const now = new Date('2026-09-07T16:00:00Z');
+  expect(formatRelativePlayTime('2026-09-07T15:59:45Z', now)).toBe('Just now');
+  expect(formatRelativePlayTime('2026-09-07T15:52:00Z', now)).toBe('8 minutes ago');
+  expect(formatRelativePlayTime('2026-09-07T15:00:00Z', now)).toBe('1 hour ago');
+  expect(formatRelativePlayTime('2026-09-06T15:00:00Z', now)).toBe('Yesterday');
+  expect(formatRelativePlayTime('2026-09-04T16:00:00Z', now)).toBe('3 days ago');
+  expect(formatRelativePlayTime(null, now)).toBeNull();
+  expect(formatRelativePlayTime('not-a-date', now)).toBeNull();
+});
+
+test('KORE image opens the direct lightbox and Escape restores focus', async () => {
+  renderAboutPage();
+  const trigger = screen.getByRole('button', { name: 'Open KORE Wireless team lunch photo' });
   fireEvent.click(trigger);
-  expect(screen.getByRole('dialog', { name: 'Family & friends' })).toBeInTheDocument();
-  expect(screen.getByText('Visiting family in Vietnam, 2023')).toBeInTheDocument();
-
-  const imageTrigger = screen.getByRole('button', {
-    name: 'Open image: Visiting family in Vietnam, 2023'
-  });
-  fireEvent.click(imageTrigger);
-
-  const visibleDialogs = screen.getAllByRole('dialog');
-  expect(visibleDialogs).toHaveLength(1);
-  expect(visibleDialogs[0]).toHaveAccessibleName(
-    'Image viewer: Visiting family in Vietnam, 2023'
-  );
-  const parentGallery = document.querySelector('.photography-modal');
-  expect(parentGallery).toHaveAttribute('aria-hidden', 'true');
-  expect(parentGallery).not.toHaveAttribute('aria-modal');
-  expect(parentGallery).toHaveAttribute('inert');
-
+  expect(screen.getByRole('dialog', { name: /Image viewer: Team lunch/i })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Zoom in' })).toBeInTheDocument();
   fireEvent.keyDown(document, { key: 'Escape' });
-  await waitFor(() => expect(imageTrigger).toHaveFocus());
-  expect(screen.getByRole('dialog', { name: 'Family & friends' })).toBeInTheDocument();
+  await waitFor(() => expect(trigger).toHaveFocus());
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
 
+test('About portrait still opens the personal gallery and restores focus', async () => {
+  renderAboutPage();
+  const trigger = screen.getByRole('button', { name: 'View more photos of Quang' });
+  fireEvent.click(trigger);
+  expect(screen.getByRole('dialog', { name: 'More about Quang' })).toBeInTheDocument();
   fireEvent.keyDown(document, { key: 'Escape' });
   await waitFor(() => expect(trigger).toHaveFocus());
 });
@@ -127,5 +152,28 @@ test('Spotify stays lazy and shows its loading and failure states', async () => 
     'href',
     'https://open.spotify.com/user/foahrtqqvuuvt7wscxub4uerd'
   );
+  global.fetch = originalFetch;
+});
+
+test('Spotify renders valid play times semantically and omits invalid ones', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      tracks: [
+        { id: 'valid', name: 'First song', artist: 'Artist', album: 'Album', url: 'https://open.spotify.com/track/valid', playedAt: new Date(Date.now() - 8 * 60 * 1000).toISOString() },
+        { id: 'invalid', name: 'Second song', artist: 'Artist', album: 'Album', url: 'https://open.spotify.com/track/invalid', playedAt: 'invalid' }
+      ]
+    })
+  });
+  renderAboutPage();
+  const musicCard = screen.getByRole('heading', { name: 'Music' }).closest('article');
+  fireEvent.click(within(musicCard).getByRole('button', { name: 'View listening' }));
+  await screen.findByText('First song');
+  const time = screen.getByText('8 minutes ago');
+  expect(time.tagName).toBe('TIME');
+  expect(time).toHaveAttribute('dateTime');
+  expect(time).toHaveAttribute('title');
+  expect(screen.getByText('Second song').parentElement.querySelector('time')).not.toBeInTheDocument();
   global.fetch = originalFetch;
 });
