@@ -190,9 +190,11 @@ function AboutPage() {
                 </p>
 
                 <p>
-                  I became interested in computers through games and hardware, and that curiosity
-                  eventually led me into programming. I tend to learn by taking an idea or problem 
-                  far enough to encounter the harder engineering questions behind it.
+                  Games and computer hardware were what first pulled me toward computers.
+                  Growing up, I experimented with Minecraft mods and servers, rooted and
+                  jailbroken devices, and generally tried to understand how the software
+                  around me worked. That curiosity eventually turned into wanting to build
+                  software of my own.
                 </p>
 
                 <p>
