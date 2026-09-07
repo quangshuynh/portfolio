@@ -6,6 +6,7 @@ import gitProfileLensResults from '../assets/gitprofilelens-results-vert.png';
 import scribeKitLogo from '../assets/logos/scribekit-logo.png';
 import scribeKitApp from '../assets/scribekit-app.png';
 import scribeKitTranscript from '../assets/scribekit-md.png';
+import PersonalityButton from './personalityButton';
 
 const projects = [
   {
@@ -173,10 +174,10 @@ function FeaturedProjects() {
                 </ul>
                 <p className="project-stack"><strong>Stack</strong> {project.stack}</p>
                 <div className="project-actions">
-                  <a className="button" href={project.github} target="_blank" rel="noreferrer" aria-label={`View ${project.name} code`}>View code <FaGithub aria-hidden="true" /></a>
-                  {index === 0 && <a className="button button-secondary" href={`${project.github}#architecture`} target="_blank" rel="noreferrer" aria-label="Read Business Data Automation architecture">Read architecture <FaExternalLinkAlt aria-hidden="true" /></a>}
-                  {project.live && <a className="button button-secondary" href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live demo`}>Live demo <FaExternalLinkAlt aria-hidden="true" /></a>}
-                  {project.documentation && <a className="button button-secondary" href={project.documentation} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} documentation`}>Documentation <FaExternalLinkAlt aria-hidden="true" /></a>}
+                  <PersonalityButton href={project.github} target="_blank" rel="noreferrer" aria-label={`View ${project.name} code`}>View code <FaGithub aria-hidden="true" /></PersonalityButton>
+                  {index === 0 && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-architecture`} href={`${project.github}#architecture`} target="_blank" rel="noreferrer" aria-label="Read Business Data Automation architecture">Read architecture <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
+                  {project.live && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-live`} href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live demo`}>Live demo <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
+                  {project.documentation && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-documentation`} href={project.documentation} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} documentation`}>Documentation <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
                 </div>
               </div>
             </article>

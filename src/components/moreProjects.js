@@ -7,6 +7,7 @@ import moverGitLogo from '../assets/logos/git-mover-logo.png';
 import salonFlowLogo from '../assets/logos/salonflow-logo.png';
 import caseNotesLogo from '../assets/logos/casenotes-logo.png';
 import steamLogo from '../assets/logos/Steam-icon-logo.svg';
+import PersonalityButton from './personalityButton';
 
 const projects = [
   {
@@ -129,15 +130,17 @@ function MoreProjects() {
         </div>
         {projects.length > 3 && (
           <div className="more-toggle">
-            <button
-              className="button button-secondary"
+            <PersonalityButton
+              secondary
+              personality="auto"
+              personalityKey="more-projects-toggle"
               type="button"
               aria-expanded={showAllProjects}
               aria-controls="more-projects-grid"
               onClick={() => setShowAllProjects((isExpanded) => !isExpanded)}
             >
               {showAllProjects ? 'Show fewer projects' : 'View more projects'}
-            </button>
+            </PersonalityButton>
           </div>
         )}
       </div>

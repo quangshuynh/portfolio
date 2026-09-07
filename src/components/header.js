@@ -2,6 +2,7 @@ import React from 'react';
 import { FaArrowRight, FaFilePdf, FaMapMarkerAlt } from 'react-icons/fa';
 import quangPhoto from '../assets/quang.jpg';
 import SiteNav, { aboutHref } from './siteNav';
+import PersonalityButton from './personalityButton';
 
 /**
  * renders the primary navigation and portfolio introduction
@@ -29,7 +30,7 @@ function Header() {
             <span>Native applications</span>
           </div>
           <div className="hero-actions">
-            <a className="button" href="#projects">View my work <FaArrowRight aria-hidden="true" /></a>
+            <PersonalityButton href="#projects" personality="rally" personalityKey="hero-view-work">View my work <FaArrowRight aria-hidden="true" /></PersonalityButton>
             <a className="button button-secondary" href={`${process.env.PUBLIC_URL}/Quang_Huynh_Resume.pdf`} target="_blank" rel="noreferrer">
               View résumé <FaFilePdf aria-hidden="true" />
             </a>
