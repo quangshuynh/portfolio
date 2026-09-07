@@ -27,11 +27,26 @@ const galleryMetadata = {
   photography: ['Behind the lens', 'Photography by Quang', 'Close photography gallery'],
   personal: ['Beyond the résumé', 'More about Quang', 'Close personal photo gallery'],
   gaming: ['In the game', 'Gaming', 'Close gaming gallery'],
+  family: ['Close to home', 'Family & friends', 'Close family and friends gallery'],
   music: ['On repeat', 'What I’ve been listening to', 'Close music activity'],
   technology: ['Under the hood', 'Cars & technology', 'Close cars and technology gallery']
 };
 
 const focusableSelector = 'button:not([disabled]), a[href]';
+const interestGalleries = {
+  Photography: 'photography',
+  'Cars & technology': 'technology',
+  Gaming: 'gaming',
+  Music: 'music',
+  'Time with family & friends': 'family'
+};
+
+const galleryLabels = {
+  personal: 'More photos of Quang',
+  gaming: 'More gaming screenshots',
+  technology: 'More cars and technology photos',
+  family: 'Family and friends photos'
+};
 
 function trapTabKey(event, container) {
   if (event.key !== 'Tab') return;
@@ -49,15 +64,12 @@ function trapTabKey(event, container) {
 }
 
 export function InterestCard({ icon: Icon, title, copy, photos, onOpen }) {
-  const gallery = title === 'Photography' ? 'photography'
-    : title === 'Cars & technology' ? 'technology'
-      : title === 'Gaming' ? 'gaming'
-        : title === 'Music' ? 'music' : null;
+  const gallery = interestGalleries[title];
 
   return (
     <article className="interest-card">
       {photos && (
-        <div className={`interest-card-media${photos.length > 1 ? ' interest-card-media-pair' : ''}${title === 'Photography' ? ' interest-card-media-photography' : ''}${title === 'Music' ? ' interest-card-media-music' : ''}${title === 'Hiking' ? ' interest-card-media-hiking' : ''}`}>
+        <div className={`interest-card-media${photos.length > 1 ? ' interest-card-media-pair' : ''}${title === 'Photography' ? ' interest-card-media-photography' : ''}${title === 'Music' ? ' interest-card-media-music' : ''}${title === 'Hiking' ? ' interest-card-media-hiking' : ''}${title === 'Time with family & friends' ? ' interest-card-media-family' : ''}`}>
           {photos.map(([src, width, height, alt]) => <img src={src} width={width} height={height} alt={alt} key={src} />)}
         </div>
       )}
@@ -213,7 +225,7 @@ export function InterestGalleryModal({ activeGallery, galleries, photographyCapt
   let content;
   if (activeGallery === 'music') content = <SpotifyListening />;
   else if (activeGallery === 'photography') content = <><PhotoGallery items={showAllPhotography ? galleries.photography : galleries.photography.slice(0, 3)} label="More photographs by Quang" captions={photographyCaptions} onOpen={openLightbox} />{!showAllPhotography && <button className="button photography-view-all" type="button" onClick={() => setShowAllPhotography(true)}>View all</button>}</>;
-  else content = <PhotoGallery items={galleries[activeGallery]} label={activeGallery === 'personal' ? 'More photos of Quang' : activeGallery === 'gaming' ? 'More gaming screenshots' : 'More cars and technology photos'} className={`${activeGallery}-gallery`} onOpen={openLightbox} />;
+  else content = <PhotoGallery items={galleries[activeGallery]} label={galleryLabels[activeGallery]} className={`${activeGallery}-gallery`} onOpen={openLightbox} />;
 
-  return <div className="photography-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="photography-modal" role="dialog" aria-modal="true" aria-labelledby="interest-modal-title"><div className="photography-modal-header"><div><p className="eyebrow">{eyebrow}</p><h3 id="interest-modal-title">{title}</h3></div><button className="photography-modal-close" type="button" onClick={onClose} ref={closeButton} aria-label={closeLabel}><FaTimes aria-hidden="true" /></button></div>{content}</section>{lightboxImage && <PhotoLightbox image={lightboxImage} onClose={closeLightbox} />}</div>;
+  return <div className="photography-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="photography-modal" role="dialog" aria-modal={lightboxImage ? undefined : 'true'} aria-hidden={lightboxImage ? 'true' : undefined} inert={lightboxImage ? '' : undefined} aria-labelledby="interest-modal-title"><div className="photography-modal-header"><div><p className="eyebrow">{eyebrow}</p><h3 id="interest-modal-title">{title}</h3></div><button className="photography-modal-close" type="button" onClick={onClose} ref={closeButton} aria-label={closeLabel}><FaTimes aria-hidden="true" /></button></div>{content}</section>{lightboxImage && <PhotoLightbox image={lightboxImage} onClose={closeLightbox} />}</div>;
 }

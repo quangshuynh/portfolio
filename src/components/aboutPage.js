@@ -15,6 +15,7 @@ import quangBeachSunset from '../assets/about/quang/quang-beach-sunset-web.jpg';
 import quangArtSpace from '../assets/about/quang/quang-art-space-web.jpg';
 import quangWaterfront from '../assets/about/quang/quang-waterfront-web.jpg';
 import musicPhoto from '../assets/about/music/quang-guitar-web.jpg';
+import familyPhoto from '../assets/about/family/vietnam2023-web.jpg';
 import architectureSpire from '../assets/about/photography/optimized/architecture-spire-web.jpg';
 import birdOnLawn from '../assets/about/photography/optimized/bird-on-lawn-web.jpg';
 import blueCactusSign from '../assets/about/photography/optimized/blue-cactus-sign-web.jpg';
@@ -74,13 +75,14 @@ const interestPhotos = {
   Hiking: [[hikingOverlook, 1600, 1150, 'Quang standing with arms outstretched at a scenic lake overlook']],
   Music: [[musicPhoto, 1200, 1600, 'Quang playing guitar']],
   'Cars & technology': [[carsPhoto, 1400, 933, 'A blue classic sports car displayed behind a fence']],
-  Gaming: [[minecraftWorld, 1600, 861, 'A detailed Minecraft survival world with a castle, village, farms, and modern buildings at sunset']]
+  Gaming: [[minecraftWorld, 1600, 861, 'A detailed Minecraft survival world with a castle, village, farms, and modern buildings at sunset']],
+  'Time with family & friends': [[familyPhoto, 1400, 1050, 'Family gathering during a visit to Vietnam']]
 };
 
 const values = [
   ['Curiosity', 'I like understanding why systems behave the way they do, not just getting them to work once.'],
   ['Reliability', 'I care about software that behaves predictably, handles failure intentionally, and is understandable to maintain.'],
-  ['Usefulness', 'I enjoy taking an idea or problem and turning it into something practical that another person could actually use.']
+  ['Usefulness', 'I like turning an idea or problem into something practical enough that another person could genuinely use it.']
 ];
 
 const photographyGallery = [
@@ -130,13 +132,17 @@ const personalGallery = [
 const technologyGallery = [
   [techPhoto, 1050, 1400, 'Computer hardware and a custom desktop PC during a hands-on build', 'Building a PC from the ground up', 'portrait'],
   [customPcGreen, 1050, 1400, 'A custom desktop PC illuminated by green lighting', 'My finished RTX 4070 Ti build', 'portrait'],
-  [graphicsCard, 1050, 1400, 'An RTX 3080 Ti graphics card held above a work surface', 'Getting an RTX 3080 Ti ready for an upgrade', 'portrait'],
+  [graphicsCard, 1050, 1400, 'An RTX 3080 Ti graphics card held above a work surface', 'Getting an RTX 3080 Ti Founders Edition ready to resell', 'portrait'],
   [carShowPorsche, 1400, 984, 'A black Singer Porsche 930 displayed at Little Speed Shop Cars & Coffee', 'A Singer Porsche 930 at The Little Speed Shop’s Cars & Coffee'],
   [carShowSubaruEngine, 1400, 889, 'Modified blue Blobeye STI with its engine bay open at a car show', 'Taking a closer look under the hood of this Blobeye STI']
 ];
 
 const gamingGallery = [
   [csgoScreenshot, 1152, 864, 'Counter-Strike: Global Offensive menu screenshot', 'CS:GO, 2022']
+];
+
+const familyGallery = [
+  [familyPhoto, 1400, 1050, 'Family gathering during a visit to Vietnam', 'Visiting family in Vietnam, 2023']
 ];
 
 function AboutPage() {
@@ -181,7 +187,7 @@ function AboutPage() {
                 <p>
                   That curiosity has taken me into backend reliability, data reconciliation,
                   GitHub APIs, native macOS audio capture, and local-first iOS applications,
-                  especially in areas where correctness and failure behavior matter.
+                  often in areas where correctness and failure behavior matter.
                 </p>
               </div>
               <div className="hero-actions">
@@ -191,7 +197,7 @@ function AboutPage() {
             </div>
             <figure className="about-portrait">
               <button className="about-portrait-button" type="button" aria-label="View more photos of Quang" aria-haspopup="dialog" onClick={(event) => openGallery('personal', event.currentTarget)}>
-                <img src={quangPhoto} width="1000" height="1000" alt="Quang Huynh relaxing on a bench" />
+                <img src={quangPhoto} width="1000" height="1000" alt="Quang seated on a bench outdoors" />
                 <span>View photos</span>
               </button>
             </figure>
@@ -260,7 +266,8 @@ function AboutPage() {
                   personal: personalGallery,
                   photography: photographyGallery,
                   technology: technologyGallery,
-                  gaming: gamingGallery
+                  gaming: gamingGallery,
+                  family: familyGallery
                 }}
                 photographyCaptions={photographyCaptions}
                 onClose={closeGallery}
@@ -274,10 +281,7 @@ function AboutPage() {
             <div className="section-heading"><div><p className="eyebrow">How I like to work</p><h2 id="values-title">What guides my work</h2></div><p>Three principles I return to when I’m learning, building, and collaborating.</p></div>
             <div className="values-grid">{values.map(([title, copy], index) => <article className="value-card" key={title}><span>0{index + 1}</span><h3>{title}</h3><p>{copy}</p></article>)}</div>
             <p className="education-note">
-              I’m currently pursuing an accelerated BS/MS in Computer Science at RIT. 
-              I’m especially interested in the point where ideas from systems,
-              databases, algorithms, and machine learning turn into software that has to
-              behave correctly outside the classroom.
+              I’m currently pursuing an accelerated BS/MS in Computer Science at RIT, where I’m especially interested in turning systems, database, and algorithmic ideas into software that holds up outside the classroom.
             </p>
           </div>
         </section>

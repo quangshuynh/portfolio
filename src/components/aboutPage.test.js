@@ -11,6 +11,44 @@ function photographyTrigger() {
     .getByRole('button', { name: 'View more' });
 }
 
+test('family card opens its gallery and existing lightbox accessibly', async () => {
+  renderAboutPage();
+  const familyCard = screen.getByRole('heading', {
+    name: 'Time with family & friends'
+  }).closest('article');
+  const preview = within(familyCard).getByRole('img', {
+    name: 'Family gathering during a visit to Vietnam'
+  });
+  const trigger = within(familyCard).getByRole('button', { name: 'View more' });
+
+  expect(preview.getAttribute('src')).toContain('vietnam2023-web.jpg');
+  fireEvent.click(trigger);
+  expect(screen.getByRole('dialog', { name: 'Family & friends' })).toBeInTheDocument();
+  expect(screen.getByText('Visiting family in Vietnam, 2023')).toBeInTheDocument();
+
+  const imageTrigger = screen.getByRole('button', {
+    name: 'Open image: Visiting family in Vietnam, 2023'
+  });
+  fireEvent.click(imageTrigger);
+
+  const visibleDialogs = screen.getAllByRole('dialog');
+  expect(visibleDialogs).toHaveLength(1);
+  expect(visibleDialogs[0]).toHaveAccessibleName(
+    'Image viewer: Visiting family in Vietnam, 2023'
+  );
+  const parentGallery = document.querySelector('.photography-modal');
+  expect(parentGallery).toHaveAttribute('aria-hidden', 'true');
+  expect(parentGallery).not.toHaveAttribute('aria-modal');
+  expect(parentGallery).toHaveAttribute('inert');
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => expect(imageTrigger).toHaveFocus());
+  expect(screen.getByRole('dialog', { name: 'Family & friends' })).toBeInTheDocument();
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => expect(trigger).toHaveFocus());
+});
+
 test('gallery closes by button, Escape, and backdrop and restores its trigger', async () => {
   renderAboutPage();
   const trigger = photographyTrigger();
