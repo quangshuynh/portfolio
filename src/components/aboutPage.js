@@ -14,6 +14,7 @@ import graphicsCard from '../assets/about/cars-tech/graphics-card-rtx-3080-ti-we
 import quangBeachSunset from '../assets/about/quang/quang-beach-sunset-web.jpg';
 import quangArtSpace from '../assets/about/quang/quang-art-space-web.jpg';
 import quangWaterfront from '../assets/about/quang/quang-waterfront-web.jpg';
+import musicPhoto from '../assets/about/music/quang-guitar.jpg';
 import architectureSpire from '../assets/about/photography/optimized/architecture-spire-web.jpg';
 import birdOnLawn from '../assets/about/photography/optimized/bird-on-lawn-web.jpg';
 import blueCactusSign from '../assets/about/photography/optimized/blue-cactus-sign-web.jpg';
@@ -46,6 +47,7 @@ const interests = [
 const interestPhotos = {
   Photography: [[photographySunset, 1200, 1500, 'Golden sunset clouds reflected across waves at the edge of a lake']],
   Hiking: [[hikingOverlook, 1600, 1150, 'Quang standing with arms outstretched at a scenic lake overlook']],
+  Music: [[musicPhoto, 1200, 1500, 'Quang playing guitar']],
   'Cars & technology': [[carsPhoto, 1400, 933, 'A blue classic sports car displayed behind a fence']],
   Gaming: [[minecraftWorld, 1600, 861, 'A detailed Minecraft survival world with a castle, village, farms, and modern buildings at sunset']]
 };
@@ -515,7 +517,24 @@ useEffect(() => {
                 return (
                   <article className="interest-card" key={title}>
                     {photos && (
-                      <div className={`interest-card-media${photos.length > 1 ? ' interest-card-media-pair' : ''}${title === 'Photography' || title === 'Hiking' ? ' interest-card-media-lowered' : ''}`}>
+                      <div
+                        className={`interest-card-media${
+                          photos.length > 1 ? ' interest-card-media-pair' : ''
+                        }${
+                          title === 'Photography'
+                            ? ' interest-card-media-photography'
+                            : ''
+                        }${
+                          title === 'Music'
+                            ? ' interest-card-media-music'
+                            : ''
+                        }${
+                          title === 'Hiking'
+                            ? ' interest-card-media-hiking'
+                            : ''
+                        }
+                        `}
+                      >
                         {photos.map(([src, width, height, alt]) => <img src={src} width={width} height={height} alt={alt} key={src} />)}
                       </div>
                     )}

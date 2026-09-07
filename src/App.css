@@ -62,7 +62,9 @@
 .interest-card p, .value-card p { margin: 0; color: var(--muted); line-height: 1.65; }
 .interest-card-media { height: 170px; margin: calc(0px - clamp(1.35rem, 3vw, 2rem)) calc(0px - clamp(1.35rem, 3vw, 2rem)) 1.3rem; overflow: hidden; border-radius: .75rem .75rem 0 0; }
 .interest-card-media img { width: 100%; height: 100%; object-fit: cover; }
-.interest-card-media-lowered img { object-position: center 67%; }
+.interest-card-media-photography img { object-position: center 67%; }
+.interest-card-media-hiking img { object-position: center 70%; }
+.interest-card-media-music img {object-position: center 28%;}
 .interest-card-media-pair { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; }
 .interest-view-more { margin-top: 1.1rem; padding: 0; border: 0; border-bottom: 1px solid currentColor; background: transparent; color: var(--accent-dark); cursor: pointer; font: inherit; font-weight: 800; }
 .photography-modal-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: clamp(1rem, 4vw, 3rem); background: rgba(4, 8, 7, .78); backdrop-filter: blur(8px); }
