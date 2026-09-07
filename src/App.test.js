@@ -77,7 +77,7 @@ test('renders the dedicated About Quang route with working homepage links', () =
 
   expect(screen.getByRole('heading', { name: 'Hi, I’m Quang.' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Beyond software' })).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'What guides my work' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'How I approach engineering' })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/#about');
   expect(screen.getByRole('img', { name: /golden sunset clouds/i })).toBeInTheDocument();
   expect(screen.getByRole('img', { name: /blue classic sports car/i })).toBeInTheDocument();

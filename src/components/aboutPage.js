@@ -185,8 +185,8 @@ function AboutPage() {
               <div className="about-prose">
                 <p>
                   I’m a software developer and computer science student. I was born in Vietnam
-                  and moved to the United States with my family when I was young, and Rochester
-                  has been home for most of my life.
+                  and moved to the United States with my family when I was young. Rochester has
+                  been home for most of my life.
                 </p>
 
                 <p>
@@ -219,7 +219,7 @@ function AboutPage() {
           <div className="section-inner about-story">
             <div className="about-story-intro">
               <p className="eyebrow">My path into software</p>
-              <h2 id="path-title">Learning beyond the classroom</h2>
+              <h2 id="path-title">From coursework to production software</h2>
 
               <figure className="kore-team-photo">
                 <ImageTrigger className="kore-team-photo-button" label="Open KORE Wireless team lunch photo" onOpen={(trigger) => openDirectLightbox({ src: koreTeamLunch, alt: 'Quang seated at lunch with members of the KORE Wireless engineering team', caption: 'Team lunch near the end of my software engineering co-op at KORE Wireless' }, trigger)}>
@@ -289,7 +289,7 @@ function AboutPage() {
 
         <section className="page-section about-values" aria-labelledby="values-title">
           <div className="section-inner">
-            <div className="section-heading"><div><p className="eyebrow">How I like to work</p><h2 id="values-title">What guides my work</h2></div><p>Three principles I return to when I’m learning, building, and collaborating.</p></div>
+            <div className="section-heading"><div><p className="eyebrow">How I like to work</p><h2 id="values-title">How I approach engineering</h2></div><p>Three principles I return to when I’m learning, building, and collaborating.</p></div>
             <div className="values-grid">{values.map(([title, copy], index) => <article className="value-card" key={title}><span>0{index + 1}</span><h3>{title}</h3><p>{copy}</p></article>)}</div>
             <p className="education-note">
               I’m currently pursuing an accelerated BS/MS in Computer Science at RIT,

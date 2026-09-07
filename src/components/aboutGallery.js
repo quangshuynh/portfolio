@@ -3,11 +3,21 @@ import { FaMinus, FaPlus, FaSearchPlus, FaTimes } from 'react-icons/fa';
 
 const SPOTIFY_ENDPOINT = 'https://spotify-portfolio-api.quangs.workers.dev/recent';
 const SPOTIFY_PROFILE = 'https://open.spotify.com/user/foahrtqqvuuvt7wscxub4uerd';
+const SPOTIFY_CACHE_TTL = 5 * 60 * 1000;
 let spotifyTracksCache = null;
+let spotifyTracksCachedAt = null;
 let spotifyRequest = null;
 
+function getFreshSpotifyTracksCache() {
+  if (spotifyTracksCache === null || spotifyTracksCachedAt === null) return null;
+  return Date.now() - spotifyTracksCachedAt < SPOTIFY_CACHE_TTL
+    ? spotifyTracksCache
+    : null;
+}
+
 function getSpotifyTracks() {
-  if (spotifyTracksCache) return Promise.resolve(spotifyTracksCache);
+  const cachedTracks = getFreshSpotifyTracksCache();
+  if (cachedTracks) return Promise.resolve(cachedTracks);
   if (!spotifyRequest) {
     spotifyRequest = fetch(SPOTIFY_ENDPOINT)
       .then((response) => {
@@ -16,11 +26,18 @@ function getSpotifyTracks() {
       })
       .then((data) => {
         spotifyTracksCache = data.tracks ?? [];
+        spotifyTracksCachedAt = Date.now();
         return spotifyTracksCache;
       })
       .finally(() => { spotifyRequest = null; });
   }
   return spotifyRequest;
+}
+
+export function resetSpotifyCacheForTests() {
+  spotifyTracksCache = null;
+  spotifyTracksCachedAt = null;
+  spotifyRequest = null;
 }
 
 const galleryMetadata = {
@@ -148,9 +165,16 @@ function TrackPlayTime({ playedAt }) {
   return <time className="spotify-track-time" dateTime={playedDate.toISOString()} title={exactTime} aria-label={`Played ${exactTime}`}>{relativeTime}</time>;
 }
 
+function getPlayedAtTime(playedAt) {
+  if (!playedAt) return null;
+  const time = new Date(playedAt).getTime();
+  return Number.isNaN(time) ? null : time;
+}
+
 export function SpotifyListening() {
-  const [tracks, setTracks] = useState(spotifyTracksCache ?? []);
-  const [status, setStatus] = useState(spotifyTracksCache ? 'success' : 'loading');
+  const cachedTracks = getFreshSpotifyTracksCache();
+  const [tracks, setTracks] = useState(cachedTracks ?? []);
+  const [status, setStatus] = useState(cachedTracks ? 'success' : 'loading');
   const [requestAttempt, setRequestAttempt] = useState(0);
 
   useEffect(() => {
@@ -174,7 +198,18 @@ export function SpotifyListening() {
   if (status === 'error') return <div className="spotify-listening"><div className="spotify-listening-status"><p>Couldn’t load my recent listening right now.</p><button className="interest-view-more" type="button" onClick={retry}>Retry</button><a className="interest-view-more" href={SPOTIFY_PROFILE} target="_blank" rel="noreferrer">View my Spotify</a></div></div>;
   if (!tracks.length) return <div className="spotify-listening"><p>No recent listening activity to show.</p></div>;
 
-  return <div className="spotify-listening"><div className="spotify-track-list">{tracks.map((track) => <a className="spotify-track" href={track.url} target="_blank" rel="noreferrer" key={`${track.id}-${track.playedAt}`}>{track.image && <img src={track.image} alt="" loading="lazy" />}<div><strong>{track.name}</strong><span>{track.artist}</span><small>{track.album}</small><TrackPlayTime playedAt={track.playedAt} /></div></a>)}</div><a className="interest-view-more spotify-profile-link" href={SPOTIFY_PROFILE} target="_blank" rel="noreferrer">View my Spotify</a></div>;
+  const sortedTracks = [...tracks].sort((first, second) => {
+    const firstPlayedAt = getPlayedAtTime(first.playedAt);
+    const secondPlayedAt = getPlayedAtTime(second.playedAt);
+    const firstIsValid = firstPlayedAt !== null;
+    const secondIsValid = secondPlayedAt !== null;
+    if (firstIsValid && secondIsValid) return secondPlayedAt - firstPlayedAt;
+    if (firstIsValid) return -1;
+    if (secondIsValid) return 1;
+    return 0;
+  });
+
+  return <div className="spotify-listening"><div className="spotify-track-list">{sortedTracks.map((track, index) => <a className={`spotify-track${index === 0 && getPlayedAtTime(track.playedAt) !== null ? ' spotify-track-latest' : ''}`} href={track.url} target="_blank" rel="noreferrer" key={`${track.id}-${track.playedAt}`}>{track.image && <img src={track.image} alt="" loading="lazy" />}<div><strong>{track.name}</strong><span>{track.artist}</span><small>{track.album}</small><TrackPlayTime playedAt={track.playedAt} /></div></a>)}</div><a className="interest-view-more spotify-profile-link" href={SPOTIFY_PROFILE} target="_blank" rel="noreferrer">View my Spotify</a></div>;
 }
 
 export function PhotoLightbox({ image, onClose }) {
