@@ -132,7 +132,7 @@ const gamingGallery = [
 ];
 
 const familyGallery = [
-  { src: familyPhoto, width: 1400, height: 1050, alt: 'Family gathering during a visit to Vietnam', caption: 'Visiting family in Vietnam, 2023', shape: 'landscape' }
+  { src: familyPhoto, width: 1400, height: 1050, alt: 'Family gathering during a visit to Vietnam', caption: 'Visiting family in Vietnam, 2023', shape: 'landscape' },
 ];
 
 const galleries = { personal: personalGallery, photography: photographyGallery, technology: technologyGallery, gaming: gamingGallery, family: familyGallery };
@@ -184,7 +184,7 @@ function AboutPage() {
               <p className="about-location"><FaMapMarkerAlt aria-hidden="true" /> Rochester, New York</p>
               <div className="about-prose">
                 <p>
-                  I’m a software developer and Computer Science student. I was born in Vietnam
+                  I’m a software developer and computer science student. I was born in Vietnam
                   and moved to the United States with my family when I was young, and Rochester
                   has been home for most of my life.
                 </p>

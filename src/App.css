@@ -101,9 +101,6 @@
 .technology-gallery { grid-auto-rows: 220px; }
 .family-gallery img { object-fit: contain; background: var(--section-alt); }
 .photography-view-all { display: flex; margin: 1.5rem auto 0; cursor: pointer; font: inherit; }
-.technology-modal-photo { max-width: 620px; margin: 1.5rem auto 0; }
-.technology-modal-photo img { display: block; width: 100%; max-height: min(64vh, 680px); object-fit: cover; border-radius: .8rem; }
-.technology-modal-photo figcaption { margin-top: .75rem; color: var(--muted); text-align: center; font-size: .85rem; }
 /* Spotify listening activity */
 
 .spotify-listening {

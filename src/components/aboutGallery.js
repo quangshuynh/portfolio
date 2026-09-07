@@ -25,6 +25,7 @@ function getSpotifyTracks() {
 
 const galleryMetadata = {
   photography: ['Behind the lens', 'Photography by Quang', 'Close photography gallery'],
+  // Reserved for a future expanded hiking gallery.
   hiking: ['On the trail', 'Hiking', 'Close hiking gallery'],
   personal: ['Beyond the résumé', 'More about Quang', 'Close personal photo gallery'],
   gaming: ['In the game', 'Gaming', 'Close gaming gallery'],
@@ -150,6 +151,7 @@ function TrackPlayTime({ playedAt }) {
 export function SpotifyListening() {
   const [tracks, setTracks] = useState(spotifyTracksCache ?? []);
   const [status, setStatus] = useState(spotifyTracksCache ? 'success' : 'loading');
+  const [requestAttempt, setRequestAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -161,10 +163,15 @@ export function SpotifyListening() {
       })
       .catch(() => { if (active) setStatus('error'); });
     return () => { active = false; };
-  }, []);
+  }, [requestAttempt]);
+
+  const retry = () => {
+    setStatus('loading');
+    setRequestAttempt((attempt) => attempt + 1);
+  };
 
   if (status === 'loading') return <div className="spotify-listening"><p>Loading recent listening...</p></div>;
-  if (status === 'error') return <div className="spotify-listening"><div className="spotify-listening-status"><p>Couldn’t load my recent listening right now.</p><a className="interest-view-more" href={SPOTIFY_PROFILE} target="_blank" rel="noreferrer">View my Spotify</a></div></div>;
+  if (status === 'error') return <div className="spotify-listening"><div className="spotify-listening-status"><p>Couldn’t load my recent listening right now.</p><button className="interest-view-more" type="button" onClick={retry}>Retry</button><a className="interest-view-more" href={SPOTIFY_PROFILE} target="_blank" rel="noreferrer">View my Spotify</a></div></div>;
   if (!tracks.length) return <div className="spotify-listening"><p>No recent listening activity to show.</p></div>;
 
   return <div className="spotify-listening"><div className="spotify-track-list">{tracks.map((track) => <a className="spotify-track" href={track.url} target="_blank" rel="noreferrer" key={`${track.id}-${track.playedAt}`}>{track.image && <img src={track.image} alt="" loading="lazy" />}<div><strong>{track.name}</strong><span>{track.artist}</span><small>{track.album}</small><TrackPlayTime playedAt={track.playedAt} /></div></a>)}</div><a className="interest-view-more spotify-profile-link" href={SPOTIFY_PROFILE} target="_blank" rel="noreferrer">View my Spotify</a></div>;

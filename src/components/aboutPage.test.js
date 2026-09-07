@@ -55,14 +55,17 @@ test('formats recent play times and handles invalid timestamps', () => {
 });
 
 test('KORE image opens the direct lightbox and Escape restores focus', async () => {
+  document.body.style.overflow = 'scroll';
   renderAboutPage();
   const trigger = screen.getByRole('button', { name: 'Open KORE Wireless team lunch photo' });
   fireEvent.click(trigger);
+  expect(document.body).toHaveStyle({ overflow: 'hidden' });
   expect(screen.getByRole('dialog', { name: /Image viewer: Team lunch/i })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Zoom in' })).toBeInTheDocument();
   fireEvent.keyDown(document, { key: 'Escape' });
   await waitFor(() => expect(trigger).toHaveFocus());
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(document.body).toHaveStyle({ overflow: 'scroll' });
 });
 
 test('About portrait still opens the personal gallery and restores focus', async () => {
@@ -93,14 +96,20 @@ test('gallery closes by button, Escape, and backdrop and restores its trigger', 
 });
 
 test('nested lightbox owns Escape, restores focus, and supports zoom shortcuts', async () => {
+  document.body.style.overflow = 'auto';
   renderAboutPage();
   const trigger = photographyTrigger();
   fireEvent.click(trigger);
+  expect(document.body).toHaveStyle({ overflow: 'hidden' });
   const imageTrigger = screen.getByRole('button', {
     name: /Open image: Looking up through Cornell/i
   });
 
   fireEvent.click(imageTrigger);
+  const parentDialog = document.querySelector('.photography-modal');
+  expect(parentDialog).toHaveAttribute('aria-hidden', 'true');
+  expect(parentDialog).toHaveAttribute('inert');
+  expect(document.body).toHaveStyle({ overflow: 'hidden' });
   expect(screen.getByRole('button', { name: 'Close image viewer' })).toHaveFocus();
   expect(screen.getByRole('dialog', { name: /Image viewer:/i })).toHaveAttribute(
     'aria-describedby'
@@ -114,10 +123,12 @@ test('nested lightbox owns Escape, restores focus, and supports zoom shortcuts',
   fireEvent.keyDown(document, { key: 'Escape' });
   await waitFor(() => expect(imageTrigger).toHaveFocus());
   expect(screen.getByRole('dialog', { name: 'Photography by Quang' })).toBeInTheDocument();
+  expect(document.body).toHaveStyle({ overflow: 'hidden' });
 
   fireEvent.keyDown(document, { key: 'Escape' });
   await waitFor(() => expect(trigger).toHaveFocus());
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(document.body).toHaveStyle({ overflow: 'auto' });
 });
 
 test('gallery and lightbox trap Tab within the active dialog', () => {
@@ -152,6 +163,25 @@ test('Spotify stays lazy and shows its loading and failure states', async () => 
     'href',
     'https://open.spotify.com/user/foahrtqqvuuvt7wscxub4uerd'
   );
+  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  global.fetch = originalFetch;
+});
+
+test('Spotify retries a failed request only after explicit action', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = jest.fn()
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockRejectedValueOnce(new Error('still offline'));
+  renderAboutPage();
+  const musicCard = screen.getByRole('heading', { name: 'Music' }).closest('article');
+  fireEvent.click(within(musicCard).getByRole('button', { name: 'View listening' }));
+  const retry = await screen.findByRole('button', { name: 'Retry' });
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+
+  fireEvent.click(retry);
+  expect(screen.getByText('Loading recent listening...')).toBeInTheDocument();
+  await screen.findByRole('button', { name: 'Retry' });
+  expect(global.fetch).toHaveBeenCalledTimes(2);
   global.fetch = originalFetch;
 });
 
