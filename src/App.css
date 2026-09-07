@@ -643,6 +643,26 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
   .interest-grid, .values-grid { grid-template-columns: 1fr; }
   .photography-modal-backdrop { align-items: stretch; padding: .75rem; }
   .photography-modal { max-height: calc(100dvh - 1.5rem); padding: 1rem; }
+  #photography-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+  #photography-gallery figure,
+  #photography-gallery .photography-gallery-portrait { display: block; aspect-ratio: 1; }
+  #photography-gallery .photography-gallery-image-button { height: 100%; }
+  #photography-gallery img { width: 100%; height: 100%; object-fit: cover; }
+  #photography-gallery figcaption {
+    position: absolute;
+    right: .35rem;
+    bottom: .35rem;
+    left: .35rem;
+    width: auto;
+    padding: .45rem .5rem;
+    border-radius: .4rem;
+    background: linear-gradient(90deg, rgba(7, 12, 10, .88), rgba(7, 12, 10, .68));
+    color: #f5f7f6;
+    font-size: .68rem;
+    line-height: 1.25;
+    opacity: .9;
+    backdrop-filter: blur(4px);
+  }
   .pipeline-row { grid-template-columns: 1fr; }
   .gallery-stage { min-height: 300px; }
   .foody .gallery-stage { min-height: 420px; }
