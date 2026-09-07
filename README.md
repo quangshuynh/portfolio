@@ -2,7 +2,9 @@
 
 Personal portfolio highlighting professional software engineering experience, backend and data-oriented projects, technical breadth, and education.
 
-**Live site:** [quangshuynh.github.io/portfolio](https://quangshuynh.github.io/portfolio/)
+**Live site:** [quanghuynh.com](http://quanghuynh.com/)
+[quangshuynh.github.io/portfolio](https://quangshuynh.github.io/portfolio/)
+[quangs.vercel.app](https://quangs.vercel.app/)
 
 ## Stack
 
@@ -10,6 +12,7 @@ Personal portfolio highlighting professional software engineering experience, ba
 - Plain CSS with responsive layouts and reduced-motion support
 - React Icons
 - GitHub Pages deployment through GitHub Actions
+- Vercel deployment from the same production build
 
 ## Local development
 
@@ -27,10 +30,9 @@ npm run build
 
 ## Deployment
 
-The `homepage` field in `package.json` configures production assets for the `/portfolio/` subpath.
-
 - Every pull request and push runs CI (`.github/workflows/ci.yml`): install, test, and production build.
-- Every push to `main` also runs the Pages deployment workflow (`.github/workflows/deploy-pages.yml`), which builds the site and publishes the `build` directory to GitHub Pages automatically.
+- Every push to `main` also runs the Pages deployment workflow (`.github/workflows/deploy-pages.yml`). That workflow sets `PUBLIC_URL=/portfolio`, builds the site, and publishes the `build` directory to GitHub Pages.
+- Vercel uses the normal `npm run build` command without `PUBLIC_URL`, so assets and routes are generated for the domain root. `vercel.json` rewrites application routes such as `/about` to the SPA entry point.
 
 No manual deploy step is needed — merging to `main` is enough.
 

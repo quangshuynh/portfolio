@@ -1,5 +1,6 @@
 import React from 'react';
 import ritLogo from '../assets/logos/rit-logo.png';
+import { aboutHref } from './siteNav';
 
 const honors = [
   'Farash Foundation First in Family Scholar',
@@ -32,7 +33,7 @@ function Education() {
               thoughtful engineering matter.
             </p>
 
-            <a className="text-link" href="/portfolio/about">
+            <a className="text-link" href={aboutHref}>
               More about me →
             </a>
           </div>
