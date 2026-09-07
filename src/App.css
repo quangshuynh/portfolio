@@ -8,9 +8,16 @@
 .nav-inner, .section-inner, .hero-inner, .footer-inner { width: min(1120px, calc(100% - 2.5rem)); min-width: 0; margin-inline: auto; }
 .nav-inner { min-height: 4.5rem; display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
 .brand { font-family: Circular, sans-serif; font-size: 1.05rem; text-decoration: none; letter-spacing: -0.02em; }
-.brand-cat { position: relative; flex: 0 0 54px; width: 54px; height: 54px; overflow: hidden; }
+.brand-cat {
+  position: relative;
+  flex: 0 0 54px;
+  width: 54px;
+  height: 54px;
+  overflow: hidden;
+  border-radius: 0.65rem;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
 .brand-cat img { position: absolute; top: 50%; left: 50%; width: 108px; height: auto; max-width: none; transform: translate(-50%, -50%); }
-.brand-cat { border-radius: 0.65rem; transition: transform 160ms ease, box-shadow 160ms ease; }
 .brand-cat:hover { transform: translateY(-2px); box-shadow: 0 0 0 3px var(--accent-soft); }
 .nav-links { display: flex; min-width: 0; align-items: center; gap: clamp(1rem, 2.5vw, 2rem); }
 .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.92rem; font-weight: 650; }
@@ -64,8 +71,8 @@
 .interest-card-media img { width: 100%; height: 100%; object-fit: cover; }
 .interest-card-media-photography img { object-position: center 67%; }
 .interest-card-media-hiking img { object-position: center 70%; }
-.interest-card-media-music img {object-position: center 28%;}
-.interest-card-media-family img {object-position: center 3%;}
+.interest-card-media-music img {object-position: center 28%; }
+.interest-card-media-family img {object-position: center 3%; }
 .interest-card-media-pair { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; }
 .interest-view-more { margin-top: 1.1rem; padding: 0; border: 0; border-bottom: 1px solid currentColor; background: transparent; color: var(--accent-dark); cursor: pointer; font: inherit; font-weight: 800; }
 .photography-modal-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: clamp(1rem, 4vw, 3rem); background: rgba(4, 8, 7, .78); backdrop-filter: blur(8px); }
@@ -721,5 +728,29 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 
   .spotify-track small {
     font-size: 0.72rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+
+  .about-portrait-button img,
+  .about-portrait-button span,
+  .photography-gallery-image-button img,
+  .photography-gallery-zoom-hint,
+  .spotify-track,
+  .button,
+  .brand-cat,
+  .hero-photo-link,
+  .about-float-link,
+  .about-float-link svg,
+  .theme-toggle,
+  .more-card,
+  .photo-lightbox-stage img {
+    transition: none;
   }
 }

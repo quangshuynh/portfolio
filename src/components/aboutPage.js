@@ -80,9 +80,18 @@ const interestPhotos = {
 };
 
 const values = [
-  ['Curiosity', 'I like understanding why systems behave the way they do, not just getting them to work once.'],
-  ['Reliability', 'I care about software that behaves predictably, handles failure intentionally, and is understandable to maintain.'],
-  ['Usefulness', 'I like turning an idea or problem into something practical enough that another person could genuinely use it.']
+  [
+    'Curiosity',
+    'I like understanding why a system behaves the way it does, especially when the obvious explanation is incomplete.'
+  ],
+  [
+    'Reliability',
+    'I care about software that behaves predictably, handles failure intentionally, and stays understandable over time.'
+  ],
+  [
+    'Usefulness',
+    'I like taking ideas beyond prototypes and turning them into practical tools someone could genuinely rely on.'
+  ]
 ];
 
 const photographyGallery = [
@@ -132,7 +141,7 @@ const personalGallery = [
 const technologyGallery = [
   [techPhoto, 1050, 1400, 'Computer hardware and a custom desktop PC during a hands-on build', 'Building a PC from the ground up', 'portrait'],
   [customPcGreen, 1050, 1400, 'A custom desktop PC illuminated by green lighting', 'My finished RTX 4070 Ti build', 'portrait'],
-  [graphicsCard, 1050, 1400, 'An RTX 3080 Ti graphics card held above a work surface', 'Getting an RTX 3080 Ti Founders Edition ready to resell', 'portrait'],
+  [graphicsCard, 1050, 1400, 'An RTX 3080 Ti graphics card held above a work surface', 'Getting an RTX 3080 Ti Founders Edition ready for its next build', 'portrait'],
   [carShowPorsche, 1400, 984, 'A black Singer Porsche 930 displayed at Little Speed Shop Cars & Coffee', 'A Singer Porsche 930 at The Little Speed Shop’s Cars & Coffee'],
   [carShowSubaruEngine, 1400, 889, 'Modified blue Blobeye STI with its engine bay open at a car show', 'Taking a closer look under the hood of this Blobeye STI']
 ];
@@ -172,21 +181,20 @@ function AboutPage() {
               <p className="about-location"><FaMapMarkerAlt aria-hidden="true" /> Rochester, New York</p>
               <div className="about-prose">
                 <p>
-                  I’m a software engineer and Computer Science student. I was born in Vietnam
+                  I’m a software developer and Computer Science student. I was born in Vietnam
                   and moved to the United States with my family when I was young, and Rochester
                   has been home for most of my life.
                 </p>
 
                 <p>
-                  I became interested in computers early on through games and hardware,
-                  and eventually through programming. I tend to learn by taking an idea
-                  or problem and building it far enough to encounter the harder engineering
-                  questions behind it.
+                  I became interested in computers through games and hardware, and that curiosity
+                  eventually led me into programming. I tend to learn by taking an idea or problem 
+                  far enough to encounter the harder engineering questions behind it.
                 </p>
 
                 <p>
-                  That curiosity eventually pulled me toward problems where the interesting part 
-                  is not just making something work, but figuring out what happens when assumptions 
+                  Over time, I became especially interested in problems where the interesting part
+                  is not just making something work, but figuring out what happens when assumptions
                   fail, data gets messy, or software has to keep working over time.
                 </p>
               </div>
@@ -208,7 +216,7 @@ function AboutPage() {
           <div className="section-inner about-story">
             <div className="about-story-intro">
               <p className="eyebrow">My path into software</p>
-              <h2 id="path-title">Learning how software works in production</h2>
+              <h2 id="path-title">From coursework to production software</h2>
 
               <figure className="kore-team-photo">
                 <img
@@ -229,12 +237,9 @@ function AboutPage() {
               </p>
 
               <p>
-                Over five months, I went from learning an unfamiliar enterprise codebase and 
-                integration environment to taking on increasingly independent engineering work. 
-                I learned how much of professional software development happens beyond writing the 
-                initial feature: understanding existing systems, tracing failures across applications 
-                and databases, testing changes safely, working with other engineers, and maintaining 
-                software that people already depend on.
+                During the co-op, I learned an unfamiliar enterprise codebase and integration 
+                environment while contributing across application code, SQL, integrations, testing, 
+                and production issue investigation.
               </p>
 
               <p>
@@ -289,7 +294,9 @@ function AboutPage() {
             <div className="section-heading"><div><p className="eyebrow">How I like to work</p><h2 id="values-title">What guides my work</h2></div><p>Three principles I return to when I’m learning, building, and collaborating.</p></div>
             <div className="values-grid">{values.map(([title, copy], index) => <article className="value-card" key={title}><span>0{index + 1}</span><h3>{title}</h3><p>{copy}</p></article>)}</div>
             <p className="education-note">
-              I’m currently pursuing an accelerated BS/MS in Computer Science at RIT, where I’m especially interested in turning systems, database, and algorithmic ideas into software that holds up outside the classroom.
+              I’m currently pursuing an accelerated BS/MS in Computer Science at RIT,
+              with particular interest in systems, databases, algorithms, and the
+              engineering decisions behind dependable software.
             </p>
           </div>
         </section>
