@@ -56,12 +56,12 @@ const interests = [
   [
     FaCar,
     'Cars & technology',
-    'I enjoy learning how things are put together, whether that means working on computer hardware, exploring new technology, or looking under the hood of a car.'
+    'I enjoy understanding how hardware works, from building and upgrading PCs to learning what is happening under the hood of a car.'
   ],
   [
     FaGamepad,
     'Gaming',
-    'Gaming is one of the ways I relax and was also part of what originally made computers interesting to me.'
+    'I like games that reward exploration, strategy, progression, and building things over time.'
   ],
   [
     FaUsers,
@@ -219,7 +219,7 @@ function AboutPage() {
           <div className="section-inner about-story">
             <div className="about-story-intro">
               <p className="eyebrow">My path into software</p>
-              <h2 id="path-title">From coursework to production software</h2>
+              <h2 id="path-title">Learning beyond the classroom</h2>
 
               <figure className="kore-team-photo">
                 <ImageTrigger className="kore-team-photo-button" label="Open KORE Wireless team lunch photo" onOpen={(trigger) => openDirectLightbox({ src: koreTeamLunch, alt: 'Quang seated at lunch with members of the KORE Wireless engineering team', caption: 'Team lunch near the end of my software engineering co-op at KORE Wireless' }, trigger)}>
