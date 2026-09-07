@@ -477,8 +477,6 @@ useEffect(() => {
               <figure className="kore-team-photo">
                 <img
                   src={koreTeamLunch}
-                  width="1200"
-                  height="1600"
                   alt="Quang with members of the KORE Wireless engineering team"
                   loading="lazy"
                 />
