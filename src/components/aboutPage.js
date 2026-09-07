@@ -4,7 +4,7 @@ import quangPhoto from '../assets/about/quang/quang-about-portrait-web.jpg';
 import photographySunset from '../assets/about/photography/quang-photography-sunset-web.jpg';
 import hikingOverlook from '../assets/about/hiking/quang-hiking-overlook-web.jpg';
 import minecraftWorld from '../assets/about/gaming/quang-minecraft-survival-world-web.jpg';
-import csgoScreenshot from '../assets/about/gaming/csgo.jpg';
+import csgoScreenshot from '../assets/about/gaming/csgo-web.jpg';
 import carsPhoto from '../assets/about/cars-tech/quang-cars-web.jpg';
 import techPhoto from '../assets/about/cars-tech/quang-tech-web.jpg';
 import carShowPorsche from '../assets/about/cars-tech/car-show-porsche-web.jpg';
@@ -14,7 +14,7 @@ import graphicsCard from '../assets/about/cars-tech/graphics-card-rtx-3080-ti-we
 import quangBeachSunset from '../assets/about/quang/quang-beach-sunset-web.jpg';
 import quangArtSpace from '../assets/about/quang/quang-art-space-web.jpg';
 import quangWaterfront from '../assets/about/quang/quang-waterfront-web.jpg';
-import musicPhoto from '../assets/about/music/quang-guitar.jpg';
+import musicPhoto from '../assets/about/music/quang-guitar-web.jpg';
 import architectureSpire from '../assets/about/photography/optimized/architecture-spire-web.jpg';
 import birdOnLawn from '../assets/about/photography/optimized/bird-on-lawn-web.jpg';
 import blueCactusSign from '../assets/about/photography/optimized/blue-cactus-sign-web.jpg';
@@ -31,7 +31,7 @@ import waterfallCliffs from '../assets/about/photography/optimized/waterfall-cli
 import whiteCarAtNight from '../assets/about/photography/optimized/white-car-at-night-web.jpg';
 import woodlandFence from '../assets/about/photography/optimized/woodland-fence-web.jpg';
 import woodlandStream from '../assets/about/photography/optimized/woodland-stream-web.jpg';
-import koreTeamLunch from '../assets/about/kore/mission-bbq-kore-team-lunch.jpg';
+import koreTeamLunch from '../assets/about/kore/mission-bbq-kore-team-lunch-web.jpg';
 import Footer from './footer';
 import SiteNav, { homeHref } from './siteNav';
 
@@ -47,7 +47,7 @@ const interests = [
 const interestPhotos = {
   Photography: [[photographySunset, 1200, 1500, 'Golden sunset clouds reflected across waves at the edge of a lake']],
   Hiking: [[hikingOverlook, 1600, 1150, 'Quang standing with arms outstretched at a scenic lake overlook']],
-  Music: [[musicPhoto, 1200, 1500, 'Quang playing guitar']],
+  Music: [[musicPhoto, 1200, 1600, 'Quang playing guitar']],
   'Cars & technology': [[carsPhoto, 1400, 933, 'A blue classic sports car displayed behind a fence']],
   Gaming: [[minecraftWorld, 1600, 861, 'A detailed Minecraft survival world with a castle, village, farms, and modern buildings at sunset']]
 };
@@ -111,7 +111,7 @@ const technologyGallery = [
 ];
 
 const gamingGallery = [
-  [csgoScreenshot, 1920, 1080, 'Counter-Strike: Global Offensive menu screenshot', 'CS:GO menu screen 2022']
+  [csgoScreenshot, 1152, 864, 'Counter-Strike: Global Offensive menu screenshot', 'CS:GO menu screen 2022']
 ];
 
 function AboutPage() {
@@ -477,6 +477,8 @@ useEffect(() => {
               <figure className="kore-team-photo">
                 <img
                   src={koreTeamLunch}
+                  width="1200"
+                  height="1600"
                   alt="Quang with members of the KORE Wireless engineering team"
                   loading="lazy"
                 />
