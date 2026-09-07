@@ -8,6 +8,7 @@
 .nav-inner, .section-inner, .hero-inner, .footer-inner { width: min(1120px, calc(100% - 2.5rem)); min-width: 0; margin-inline: auto; }
 .nav-inner { min-height: 4.5rem; display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
 .brand { font-family: Circular, sans-serif; font-size: 1.05rem; text-decoration: none; letter-spacing: -0.02em; }
+.brand-lockup { display: inline-flex; flex: 0 0 auto; align-items: center; gap: .75rem; color: var(--ink); font-weight: 800; }
 .brand-cat {
   position: relative;
   flex: 0 0 54px;
@@ -18,7 +19,14 @@
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
 .brand-cat img { position: absolute; top: 50%; left: 50%; width: 108px; height: auto; max-width: none; transform: translate(-50%, -50%); }
-.brand-cat:hover { transform: translateY(-2px); box-shadow: 0 0 0 3px var(--accent-soft); }
+.brand-lockup:hover .brand-cat { transform: translateY(-2px); box-shadow: 0 0 0 3px var(--accent-soft); }
+.brand-name { display: inline-flex; align-items: center; letter-spacing: -.015em; line-height: 1.2; transition: transform 160ms ease; }
+.brand-domain { color: var(--ink); text-shadow: 0 1px 0 var(--surface); transition: color 160ms ease; }
+.brand-tld { margin-left: .16rem; padding: .2rem .42rem .22rem; border: 2px solid var(--primary-bg); border-radius: .5rem .5rem .5rem .18rem; background: var(--primary-bg); color: var(--primary-text); font-size: .8em; letter-spacing: 0; box-shadow: 0 2px 0 var(--accent); transform: rotate(-3deg); transition: transform 160ms ease, box-shadow 160ms ease; }
+.brand-lockup:hover .brand-name { transform: translateY(-1px); }
+.brand-lockup:hover .brand-domain { color: var(--accent-dark); }
+.brand-lockup:hover .brand-tld { box-shadow: 0 3px 0 var(--accent); transform: rotate(2deg) scale(1.06); }
+.brand-lockup:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; border-radius: .75rem; }
 .nav-links { display: flex; min-width: 0; align-items: center; gap: clamp(1rem, 2.5vw, 2rem); }
 .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.92rem; font-weight: 650; }
 .nav-links a:hover { color: var(--accent); }

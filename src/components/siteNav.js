@@ -9,8 +9,14 @@ function SiteNav() {
   return (
     <nav className="site-nav" aria-label="Primary navigation">
       <div className="nav-inner">
-        <a className="brand brand-cat" href={homeHref('#top')} aria-label="Back to homepage">
-          <img src={chiTheCat} alt="" aria-hidden="true" />
+        <a className="brand brand-lockup" href={homeHref('#top')} aria-label="quanghuynh.com — back to homepage">
+          <span className="brand-cat" aria-hidden="true">
+            <img src={chiTheCat} alt="" />
+          </span>
+          <span className="brand-name">
+            <span className="brand-domain">quanghuynh</span>
+            <span className="brand-tld">.com</span>
+          </span>
         </a>
         <div className="nav-links">
           <a href={homeHref('#experience')}>Experience</a>
