@@ -231,11 +231,11 @@
 
   line-height: 1.65;
 }
-.spotify-track:first-child {
+.spotify-track-latest {
   border-color: var(--accent);
 }
 
-.spotify-track:first-child::after {
+.spotify-track-latest::after {
   content: 'Latest';
 
   justify-self: start;

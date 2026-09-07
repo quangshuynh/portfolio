@@ -1,6 +1,17 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import AboutPage from './aboutPage';
-import { formatRelativePlayTime } from './aboutGallery';
+import { formatRelativePlayTime, resetSpotifyCacheForTests, SpotifyListening } from './aboutGallery';
+
+const originalFetch = global.fetch;
+
+beforeEach(() => {
+  resetSpotifyCacheForTests();
+});
+
+afterEach(() => {
+  global.fetch = originalFetch;
+  jest.restoreAllMocks();
+});
 
 function renderAboutPage() {
   window.history.pushState({}, '', '/about');
@@ -11,6 +22,23 @@ function photographyTrigger() {
   return within(screen.getByRole('heading', { name: 'Photography' }).closest('article'))
     .getByRole('button', { name: 'View more' });
 }
+
+function openSpotifyListening() {
+  const musicCard = screen.getByRole('heading', { name: 'Music' }).closest('article');
+  fireEvent.click(within(musicCard).getByRole('button', { name: 'View listening' }));
+}
+
+test('renders the updated biography and section headings', () => {
+  renderAboutPage();
+  expect(screen.getByText(/I’m a software developer and computer science student\. I was born in Vietnam and moved to the United States with my family when I was young\. Rochester has been home for most of my life\./)).toBeInTheDocument();
+  expect(screen.getByText('My path into software')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'From coursework to production software' })).toBeInTheDocument();
+  expect(screen.getByText('How I like to work')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'How I approach engineering' })).toBeInTheDocument();
+  for (const value of ['Curiosity', 'Reliability', 'Usefulness']) {
+    expect(screen.getByRole('heading', { name: value })).toBeInTheDocument();
+  }
+});
 
 test('only interests with additional content render actions while every featured image opens directly', () => {
   renderAboutPage();
@@ -147,13 +175,11 @@ test('gallery and lightbox trap Tab within the active dialog', () => {
 });
 
 test('Spotify stays lazy and shows its loading and failure states', async () => {
-  const originalFetch = global.fetch;
   global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
   renderAboutPage();
 
   expect(global.fetch).not.toHaveBeenCalled();
-  const musicCard = screen.getByRole('heading', { name: 'Music' }).closest('article');
-  fireEvent.click(within(musicCard).getByRole('button', { name: 'View listening' }));
+  openSpotifyListening();
   expect(screen.getByText('Loading recent listening...')).toBeInTheDocument();
   await screen.findByText('Couldn’t load my recent listening right now.');
   expect(global.fetch).toHaveBeenCalledWith(
@@ -164,29 +190,27 @@ test('Spotify stays lazy and shows its loading and failure states', async () => 
     'https://open.spotify.com/user/foahrtqqvuuvt7wscxub4uerd'
   );
   expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-  global.fetch = originalFetch;
 });
 
-test('Spotify retries a failed request only after explicit action', async () => {
-  const originalFetch = global.fetch;
+test('Spotify retries a failed request successfully only after explicit action', async () => {
   global.fetch = jest.fn()
     .mockRejectedValueOnce(new Error('offline'))
-    .mockRejectedValueOnce(new Error('still offline'));
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ tracks: [{ id: 'recovered', name: 'Recovered song', artist: 'Artist', album: 'Album', url: 'https://open.spotify.com/track/recovered', playedAt: '2026-09-07T15:00:00Z' }] })
+    });
   renderAboutPage();
-  const musicCard = screen.getByRole('heading', { name: 'Music' }).closest('article');
-  fireEvent.click(within(musicCard).getByRole('button', { name: 'View listening' }));
+  openSpotifyListening();
   const retry = await screen.findByRole('button', { name: 'Retry' });
   expect(global.fetch).toHaveBeenCalledTimes(1);
 
   fireEvent.click(retry);
   expect(screen.getByText('Loading recent listening...')).toBeInTheDocument();
-  await screen.findByRole('button', { name: 'Retry' });
+  await screen.findByText('Recovered song');
   expect(global.fetch).toHaveBeenCalledTimes(2);
-  global.fetch = originalFetch;
 });
 
 test('Spotify renders valid play times semantically and omits invalid ones', async () => {
-  const originalFetch = global.fetch;
   global.fetch = jest.fn().mockResolvedValue({
     ok: true,
     json: async () => ({
@@ -197,13 +221,73 @@ test('Spotify renders valid play times semantically and omits invalid ones', asy
     })
   });
   renderAboutPage();
-  const musicCard = screen.getByRole('heading', { name: 'Music' }).closest('article');
-  fireEvent.click(within(musicCard).getByRole('button', { name: 'View listening' }));
+  openSpotifyListening();
   await screen.findByText('First song');
   const time = screen.getByText('8 minutes ago');
   expect(time.tagName).toBe('TIME');
   expect(time).toHaveAttribute('dateTime');
   expect(time).toHaveAttribute('title');
   expect(screen.getByText('Second song').parentElement.querySelector('time')).not.toBeInTheDocument();
-  global.fetch = originalFetch;
+});
+
+test('Spotify reuses a fresh cache and refreshes it after five minutes', async () => {
+  let now = new Date('2026-09-07T16:00:00Z').getTime();
+  jest.spyOn(Date, 'now').mockImplementation(() => now);
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ tracks: [{ id: 'first', name: 'Cached song', artist: 'Artist', album: 'Album', url: '#first', playedAt: '2026-09-07T15:00:00Z' }] }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ tracks: [{ id: 'second', name: 'Fresh song', artist: 'Artist', album: 'Album', url: '#second', playedAt: '2026-09-07T15:30:00Z' }] }) });
+  renderAboutPage();
+
+  openSpotifyListening();
+  await screen.findByText('Cached song');
+  fireEvent.click(screen.getByRole('button', { name: 'Close music activity' }));
+
+  now += 5 * 60 * 1000 - 1;
+  openSpotifyListening();
+  await screen.findByText('Cached song');
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole('button', { name: 'Close music activity' }));
+
+  now += 1;
+  openSpotifyListening();
+  expect(screen.getByText('Loading recent listening...')).toBeInTheDocument();
+  await screen.findByText('Fresh song');
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+});
+
+test('Spotify deduplicates concurrent requests', async () => {
+  let resolveFetch;
+  global.fetch = jest.fn(() => new Promise((resolve) => { resolveFetch = resolve; }));
+  render(<><SpotifyListening /><SpotifyListening /></>);
+
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    resolveFetch({ ok: true, json: async () => ({ tracks: [{ id: 'shared', name: 'Shared song', artist: 'Artist', album: 'Album', url: '#shared', playedAt: '2026-09-07T15:00:00Z' }] }) });
+  });
+  expect(await screen.findAllByText('Shared song')).toHaveLength(2);
+});
+
+test('Spotify sorts newest valid plays first and leaves malformed timestamps after them', async () => {
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ tracks: [
+      { id: 'invalid', name: 'Malformed song', artist: 'Artist', album: 'Album', url: '#invalid', playedAt: 'not-a-date' },
+      { id: 'older', name: 'Older song', artist: 'Artist', album: 'Album', url: '#older', playedAt: '2026-09-07T14:00:00Z' },
+      { id: 'missing', name: 'Missing date song', artist: 'Artist', album: 'Album', url: '#missing' },
+      { id: 'newest', name: 'Newest song', artist: 'Artist', album: 'Album', url: '#newest', playedAt: '2026-09-07T15:00:00Z' }
+    ] })
+  });
+  renderAboutPage();
+  openSpotifyListening();
+  await screen.findByText('Newest song');
+
+  const renderedTracks = [...document.querySelectorAll('.spotify-track')];
+  expect(renderedTracks.map((track) => track.querySelector('strong').textContent)).toEqual([
+    'Newest song', 'Older song', 'Malformed song', 'Missing date song'
+  ]);
+  expect(renderedTracks[0]).toHaveTextContent('Newest song');
+  expect(renderedTracks[0]).toHaveClass('spotify-track-latest');
+  expect(renderedTracks.slice(1).every((track) => !track.classList.contains('spotify-track-latest'))).toBe(true);
+  expect(screen.getByText('Malformed song').parentElement.querySelector('time')).not.toBeInTheDocument();
+  expect(screen.getByText('Missing date song').parentElement.querySelector('time')).not.toBeInTheDocument();
 });
