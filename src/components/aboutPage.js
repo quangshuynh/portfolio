@@ -96,7 +96,7 @@ const photographyGallery = [
   [waterfallCliffs, 927, 1400, 'Layered waterfalls flowing over a rocky cliff in Ithaca', 'portrait'],
   [woodlandStream, 933, 1400, 'A narrow stream winding through a sunlit woodland at Cornell', 'portrait'],
   [historicBuilding, 1400, 933, 'Rush Rhees Library framed by bare winter branches'],
-  [hilltopCastle, 933, 1400, 'A stone castle overlooking a wide valley at Cornell', 'portrait'],
+  [hilltopCastle, 933, 1400, 'A stone building overlooking a wide valley at Cornell', 'portrait'],
   [blueCactusSign, 1400, 933, 'A colorful Blue Cactus sign on a brick street at the University of Rochester'],
   [woodlandFence, 1400, 1050, 'A wooden fence bordering a green woodland'],
   [whiteCarAtNight, 1400, 1050, '2011 Subaru WRX at night']
@@ -136,7 +136,7 @@ const technologyGallery = [
 ];
 
 const gamingGallery = [
-  [csgoScreenshot, 1152, 864, 'Counter-Strike: Global Offensive menu screenshot', 'CS:GO menu screen 2022']
+  [csgoScreenshot, 1152, 864, 'Counter-Strike: Global Offensive menu screenshot', 'CS:GO, 2022']
 ];
 
 function AboutPage() {
@@ -274,8 +274,8 @@ function AboutPage() {
             <div className="section-heading"><div><p className="eyebrow">How I like to work</p><h2 id="values-title">What guides my work</h2></div><p>Three principles I return to when I’m learning, building, and collaborating.</p></div>
             <div className="values-grid">{values.map(([title, copy], index) => <article className="value-card" key={title}><span>0{index + 1}</span><h3>{title}</h3><p>{copy}</p></article>)}</div>
             <p className="education-note">
-              I’m currently pursuing Computer Science through RIT’s accelerated BS/MS
-              program. I’m especially interested in the point where ideas from systems,
+              I’m currently pursuing an accelerated BS/MS in Computer Science at RIT. 
+              I’m especially interested in the point where ideas from systems,
               databases, algorithms, and machine learning turn into software that has to
               behave correctly outside the classroom.
             </p>
