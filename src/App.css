@@ -586,6 +586,52 @@
 .button:hover { transform: translateY(-2px); background: var(--accent-dark); border-color: var(--accent-dark); }
 .button-secondary { background: transparent; color: var(--ink); border-color: var(--line); }
 .button-secondary:hover { background: var(--surface); color: var(--accent-dark); border-color: var(--accent); }
+
+/* personality buttons: shared CTA geometry with quiet, theme-specific details */
+.personality-button {
+  --personality-detail: currentColor;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: .35rem .55rem .35rem .55rem;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 9%, transparent);
+}
+.personality-button__label { position: relative; z-index: 2; display: inline-flex; align-items: center; gap: .55rem; }
+.personality-button::before,
+.personality-button::after { content: ''; position: absolute; z-index: 1; pointer-events: none; color: var(--personality-detail); opacity: .48; transition: transform 160ms ease, opacity 160ms ease; }
+.personality-button:hover::before,
+.personality-button:hover::after,
+.personality-button:focus-visible::before,
+.personality-button:focus-visible::after { opacity: .78; }
+.personality-button:active { transform: translateY(0); box-shadow: inset 0 2px 3px color-mix(in srgb, currentColor 16%, transparent); }
+.personality-button:disabled,
+.personality-button[aria-disabled='true'] { opacity: .58; cursor: not-allowed; transform: none; }
+
+.personality-button[data-personality='rally'] { padding-left: 1.35rem; }
+.personality-button[data-personality='rally']::before { inset: 0 auto 0 0; width: .38rem; background: repeating-linear-gradient(135deg, currentColor 0 3px, transparent 3px 6px); }
+.personality-button[data-personality='rally']:hover::before { transform: translateX(2px); }
+
+.personality-button[data-personality='mechanical'] { border-radius: .2rem .55rem; }
+.personality-button[data-personality='mechanical']::before { inset: .28rem; border: 1px solid currentColor; opacity: .16; }
+.personality-button[data-personality='mechanical']::after { top: .38rem; right: .4rem; width: 3px; height: 3px; border-radius: 50%; background: currentColor; box-shadow: 0 1.68rem 0 currentColor; }
+
+.personality-button[data-personality='cat'] { border-radius: .18rem .18rem .55rem .55rem; }
+.personality-button[data-personality='cat']::before { top: 0; right: .75rem; width: 1.1rem; height: .32rem; background: linear-gradient(135deg, currentColor 49%, transparent 51%) left/50% 100% no-repeat, linear-gradient(225deg, currentColor 49%, transparent 51%) right/50% 100% no-repeat; }
+.personality-button[data-personality='cat']:hover::before { transform: translateY(2px); }
+
+.personality-button[data-personality='music']::after { right: .42rem; bottom: .28rem; width: 1.25rem; height: .32rem; background: linear-gradient(90deg, currentColor 0 12%, transparent 12% 20%, currentColor 20% 36%, transparent 36% 44%, currentColor 44% 62%, transparent 62% 70%, currentColor 70% 82%, transparent 82% 90%, currentColor 90%); transform-origin: bottom; }
+.personality-button[data-personality='music']:hover::after { transform: scaleY(1.45); }
+
+.personality-button[data-personality='hardware']::before { left: .35rem; bottom: .32rem; width: 1rem; height: .42rem; border-left: 1px solid currentColor; border-bottom: 1px solid currentColor; }
+.personality-button[data-personality='hardware']::after { left: 1.27rem; bottom: .25rem; width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+.personality-button[data-personality='hardware']:hover::after { transform: translateX(2px); }
+
+.personality-button[data-personality='camera']::before { inset: .32rem; background: linear-gradient(currentColor, currentColor) left top/8px 1px no-repeat, linear-gradient(currentColor, currentColor) left top/1px 8px no-repeat, linear-gradient(currentColor, currentColor) right bottom/8px 1px no-repeat, linear-gradient(currentColor, currentColor) right bottom/1px 8px no-repeat; }
+.personality-button[data-personality='camera']::after { right: .45rem; top: .35rem; width: 5px; height: 5px; border: 1px solid currentColor; border-radius: 50%; }
+
+.personality-button[data-personality='food']::after { right: .45rem; bottom: .32rem; width: .75rem; height: .28rem; border: 1px solid currentColor; border-top: 0; border-radius: 0 0 999px 999px; }
+.personality-button[data-personality='food']::before { right: .66rem; bottom: .66rem; width: 1px; height: .35rem; background: currentColor; box-shadow: .22rem -.08rem 0 currentColor; }
+.personality-button[data-personality='food']:hover::before { transform: translateY(-2px); }
 a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offset: 4px; }
 
 /* shared sections */

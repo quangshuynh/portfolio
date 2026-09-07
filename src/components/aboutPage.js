@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FaArrowRight, FaCamera, FaCar, FaGamepad, FaMapMarkerAlt, FaMountain, FaMusic, FaUsers, FaGithub } from 'react-icons/fa';
+import PersonalityButton from './personalityButton';
 import quangPhoto from '../assets/about/quang/quang-about-portrait-web.jpg';
 import photographySunset from '../assets/about/photography/quang-photography-sunset-web.jpg';
 import hikingOverlook from '../assets/about/hiking/quang-hiking-overlook-web.jpg';
@@ -204,8 +205,8 @@ function AboutPage() {
                 </p>
               </div>
               <div className="hero-actions">
-                <a className="button" href={homeHref('#projects')}>View my work <FaArrowRight aria-hidden="true" /></a>
-                <a className="button button-secondary" href={homeHref('#contact')}>Get in touch</a>
+                <PersonalityButton href={homeHref('#projects')} personality="hardware" personalityKey="about-view-work">View my work <FaArrowRight aria-hidden="true" /></PersonalityButton>
+                <PersonalityButton secondary href={homeHref('#contact')} personality="auto" personalityKey="about-contact">Get in touch</PersonalityButton>
               </div>
             </div>
             <figure className="about-portrait">
@@ -306,7 +307,7 @@ function AboutPage() {
             <p className="eyebrow">Selected work</p>
             <h2 id="about-cta-title">Want to see what I’ve been building?</h2>
             <div className="hero-actions">
-              <a className="button" href={homeHref('#projects')}>View projects <FaArrowRight aria-hidden="true" /></a>
+              <PersonalityButton href={homeHref('#projects')} personality="auto" personalityKey="about-view-projects">View projects <FaArrowRight aria-hidden="true" /></PersonalityButton>
               <a className="button button-secondary" href="https://github.com/quangshuynh" target="_blank" rel="noreferrer"><FaGithub aria-hidden="true" /> GitHub</a>
             </div>
           </div>
