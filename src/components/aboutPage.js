@@ -282,7 +282,16 @@ function AboutPage() {
           </div>
         </section>
 
-        <section className="about-cta" aria-labelledby="about-cta-title"><div className="section-inner"><p className="eyebrow">Selected work</p><h2 id="about-cta-title">Want to see what I’ve been building?</h2><div className="hero-actions"><a className="button" href={homeHref('#projects')}>View projects <FaArrowRight aria-hidden="true" /></a><a className="button button-secondary" href="https://github.com/quangshuynh" target="_blank" rel="noreferrer"><FaGithub aria-hidden="true" /> GitHub</a></div></div></section>
+        <section className="about-cta" aria-labelledby="about-cta-title">
+          <div className="section-inner">
+            <p className="eyebrow">Selected work</p>
+            <h2 id="about-cta-title">Want to see what I’ve been building?</h2>
+            <div className="hero-actions">
+              <a className="button" href={homeHref('#projects')}>View projects <FaArrowRight aria-hidden="true" /></a>
+              <a className="button button-secondary" href="https://github.com/quangshuynh" target="_blank" rel="noreferrer"><FaGithub aria-hidden="true" /> GitHub</a>
+            </div>
+          </div>
+        </section>
       </main>
       <Footer />
     </div>
