@@ -36,12 +36,36 @@ import Footer from './footer';
 import SiteNav, { homeHref } from './siteNav';
 
 const interests = [
-  [FaCamera, 'Photography', 'I enjoy photography and experimenting with how composition, lighting, and perspective shape an image.'],
-  [FaMountain, 'Hiking', 'I enjoy getting outside, exploring new places, and taking a break from screens.'],
-  [FaMusic, 'Music', 'I enjoy listening to music, discovering new artists, and playing guitar recreationally.', 'https://open.spotify.com/user/foahrtqqvuuvt7wscxub4uerd'],
-  [FaCar, 'Cars & technology', 'I’ve always been interested in technology beyond computers, including cars and how mechanical and electronic systems work.'],
-  [FaGamepad, 'Gaming', 'Gaming is one of the ways I relax and was also part of what originally made computers interesting to me.'],
-  [FaUsers, 'Family & friends', 'Spending time with family and friends is an important part of my life, especially over a meal, a game, or a shared activity.']
+  [
+    FaCamera,
+    'Photography',
+    'I enjoy photography and experimenting with how composition, lighting, and perspective shape an image.'
+  ],
+  [
+    FaMountain,
+    'Hiking',
+    'I enjoy getting outside, exploring new places, and taking a break from screens.'
+  ],
+  [
+    FaMusic,
+    'Music',
+    'I enjoy listening to music, discovering new artists, and playing guitar recreationally.'
+  ],
+  [
+    FaCar,
+    'Cars & technology',
+    'I’ve always been interested in technology beyond computers, including cars and how mechanical and electronic systems work.'
+  ],
+  [
+    FaGamepad,
+    'Gaming',
+    'Gaming is one of the ways I relax and was also part of what originally made computers interesting to me.'
+  ],
+  [
+    FaUsers,
+    'Time with family & friends',
+    'Spending time with family and friends is an important part of my life, especially over a meal, a game, or a shared activity.'
+  ]
 ];
 
 const interestPhotos = {
@@ -61,16 +85,16 @@ const values = [
 const photographyGallery = [
   [architectureSpire, 933, 1400, 'A church spire rising between brick buildings at Cornell', 'portrait'],
   [birdOnLawn, 933, 1400, 'A small bird standing in vivid green grass at Cornell', 'portrait'],
-  [libraryReadingRoom, 1400, 933, 'Rush Rhees Library. Warm reading lamps glowing in a wood-paneled library at the University of Rochester'],
+  [libraryReadingRoom, 1400, 933, 'Warm reading lamps glowing inside the wood-paneled Rush Rhees Library'],
   [riversideBridge, 1050, 1400, 'A red metal bridge crossing the Genesee River', 'portrait'],
   [horizonSunset, 1050, 1400, 'The sun meeting a dark lake at the horizon', 'portrait'],
-  [riversideWaterfall, 1400, 1050, 'A broad waterfall surrounded by summer greenery at Bristol Mountains'],
+  [riversideWaterfall, 1400, 1050, 'A broad waterfall surrounded by summer greenery at Rochester Lower Falls'],
   [lakesideSunset, 1400, 1050, 'Pink sunset clouds above a calm lakeshore in Irondequoit Bay'],
   [niagaraOverlook, 1050, 1400, 'A distant city skyline beyond a misty waterfall at Niagara Falls', 'portrait'],
-  [forestCanopy, 927, 1400, 'Looking upward through a dense green forest canopy at Bristol Mountains', 'portrait'],
+  [forestCanopy, 927, 1400, 'Looking upward through a dense green forest canopy at Bristol Mountain', 'portrait'],
   [waterfallCliffs, 927, 1400, 'Layered waterfalls flowing over a rocky cliff in Ithaca', 'portrait'],
   [woodlandStream, 933, 1400, 'A narrow stream winding through a sunlit woodland at Cornell', 'portrait'],
-  [historicBuilding, 1400, 933, 'Rush Rhees Library. An ornate historic building framed by bare branches at the University of Rochester'],
+  [historicBuilding, 1400, 933, 'Rush Rhees Library framed by bare winter branches'],
   [hilltopCastle, 933, 1400, 'A stone castle overlooking a wide valley at Cornell', 'portrait'],
   [blueCactusSign, 1400, 933, 'A colorful Blue Cactus sign on a brick street at the University of Rochester'],
   [woodlandFence, 1400, 1050, 'A wooden fence bordering a green woodland'],
@@ -106,7 +130,7 @@ const technologyGallery = [
   [techPhoto, 1050, 1400, 'Computer hardware and a custom desktop PC during a hands-on build', 'Building a PC from the ground up', 'portrait'],
   [customPcGreen, 1050, 1400, 'A custom desktop PC illuminated by green lighting', 'My finished RTX 4070 Ti build', 'portrait'],
   [graphicsCard, 1050, 1400, 'An RTX 3080 Ti graphics card held above a work surface', 'Getting an RTX 3080 Ti ready for an upgrade', 'portrait'],
-  [carShowPorsche, 1400, 984, 'A black Singer Porsche 930 displayed at Little Speed Shop Cars  & Coffee', 'A Singer Porsche 930 at The Little Speed Shop’s Cars & Coffee'],
+  [carShowPorsche, 1400, 984, 'A black Singer Porsche 930 displayed at Little Speed Shop Cars & Coffee', 'A Singer Porsche 930 at The Little Speed Shop’s Cars & Coffee'],
   [carShowSubaruEngine, 1400, 889, 'Modified blue Blobeye STI with its engine bay open at a car show', 'Taking a closer look under the hood of this Blobeye STI']
 ];
 
@@ -128,6 +152,7 @@ function AboutPage() {
   const closeGalleryButton = useRef(null);
   const closeLightboxButton = useRef(null);
   const galleryTrigger = useRef(null);
+  const lightboxTrigger = useRef(null);
   const lightboxDrag = useRef(null);
 
   const [spotifyTracks, setSpotifyTracks] = useState([]);
@@ -174,22 +199,28 @@ function AboutPage() {
     setShowAllPhotography(false);
   };
 
-  const openLightbox = (src, alt, caption) => {
-    setLightboxImage({
-      src,
-      alt,
-      caption
-    });
+const openLightbox = (src, alt, caption, trigger) => {
+  lightboxTrigger.current = trigger;
 
-    setLightboxScale(1);
-    setLightboxPosition({ x: 0, y: 0 });
-  };
+  setLightboxImage({
+    src,
+    alt,
+    caption
+  });
 
-  const closeLightbox = () => {
-    setLightboxImage(null);
-    setLightboxScale(1);
-    setLightboxPosition({ x: 0, y: 0 });
-  };
+  setLightboxScale(1);
+  setLightboxPosition({ x: 0, y: 0 });
+};
+
+const closeLightbox = useCallback(() => {
+  setLightboxImage(null);
+  setLightboxScale(1);
+  setLightboxPosition({ x: 0, y: 0 });
+
+  requestAnimationFrame(() => {
+    lightboxTrigger.current?.focus();
+  });
+}, []);
 
   const zoomLightbox = useCallback((amount) => {
     setLightboxScale((currentScale) => {
@@ -430,7 +461,7 @@ useEffect(() => {
       handleKeyDown
     );
   };
-}, [activeGallery, lightboxImage, zoomLightbox]);
+}, [activeGallery, lightboxImage, zoomLightbox, closeLightbox]);
 
 useEffect(() => {
   if (lightboxImage) {
@@ -450,9 +481,24 @@ useEffect(() => {
               <h1 id="about-page-title">Hi, I’m Quang.</h1>
               <p className="about-location"><FaMapMarkerAlt aria-hidden="true" /> Rochester, New York</p>
               <div className="about-prose">
-                <p>I’m a software developer and Computer Science student based in Rochester, New York. I was born in Vietnam and moved to the United States with my family when I was young, and Rochester has been home for most of my life.</p>
-                <p>I became interested in computers and technology early on. Over time, that curiosity turned into a goal of becoming a software engineer. I tend to learn by taking an idea or problem and building something from it—usually far enough that I run into the difficult engineering questions that require deeper thinking.</p>
-                <p>A lot of my work reflects that. I’ve explored backend reliability, data reconciliation, GitHub APIs, native macOS audio capture, and local-first iOS applications because I wanted to understand how those systems behave beyond the happy path.</p>
+                <p>
+                  I’m a software developer and Computer Science student based in Rochester,
+                  New York. I was born in Vietnam and moved to the United States with my
+                  family when I was young, and Rochester has been home for most of my life.
+                </p>
+
+                <p>
+                  I became interested in computers early on through games and hardware,
+                  and eventually through programming. I tend to learn by taking an idea
+                  or problem and building it far enough to encounter the harder engineering
+                  questions behind it.
+                </p>
+
+                <p>
+                  That curiosity has taken me into backend reliability, data reconciliation,
+                  GitHub APIs, native macOS audio capture, and local-first iOS applications,
+                  especially where correctness and failure behavior matter.
+                </p>
               </div>
               <div className="hero-actions">
                 <a className="button" href={homeHref('#projects')}>View my work <FaArrowRight aria-hidden="true" /></a>
@@ -472,7 +518,7 @@ useEffect(() => {
           <div className="section-inner about-story">
             <div className="about-story-intro">
               <p className="eyebrow">My path into software</p>
-              <h2 id="path-title">From the classroom to production.</h2>
+              <h2 id="path-title">Learning how software works in production</h2>
 
               <figure className="kore-team-photo">
                 <img
@@ -512,7 +558,7 @@ useEffect(() => {
           <div className="section-inner">
             <div className="section-heading"><div><p className="eyebrow">Outside the editor</p><h2 id="beyond-title">Beyond software</h2></div><p>A few of the things I make time for away from work and school.</p></div>
             <div className="interest-grid">
-              {interests.map(([Icon, title, copy, href]) => {
+              {interests.map(([Icon, title, copy]) => {
                 const photos = interestPhotos[title];
                 return (
                   <article className="interest-card" key={title}>
@@ -623,8 +669,13 @@ useEffect(() => {
                           <button
                             className="photography-gallery-image-button"
                             type="button"
-                            onClick={() =>
-                              openLightbox(src, alt, caption)
+                            onClick={(event) =>
+                              openLightbox(
+                                src,
+                                alt,
+                                caption,
+                                event.currentTarget
+                              )
                             }
                             aria-label={`Open image: ${caption}`}
                           >
@@ -662,11 +713,12 @@ useEffect(() => {
                           <button
                             className="photography-gallery-image-button"
                             type="button"
-                            onClick={() =>
+                            onClick={(event) =>
                               openLightbox(
                                 src,
                                 alt,
-                                photographyCaptions[src]
+                                photographyCaptions[src],
+                                event.currentTarget
                               )
                             }
                             aria-label={`Open image: ${photographyCaptions[src]}`}
@@ -704,7 +756,7 @@ useEffect(() => {
                             <button
                               className="photography-gallery-image-button"
                               type="button"
-                              onClick={() => openLightbox(src, alt, caption)}
+                              onClick={(event) => openLightbox(src, alt, caption, event.currentTarget)}
                               aria-label={`Open image: ${caption}`}
                             >
                               <img
@@ -802,7 +854,7 @@ useEffect(() => {
                             <button
                               className="photography-gallery-image-button"
                               type="button"
-                              onClick={() => openLightbox(src, alt, caption)}
+                              onClick={(event) => openLightbox(src, alt, caption, event.currentTarget)}
                               aria-label={`Open image: ${caption}`}
                             >
                               <img
@@ -930,7 +982,12 @@ useEffect(() => {
           <div className="section-inner">
             <div className="section-heading"><div><p className="eyebrow">How I like to work</p><h2 id="values-title">What guides my work</h2></div><p>Three principles I return to when I’m learning, building, and collaborating.</p></div>
             <div className="values-grid">{values.map(([title, copy], index) => <article className="value-card" key={title}><span>0{index + 1}</span><h3>{title}</h3><p>{copy}</p></article>)}</div>
-            <p className="education-note">I’m currently pursuing Computer Science through RIT’s accelerated BS/MS program. My coursework has included algorithms, databases, software engineering, systems, parallel and distributed computing, artificial intelligence, and machine learning, and I especially enjoy applying those concepts through projects.</p>
+            <p className="education-note">
+              I’m currently pursuing Computer Science through RIT’s accelerated BS/MS
+              program. My coursework spans algorithms, databases, software engineering,
+              systems, distributed computing, AI, and machine learning, and I especially enjoy
+              applying those ideas through projects.
+            </p>
           </div>
         </section>
 
