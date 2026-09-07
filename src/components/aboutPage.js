@@ -56,7 +56,7 @@ const interests = [
   [
     FaCar,
     'Cars & technology',
-    'I’ve always been interested in technology beyond computers, including cars and how mechanical and electronic systems work.'
+    'I enjoy learning how things are put together, whether that means working on computer hardware, exploring new technology, or looking under the hood of a car.'
   ],
   [
     FaGamepad,
@@ -172,9 +172,9 @@ function AboutPage() {
               <p className="about-location"><FaMapMarkerAlt aria-hidden="true" /> Rochester, New York</p>
               <div className="about-prose">
                 <p>
-                  I’m a software engineer and Computer Science student based in Rochester,
-                  New York. I was born in Vietnam and moved to the United States with my
-                  family when I was young, and Rochester has been home for most of my life.
+                  I’m a software engineer and Computer Science student. I was born in Vietnam
+                  and moved to the United States with my family when I was young, and Rochester
+                  has been home for most of my life.
                 </p>
 
                 <p>
@@ -185,9 +185,9 @@ function AboutPage() {
                 </p>
 
                 <p>
-                  That curiosity has taken me into backend reliability, data reconciliation,
-                  GitHub APIs, native macOS audio capture, and local-first iOS applications,
-                  often in areas where correctness and failure behavior matter.
+                  That curiosity eventually pulled me toward problems where the interesting part 
+                  is not just making something work, but figuring out what happens when assumptions 
+                  fail, data gets messy, or software has to keep working over time.
                 </p>
               </div>
               <div className="hero-actions">
@@ -223,15 +223,23 @@ function AboutPage() {
             </div>
             <div className="about-prose">
               <p>
-                My first professional software engineering role was at KORE Wireless through RIT’s co-op program. It was my first opportunity to move beyond coursework and contribute to production systems used to support real business operations.
+                My first professional software engineering role was at KORE Wireless through
+                RIT’s co-op program. It was my first opportunity to move beyond coursework and
+                contribute to software used in real business operations.
               </p>
 
               <p>
-                Over five months, I went from learning an unfamiliar enterprise codebase and integration environment to taking on increasingly independent engineering work. I learned how much of professional software development happens beyond writing the initial feature: understanding existing systems, tracing failures across applications and databases, testing changes safely, working with other engineers, and maintaining software that people already depend on.
+                Over five months, I went from learning an unfamiliar enterprise codebase and 
+                integration environment to taking on increasingly independent engineering work. 
+                I learned how much of professional software development happens beyond writing the 
+                initial feature: understanding existing systems, tracing failures across applications 
+                and databases, testing changes safely, working with other engineers, and maintaining 
+                software that people already depend on.
               </p>
 
               <p>
-                That experience changed how I approach my own projects. I became much more interested in reliability, failure handling, data correctness, and what happens outside the happy path.
+                That experience changed how I approach my own projects. I became much more interested in 
+                reliability, failure handling, data correctness, and what happens outside the happy path.
               </p>
 
               <blockquote className="about-quote">

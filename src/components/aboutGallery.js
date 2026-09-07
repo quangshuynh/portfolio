@@ -32,7 +32,14 @@ const galleryMetadata = {
   technology: ['Under the hood', 'Cars & technology', 'Close cars and technology gallery']
 };
 
-const focusableSelector = 'button:not([disabled]), a[href]';
+const focusableSelector = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])'
+].join(',');
 const interestGalleries = {
   Photography: 'photography',
   'Cars & technology': 'technology',
@@ -227,5 +234,5 @@ export function InterestGalleryModal({ activeGallery, galleries, photographyCapt
   else if (activeGallery === 'photography') content = <><PhotoGallery items={showAllPhotography ? galleries.photography : galleries.photography.slice(0, 3)} label="More photographs by Quang" captions={photographyCaptions} onOpen={openLightbox} />{!showAllPhotography && <button className="button photography-view-all" type="button" onClick={() => setShowAllPhotography(true)}>View all</button>}</>;
   else content = <PhotoGallery items={galleries[activeGallery]} label={galleryLabels[activeGallery]} className={`${activeGallery}-gallery`} onOpen={openLightbox} />;
 
-  return <div className="photography-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="photography-modal" role="dialog" aria-modal={lightboxImage ? undefined : 'true'} aria-hidden={lightboxImage ? 'true' : undefined} inert={lightboxImage ? '' : undefined} aria-labelledby="interest-modal-title"><div className="photography-modal-header"><div><p className="eyebrow">{eyebrow}</p><h3 id="interest-modal-title">{title}</h3></div><button className="photography-modal-close" type="button" onClick={onClose} ref={closeButton} aria-label={closeLabel}><FaTimes aria-hidden="true" /></button></div>{content}</section>{lightboxImage && <PhotoLightbox image={lightboxImage} onClose={closeLightbox} />}</div>;
+  return <div className="photography-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="photography-modal" role="dialog" aria-modal={lightboxImage ? undefined : 'true'} aria-hidden={lightboxImage ? 'true' : undefined} inert={Boolean(lightboxImage)} aria-labelledby="interest-modal-title"><div className="photography-modal-header"><div><p className="eyebrow">{eyebrow}</p><h3 id="interest-modal-title">{title}</h3></div><button className="photography-modal-close" type="button" onClick={onClose} ref={closeButton} aria-label={closeLabel}><FaTimes aria-hidden="true" /></button></div>{content}</section>{lightboxImage && <PhotoLightbox image={lightboxImage} onClose={closeLightbox} />}</div>;
 }
