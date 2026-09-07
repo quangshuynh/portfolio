@@ -823,11 +823,24 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
   .interest-grid, .values-grid { grid-template-columns: 1fr; }
   .photography-modal-backdrop { align-items: stretch; padding: .75rem; }
   .photography-modal { max-height: calc(100dvh - 1.5rem); padding: 1rem; }
-  #photography-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
-  #photography-gallery figure,
-  #photography-gallery .photography-gallery-portrait { display: block; aspect-ratio: 1; }
-  #photography-gallery .photography-gallery-image-button { height: 100%; }
-  #photography-gallery img { width: 100%; height: 100%; object-fit: cover; }
+  .photography-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    gap: .65rem;
+  }
+  .photography-gallery figure {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+  }
+  .photography-gallery .photography-gallery-portrait {
+    grid-row: auto;
+    min-height: 0;
+    aspect-ratio: 3 / 4;
+  }
+  .photography-gallery .photography-gallery-image-button { height: 100%; }
+  .photography-gallery img { width: 100%; height: 100%; object-fit: cover; }
   #photography-gallery figcaption {
     position: absolute;
     right: .35rem;
