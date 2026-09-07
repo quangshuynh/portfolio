@@ -92,7 +92,7 @@ test('renders the dedicated About Quang route with working homepage links', () =
   expect(screen.queryByLabelText('More photographs by Quang')).not.toBeInTheDocument();
   fireEvent.click(photographyToggle);
   expect(screen.getByLabelText('More photographs by Quang')).toBeInTheDocument();
-  expect(screen.getAllByLabelText('More photographs by Quang')[0].querySelectorAll('img')).toHaveLength(3);
+  expect(screen.getAllByLabelText('More photographs by Quang')[0].querySelectorAll('img')).toHaveLength(4);
   fireEvent.click(screen.getByRole('button', { name: 'View all' }));
   expect(screen.getAllByLabelText('More photographs by Quang')[0].querySelectorAll('img')).toHaveLength(16);
   expect(screen.getByRole('img', { name: /church spire/i })).toHaveAttribute('loading', 'lazy');

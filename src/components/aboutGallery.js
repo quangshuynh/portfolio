@@ -267,7 +267,7 @@ export function InterestGalleryModal({ activeGallery, galleries, onClose }) {
   const openLightbox = (src, alt, caption, trigger) => { lightboxTrigger.current = trigger; lightboxOpen.current = true; setLightboxImage({ src, alt, caption }); };
   let content;
   if (activeGallery === 'music') content = <SpotifyListening />;
-  else if (activeGallery === 'photography') content = <><PhotoGallery items={showAllPhotography ? galleries.photography : galleries.photography.slice(0, 3)} label="More photographs by Quang" onOpen={openLightbox} />{!showAllPhotography && <button className="button photography-view-all" type="button" onClick={() => setShowAllPhotography(true)}>View all</button>}</>;
+  else if (activeGallery === 'photography') content = <><PhotoGallery items={showAllPhotography ? galleries.photography : galleries.photography.slice(0, 4)} label="More photographs by Quang" onOpen={openLightbox} />{!showAllPhotography && <button className="button photography-view-all" type="button" onClick={() => setShowAllPhotography(true)}>View all</button>}</>;
   else content = <PhotoGallery items={galleries[activeGallery]} label={galleryLabels[activeGallery]} className={`${activeGallery}-gallery`} onOpen={openLightbox} />;
 
   return (
