@@ -181,7 +181,8 @@ test('Spotify stays lazy and shows its loading and failure states', async () => 
   expect(global.fetch).not.toHaveBeenCalled();
   openSpotifyListening();
   expect(screen.getByText('Loading recent listening...')).toBeInTheDocument();
-  await screen.findByText('Couldn’t load my recent listening right now.');
+  expect(await screen.findByText('Couldn’t load recent listening')).toBeInTheDocument();
+  expect(screen.getByText('Spotify activity is temporarily unavailable.')).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledWith(
     'https://spotify-portfolio-api.quangs.workers.dev/recent'
   );
