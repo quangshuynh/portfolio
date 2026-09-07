@@ -98,6 +98,7 @@ const photographyGallery = [
   { src: architectureSpire, width: 933, height: 1400, alt: 'A church spire rising between brick buildings at Cornell', caption: "Looking up through Cornell's brick architecture", shape: 'portrait' },
   { src: birdOnLawn, width: 933, height: 1400, alt: 'A small bird standing in vivid green grass at Cornell', caption: 'A quiet moment on the grass at Cornell', shape: 'portrait' },
   { src: libraryReadingRoom, width: 1400, height: 933, alt: 'Warm reading lamps glowing inside the wood-paneled Rush Rhees Library', caption: 'Warm light inside Rush Rhees Library', shape: 'landscape' },
+  { src: blueCactusSign, width: 1400, height: 933, alt: 'A colorful Blue Cactus sign on a brick street at the University of Rochester', caption: 'A little color at the University of Rochester', shape: 'landscape' },
   { src: riversideBridge, width: 1050, height: 1400, alt: 'A red metal bridge crossing the Genesee River', caption: 'Red steel bridge over the Genesee River', shape: 'portrait' },
   { src: horizonSunset, width: 1050, height: 1400, alt: 'The sun meeting a dark lake at the horizon', caption: 'Watching the last light disappear over the water', shape: 'portrait' },
   { src: riversideWaterfall, width: 1400, height: 1050, alt: 'A broad waterfall surrounded by summer greenery at Rochester Lower Falls', caption: 'Rochester Lower Falls overlook', shape: 'landscape' },
@@ -108,7 +109,6 @@ const photographyGallery = [
   { src: woodlandStream, width: 933, height: 1400, alt: 'A narrow stream winding through a sunlit woodland at Cornell', caption: 'Following a stream through the woods at Cornell', shape: 'portrait' },
   { src: historicBuilding, width: 1400, height: 933, alt: 'Rush Rhees Library framed by bare winter branches', caption: 'Rush Rhees Library through bare winter branches', shape: 'landscape' },
   { src: hilltopCastle, width: 933, height: 1400, alt: 'A stone building overlooking a wide valley at Cornell', caption: 'Looking out from Cornell stone architecture', shape: 'portrait' },
-  { src: blueCactusSign, width: 1400, height: 933, alt: 'A colorful Blue Cactus sign on a brick street at the University of Rochester', caption: 'A little color near the University of Rochester', shape: 'landscape' },
   { src: woodlandFence, width: 1400, height: 1050, alt: 'A wooden fence bordering a green woodland', caption: 'At the edge of the woods in Durand Eastman Park', shape: 'landscape' },
   { src: whiteCarAtNight, width: 1400, height: 1050, alt: '2011 Subaru WRX at night', caption: 'My 2011 Subaru WRX after dark', shape: 'landscape' }
 ];
@@ -215,7 +215,7 @@ function AboutPage() {
           </div>
         </section>
 
-        <section className="page-section" aria-labelledby="path-title">
+        <section className="page-section about-path" aria-labelledby="path-title">
           <div className="section-inner about-story">
             <div className="about-story-intro">
               <p className="eyebrow">My path into software</p>
@@ -258,7 +258,7 @@ function AboutPage() {
           </div>
         </section>
 
-        <section className="page-section" aria-labelledby="beyond-title">
+        <section className="page-section about-beyond" aria-labelledby="beyond-title">
           <div className="section-inner">
             <div className="section-heading"><div><p className="eyebrow">Outside the editor</p><h2 id="beyond-title">Beyond software</h2></div><p>A few of the things I make time for away from work and school.</p></div>
             <div className="interest-grid">
@@ -287,7 +287,7 @@ function AboutPage() {
           </div>
         </section>
 
-        <section className="page-section" aria-labelledby="values-title">
+        <section className="page-section about-values" aria-labelledby="values-title">
           <div className="section-inner">
             <div className="section-heading"><div><p className="eyebrow">How I like to work</p><h2 id="values-title">What guides my work</h2></div><p>Three principles I return to when I’m learning, building, and collaborating.</p></div>
             <div className="values-grid">{values.map(([title, copy], index) => <article className="value-card" key={title}><span>0{index + 1}</span><h3>{title}</h3><p>{copy}</p></article>)}</div>

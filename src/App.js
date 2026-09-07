@@ -9,6 +9,7 @@ import MoreProjects from './components/moreProjects';
 import Education from './components/education';
 import Footer from './components/footer';
 import AboutPage from './components/aboutPage';
+import HashScroll from './components/hashScroll';
 
 /**
  * renders the portfolio application
@@ -54,6 +55,7 @@ function App() {
 
   return (
     <div className="app-shell">
+      <HashScroll />
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <Header />
       <main id="main-content">

@@ -43,8 +43,8 @@
 .about-float-link:hover svg { transform: translateX(3px); }
 
 /* personal about page */
-.about-hero { position: relative; padding: clamp(4.5rem, 9vw, 8rem) 0; overflow: hidden; }
-.about-hero::after { content: ''; position: absolute; top: -16rem; right: -13rem; width: 34rem; height: 34rem; border: 6rem solid var(--accent-soft); border-radius: 50%; pointer-events: none; }
+.about-hero { position: relative; padding: clamp(4.5rem, 9vw, 8rem) 0; overflow: hidden; border-bottom: 1px solid var(--line); background: linear-gradient(135deg, var(--section-alt), color-mix(in srgb, var(--paper) 72%, var(--accent-soft))); }
+.about-hero::after { content: ''; position: absolute; top: -16rem; right: -13rem; width: 34rem; height: 34rem; border: 6rem solid color-mix(in srgb, var(--accent-soft) 72%, transparent); border-radius: 50%; pointer-events: none; }
 .about-hero-grid { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(230px, .65fr); gap: clamp(3rem, 8vw, 7rem); align-items: center; }
 .about-hero h1 { margin: 0; font-family: Circular, sans-serif; font-size: clamp(3.5rem, 8vw, 6.5rem); line-height: 1; letter-spacing: -.055em; }
 .about-location { display: flex; align-items: center; gap: .5rem; margin: 1.25rem 0 1.8rem; color: var(--accent-dark); font-weight: 750; }
@@ -61,6 +61,9 @@
 .about-quote p { margin: 0; color: var(--detail-text); font-size: 1.12rem; }
 .about-quote footer { margin-top: .7rem; color: var(--tag-text); font-size: .82rem; font-weight: 750; }
 .about-quote cite { font-style: normal; }
+.about-page .about-path,
+.about-page .about-values { background: var(--paper); }
+.about-page .about-beyond { background: color-mix(in srgb, var(--paper) 78%, var(--section-alt)); }
 .interest-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
 .interest-card, .value-card { padding: clamp(1.35rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: .8rem; background: var(--surface); }
 .interest-card h3, .value-card h3 { margin: 1rem 0 .55rem; font-family: Circular, sans-serif; font-size: 1.22rem; }
