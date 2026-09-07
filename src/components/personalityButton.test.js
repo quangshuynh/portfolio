@@ -60,3 +60,20 @@ test('keeps native link and button semantics while decoration stays in CSS', () 
   expect(screen.getByRole('button', { name: 'Learn more' })).toHaveAttribute('data-personality', 'camera');
   expect(screen.getByRole('button', { name: 'Learn more' })).toHaveAttribute('type', 'button');
 });
+
+test.each(PERSONALITY_VARIANTS)('renders the %s silhouette as both a primary and secondary CTA', (personality) => {
+  const { rerender } = render(
+    <PersonalityButton personality={personality}>Read architecture</PersonalityButton>,
+  );
+  const primary = screen.getByRole('button', { name: 'Read architecture' });
+  expect(primary).toHaveAttribute('data-personality', personality);
+  expect(primary).toHaveClass('personality-button');
+  expect(primary).not.toHaveClass('button-secondary');
+
+  rerender(
+    <PersonalityButton secondary personality={personality}>Documentation</PersonalityButton>,
+  );
+  const secondary = screen.getByRole('button', { name: 'Documentation' });
+  expect(secondary).toHaveAttribute('data-personality', personality);
+  expect(secondary).toHaveClass('personality-button', 'button-secondary');
+});
