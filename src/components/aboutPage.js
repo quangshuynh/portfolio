@@ -477,12 +477,12 @@ useEffect(() => {
         <section className="about-hero" aria-labelledby="about-page-title">
           <div className="section-inner about-hero-grid">
             <div>
-              <p className="eyebrow">About Quang</p>
+              <p className="eyebrow">A little more about me</p>
               <h1 id="about-page-title">Hi, I’m Quang.</h1>
               <p className="about-location"><FaMapMarkerAlt aria-hidden="true" /> Rochester, New York</p>
               <div className="about-prose">
                 <p>
-                  I’m a software developer and Computer Science student based in Rochester,
+                  I’m a software engineer and Computer Science student based in Rochester,
                   New York. I was born in Vietnam and moved to the United States with my
                   family when I was young, and Rochester has been home for most of my life.
                 </p>
@@ -497,7 +497,7 @@ useEffect(() => {
                 <p>
                   That curiosity has taken me into backend reliability, data reconciliation,
                   GitHub APIs, native macOS audio capture, and local-first iOS applications,
-                  especially where correctness and failure behavior matter.
+                  especially in areas where correctness and failure behavior matter.
                 </p>
               </div>
               <div className="hero-actions">
@@ -984,9 +984,9 @@ useEffect(() => {
             <div className="values-grid">{values.map(([title, copy], index) => <article className="value-card" key={title}><span>0{index + 1}</span><h3>{title}</h3><p>{copy}</p></article>)}</div>
             <p className="education-note">
               I’m currently pursuing Computer Science through RIT’s accelerated BS/MS
-              program. My coursework spans algorithms, databases, software engineering,
-              systems, distributed computing, AI, and machine learning, and I especially enjoy
-              applying those ideas through projects.
+              program. I’m especially interested in the point where ideas from systems,
+              databases, algorithms, and machine learning turn into software that has to
+              behave correctly outside the classroom.
             </p>
           </div>
         </section>
