@@ -222,6 +222,7 @@ export function SpotifyListening() {
               href={SPOTIFY_PROFILE}
               target="_blank"
               rel="noreferrer"
+              aria-label="View my Spotify"
             >
               View my Spotify ↗
             </a>
