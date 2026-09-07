@@ -2,7 +2,7 @@
 
 Personal portfolio highlighting professional software engineering experience, backend and data-oriented projects, technical breadth, and education.
 
-**Live site:** [quanghuynh.com](http://quanghuynh.com/)
+**Live site:** [quanghuynh.com](https://quanghuynh.com/)
 [quangshuynh.github.io/portfolio](https://quangshuynh.github.io/portfolio/)
 [quangs.vercel.app](https://quangs.vercel.app/)
 
