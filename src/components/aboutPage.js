@@ -37,7 +37,7 @@ import SiteNav, { homeHref } from './siteNav';
 const interests = [
   [FaCamera, 'Photography', 'I enjoy photography and experimenting with how composition, lighting, and perspective shape an image.'],
   [FaMountain, 'Hiking', 'I enjoy getting outside, exploring new places, and taking a break from screens.'],
-  [FaMusic, 'Music', 'I enjoy listening to music, discovering new artists, and playing guitar recreationally.'],
+  [FaMusic, 'Music', 'I enjoy listening to music, discovering new artists, and playing guitar recreationally.', 'https://open.spotify.com/user/foahrtqqvuuvt7wscxub4uerd'],
   [FaCar, 'Cars & technology', 'I’ve always been interested in technology beyond computers, including cars and how mechanical and electronic systems work.'],
   [FaGamepad, 'Gaming', 'Gaming is one of the ways I relax and was also part of what originally made computers interesting to me.'],
   [FaUsers, 'Family & friends', 'Spending time with family and friends is an important part of my life, especially over a meal, a game, or a shared activity.']
@@ -127,6 +127,36 @@ function AboutPage() {
   const closeLightboxButton = useRef(null);
   const galleryTrigger = useRef(null);
   const lightboxDrag = useRef(null);
+
+  const [spotifyTracks, setSpotifyTracks] = useState([]);
+  const [spotifyLoading, setSpotifyLoading] = useState(false);
+  const [spotifyError, setSpotifyError] = useState(false);
+
+  const loadSpotifyTracks = async () => {
+    if (spotifyTracks.length || spotifyLoading) {
+      return;
+    }
+
+    setSpotifyLoading(true);
+    setSpotifyError(false);
+
+    try {
+      const response = await fetch(
+        'https://spotify-portfolio-api.quangs.workers.dev/recent'
+      );
+
+      if (!response.ok) {
+        throw new Error('Spotify request failed');
+      }
+
+      const data = await response.json();
+      setSpotifyTracks(data.tracks ?? []);
+    } catch {
+      setSpotifyError(true);
+    } finally {
+      setSpotifyLoading(false);
+    }
+  };
 
   const openGallery = (gallery, trigger) => {
     galleryTrigger.current = trigger;
@@ -271,7 +301,7 @@ useEffect(() => {
       );
 
     const controls = modal?.querySelectorAll(
-      'button:not([disabled])'
+      'button:not([disabled]), a[href]'
     );
 
     if (!controls?.length) {
@@ -480,7 +510,7 @@ useEffect(() => {
           <div className="section-inner">
             <div className="section-heading"><div><p className="eyebrow">Outside the editor</p><h2 id="beyond-title">Beyond software</h2></div><p>A few of the things I make time for away from work and school.</p></div>
             <div className="interest-grid">
-              {interests.map(([Icon, title, copy]) => {
+              {interests.map(([Icon, title, copy, href]) => {
                 const photos = interestPhotos[title];
                 return (
                   <article className="interest-card" key={title}>
@@ -491,6 +521,19 @@ useEffect(() => {
                     )}
                     <h3><Icon aria-hidden="true" />{title}</h3>
                     <p>{copy}</p>
+                      {title === 'Music' && (
+                        <button
+                          className="interest-view-more"
+                          type="button"
+                          aria-haspopup="dialog"
+                          onClick={(event) => {
+                            loadSpotifyTracks();
+                            openGallery('music', event.currentTarget);
+                          }}
+                        >
+                          View listening
+                        </button>
+                      )}
                     {(title === 'Photography' || title === 'Cars & technology' || title === 'Gaming') && (
                       <button className="interest-view-more" type="button" aria-haspopup="dialog" onClick={(event) => openGallery(title === 'Photography' ? 'photography' : title === 'Gaming' ? 'gaming' : 'technology', event.currentTarget)}>View more</button>
                     )}
@@ -510,7 +553,9 @@ useEffect(() => {
                             ? 'Beyond the résumé'
                             : activeGallery === 'gaming'
                               ? 'In the game'
-                              : 'Under the hood'}
+                              : activeGallery === 'music'
+                                ? 'On repeat'
+                                : 'Under the hood'}
                       </p>
 
                       <h3 id="interest-modal-title">
@@ -520,10 +565,30 @@ useEffect(() => {
                             ? 'More about Quang'
                             : activeGallery === 'gaming'
                               ? 'Gaming'
-                              : 'Cars & technology'}
+                              : activeGallery === 'music'
+                                ? 'What I’ve been listening to'
+                                : 'Cars & technology'}
                       </h3>
                     </div>
-                    <button className="photography-modal-close" type="button" onClick={closeGallery} ref={closeGalleryButton} aria-label={`Close ${activeGallery === 'photography' ? 'photography gallery' : activeGallery === 'personal' ? 'personal photo gallery' : activeGallery === 'gaming' ? 'gaming gallery' : 'cars and technology gallery'}`}><FaTimes aria-hidden="true" /></button>
+                    <button
+                      className="photography-modal-close"
+                      type="button"
+                      onClick={closeGallery}
+                      ref={closeGalleryButton}
+                      aria-label={`Close ${
+                        activeGallery === 'photography'
+                          ? 'photography gallery'
+                          : activeGallery === 'personal'
+                            ? 'personal photo gallery'
+                            : activeGallery === 'gaming'
+                              ? 'gaming gallery'
+                              : activeGallery === 'music'
+                                ? 'music activity'
+                                : 'cars and technology gallery'
+                      }`}
+                    >
+                      <FaTimes aria-hidden="true" />
+                    </button>
                   </div>
                   {activeGallery === 'personal' ? <div className="photography-gallery personal-gallery" aria-label="More photos of Quang">
                     {personalGallery.map(
@@ -642,6 +707,64 @@ useEffect(() => {
                             <figcaption>{caption}</figcaption>
                           </figure>
                         ))}
+                      </div>
+                    ) : activeGallery === 'music' ? (
+                      <div className="spotify-listening">
+                        {spotifyLoading ? (
+                          <p>Loading recent listening...</p>
+                        ) : spotifyError ? (
+                          <div className="spotify-listening-status">
+                            <p>Couldn’t load my recent listening right now.</p>
+
+                            <a
+                              className="interest-view-more"
+                              href="https://open.spotify.com/user/foahrtqqvuuvt7wscxub4uerd"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              View my Spotify
+                            </a>
+                          </div>
+                        ) : spotifyTracks.length ? (
+                          <>
+                            <div className="spotify-track-list">
+                              {spotifyTracks.map((track) => (
+                                <a
+                                  className="spotify-track"
+                                  href={track.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  key={`${track.id}-${track.playedAt}`}
+                                >
+                                  {track.image && (
+                                    <img
+                                      src={track.image}
+                                      alt=""
+                                      loading="lazy"
+                                    />
+                                  )}
+
+                                  <div>
+                                    <strong>{track.name}</strong>
+                                    <span>{track.artist}</span>
+                                    <small>{track.album}</small>
+                                  </div>
+                                </a>
+                              ))}
+                            </div>
+
+                            <a
+                              className="interest-view-more spotify-profile-link"
+                              href="https://open.spotify.com/user/foahrtqqvuuvt7wscxub4uerd"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              View my Spotify
+                            </a>
+                          </>
+                        ) : (
+                          <p>No recent listening activity to show.</p>
+                        )}
                       </div>
                     ) : (
                       <div
