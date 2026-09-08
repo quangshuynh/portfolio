@@ -46,9 +46,10 @@
   height: 1.2em;
   flex: 0 0 auto;
   transform-origin: 70% 70%;
+  animation: wave-hand 3s ease-in-out infinite;
 }
-@media (hover: none) and (prefers-reduced-motion: no-preference) {
-  .waving-hand { animation: wave-hand 3s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .waving-hand { animation: none; }
 }
 @keyframes wave-hand {
   0%, 100% { transform: rotate(0deg); }
