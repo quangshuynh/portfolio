@@ -1,6 +1,7 @@
 import React from 'react';
 import { FaArrowRight, FaFilePdf, FaMapMarkerAlt } from 'react-icons/fa';
 import quangPhoto from '../assets/quang.jpg';
+import wavingHand from '../assets/waving_hand.svg';
 import SiteNav, { aboutHref } from './siteNav';
 import PersonalityButton from './personalityButton';
 
@@ -16,7 +17,10 @@ function Header() {
       <section className="hero" id="top" aria-labelledby="hero-title">
         <div className="hero-inner">
           <p className="eyebrow">Software Engineering | Backend | Developer Tools | Native Apps</p>
-          <p className="hero-intro">Hi, I’m Quang.</p>
+          <p className="hero-intro">
+            Hi, I’m Quang.
+            <img className="waving-hand" src={wavingHand} alt="" aria-hidden="true" />
+          </p>
           <h1 id="hero-title">I build reliable backend systems, developer tools, automation, and native applications.</h1>
           <p className="hero-lede">
             I’m a software developer with professional experience in .NET applications,

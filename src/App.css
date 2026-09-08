@@ -37,8 +37,9 @@
 .hero::after { content: ''; position: absolute; width: 28rem; height: 28rem; top: -13rem; right: -10rem; border: 5rem solid var(--accent-soft); border-radius: 50%; opacity: 0.65; pointer-events: none; }
 .hero-inner { position: relative; z-index: 1; }
 .eyebrow { margin: 0 0 1.25rem; color: var(--accent); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
-.hero-intro { margin: 0 0 0.8rem; color: var(--detail-text); font-size: clamp(1.05rem, 2vw, 1.3rem); font-weight: 750; }
-.hero h1 { max-width: 900px; margin: 0; font-family: Circular, sans-serif; font-size: clamp(3rem, 8vw, 6.6rem); line-height: 0.98; letter-spacing: -0.055em; }
+.hero-intro { display: flex; align-items: center; gap: .35em; margin: 0 0 0.8rem; color: var(--detail-text); font-size: clamp(1.05rem, 2vw, 1.3rem); font-weight: 750; }
+.waving-hand { display: inline-block; width: 1.2em; height: 1.2em; flex: 0 0 auto; }
+.hero h1 { max-width: 900px; margin: 0; font-family: Circular, sans-serif; font-size: clamp(2.8rem, 7vw, 5.8rem); line-height: 1.02; letter-spacing: -0.05em; }
 .hero-lede { max-width: 740px; margin: 1.8rem 0 0; color: var(--muted); font-size: clamp(1.08rem, 2vw, 1.35rem); line-height: 1.7; }
 .hero-meta { display: flex; flex-wrap: wrap; gap: 0.65rem 1.4rem; margin-top: 1.5rem; color: var(--muted); font-size: 0.92rem; font-weight: 650; }
 .hero-photo-wrap { position: absolute; right: 0; bottom: -1rem; width: 170px; }
