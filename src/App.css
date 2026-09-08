@@ -38,7 +38,25 @@
 .hero-inner { position: relative; z-index: 1; }
 .eyebrow { margin: 0 0 1.25rem; color: var(--accent); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
 .hero-intro { display: flex; align-items: center; gap: .35em; margin: 0 0 0.8rem; color: var(--detail-text); font-size: clamp(1.05rem, 2vw, 1.3rem); font-weight: 750; }
-.waving-hand { display: inline-block; width: 1.2em; height: 1.2em; flex: 0 0 auto; }
+.waving-hand {
+  position: relative;
+  top: -.08em;
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  flex: 0 0 auto;
+  transform-origin: 70% 70%;
+}
+@media (hover: none) and (prefers-reduced-motion: no-preference) {
+  .waving-hand { animation: wave-hand 3s ease-in-out infinite; }
+}
+@keyframes wave-hand {
+  0%, 100% { transform: rotate(0deg); }
+  10% { transform: rotate(12deg); }
+  20% { transform: rotate(6deg); }
+  30% { transform: rotate(12deg); }
+  40% { transform: rotate(0deg); }
+}
 .hero h1 { max-width: 900px; margin: 0; font-family: Circular, sans-serif; font-size: clamp(2.8rem, 7vw, 5.8rem); line-height: 1.02; letter-spacing: -0.05em; }
 .hero-lede { max-width: 740px; margin: 1.8rem 0 0; color: var(--muted); font-size: clamp(1.08rem, 2vw, 1.35rem); line-height: 1.7; }
 .hero-meta { display: flex; flex-wrap: wrap; gap: 0.65rem 1.4rem; margin-top: 1.5rem; color: var(--muted); font-size: 0.92rem; font-weight: 650; }
