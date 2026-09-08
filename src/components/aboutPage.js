@@ -33,6 +33,7 @@ import waterfallCliffs from '../assets/about/photography/optimized/waterfall-cli
 import whiteCarAtNight from '../assets/about/photography/optimized/white-car-at-night-web.jpg';
 import waterImpact from '../assets/about/photography/impact.jpg';
 import rochesterSkyline from '../assets/about/photography/rochester-skyline.jpg';
+import trainTracks from '../assets/about/photography/around-the-bend.jpg';
 import woodlandStream from '../assets/about/photography/optimized/woodland-stream-web.jpg';
 import koreTeamLunch from '../assets/about/kore/mission-bbq-kore-team-lunch-web.jpg';
 import Footer from './footer';
@@ -110,8 +111,9 @@ const photographyGallery = [
   { src: waterfallCliffs, width: 927, height: 1400, alt: 'Layered waterfalls flowing over a rocky cliff in Ithaca', caption: 'Ithaca Falls in the summer', shape: 'portrait' },
   { src: woodlandStream, width: 933, height: 1400, alt: 'A narrow stream winding through a sunlit woodland at Cornell', caption: 'Following a stream through the woods at Cornell', shape: 'portrait' },
   { src: historicBuilding, width: 1400, height: 933, alt: 'Rush Rhees Library framed by bare winter branches', caption: 'Rush Rhees Library through bare winter branches', shape: 'landscape' },
-  { src: hilltopCastle, width: 933, height: 1400, alt: 'A stone building overlooking a wide valley at Cornell', caption: 'Looking out from Cornell stone architecture', shape: 'portrait' },
   { src: waterImpact, width: 1400, height: 1050, alt: 'A splash of water frozen in midair', caption: 'Capturing the moment of impact at Webster Park', shape: 'landscape' },
+  { src: hilltopCastle, width: 933, height: 1400, alt: 'A stone building overlooking a wide valley at Cornell', caption: 'Looking out from Cornell stone architecture', shape: 'portrait' },
+  { src: trainTracks, width: 1400, height: 1050, alt: 'Train tracks curving around a bend in the distance', caption: 'Train tracks curving around a bend', shape: 'portrait' },
   { src: rochesterSkyline, width: 1400, height: 1050, alt: 'Rochester skyline at night', caption: 'Rochester skyline at night', shape: 'landscape' },
   { src: whiteCarAtNight, width: 1400, height: 1050, alt: '2011 Subaru WRX at night', caption: 'My 2011 Subaru WRX after dark', shape: 'landscape' }
 ];
