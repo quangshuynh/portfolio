@@ -31,7 +31,8 @@ import riversideBridge from '../assets/about/photography/optimized/riverside-bri
 import riversideWaterfall from '../assets/about/photography/optimized/riverside-waterfall-web.jpg';
 import waterfallCliffs from '../assets/about/photography/optimized/waterfall-cliffs-web.jpg';
 import whiteCarAtNight from '../assets/about/photography/optimized/white-car-at-night-web.jpg';
-import woodlandFence from '../assets/about/photography/optimized/woodland-fence-web.jpg';
+import waterImpact from '../assets/about/photography/impact.jpg';
+import rochesterSkyline from '../assets/about/photography/rochester-skyline.jpg';
 import woodlandStream from '../assets/about/photography/optimized/woodland-stream-web.jpg';
 import koreTeamLunch from '../assets/about/kore/mission-bbq-kore-team-lunch-web.jpg';
 import Footer from './footer';
@@ -110,7 +111,8 @@ const photographyGallery = [
   { src: woodlandStream, width: 933, height: 1400, alt: 'A narrow stream winding through a sunlit woodland at Cornell', caption: 'Following a stream through the woods at Cornell', shape: 'portrait' },
   { src: historicBuilding, width: 1400, height: 933, alt: 'Rush Rhees Library framed by bare winter branches', caption: 'Rush Rhees Library through bare winter branches', shape: 'landscape' },
   { src: hilltopCastle, width: 933, height: 1400, alt: 'A stone building overlooking a wide valley at Cornell', caption: 'Looking out from Cornell stone architecture', shape: 'portrait' },
-  { src: woodlandFence, width: 1400, height: 1050, alt: 'A wooden fence bordering a green woodland', caption: 'At the edge of the woods in Durand Eastman Park', shape: 'landscape' },
+  { src: waterImpact, width: 1400, height: 1050, alt: 'A splash of water frozen in midair', caption: 'Capturing the moment of impact at Webster Park', shape: 'landscape' },
+  { src: rochesterSkyline, width: 1400, height: 1050, alt: 'Rochester skyline at night', caption: 'Rochester skyline at night', shape: 'landscape' },
   { src: whiteCarAtNight, width: 1400, height: 1050, alt: '2011 Subaru WRX at night', caption: 'My 2011 Subaru WRX after dark', shape: 'landscape' }
 ];
 
