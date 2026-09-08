@@ -27,11 +27,17 @@ function Experience() {
 
         <article className="experience-card">
           <div className="experience-company">
-            <img
-              className="company-logo"
-              src={koreLogo}
-              alt="KORE Wireless"
-            />
+            <a
+              href="https://www.korewireless.com/about-us"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <img
+                className="company-logo"
+                src={koreLogo}
+                alt="KORE Wireless"
+              />
+            </a>
             <h3>KORE Wireless</h3>
             <p className="experience-role">IoT Software Engineering Co-op</p>
             <p>

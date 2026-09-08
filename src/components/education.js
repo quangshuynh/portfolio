@@ -3,11 +3,14 @@ import ritLogo from '../assets/logos/rit-logo.png';
 import { aboutHref } from './siteNav';
 
 const honors = [
-  'Farash Foundation First in Family Scholar',
-  'Richard T. Cheng Endowed Scholarship',
-  'Patrick P. Lee Scholarship',
-  'RIT Presidential Scholar',
-  "Dean's List",
+  { name: 'Farash Foundation First in Family Scholar' },
+  {
+    name: 'Richard T. Cheng Endowed Scholarship',
+    href: 'https://www.rit.edu/news/congratulations-our-2024-computer-science-scholarship-award-winners',
+  },
+  { name: 'Patrick P. Lee Scholarship' },
+  { name: 'RIT Presidential Scholar' },
+  { name: "Dean's List" },
 ];
 
 /**
@@ -39,12 +42,37 @@ function Education() {
           </div>
           <article className="education-card">
             <div className="education-title">
-              <img className="institution-logo" src={ritLogo} alt="Rochester Institute of Technology" loading="lazy" />
+              <a
+                href="https://www.rit.edu/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <img
+                  className="institution-logo"
+                  src={ritLogo}
+                  alt="Rochester Institute of Technology"
+                  loading="lazy"
+                />
+              </a>
               <div><h3>Rochester Institute of Technology</h3><p className="degree">BS/MS Computer Science – Accelerated Program</p></div>
             </div>
             <div className="education-meta"><span>Expected graduation: 2028</span><span>GPA: 3.42 / 4.00</span></div>
             <ul className="honors-list" aria-label="Academic honors">
-              {honors.map((honor) => <li key={honor}>{honor}</li>)}
+              {honors.map((honor) => (
+                <li key={honor.name}>
+                  {honor.href ? (
+                    <a
+                      href={honor.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {honor.name}
+                    </a>
+                  ) : (
+                    honor.name
+                  )}
+                </li>
+              ))}
             </ul>
           </article>
         </div>
