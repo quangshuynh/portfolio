@@ -32,8 +32,8 @@ function Education() {
             </p>
             <p>
               I gravitate toward practical software: backend systems, developer tools,
-              automation, native applications, and projects where reliability and
-              thoughtful engineering matter.
+              automation, native applications, and production web systems for family-owned
+              businesses—especially where reliability and thoughtful engineering matter.
             </p>
 
             <a className="text-link" href={aboutHref}>

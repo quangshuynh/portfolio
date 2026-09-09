@@ -776,6 +776,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .project-visual.foody { background: #0b1417; }
 .project-visual.steam { background: #173349; }
 .project-visual img { width: 100%; max-height: 380px; object-fit: contain; border-radius: 0.65rem; box-shadow: 0 14px 35px rgba(0,0,0,.18); }
+.project-visual.production-site-visual { padding: clamp(1rem, 2.5vw, 2rem); background: #181714; }
+.project-visual.production-site-visual img { max-height: 520px; border: 1px solid rgba(255,255,255,.12); object-fit: cover; object-position: top; }
 .gallery-stage { display: grid; place-items: center; width: 100%; min-height: 330px; overflow: hidden; }
 .gallery-stage > img { max-height: none; }
 .gallery-stage > .project-result-image { width: 100%; max-width: 100%; max-height: min(600px, 72vh); object-fit: contain; }
@@ -819,6 +821,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .more-card:hover { transform: translateY(-3px); border-color: #aeb9b2; }
 .more-card.has-logo h3 { padding-right: 2.75rem; }
 .more-card-logo { position: absolute; top: 1rem; right: 1rem; width: 34px; height: 34px; object-fit: contain; }
+.more-card-preview { width: 100%; aspect-ratio: 16 / 9; margin-bottom: 1.25rem; border: 1px solid var(--line); border-radius: .6rem; object-fit: cover; object-position: top; }
 .more-card p { flex: 1; margin: 0; color: var(--muted); line-height: 1.65; }
 .more-card .more-highlight { flex: 0 0 auto; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--detail-text); font-size: 0.88rem; }
 .more-card .tag-list { margin-top: 1.25rem; }

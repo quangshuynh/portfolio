@@ -24,8 +24,9 @@ function Header() {
           <h1 id="hero-title">I build reliable backend systems, developer tools, automation, and native applications.</h1>
           <p className="hero-lede">
             I’m a software developer with professional experience in .NET applications,
-            databases, and enterprise workflows, alongside independent work in backend
-            services, developer tools, and native applications.
+            databases, and enterprise workflows. I also design, deploy, and maintain production
+            web applications for family-owned businesses alongside my backend, developer-tool,
+            and native application work.
           </p>
           <div className="hero-meta" aria-label="Location and focus">
             <span><FaMapMarkerAlt aria-hidden="true" /> Rochester, NY</span>

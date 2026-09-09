@@ -7,6 +7,7 @@ import moverGitLogo from '../assets/logos/git-mover-logo.png';
 import salonFlowLogo from '../assets/logos/salonflow-logo.png';
 import caseNotesLogo from '../assets/logos/casenotes-logo.png';
 import steamLogo from '../assets/logos/Steam-icon-logo.svg';
+import photoPortfolio from '../assets/585photo585-portfolio.png';
 import PersonalityButton from './personalityButton';
 
 const projects = [
@@ -42,6 +43,18 @@ const projects = [
     github: 'https://github.com/quangshuynh/repo-radar',
     logo: repoRadarLogo,
     logoClass: 'repo-radar-logo',
+  },
+  {
+    name: '585photo585',
+    description:
+      'Custom photography portfolio and lightweight CMS built and deployed for a family-owned Rochester photography business.',
+    highlight:
+      'Responsive editorial galleries, progressive loading, and full-screen lightbox navigation, with a protected admin workflow for direct uploads, metadata and alt text, publishing, drag-and-drop ordering, and deletion.',
+    technologies: ['React', 'Vite', 'Supabase', 'PostgreSQL', 'Storage', 'Auth & RLS'],
+    live: 'https://www.585photo585.com',
+    liveLabel: 'Live Site',
+    image: photoPortfolio,
+    imageAlt: '585photo585 editorial photography portfolio homepage with Featured, Portraits, and Clips collections',
   },
   {
     name: 'SalonFlow',
@@ -117,12 +130,13 @@ function MoreProjects() {
               )}
               <h3>{project.name}</h3>
               <p>{project.description}</p>
+              {project.image && <img className="more-card-preview" src={project.image} alt={project.imageAlt} loading="lazy" />}
               <p className="more-highlight">{project.highlight}</p>
               <ul className="tag-list" aria-label={`${project.name} technologies`}>
                 {project.technologies.map((item) => <li key={item}>{item}</li>)}
               </ul>
               <div className="more-links">
-                <a className="text-link" href={project.github} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} repository`}>Repository <FaGithub aria-hidden="true" /></a>
+                {project.github && <a className="text-link" href={project.github} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} repository`}>Repository <FaGithub aria-hidden="true" /></a>}
                 {project.live && <a className="text-link" href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} ${project.liveLabel ? project.liveLabel.toLowerCase() : 'live demo'}`}>{project.liveLabel || 'Live demo'} <FaExternalLinkAlt aria-hidden="true" /></a>}
               </div>
             </article>

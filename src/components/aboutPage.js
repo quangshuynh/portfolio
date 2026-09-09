@@ -255,6 +255,12 @@ function AboutPage() {
                 reliability, failure handling, data correctness, and what happens outside the happy path.
               </p>
 
+              <p>
+                I have since designed, built, deployed, and maintained production web applications
+                for family-owned Rochester businesses, alongside my native Apple, backend, and
+                open-source engineering work.
+              </p>
+
               <blockquote className="about-quote">
                 <p>“He was able to work with greater independence than is expected of co-ops.”</p>
                 <footer>
