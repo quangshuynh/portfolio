@@ -59,7 +59,7 @@ const projects = [
   {
     name: 'SalonFlow',
     description:
-      'Responsive mapping application for tracking restaurant visits, ratings, saved places, and nearby recommendations.',
+      'Multi-tenant salon management application for scheduling appointments, managing customers, staff, and services, and supporting day-to-day salon operations.',
     highlight:
       'Backed by Supabase authentication and PostgreSQL persistence with database-enforced tenant isolation, tenant-scoped relational integrity, and integration tests that validate RLS behavior.',
     technologies: ['Next.js', 'TypeScript', 'Supabase', 'PostgreSQL'],
