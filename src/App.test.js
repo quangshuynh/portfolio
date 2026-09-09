@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import App from './App';
 
 test('renders Quang Huynh’s software engineering portfolio', () => {
@@ -74,6 +74,19 @@ test('renders Quang Huynh’s software engineering portfolio', () => {
   fireEvent.click(themeToggle);
   expect(document.documentElement).toHaveAttribute('data-theme', 'light');
   expect(screen.getByRole('button', { name: 'Switch to dark mode' })).toBeInTheDocument();
+});
+
+test('home page project screenshots open in the lightbox and restore focus', async () => {
+  render(<App />);
+  const trigger = screen.getByRole('button', { name: 'Open image: 585Dashcam585 storefront' });
+
+  fireEvent.click(trigger);
+  expect(screen.getByRole('dialog', { name: 'Image viewer: 585Dashcam585 storefront' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Close image viewer' })).toHaveFocus();
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => expect(trigger).toHaveFocus());
+  expect(screen.queryByRole('dialog', { name: 'Image viewer: 585Dashcam585 storefront' })).not.toBeInTheDocument();
 });
 
 test('renders the dedicated About Quang route with working homepage links', () => {

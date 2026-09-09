@@ -776,6 +776,14 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .project-visual.foody { background: #0b1417; }
 .project-visual.steam { background: #173349; }
 .project-visual img { width: 100%; max-height: 380px; object-fit: contain; border-radius: 0.65rem; box-shadow: 0 14px 35px rgba(0,0,0,.18); }
+.home-image-trigger { position: relative; display: block; width: 100%; padding: 0; border: 0; border-radius: .65rem; background: transparent; color: inherit; cursor: zoom-in; overflow: hidden; }
+.home-image-trigger img { transition: transform 180ms ease, filter 180ms ease; }
+.home-image-trigger:hover img, .home-image-trigger:focus-visible img { transform: scale(1.015); filter: brightness(.9); }
+.home-image-trigger:hover .photography-gallery-zoom-hint, .home-image-trigger:focus-visible .photography-gallery-zoom-hint { opacity: 1; transform: translateY(0); }
+.gallery-stage > .home-image-trigger { display: grid; place-items: center; }
+.gallery-stage > .home-image-trigger > .project-result-image { width: 100%; max-width: 100%; max-height: min(600px, 72vh); object-fit: contain; }
+.gallery-stage > .home-image-trigger > .vertical-project-shot { width: auto; height: auto; max-width: 100%; max-height: 520px; }
+.production-site-visual > .home-image-trigger img { max-height: 520px; border: 1px solid rgba(255,255,255,.12); object-fit: cover; object-position: top; }
 .project-visual.production-site-visual { padding: clamp(1rem, 2.5vw, 2rem); background: #181714; }
 .project-visual.production-site-visual img { max-height: 520px; border: 1px solid rgba(255,255,255,.12); object-fit: cover; object-position: top; }
 .gallery-stage { display: grid; place-items: center; width: 100%; min-height: 330px; overflow: hidden; }

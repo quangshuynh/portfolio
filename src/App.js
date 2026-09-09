@@ -10,6 +10,7 @@ import Education from './components/education';
 import Footer from './components/footer';
 import AboutPage from './components/aboutPage';
 import HashScroll from './components/hashScroll';
+import { HomeLightboxProvider } from './components/homeLightbox';
 
 /**
  * renders the portfolio application
@@ -54,6 +55,7 @@ function App() {
   }
 
   return (
+    <HomeLightboxProvider>
     <div className="app-shell">
       <HashScroll />
       <a className="skip-link" href="#main-content">Skip to main content</a>
@@ -68,6 +70,7 @@ function App() {
       <Footer />
       <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
     </div>
+    </HomeLightboxProvider>
   );
 }
 
