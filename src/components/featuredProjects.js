@@ -8,6 +8,7 @@ import scribeKitApp from '../assets/scribekit-app.png';
 import scribeKitTranscript from '../assets/scribekit-md.png';
 import dashcamStorefront from '../assets/585dashcam585-storefront.png';
 import PersonalityButton from './personalityButton';
+import { HomeImageTrigger } from './homeLightbox';
 
 const projects = [
   {
@@ -89,7 +90,7 @@ function BusinessGallery() {
             <div className="pipeline-row"><span>CSV Reports</span><span>PostgreSQL</span><span>API + Dashboard</span></div>
           </div>
         ) : (
-          <img className="project-result-image" src={dashboardImage} alt="Business Data Automation reconciliation dashboard showing financial totals, payment statuses, and flagged discrepancies" loading="lazy" />
+          <HomeImageTrigger src={dashboardImage} imageClassName="project-result-image" alt="Business Data Automation reconciliation dashboard showing financial totals, payment statuses, and flagged discrepancies" caption="Business Data Automation reconciliation dashboard" />
         )}
       </div>
       <div className="gallery-controls" aria-label="Business Data Automation gallery">
@@ -113,7 +114,7 @@ function GitProfileLensVisual() {
         {slide === 'logo' ? (
           <img src={gitProfileLensLogo} alt="GitProfileLens project logo" loading="lazy" />
         ) : (
-          <img className="project-result-image" src={gitProfileLensResults} alt="GitProfileLens audit dashboard showing presentation and discoverability scores with prioritized recommendations" loading="lazy" />
+          <HomeImageTrigger src={gitProfileLensResults} imageClassName="project-result-image" alt="GitProfileLens audit dashboard showing presentation and discoverability scores with prioritized recommendations" caption="GitProfileLens audit results" />
         )}
       </div>
       <div className="gallery-controls" aria-label="GitProfileLens gallery">
@@ -135,8 +136,8 @@ function ScribeKitGallery() {
     <div className="project-visual gallery">
       <div className="gallery-stage">
         {slide === 'logo' && <img src={scribeKitLogo} alt="ScribeKit app logo" loading="lazy" />}
-        {slide === 'app' && <img className="project-result-image vertical-project-shot" src={scribeKitApp} alt="ScribeKit macOS meeting window showing selected application audio, on-device transcription status, and a live transcript" loading="lazy" />}
-        {slide === 'transcript' && <img className="project-result-image vertical-project-shot" src={scribeKitTranscript} alt="ScribeKit timestamped Markdown transcript output" loading="lazy" />}
+        {slide === 'app' && <HomeImageTrigger src={scribeKitApp} imageClassName="project-result-image vertical-project-shot" alt="ScribeKit macOS meeting window showing selected application audio, on-device transcription status, and a live transcript" caption="ScribeKit macOS meeting window" />}
+        {slide === 'transcript' && <HomeImageTrigger src={scribeKitTranscript} imageClassName="project-result-image vertical-project-shot" alt="ScribeKit timestamped Markdown transcript output" caption="ScribeKit timestamped Markdown transcript" />}
       </div>
       <div className="gallery-controls" aria-label="ScribeKit gallery">
         <button type="button" aria-pressed={slide === 'logo'} onClick={() => setSlide('logo')}>Logo</button>
@@ -156,7 +157,7 @@ function ProjectVisual({ type }) {
   if (type === 'dashcam') {
     return (
       <div className="project-visual production-site-visual">
-        <img src={dashcamStorefront} alt="585Dashcam585 storefront showing dashcam products and local installation options" loading="lazy" />
+        <HomeImageTrigger src={dashcamStorefront} alt="585Dashcam585 storefront showing dashcam products and local installation options" caption="585Dashcam585 storefront" />
       </div>
     );
   }

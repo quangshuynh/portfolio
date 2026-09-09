@@ -9,6 +9,7 @@ import caseNotesLogo from '../assets/logos/casenotes-logo.png';
 import steamLogo from '../assets/logos/Steam-icon-logo.svg';
 import photoPortfolio from '../assets/585photo585-portfolio.png';
 import PersonalityButton from './personalityButton';
+import { HomeImageTrigger } from './homeLightbox';
 
 const projects = [
   {
@@ -130,7 +131,7 @@ function MoreProjects() {
               )}
               <h3>{project.name}</h3>
               <p>{project.description}</p>
-              {project.image && <img className="more-card-preview" src={project.image} alt={project.imageAlt} loading="lazy" />}
+              {project.image && <HomeImageTrigger src={project.image} imageClassName="more-card-preview" alt={project.imageAlt} caption={`${project.name} project preview`} />}
               <p className="more-highlight">{project.highlight}</p>
               <ul className="tag-list" aria-label={`${project.name} technologies`}>
                 {project.technologies.map((item) => <li key={item}>{item}</li>)}
