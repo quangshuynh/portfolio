@@ -6,9 +6,24 @@ import gitProfileLensResults from '../assets/gitprofilelens-results-vert.png';
 import scribeKitLogo from '../assets/logos/scribekit-logo.png';
 import scribeKitApp from '../assets/scribekit-app.png';
 import scribeKitTranscript from '../assets/scribekit-md.png';
+import dashcamStorefront from '../assets/585dashcam585-storefront.png';
 import PersonalityButton from './personalityButton';
 
 const projects = [
+  {
+    name: '585Dashcam585',
+    label: 'Production commerce platform',
+    purpose: 'Built and deployed a full-stack commerce platform for a family-owned Rochester automotive services business, replacing its hosted website with a custom production application.',
+    highlights: [
+      'Runs guest and authenticated checkout with server-authoritative pricing, live Stripe payments, signed webhooks, and idempotent PostgreSQL order finalization',
+      'Provides customer accounts, persistent carts and wishlists, order history, and a protected admin CRM for customers, fulfillment, catalog data, and analytics',
+      'Sends transactional email through Resend with database-backed delivery state, retry handling, stale-claim recovery, and duplicate-delivery protection',
+      'Deployed with Cloudflare Workers and Static Assets, Supabase authentication and RLS, least-privilege credentials, and privacy-conscious Cloudflare analytics',
+    ],
+    stack: 'React · Vite · JavaScript · Cloudflare Workers · Supabase · PostgreSQL · Stripe · Resend · Cloudflare GraphQL Analytics API',
+    live: 'https://www.585dashcam585.com',
+    visual: 'dashcam',
+  },
   {
     name: 'Business Data Automation',
     label: 'Backend & data engineering',
@@ -138,6 +153,13 @@ function ScribeKitGallery() {
  * :returns: selected project visual markup
  */
 function ProjectVisual({ type }) {
+  if (type === 'dashcam') {
+    return (
+      <div className="project-visual production-site-visual">
+        <img src={dashcamStorefront} alt="585Dashcam585 storefront showing dashcam products and local installation options" loading="lazy" />
+      </div>
+    );
+  }
   if (type === 'dashboard') {
     return (
       <BusinessGallery />
@@ -174,9 +196,10 @@ function FeaturedProjects() {
                 </ul>
                 <p className="project-stack"><strong>Stack</strong> {project.stack}</p>
                 <div className="project-actions">
-                  <PersonalityButton href={project.github} target="_blank" rel="noreferrer" aria-label={`View ${project.name} code`}>View code <FaGithub aria-hidden="true" /></PersonalityButton>
-                  {index === 0 && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-architecture`} href={`${project.github}#architecture`} target="_blank" rel="noreferrer" aria-label="Read Business Data Automation architecture">Read architecture <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
-                  {project.live && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-live`} href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live demo`}>Live demo <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
+                  {project.live && !project.github && <PersonalityButton href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live site`}>Live Site <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
+                  {project.github && <PersonalityButton href={project.github} target="_blank" rel="noreferrer" aria-label={`View ${project.name} code`}>View code <FaGithub aria-hidden="true" /></PersonalityButton>}
+                  {project.name === 'Business Data Automation' && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-architecture`} href={`${project.github}#architecture`} target="_blank" rel="noreferrer" aria-label="Read Business Data Automation architecture">Read architecture <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
+                  {project.live && project.github && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-live`} href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live demo`}>Live demo <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
                   {project.documentation && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-documentation`} href={project.documentation} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} documentation`}>Documentation <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
                 </div>
               </div>

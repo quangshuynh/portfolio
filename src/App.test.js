@@ -10,6 +10,8 @@ test('renders Quang Huynh’s software engineering portfolio', () => {
   })
 ).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Business Data Automation' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '585Dashcam585' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open 585Dashcam585 live site' })).toHaveAttribute('href', 'https://www.585dashcam585.com');
   expect(screen.getByRole('heading', { name: 'Experience' })).toBeInTheDocument();
   expect(screen.getByText('GPA: 3.42 / 4.00')).toBeInTheDocument();
   expect(screen.queryByText(/GPA: 3\.68/)).not.toBeInTheDocument();
@@ -28,6 +30,9 @@ test('renders Quang Huynh’s software engineering portfolio', () => {
   const moreProjectsToggle = screen.getByRole('button', { name: 'View more projects' });
   expect(moreProjectsToggle).toHaveAttribute('aria-expanded', 'false');
   fireEvent.click(moreProjectsToggle);
+  expect(screen.getByRole('heading', { name: '585photo585' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open 585photo585 live site' })).toHaveAttribute('href', 'https://www.585photo585.com');
+  expect(screen.queryByRole('link', { name: 'Open 585photo585 repository' })).not.toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Foody' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'SalonFlow' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'mover-git' })).toBeInTheDocument();

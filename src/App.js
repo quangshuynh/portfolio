@@ -33,8 +33,8 @@ function App() {
     const title = isAbout ? 'Quang Huynh | About Quang' : 'Quang Huynh | Software Engineer';
     const description = isAbout
       ? 'Learn more about Quang Huynh, a software developer and Computer Science student in Rochester, NY, including his background, interests, and approach to engineering.'
-      : 'Computer science student with professional software engineering experience building backend, automation, data, API, and full-stack systems.';
-    const canonicalUrl = `https://quangshuynh.github.io/portfolio${isAbout ? '/about' : '/'}`;
+      : 'Software developer building production web applications, backend systems, developer tools, automation, and native applications.';
+    const canonicalUrl = `https://quanghuynh.com${isAbout ? '/about' : '/'}`;
     document.title = title;
     document.querySelector('meta[name="description"]')?.setAttribute('content', description);
     document.querySelector('meta[property="og:title"]')?.setAttribute('content', title);
