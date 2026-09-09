@@ -665,8 +665,84 @@
 a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offset: 4px; }
 
 /* shared sections */
-.page-section { padding: clamp(4.5rem, 8vw, 7.5rem) 0; border-top: 1px solid var(--line); }
+.page-section { position: relative; overflow: hidden; padding: clamp(4.5rem, 8vw, 7.5rem) 0; border-top: 1px solid var(--line); }
 .page-section:nth-of-type(even) { background: var(--section-alt); }
+.page-section > .section-inner { position: relative; z-index: 1; }
+
+/* Oversized decorative geometry echoes the hero ring without competing with content. */
+#experience::before,
+.about-path::before {
+  content: '';
+  position: absolute;
+  top: clamp(2rem, 7vw, 5.5rem);
+  left: -3.5rem;
+  width: 9rem;
+  height: 9rem;
+  background: var(--accent-soft);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%, 50% 0, 50% 18%, 18% 88%, 82% 88%, 50% 18%);
+  transform: rotate(-14deg);
+  opacity: .72;
+  pointer-events: none;
+}
+
+#projects::after,
+.about-beyond::after {
+  content: '';
+  position: absolute;
+  top: clamp(3rem, 10vw, 9rem);
+  right: -2.25rem;
+  width: 8.5rem;
+  height: 8.5rem;
+  background: var(--accent-soft);
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 94%, 50% 72%, 21% 94%, 32% 57%, 2% 35%, 39% 35%);
+  transform: rotate(10deg);
+  opacity: .7;
+  pointer-events: none;
+}
+
+#more-projects::before,
+.about-values::before {
+  content: '';
+  position: absolute;
+  left: -3rem;
+  bottom: 12%;
+  width: 7rem;
+  height: 7rem;
+  border: 1.25rem solid var(--accent-soft);
+  border-radius: .65rem;
+  transform: rotate(45deg);
+  opacity: .75;
+  pointer-events: none;
+}
+
+#skills::after {
+  content: '';
+  position: absolute;
+  right: 1.5rem;
+  bottom: 2.5rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 2rem -2rem 0 var(--accent-soft), 4rem 0 0 var(--accent-soft), 2rem 2rem 0 var(--accent);
+  opacity: .65;
+  transform: rotate(12deg);
+  pointer-events: none;
+}
+
+#about::after {
+  content: '';
+  position: absolute;
+  right: -4rem;
+  top: 3rem;
+  width: 9rem;
+  height: 9rem;
+  border: 1.15rem solid var(--accent-soft);
+  border-radius: 50% 50% 12% 50%;
+  transform: rotate(24deg);
+  opacity: .7;
+  pointer-events: none;
+}
 .section-heading { display: grid; grid-template-columns: minmax(11rem, 0.42fr) 1fr; gap: clamp(2rem, 7vw, 7rem); align-items: end; margin-bottom: clamp(2.3rem, 5vw, 4rem); }
 .section-heading h2 { margin: 0; font-family: Circular, sans-serif; font-size: clamp(2.25rem, 5vw, 4.2rem); line-height: 1; letter-spacing: -0.045em; }
 .section-heading p { max-width: 680px; margin: 0; color: var(--muted); font-size: 1.04rem; line-height: 1.7; }
@@ -899,6 +975,14 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 /* mobile layout */
 @media (max-width: 620px) {
   .nav-inner, .section-inner, .hero-inner, .footer-inner { width: calc(100% - 1.5rem); }
+  #experience::before,
+  .about-path::before,
+  #projects::after,
+  .about-beyond::after,
+  #more-projects::before,
+  .about-values::before,
+  #about::after { width: 5.5rem; height: 5.5rem; opacity: .48; }
+  #skills::after { right: -.5rem; bottom: 1.5rem; transform: rotate(12deg) scale(.72); }
   .nav-inner { min-height: auto; padding: 1rem 0; gap: 1rem; align-items: center; }
   .nav-links { justify-content: flex-end; flex-wrap: wrap; gap: 0.5rem 0.85rem; }
   .hero h1 { font-size: clamp(2.65rem, 13vw, 3.8rem); overflow-wrap: break-word; }
