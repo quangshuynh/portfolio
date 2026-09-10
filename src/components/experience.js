@@ -8,11 +8,11 @@ import koreLogo from '../assets/logos/kore-logo.png';
 function Experience() {
   return (
     <section
-      className="page-section"
+      className="page-section scroll-panel section-reveal"
       id="experience"
       aria-labelledby="experience-title"
     >
-      <div className="section-inner">
+      <div className="section-inner reveal-content">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Professional work</p>

@@ -178,8 +178,8 @@ function ProjectVisual({ type }) {
  */
 function FeaturedProjects() {
   return (
-    <section className="page-section" id="projects" aria-labelledby="projects-title">
-      <div className="section-inner">
+    <section className="page-section scroll-panel section-reveal" id="projects" aria-labelledby="projects-title">
+      <div className="section-inner reveal-content">
         <div className="section-heading">
           <div><p className="eyebrow">Selected work</p><h2 id="projects-title">Featured projects</h2></div>
           <p>Selected projects highlighting engineering decisions, reliability, system design, and practical problem solving.</p>

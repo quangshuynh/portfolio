@@ -44,6 +44,31 @@ function App() {
     document.querySelector('link[rel="canonical"]')?.setAttribute('href', canonicalUrl);
   }, [isAbout]);
 
+  useEffect(() => {
+    const panels = Array.from(document.querySelectorAll('.section-reveal'));
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+    if (reducedMotion || !('IntersectionObserver' in window)) {
+      panels.forEach((panel) => panel.classList.add('is-visible'));
+      return undefined;
+    }
+
+    document.documentElement.classList.add('reveal-ready');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-visible');
+        observer.unobserve(entry.target);
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+
+    panels.forEach((panel) => observer.observe(panel));
+    return () => {
+      observer.disconnect();
+      document.documentElement.classList.remove('reveal-ready');
+    };
+  }, [isAbout]);
+
   /**
    * toggles the active color theme
    * :returns: no return value

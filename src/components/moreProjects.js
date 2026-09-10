@@ -110,8 +110,8 @@ function MoreProjects() {
   const visibleProjects = showAllProjects ? projects : projects.slice(0, 3);
 
   return (
-    <section className="page-section" id="more-projects" aria-labelledby="more-projects-title">
-      <div className="section-inner">
+    <section className="page-section scroll-panel section-reveal" id="more-projects" aria-labelledby="more-projects-title">
+      <div className="section-inner reveal-content">
         <div className="section-heading">
           <div><p className="eyebrow">Additional work</p><h2 id="more-projects-title">More projects</h2></div>
           <p>Additional projects spanning system design, developer tooling, automation, native applications, and product engineering.</p>
