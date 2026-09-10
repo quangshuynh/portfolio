@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { FaArrowRight, FaCamera, FaCar, FaGamepad, FaMapMarkerAlt, FaMountain, FaMusic, FaUsers, FaGithub } from 'react-icons/fa';
 import PersonalityButton from './personalityButton';
 import quangPhoto from '../assets/about/quang/quang-about-portrait-web.jpg';
@@ -169,19 +169,12 @@ function AboutPage() {
     requestAnimationFrame(() => lightboxTrigger.current?.focus());
   }, []);
 
-  useEffect(() => {
-    if (!directLightbox) return undefined;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = previousOverflow; };
-  }, [directLightbox]);
-
   return (
     <div className="app-shell about-page">
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <header><SiteNav /></header>
       <main id="main-content">
-        <section className="about-hero scroll-panel section-reveal" aria-labelledby="about-page-title">
+        <section className="about-hero scroll-stop scroll-enter" aria-labelledby="about-page-title">
           <div className="section-inner about-hero-grid reveal-content">
             <div>
               <p className="eyebrow">A little more about me</p>
@@ -222,7 +215,7 @@ function AboutPage() {
           </div>
         </section>
 
-        <section className="page-section about-path scroll-panel section-reveal" aria-labelledby="path-title">
+        <section className="page-section about-path scroll-stop scroll-enter" aria-labelledby="path-title">
           <div className="section-inner about-story reveal-content">
             <div className="about-story-intro">
               <p className="eyebrow">My path into software</p>
@@ -271,7 +264,7 @@ function AboutPage() {
           </div>
         </section>
 
-        <section className="page-section about-beyond scroll-panel section-reveal" aria-labelledby="beyond-title">
+        <section className="page-section about-beyond scroll-stop scroll-enter" aria-labelledby="beyond-title">
           <div className="section-inner reveal-content">
             <div className="section-heading"><div><p className="eyebrow">Outside the editor</p><h2 id="beyond-title">Beyond software</h2></div><p>A few of the things I make time for away from work and school.</p></div>
             <div className="interest-grid">
@@ -300,7 +293,7 @@ function AboutPage() {
           </div>
         </section>
 
-        <section className="page-section about-values scroll-panel section-reveal" aria-labelledby="values-title">
+        <section className="page-section about-values scroll-stop scroll-enter" aria-labelledby="values-title">
           <div className="section-inner reveal-content">
             <div className="section-heading"><div><p className="eyebrow">How I like to work</p><h2 id="values-title">How I approach engineering</h2></div><p>Three principles I return to when I’m learning, building, and collaborating.</p></div>
             <div className="values-grid">{values.map(([title, copy], index) => <article className="value-card" key={title}><span>0{index + 1}</span><h3>{title}</h3><p>{copy}</p></article>)}</div>
@@ -312,7 +305,7 @@ function AboutPage() {
           </div>
         </section>
 
-        <section className="about-cta scroll-panel section-reveal" aria-labelledby="about-cta-title">
+        <section className="about-cta scroll-stop scroll-enter" aria-labelledby="about-cta-title">
           <div className="section-inner reveal-content">
             <p className="eyebrow">Selected work</p>
             <h2 id="about-cta-title">Want to see what I’ve been building?</h2>

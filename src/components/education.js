@@ -19,7 +19,7 @@ const honors = [
  */
 function Education() {
   return (
-    <section className="page-section scroll-panel section-reveal" id="about" aria-labelledby="about-title">
+    <section className="page-section scroll-stop scroll-enter" id="about" aria-labelledby="about-title">
       <div className="section-inner reveal-content">
         <div className="section-heading">
           <div><p className="eyebrow">Background</p><h2 id="about-title">About & education</h2></div>

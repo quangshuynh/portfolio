@@ -45,11 +45,11 @@ function App() {
   }, [isAbout]);
 
   useEffect(() => {
-    const panels = Array.from(document.querySelectorAll('.section-reveal'));
+    const stops = Array.from(document.querySelectorAll('.scroll-enter'));
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
     if (reducedMotion || !('IntersectionObserver' in window)) {
-      panels.forEach((panel) => panel.classList.add('is-visible'));
+      stops.forEach((stop) => stop.classList.add('is-visible'));
       return undefined;
     }
 
@@ -62,10 +62,41 @@ function App() {
       });
     }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
 
-    panels.forEach((panel) => observer.observe(panel));
+    stops.forEach((stop) => observer.observe(stop));
     return () => {
       observer.disconnect();
       document.documentElement.classList.remove('reveal-ready');
+    };
+  }, [isAbout]);
+
+  useEffect(() => {
+    let frame;
+    let lastScrollY = window.scrollY;
+    const updateSnapBoundary = () => {
+      frame = undefined;
+      const header = document.querySelector('.app-shell > header, .about-page > header');
+      const footer = document.querySelector('.site-footer');
+      const currentScrollY = window.scrollY;
+      const movingUp = currentScrollY < lastScrollY;
+      const nearTop = currentScrollY === 0
+        || (movingUp && currentScrollY <= (header?.offsetHeight ?? 0) + 96);
+      const footerLead = Math.min(180, window.innerHeight * .2);
+      const nearFooter = Boolean(footer) && currentScrollY + window.innerHeight >= footer.offsetTop - footerLead;
+      document.documentElement.classList.toggle('snap-boundary', nearTop || nearFooter);
+      lastScrollY = currentScrollY;
+    };
+    const scheduleUpdate = () => {
+      if (!frame) frame = requestAnimationFrame(updateSnapBoundary);
+    };
+
+    updateSnapBoundary();
+    window.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('resize', scheduleUpdate);
+      document.documentElement.classList.remove('snap-boundary');
     };
   }, [isAbout]);
 

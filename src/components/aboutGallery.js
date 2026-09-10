@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { FaMinus, FaPlus, FaSearchPlus, FaTimes } from 'react-icons/fa';
+import useOverlayLock from './overlayLock';
 
 const SPOTIFY_ENDPOINT = 'https://spotify-portfolio-api.quangs.workers.dev/recent';
 const SPOTIFY_PROFILE = 'https://open.spotify.com/user/foahrtqqvuuvt7wscxub4uerd';
@@ -256,6 +258,7 @@ export function PhotoLightbox({ image, onClose }) {
   const imageElement = useRef(null);
   const drag = useRef(null);
   const helpId = useId();
+  useOverlayLock();
 
   const clampPosition = useCallback((next, nextScale = scale) => {
     const stageRect = stage.current?.getBoundingClientRect();
@@ -302,7 +305,7 @@ export function PhotoLightbox({ image, onClose }) {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
-  return (
+  return createPortal(
     <div ref={dialogRef} className="photo-lightbox-backdrop" role="dialog" aria-modal="true" aria-label={image.caption ? `Image viewer: ${image.caption}` : 'Image viewer'} aria-describedby={helpId} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div className="photo-lightbox-toolbar"><div className="photo-lightbox-zoom-controls" aria-label="Image zoom controls"><button type="button" onClick={() => zoom(-.25)} disabled={scale <= 1} aria-label="Zoom out"><FaMinus aria-hidden="true" /></button><button className="photo-lightbox-scale" type="button" onClick={reset} aria-label="Reset zoom">{Math.round(scale * 100)}%</button><button type="button" onClick={() => zoom(.25)} disabled={scale >= 5} aria-label="Zoom in"><FaPlus aria-hidden="true" /></button></div><button className="photo-lightbox-close" type="button" onClick={onClose} ref={closeButton} aria-label="Close image viewer"><FaTimes aria-hidden="true" /></button></div>
       <div ref={stage} className={`photo-lightbox-stage${scale > 1 ? ' is-zoomed' : ''}`} onWheel={(event) => { event.preventDefault(); zoom(-Math.max(-100, Math.min(100, event.deltaY)) * .0025); }} onPointerDown={(event) => { if (scale <= 1 || event.button === 2) return; event.currentTarget.setPointerCapture(event.pointerId); drag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, origin: position }; }} onPointerMove={(event) => { const current = drag.current; if (!current || current.pointerId !== event.pointerId || scale <= 1) return; setPosition(clampPosition({ x: current.origin.x + event.clientX - current.startX, y: current.origin.y + event.clientY - current.startY })); }} onPointerUp={endDrag} onPointerCancel={endDrag} onDoubleClick={() => scale > 1 ? reset() : zoom(1)}>
@@ -310,7 +313,8 @@ export function PhotoLightbox({ image, onClose }) {
       </div>
       {image.caption && <p className="photo-lightbox-caption">{image.caption}</p>}
       <p className="photo-lightbox-help" id={helpId}>Scroll to zoom · Drag to pan · 0 to reset</p>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -321,6 +325,7 @@ export function InterestGalleryModal({ activeGallery, galleries, onClose }) {
   const lightboxOpen = useRef(false);
   const closeButton = useRef(null);
   const [eyebrow, title, closeLabel] = galleryMetadata[activeGallery];
+  useOverlayLock();
 
   const closeLightbox = useCallback(() => {
     lightboxOpen.current = false;
@@ -329,8 +334,6 @@ export function InterestGalleryModal({ activeGallery, galleries, onClose }) {
   }, []);
 
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     closeButton.current?.focus();
     const handleKeyDown = (event) => {
       if (lightboxOpen.current) return;
@@ -338,7 +341,7 @@ export function InterestGalleryModal({ activeGallery, galleries, onClose }) {
       else trapTabKey(event, closeButton.current?.closest('.photography-modal'));
     };
     document.addEventListener('keydown', handleKeyDown);
-    return () => { document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', handleKeyDown); };
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
   const openLightbox = (src, alt, caption, trigger) => { lightboxTrigger.current = trigger; lightboxOpen.current = true; setLightboxImage({ src, alt, caption }); };
@@ -347,7 +350,7 @@ export function InterestGalleryModal({ activeGallery, galleries, onClose }) {
   else if (activeGallery === 'photography') content = <><PhotoGallery items={showAllPhotography ? galleries.photography : galleries.photography.slice(0, 4)} label="More photographs by Quang" onOpen={openLightbox} />{!showAllPhotography && <button className="button photography-view-all" type="button" onClick={() => setShowAllPhotography(true)}>View all</button>}</>;
   else content = <PhotoGallery items={galleries[activeGallery]} label={galleryLabels[activeGallery]} className={`${activeGallery}-gallery`} onOpen={openLightbox} />;
 
-  return (
+  return createPortal(
     <div
       className="photography-modal-backdrop"
       onMouseDown={(event) => {
@@ -390,6 +393,7 @@ export function InterestGalleryModal({ activeGallery, galleries, onClose }) {
           onClose={closeLightbox}
         />
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
