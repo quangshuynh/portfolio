@@ -9,11 +9,18 @@ const collapseDistance = 440;
 
 const mix = (expanded, compact, progress) => expanded + (compact - expanded) * progress;
 
-const writeNavProgress = (nav, progress) => {
+const readNavMetrics = () => {
   const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-  const expandedNavHeight = Math.min(12 * rootFontSize, Math.max(10 * rootFontSize, window.innerHeight * 0.2));
-  const expandedLogoSize = Math.min(9.25 * rootFontSize, Math.max(8 * rootFontSize, window.innerWidth * 0.08));
-  const expandedBrandSize = Math.min(2.9 * rootFontSize, Math.max(2.5 * rootFontSize, window.innerWidth * 0.03));
+  return {
+    rootFontSize,
+    expandedNavHeight: Math.min(12 * rootFontSize, Math.max(10 * rootFontSize, window.innerHeight * 0.2)),
+    expandedLogoSize: Math.min(9.25 * rootFontSize, Math.max(8 * rootFontSize, window.innerWidth * 0.08)),
+    expandedBrandSize: Math.min(2.9 * rootFontSize, Math.max(2.5 * rootFontSize, window.innerWidth * 0.03)),
+  };
+};
+
+const writeNavProgress = (nav, progress, metrics) => {
+  const { rootFontSize, expandedNavHeight, expandedLogoSize, expandedBrandSize } = metrics;
 
   nav.style.setProperty('--nav-progress', progress.toFixed(3));
   nav.style.setProperty('--nav-current-height', `${mix(expandedNavHeight, 4.5 * rootFontSize, progress)}px`);
@@ -43,6 +50,7 @@ function SiteNav({ collapsible = false }) {
     const desktopQuery = window.matchMedia(desktopNavQuery);
     let animationFrame;
     let previousProgress = -1;
+    let metrics;
 
     if (!nav) return undefined;
 
@@ -54,7 +62,8 @@ function SiteNav({ collapsible = false }) {
       const progress = Math.min(1, Math.max(0, window.scrollY / collapseDistance));
 
       if (Math.abs(progress - previousProgress) >= 0.001) {
-        writeNavProgress(nav, progress);
+        metrics ||= readNavMetrics();
+        writeNavProgress(nav, progress, metrics);
         previousProgress = progress;
       }
     };
@@ -63,6 +72,7 @@ function SiteNav({ collapsible = false }) {
       if (animationFrame === undefined) animationFrame = window.requestAnimationFrame(updateProgress);
     };
     const requestResizedProgressUpdate = () => {
+      metrics = undefined;
       previousProgress = -1;
       requestProgressUpdate();
     };

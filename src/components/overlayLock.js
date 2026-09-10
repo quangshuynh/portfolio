@@ -3,6 +3,16 @@ import { useEffect } from 'react';
 let lockCount = 0;
 let lockedScrollY = 0;
 let previousBodyStyles = null;
+let layoutFrame = null;
+let nestedLayoutFrame = null;
+
+function cancelLayoutReset() {
+  if (layoutFrame !== null) cancelAnimationFrame(layoutFrame);
+  if (nestedLayoutFrame !== null) cancelAnimationFrame(nestedLayoutFrame);
+  layoutFrame = null;
+  nestedLayoutFrame = null;
+  document.documentElement.classList.remove('layout-changing');
+}
 
 /** Keeps viewport overlays independent from page scrolling and scroll snapping. */
 export default function useOverlayLock(active = true) {
@@ -10,6 +20,7 @@ export default function useOverlayLock(active = true) {
     if (!active) return undefined;
 
     if (lockCount === 0) {
+      cancelLayoutReset();
       lockedScrollY = window.scrollY;
       previousBodyStyles = {
         position: document.body.style.position,
@@ -36,9 +47,13 @@ export default function useOverlayLock(active = true) {
       if (window.scrollY !== lockedScrollY) {
         window.scrollTo({ top: lockedScrollY, left: 0, behavior: 'auto' });
       }
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        document.documentElement.classList.remove('layout-changing');
-      }));
+      layoutFrame = requestAnimationFrame(() => {
+        layoutFrame = null;
+        nestedLayoutFrame = requestAnimationFrame(() => {
+          nestedLayoutFrame = null;
+          document.documentElement.classList.remove('layout-changing');
+        });
+      });
     };
   }, [active]);
 }
