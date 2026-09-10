@@ -257,10 +257,13 @@ export function PhotoLightbox({ image, onClose }) {
   const stage = useRef(null);
   const imageElement = useRef(null);
   const drag = useRef(null);
+  const scaleRef = useRef(scale);
   const helpId = useId();
   useOverlayLock();
 
-  const clampPosition = useCallback((next, nextScale = scale) => {
+  scaleRef.current = scale;
+
+  const clampPosition = useCallback((next, nextScale = scaleRef.current) => {
     const stageRect = stage.current?.getBoundingClientRect();
     const baseWidth = imageElement.current?.offsetWidth;
     const baseHeight = imageElement.current?.offsetHeight;
@@ -268,11 +271,12 @@ export function PhotoLightbox({ image, onClose }) {
     const maxX = Math.max(0, (baseWidth * nextScale - stageRect.width) / 2);
     const maxY = Math.max(0, (baseHeight * nextScale - stageRect.height) / 2);
     return { x: Math.max(-maxX, Math.min(maxX, next.x)), y: Math.max(-maxY, Math.min(maxY, next.y)) };
-  }, [scale]);
+  }, []);
 
   const zoom = useCallback((amount) => {
     setScale((current) => {
       const next = Math.min(5, Math.max(1, Number((current + amount).toFixed(2))));
+      scaleRef.current = next;
       setPosition((currentPosition) => clampPosition(currentPosition, next));
       return next;
     });
