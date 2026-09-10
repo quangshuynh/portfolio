@@ -9,11 +9,11 @@ function Footer() {
   return (
     <>
       <section
-        className="contact-section"
+        className="contact-section scroll-panel section-reveal"
         id="contact"
         aria-labelledby="contact-title"
       >
-        <div className="section-inner">
+        <div className="section-inner reveal-content">
           <p className="eyebrow">Contact</p>
           <h2 id="contact-title">Let’s talk about building useful software.</h2>
           <p>

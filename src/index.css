@@ -59,7 +59,7 @@
 
 /* global element defaults */
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; scroll-snap-type: y proximity; }
 body { margin: 0; min-width: 320px; background: var(--paper); color: var(--ink); transition: background 180ms ease, color 180ms ease; }
 body, button, a { -webkit-font-smoothing: antialiased; }
 button, input, textarea { font: inherit; }

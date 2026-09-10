@@ -19,8 +19,8 @@ const honors = [
  */
 function Education() {
   return (
-    <section className="page-section" id="about" aria-labelledby="about-title">
-      <div className="section-inner">
+    <section className="page-section scroll-panel section-reveal" id="about" aria-labelledby="about-title">
+      <div className="section-inner reveal-content">
         <div className="section-heading">
           <div><p className="eyebrow">Background</p><h2 id="about-title">About & education</h2></div>
           <p>I enjoy the parts of software engineering where application logic, data, APIs, and real operational problems meet.</p>

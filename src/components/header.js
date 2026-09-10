@@ -11,11 +11,12 @@ import PersonalityButton from './personalityButton';
  */
 function Header() {
   return (
-    <header>
+    <header className="home-header scroll-panel section-reveal">
       <SiteNav />
 
       <section className="hero" id="top" aria-labelledby="hero-title">
-        <div className="hero-inner">
+        <div className="hero-inner reveal-content">
+          <div className="hero-copy">
           <p className="eyebrow">Software Engineering | Backend | Developer Tools | Native Apps</p>
           <p className="hero-intro">
             Hi, I’m Quang.
@@ -39,6 +40,7 @@ function Header() {
             <a className="button button-secondary" href={`${process.env.PUBLIC_URL}/Quang_Huynh_Resume.pdf`} target="_blank" rel="noreferrer">
               View résumé <FaFilePdf aria-hidden="true" />
             </a>
+          </div>
           </div>
           <div className="hero-photo-wrap">
             <a className="hero-photo-link" href={aboutHref} aria-label="About Quang">
