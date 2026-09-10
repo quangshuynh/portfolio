@@ -178,15 +178,18 @@ function ProjectVisual({ type }) {
  */
 function FeaturedProjects() {
   return (
-    <section className="page-section" id="projects" aria-labelledby="projects-title">
-      <div className="section-inner">
-        <div className="section-heading scroll-stop scroll-enter settle-self">
-          <div><p className="eyebrow">Selected work</p><h2 id="projects-title">Featured projects</h2></div>
-          <p>Selected projects highlighting engineering decisions, reliability, system design, and practical problem solving.</p>
-        </div>
-        <div className="featured-list">
-          {projects.map((project, index) => (
-            <article className={`featured-project scroll-stop scroll-enter settle-self${index === 0 ? ' flagship-project' : ''}`} style={{ '--settle-rotate': index % 2 === 0 ? '-.35deg' : '.35deg' }} key={project.name}>
+    <section className="featured-section" id="projects" aria-labelledby="projects-title">
+      <div className="featured-list">
+        {projects.map((project, index) => (
+          <div className={`featured-stage snap-stage scroll-enter${index === 0 ? ' featured-stage-first' : ''}`} key={project.name}>
+            <div className="section-inner reveal-content" style={{ '--settle-rotate': index % 2 === 0 ? '-.35deg' : '.35deg' }}>
+              {index === 0 && (
+                <div className="section-heading">
+                  <div><p className="eyebrow">Selected work</p><h2 id="projects-title">Featured projects</h2></div>
+                  <p>Selected projects highlighting engineering decisions, reliability, system design, and practical problem solving.</p>
+                </div>
+              )}
+              <article className={`featured-project${index === 0 ? ' flagship-project' : ''}`}>
               <ProjectVisual type={project.visual} />
               <div className="project-copy">
                 <span className="project-number">{String(index + 1).padStart(2, '0')} · {project.label}</span>
@@ -204,9 +207,10 @@ function FeaturedProjects() {
                   {project.documentation && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-documentation`} href={project.documentation} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} documentation`}>Documentation <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
                 </div>
               </div>
-            </article>
-          ))}
-        </div>
+              </article>
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );

@@ -13,7 +13,7 @@ const groups = [
  */
 function TechStack() {
   return (
-    <section className="page-section scroll-stop scroll-enter" id="skills" aria-labelledby="skills-title">
+    <section className="page-section snap-stage scroll-enter" id="skills" aria-labelledby="skills-title">
       <div className="section-inner reveal-content">
         <div className="section-heading">
           <div><p className="eyebrow">Engineering toolkit</p><h2 id="skills-title">Skills</h2></div>

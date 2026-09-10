@@ -9,7 +9,7 @@ function Footer() {
   return (
     <>
       <section
-        className="contact-section scroll-stop scroll-enter"
+        className="contact-section snap-stage scroll-enter"
         id="contact"
         aria-labelledby="contact-title"
       >

@@ -128,7 +128,7 @@ function MoreProjects() {
   };
 
   return (
-    <section className="page-section scroll-stop scroll-enter" id="more-projects" aria-labelledby="more-projects-title">
+    <section className="page-section snap-stage scroll-enter" id="more-projects" aria-labelledby="more-projects-title">
       <div className="section-inner reveal-content">
         <div className="section-heading">
           <div><p className="eyebrow">Additional work</p><h2 id="more-projects-title">More projects</h2></div>
