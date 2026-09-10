@@ -85,7 +85,7 @@ function App() {
     <div className="app-shell">
       <HashScroll />
       <a className="skip-link" href="#main-content">Skip to main content</a>
-      <SiteNav />
+      <SiteNav collapsible />
       <Header />
       <main id="main-content">
         <Experience />
