@@ -40,25 +40,21 @@
 .hero-copy { min-width: 0; }
 .eyebrow { margin: 0 0 1.25rem; color: var(--accent); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
 .hero-intro { display: flex; align-items: center; gap: .35em; margin: 0 0 0.8rem; color: var(--detail-text); font-size: clamp(1.05rem, 2vw, 1.3rem); font-weight: 750; }
-.waving-hand {
-  position: relative;
-  top: -.08em;
-  display: inline-block;
-  width: 1.2em;
-  height: 1.2em;
-  flex: 0 0 auto;
-  transform-origin: 70% 70%;
-  animation: wave-hand 3s ease-in-out infinite;
+.wave-trigger { position: relative; top: -.12em; display: inline-grid; flex: 0 0 auto; place-items: center; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 1.1em; line-height: 1; }
+.wave { display: inline-block; transform: rotate(0deg); transform-origin: 70% 70%; will-change: transform; }
+.wave-trigger:hover .wave,
+.wave-trigger:focus-visible .wave,
+.wave.is-waving {
+  animation: wave-animation 2.1s ease-in-out infinite;
 }
-@media (prefers-reduced-motion: reduce) {
-  .waving-hand { animation: none; }
-}
-@keyframes wave-hand {
-  0%, 100% { transform: rotate(0deg); }
-  10% { transform: rotate(12deg); }
-  20% { transform: rotate(6deg); }
-  30% { transform: rotate(12deg); }
-  40% { transform: rotate(0deg); }
+@keyframes wave-animation {
+  0% { transform: rotate(0deg); }
+  10% { transform: rotate(14deg); }
+  20% { transform: rotate(-8deg); }
+  30% { transform: rotate(14deg); }
+  40% { transform: rotate(-4deg); }
+  50% { transform: rotate(10deg); }
+  60%, 100% { transform: rotate(0deg); }
 }
 .hero h1 { max-width: 900px; margin: 0; font-family: Circular, sans-serif; font-size: clamp(2.8rem, 6.4vw, 5.8rem); line-height: 1.02; letter-spacing: -0.05em; }
 .hero-lede { max-width: 740px; margin: 1.8rem 0 0; color: var(--muted); font-size: clamp(1.05rem, 1.6vw, 1.35rem); line-height: 1.7; }
@@ -1022,6 +1018,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 /* mobile layout */
 @media (max-width: 620px) {
   :root { --nav-height: 7.625rem; }
+  .site-nav { position: relative; top: auto; }
   .nav-inner, .section-inner, .hero-inner, .footer-inner { width: calc(100% - 1.5rem); }
   #experience::before,
   .about-path::before,
