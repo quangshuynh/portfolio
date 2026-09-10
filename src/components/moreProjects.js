@@ -107,23 +107,27 @@ const projects = [
  */
 function MoreProjects() {
   const [showAllProjects, setShowAllProjects] = useState(false);
-  const toggleAnchor = useRef(null);
-  const pendingAnchorTop = useRef(null);
+  const collapsedScrollY = useRef(null);
+  const pendingScrollY = useRef(null);
   const visibleProjects = showAllProjects ? projects : projects.slice(0, 3);
 
   useLayoutEffect(() => {
-    if (pendingAnchorTop.current === null || !toggleAnchor.current) return;
-    const delta = toggleAnchor.current.getBoundingClientRect().top - pendingAnchorTop.current;
-    pendingAnchorTop.current = null;
-    if (Math.abs(delta) > .5) window.scrollBy(0, delta);
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      document.documentElement.classList.remove('layout-changing');
-    }));
+    if (pendingScrollY.current === null) return;
+    const scrollY = pendingScrollY.current;
+    pendingScrollY.current = null;
+    if (window.scrollY !== scrollY) {
+      window.scrollTo({ top: scrollY, left: 0, behavior: 'auto' });
+    }
   }, [showAllProjects]);
 
-  const toggleProjects = () => {
-    pendingAnchorTop.current = toggleAnchor.current?.getBoundingClientRect().top ?? null;
-    document.documentElement.classList.add('layout-changing');
+  const toggleProjects = (event) => {
+    if (showAllProjects) {
+      pendingScrollY.current = collapsedScrollY.current ?? window.scrollY;
+    } else {
+      collapsedScrollY.current = window.scrollY;
+      pendingScrollY.current = window.scrollY;
+    }
+    event.currentTarget.blur();
     setShowAllProjects((isExpanded) => !isExpanded);
   };
 
@@ -162,7 +166,7 @@ function MoreProjects() {
           ))}
         </div>
         {projects.length > 3 && (
-          <div className="more-toggle" ref={toggleAnchor}>
+          <div className="more-toggle">
             <PersonalityButton
               secondary
               personality="auto"

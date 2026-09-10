@@ -832,7 +832,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .skill-group, .more-card, .education-card, .about-card { padding: clamp(1.4rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: 0.8rem; background: var(--surface); }
 .skill-group h3, .more-card h3, .education-card h3 { margin: 0 0 1rem; font-family: Circular, sans-serif; font-size: 1.25rem; letter-spacing: -0.02em; }
 .skill-group p { margin: 0; color: var(--muted); line-height: 1.9; }
-.more-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.more-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; overflow-anchor: none; }
 .more-card { position: relative; display: flex; flex-direction: column; min-width: 0; transition: transform 160ms ease, border-color 160ms ease; }
 .more-card:hover { transform: translateY(-3px); border-color: #aeb9b2; }
 .more-card.has-logo h3 { padding-right: 2.75rem; }
