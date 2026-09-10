@@ -30,9 +30,15 @@ export default function useOverlayLock(active = true) {
       if (lockCount > 0) return;
 
       document.documentElement.classList.remove('overlay-open');
+      document.documentElement.classList.add('layout-changing');
       Object.assign(document.body.style, previousBodyStyles);
       previousBodyStyles = null;
-      if (lockedScrollY !== 0) window.scrollTo(0, lockedScrollY);
+      if (window.scrollY !== lockedScrollY) {
+        window.scrollTo({ top: lockedScrollY, left: 0, behavior: 'auto' });
+      }
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        document.documentElement.classList.remove('layout-changing');
+      }));
     };
   }, [active]);
 }

@@ -2,7 +2,7 @@ import React from 'react';
 import { FaArrowRight, FaFilePdf, FaMapMarkerAlt } from 'react-icons/fa';
 import quangPhoto from '../assets/quang.jpg';
 import wavingHand from '../assets/waving_hand.svg';
-import SiteNav, { aboutHref } from './siteNav';
+import { aboutHref } from './siteNav';
 import PersonalityButton from './personalityButton';
 
 /**
@@ -11,9 +11,7 @@ import PersonalityButton from './personalityButton';
  */
 function Header() {
   return (
-    <header className="home-header scroll-stop scroll-enter">
-      <SiteNav />
-
+    <header className="home-header snap-stage scroll-enter">
       <section className="hero" id="top" aria-labelledby="hero-title">
         <div className="hero-inner reveal-content">
           <div className="hero-copy">

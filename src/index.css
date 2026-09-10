@@ -60,10 +60,7 @@
 
 /* global element defaults */
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-snap-type: y mandatory; scroll-padding-top: var(--nav-height); }
-html.snap-boundary,
-html.overlay-open,
-html.layout-changing { scroll-snap-type: none; }
+html { scroll-behavior: smooth; scroll-padding-top: var(--nav-height); }
 body { margin: 0; min-width: 320px; background: var(--paper); color: var(--ink); transition: background 180ms ease, color 180ms ease; }
 body, button, a { -webkit-font-smoothing: antialiased; }
 button, input, textarea { font: inherit; }
