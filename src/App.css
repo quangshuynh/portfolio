@@ -1017,7 +1017,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 
 /* mobile layout */
 @media (max-width: 620px) {
-  :root { --nav-height: 7.625rem; }
+  :root { --nav-height: 0rem; }
   .site-nav { position: relative; top: auto; }
   .nav-inner, .section-inner, .hero-inner, .footer-inner { width: calc(100% - 1.5rem); }
   #experience::before,
