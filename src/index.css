@@ -9,6 +9,7 @@
 
 /* dark theme tokens */
 :root {
+  --nav-height: 4.5rem;
   color-scheme: dark;
   --ink: #edf4f0;
   --muted: #aebbb4;
@@ -59,7 +60,10 @@
 
 /* global element defaults */
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-snap-type: y proximity; }
+html { scroll-behavior: smooth; scroll-snap-type: y mandatory; scroll-padding-top: var(--nav-height); }
+html.snap-boundary,
+html.overlay-open,
+html.layout-changing { scroll-snap-type: none; }
 body { margin: 0; min-width: 320px; background: var(--paper); color: var(--ink); transition: background 180ms ease, color 180ms ease; }
 body, button, a { -webkit-font-smoothing: antialiased; }
 button, input, textarea { font: inherit; }

@@ -178,15 +178,15 @@ function ProjectVisual({ type }) {
  */
 function FeaturedProjects() {
   return (
-    <section className="page-section scroll-panel section-reveal" id="projects" aria-labelledby="projects-title">
-      <div className="section-inner reveal-content">
-        <div className="section-heading">
+    <section className="page-section" id="projects" aria-labelledby="projects-title">
+      <div className="section-inner">
+        <div className="section-heading scroll-stop scroll-enter settle-self">
           <div><p className="eyebrow">Selected work</p><h2 id="projects-title">Featured projects</h2></div>
           <p>Selected projects highlighting engineering decisions, reliability, system design, and practical problem solving.</p>
         </div>
         <div className="featured-list">
           {projects.map((project, index) => (
-            <article className={`featured-project${index === 0 ? ' flagship-project' : ''}`} key={project.name}>
+            <article className={`featured-project scroll-stop scroll-enter settle-self${index === 0 ? ' flagship-project' : ''}`} style={{ '--settle-rotate': index % 2 === 0 ? '-.35deg' : '.35deg' }} key={project.name}>
               <ProjectVisual type={project.visual} />
               <div className="project-copy">
                 <span className="project-number">{String(index + 1).padStart(2, '0')} · {project.label}</span>

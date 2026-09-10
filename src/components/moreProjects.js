@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
 import foodyLogo from '../assets/logos/foody-logo.png';
 import hymicalFormsLogo from '../assets/logos/hymical-forms-logo.png';
@@ -107,10 +107,28 @@ const projects = [
  */
 function MoreProjects() {
   const [showAllProjects, setShowAllProjects] = useState(false);
+  const toggleAnchor = useRef(null);
+  const pendingAnchorTop = useRef(null);
   const visibleProjects = showAllProjects ? projects : projects.slice(0, 3);
 
+  useLayoutEffect(() => {
+    if (pendingAnchorTop.current === null || !toggleAnchor.current) return;
+    const delta = toggleAnchor.current.getBoundingClientRect().top - pendingAnchorTop.current;
+    pendingAnchorTop.current = null;
+    if (Math.abs(delta) > .5) window.scrollBy(0, delta);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.documentElement.classList.remove('layout-changing');
+    }));
+  }, [showAllProjects]);
+
+  const toggleProjects = () => {
+    pendingAnchorTop.current = toggleAnchor.current?.getBoundingClientRect().top ?? null;
+    document.documentElement.classList.add('layout-changing');
+    setShowAllProjects((isExpanded) => !isExpanded);
+  };
+
   return (
-    <section className="page-section scroll-panel section-reveal" id="more-projects" aria-labelledby="more-projects-title">
+    <section className="page-section scroll-stop scroll-enter" id="more-projects" aria-labelledby="more-projects-title">
       <div className="section-inner reveal-content">
         <div className="section-heading">
           <div><p className="eyebrow">Additional work</p><h2 id="more-projects-title">More projects</h2></div>
@@ -144,7 +162,7 @@ function MoreProjects() {
           ))}
         </div>
         {projects.length > 3 && (
-          <div className="more-toggle">
+          <div className="more-toggle" ref={toggleAnchor}>
             <PersonalityButton
               secondary
               personality="auto"
@@ -152,7 +170,7 @@ function MoreProjects() {
               type="button"
               aria-expanded={showAllProjects}
               aria-controls="more-projects-grid"
-              onClick={() => setShowAllProjects((isExpanded) => !isExpanded)}
+              onClick={toggleProjects}
             >
               {showAllProjects ? 'Show fewer projects' : 'View more projects'}
             </PersonalityButton>

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { FaSearchPlus } from 'react-icons/fa';
 import { PhotoLightbox } from './aboutGallery';
 
@@ -17,13 +17,6 @@ export function HomeLightboxProvider({ children }) {
     setImage(null);
     requestAnimationFrame(() => trigger.current?.focus());
   }, []);
-
-  useEffect(() => {
-    if (!image) return undefined;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = previousOverflow; };
-  }, [image]);
 
   return (
     <HomeLightboxContext.Provider value={openImage}>

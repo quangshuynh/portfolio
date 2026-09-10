@@ -8,7 +8,7 @@ import koreLogo from '../assets/logos/kore-logo.png';
 function Experience() {
   return (
     <section
-      className="page-section scroll-panel section-reveal"
+      className="page-section scroll-stop scroll-enter"
       id="experience"
       aria-labelledby="experience-title"
     >

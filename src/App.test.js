@@ -81,12 +81,16 @@ test('home page project screenshots open in the lightbox and restore focus', asy
   const trigger = screen.getByRole('button', { name: 'Open image: 585Dashcam585 storefront' });
 
   fireEvent.click(trigger);
-  expect(screen.getByRole('dialog', { name: 'Image viewer: 585Dashcam585 storefront' })).toBeInTheDocument();
+  const lightbox = screen.getByRole('dialog', { name: 'Image viewer: 585Dashcam585 storefront' });
+  expect(lightbox).toBeInTheDocument();
+  expect(lightbox.parentElement).toBe(document.body);
+  expect(document.documentElement).toHaveClass('overlay-open');
   expect(screen.getByRole('button', { name: 'Close image viewer' })).toHaveFocus();
 
   fireEvent.keyDown(document, { key: 'Escape' });
   await waitFor(() => expect(trigger).toHaveFocus());
   expect(screen.queryByRole('dialog', { name: 'Image viewer: 585Dashcam585 storefront' })).not.toBeInTheDocument();
+  expect(document.documentElement).not.toHaveClass('overlay-open');
 });
 
 test('renders the dedicated About Quang route with working homepage links', () => {
@@ -101,10 +105,13 @@ test('renders the dedicated About Quang route with working homepage links', () =
   expect(screen.getByRole('img', { name: /blue classic sports car/i })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'View more photos of Quang' }));
   const personalGallery = screen.getByLabelText('More photos of Quang');
+  expect(screen.getByRole('dialog', { name: 'More about Quang' }).parentElement.parentElement).toBe(document.body);
+  expect(document.documentElement).toHaveClass('overlay-open');
   expect(personalGallery.querySelectorAll('img')).toHaveLength(3);
   expect(within(personalGallery).getByRole('img', { name: /shoreline at sunset/i })).toHaveAttribute('loading', 'lazy');
   fireEvent.click(screen.getByRole('button', { name: 'Close personal photo gallery' }));
   expect(screen.queryByRole('dialog', { name: 'More about Quang' })).not.toBeInTheDocument();
+  expect(document.documentElement).not.toHaveClass('overlay-open');
   const photographyCard = screen.getByRole('heading', { name: 'Photography' }).closest('article');
   const photographyToggle = within(photographyCard).getByRole('button', { name: 'View more' });
   expect(screen.queryByLabelText('More photographs by Quang')).not.toBeInTheDocument();

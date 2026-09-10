@@ -11,7 +11,7 @@ import PersonalityButton from './personalityButton';
  */
 function Header() {
   return (
-    <header className="home-header scroll-panel section-reveal">
+    <header className="home-header scroll-stop scroll-enter">
       <SiteNav />
 
       <section className="hero" id="top" aria-labelledby="hero-title">
