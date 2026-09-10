@@ -172,7 +172,7 @@ function AboutPage() {
   return (
     <div className="app-shell about-page">
       <a className="skip-link" href="#main-content">Skip to main content</a>
-      <SiteNav />
+      <SiteNav collapsible />
       <main id="main-content">
         <section className="about-hero snap-stage scroll-enter" aria-labelledby="about-page-title">
           <div className="section-inner about-hero-grid reveal-content">
