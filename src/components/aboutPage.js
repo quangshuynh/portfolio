@@ -31,7 +31,7 @@ import riversideBridge from '../assets/about/photography/optimized/riverside-bri
 import riversideWaterfall from '../assets/about/photography/optimized/riverside-waterfall-web.jpg';
 import waterfallCliffs from '../assets/about/photography/optimized/waterfall-cliffs-web.jpg';
 import whiteCarAtNight from '../assets/about/photography/optimized/white-car-at-night-web.jpg';
-import waterImpact from '../assets/about/photography/impact.jpg';
+import pinkSkySunset from '../assets/about/photography/IMG_0931.JPG';
 import rochesterSkyline from '../assets/about/photography/rochester-skyline.jpg';
 import trainTracks from '../assets/about/photography/around-the-bend.jpg';
 import woodlandStream from '../assets/about/photography/optimized/woodland-stream-web.jpg';
@@ -105,13 +105,13 @@ const photographyGallery = [
   { src: riversideBridge, width: 1050, height: 1400, alt: 'A red metal bridge crossing the Genesee River', caption: 'Red steel bridge over the Genesee River', shape: 'portrait' },
   { src: horizonSunset, width: 1050, height: 1400, alt: 'The sun meeting a dark lake at the horizon', caption: 'Watching the last light disappear over the water', shape: 'portrait' },
   { src: riversideWaterfall, width: 1400, height: 1050, alt: 'A broad waterfall surrounded by summer greenery at Rochester Lower Falls', caption: 'Rochester Lower Falls overlook', shape: 'landscape' },
-  { src: lakesideSunset, width: 1400, height: 1050, alt: 'Pink sunset clouds above a calm lakeshore in Irondequoit Bay', caption: 'Pastel skies over Irondequoit Bay', shape: 'landscape' },
+  { src: pinkSkySunset, width: 3648, height: 2736, alt: 'A vivid pink and purple sunset above silhouetted trees and a parking lot in Rochester', caption: 'Pink skies over Rochester at sunset', shape: 'landscape' },
   { src: niagaraOverlook, width: 1050, height: 1400, alt: 'A distant city skyline beyond a misty waterfall at Niagara Falls', caption: 'Mist and skyline at Niagara Falls', shape: 'portrait' },
   { src: forestCanopy, width: 927, height: 1400, alt: 'Looking upward through a dense green forest canopy at Bristol Mountain', caption: 'Looking up through the trees at Bristol Mountain', shape: 'portrait' },
   { src: waterfallCliffs, width: 927, height: 1400, alt: 'Layered waterfalls flowing over a rocky cliff in Ithaca', caption: 'Ithaca Falls in the summer', shape: 'portrait' },
   { src: woodlandStream, width: 933, height: 1400, alt: 'A narrow stream winding through a sunlit woodland at Cornell', caption: 'Following a stream through the woods at Cornell', shape: 'portrait' },
   { src: historicBuilding, width: 1400, height: 933, alt: 'Rush Rhees Library framed by bare winter branches', caption: 'Rush Rhees Library through bare winter branches', shape: 'landscape' },
-  { src: waterImpact, width: 1400, height: 1050, alt: 'A splash of water frozen in midair', caption: 'Capturing the moment of impact at Webster Park', shape: 'landscape' },
+  { src: lakesideSunset, width: 1400, height: 1050, alt: 'Pink sunset clouds above a calm lakeshore in Irondequoit Bay', caption: 'Pastel skies over Irondequoit Bay', shape: 'landscape' },
   { src: hilltopCastle, width: 933, height: 1400, alt: 'A stone building overlooking a wide valley at Cornell', caption: 'Looking out from Cornell stone architecture', shape: 'portrait' },
   { src: trainTracks, width: 1400, height: 1050, alt: 'Train tracks curving around a bend in the distance', caption: 'Train tracks curving around a bend', shape: 'portrait' },
   { src: rochesterSkyline, width: 1400, height: 1050, alt: 'Rochester skyline at night', caption: 'Rochester skyline at night', shape: 'landscape' },
