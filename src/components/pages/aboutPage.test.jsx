@@ -10,7 +10,7 @@ beforeEach(() => {
 
 afterEach(() => {
   global.fetch = originalFetch;
-  jest.restoreAllMocks();
+  vi.restoreAllMocks();
 });
 
 function renderAboutPage() {
@@ -184,7 +184,7 @@ test('gallery and lightbox trap Tab within the active dialog', () => {
 });
 
 test('Spotify stays lazy and shows its loading and failure states', async () => {
-  global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
+  global.fetch = vi.fn().mockRejectedValue(new Error('offline'));
   renderAboutPage();
 
   expect(global.fetch).not.toHaveBeenCalled();
@@ -203,7 +203,7 @@ test('Spotify stays lazy and shows its loading and failure states', async () => 
 });
 
 test('Spotify retries a failed request successfully only after explicit action', async () => {
-  global.fetch = jest.fn()
+  global.fetch = vi.fn()
     .mockRejectedValueOnce(new Error('offline'))
     .mockResolvedValueOnce({
       ok: true,
@@ -221,7 +221,7 @@ test('Spotify retries a failed request successfully only after explicit action',
 });
 
 test('Spotify renders valid play times semantically and omits invalid ones', async () => {
-  global.fetch = jest.fn().mockResolvedValue({
+  global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({
       tracks: [
@@ -242,8 +242,8 @@ test('Spotify renders valid play times semantically and omits invalid ones', asy
 
 test('Spotify reuses a fresh cache and refreshes it after five minutes', async () => {
   let now = new Date('2026-09-07T16:00:00Z').getTime();
-  jest.spyOn(Date, 'now').mockImplementation(() => now);
-  global.fetch = jest.fn()
+  vi.spyOn(Date, 'now').mockImplementation(() => now);
+  global.fetch = vi.fn()
     .mockResolvedValueOnce({ ok: true, json: async () => ({ tracks: [{ id: 'first', name: 'Cached song', artist: 'Artist', album: 'Album', url: '#first', playedAt: '2026-09-07T15:00:00Z' }] }) })
     .mockResolvedValueOnce({ ok: true, json: async () => ({ tracks: [{ id: 'second', name: 'Fresh song', artist: 'Artist', album: 'Album', url: '#second', playedAt: '2026-09-07T15:30:00Z' }] }) });
   renderAboutPage();
@@ -267,7 +267,7 @@ test('Spotify reuses a fresh cache and refreshes it after five minutes', async (
 
 test('Spotify deduplicates concurrent requests', async () => {
   let resolveFetch;
-  global.fetch = jest.fn(() => new Promise((resolve) => { resolveFetch = resolve; }));
+  global.fetch = vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; }));
   render(<><SpotifyListening /><SpotifyListening /></>);
 
   expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -278,7 +278,7 @@ test('Spotify deduplicates concurrent requests', async () => {
 });
 
 test('Spotify sorts newest valid plays first and leaves malformed timestamps after them', async () => {
-  global.fetch = jest.fn().mockResolvedValue({
+  global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({ tracks: [
       { id: 'invalid', name: 'Malformed song', artist: 'Artist', album: 'Album', url: '#invalid', playedAt: 'not-a-date' },

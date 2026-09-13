@@ -10,7 +10,7 @@ Also deployed to [GitHub Pages](https://quangshuynh.github.io/portfolio/) and [V
 
 ## Stack
 
-- React 19 and Create React App
+- React 19 and Vite
 - Plain CSS with responsive layouts and reduced-motion support
 - React Icons
 - GitHub Pages deployment through GitHub Actions
@@ -20,20 +20,20 @@ Also deployed to [GitHub Pages](https://quangshuynh.github.io/portfolio/) and [V
 
 ```bash
 npm install
-npm start
+npm run dev
 ```
 
 Run the test suite or create a production build:
 
 ```bash
-npm test -- --watchAll=false
+npm test
 npm run build
 ```
 
 ## Deployment
 
 - CI runs on every pull request and push, installing dependencies, running tests, and verifying a production build.
-- Pushes to `main` also deploy to GitHub Pages through `.github/workflows/deploy-pages.yml`. The workflow builds with `PUBLIC_URL=/portfolio` so assets resolve correctly under the GitHub Pages subpath.
+- Pushes to `main` also deploy to GitHub Pages through `.github/workflows/deploy-pages.yml`. The workflow sets Vite's `BASE_PATH` to `/portfolio/` so assets resolve correctly under the GitHub Pages subpath while root deployments keep `/`.
 - Vercel builds the same repository with the standard `npm run build` command for root deployment. `vercel.json` provides SPA rewrites so routes such as `/about` work when opened or refreshed directly.
 
 No manual deployment step is required after merging to `main`.

@@ -1,8 +1,9 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import chiTheCat from '../../assets/chi-the-cat.png';
 
-const homeHref = (hash = '') => `${process.env.PUBLIC_URL || ''}/${hash}`;
-const aboutHref = `${process.env.PUBLIC_URL || ''}/about`;
+const basePath = import.meta.env.BASE_URL;
+const homeHref = (hash = '') => `${basePath}${hash}`;
+const aboutHref = `${basePath}about`;
 
 const desktopNavQuery = '(min-width: 1024px)';
 const collapseDistance = 440;

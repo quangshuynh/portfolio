@@ -112,7 +112,7 @@ function GitProfileLensVisual() {
     <div className="project-visual gallery">
       <div className="gallery-stage">
         {slide === 'logo' ? (
-          <img src={gitProfileLensLogo} width="1254" height="1254" alt="GitProfileLens project logo" loading="lazy" decoding="async" />
+          <img className="gitprofilelens-logo" src={gitProfileLensLogo} width="1254" height="1254" alt="GitProfileLens project logo" loading="lazy" decoding="async" />
         ) : (
           <HomeImageTrigger src={gitProfileLensResults} imageClassName="project-result-image" alt="GitProfileLens audit dashboard showing presentation and discoverability scores with prioritized recommendations" caption="GitProfileLens audit results" />
         )}
@@ -189,7 +189,7 @@ function FeaturedProjects() {
                   <p>Selected projects highlighting engineering decisions, reliability, system design, and practical problem solving.</p>
                 </div>
               )}
-              <article className={`featured-project${index === 0 ? ' flagship-project' : ''}`}>
+              <article className={`featured-project${index === 0 ? ' flagship-project' : ''}${project.name === 'GitProfileLens' ? ' gitprofilelens-project' : ''}`}>
               <ProjectVisual type={project.visual} />
               <div className="project-copy">
                 <span className="project-number">{String(index + 1).padStart(2, '0')} · {project.label}</span>
