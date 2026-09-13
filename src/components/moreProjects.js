@@ -7,6 +7,7 @@ import moverGitLogo from '../assets/logos/git-mover-logo.png';
 import salonFlowLogo from '../assets/logos/salonflow-logo.png';
 import caseNotesLogo from '../assets/logos/casenotes-logo.png';
 import steamLogo from '../assets/logos/Steam-icon-logo.svg';
+import dashPilotLogo from '../assets/logos/dashpilot-logo.png';
 import photoPortfolio from '../assets/585photo585-portfolio.png';
 import PersonalityButton from './personalityButton';
 import { HomeImageTrigger } from './homeLightbox';
@@ -21,6 +22,16 @@ const projects = [
     technologies: ['Python', 'FastAPI', 'PostgreSQL', 'SQLAlchemy'],
     github: 'https://github.com/hymical/forms',
     logo: hymicalFormsLogo,
+  },
+  {
+    name: 'DashPilot',
+    description:
+      'Local-first iOS companion for delivery drivers that records mileage, delivery activity, pickup waits, earnings, and shift performance.',
+    highlight:
+      'Built with background Core Location capture, SwiftData migrations, pause-aware mileage and working-time metrics, stacked delivery lifecycles, App Intents, and a Live Activity with Lock Screen and Dynamic Island controls.',
+    technologies: ['Swift', 'SwiftUI', 'SwiftData', 'Core Location', 'ActivityKit'],
+    github: 'https://github.com/quangshuynh/dashpilot',
+    logo: dashPilotLogo,
   },
   {
     name: 'CaseNotes',
