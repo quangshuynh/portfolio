@@ -1,6 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
-import foodyLogo from '../assets/logos/foody-logo.png';
 import hymicalFormsLogo from '../assets/logos/hymical-forms-logo.png';
 import repoRadarLogo from '../assets/logos/repo-radar-logo.png';
 import moverGitLogo from '../assets/logos/git-mover-logo.png';
