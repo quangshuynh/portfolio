@@ -59,7 +59,10 @@ const interests = [
   [
     FaCar,
     'Cars & technology',
-    'I enjoy understanding how hardware works, from building and upgrading PCs to learning what is happening under the hood of a car.'
+    <>
+      I enjoy understanding how hardware works, from building and upgrading PCs to learning what is happening under the hood of a car. I also keep a{' '}
+      <a href="https://gc8quang.vercel.app/" target="_blank" rel="noreferrer">photo archive of my blue Subaru Impreza 2.5RS</a>.
+    </>
   ],
   [
     FaGamepad,

@@ -60,6 +60,15 @@ test('only interests with additional content render actions while every featured
   expect(within(musicCard).getByRole('button', { name: 'View listening' })).toBeInTheDocument();
 });
 
+test('links to the Blue 2.5RS photo archive from the cars interest', () => {
+  renderAboutPage();
+  const carsCard = screen.getByRole('heading', { name: 'Cars & technology' }).closest('article');
+  expect(within(carsCard).getByRole('link', { name: 'photo archive of my blue Subaru Impreza 2.5RS' })).toHaveAttribute(
+    'href',
+    'https://gc8quang.vercel.app/'
+  );
+});
+
 test.each([
   ['Photography', 'Photography'],
   ['Gaming', 'Gaming'],
