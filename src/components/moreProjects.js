@@ -8,6 +8,7 @@ import salonFlowLogo from '../assets/logos/salonflow-logo.png';
 import caseNotesLogo from '../assets/logos/casenotes-logo.png';
 import steamLogo from '../assets/logos/Steam-icon-logo.svg';
 import dashPilotLogo from '../assets/logos/dashpilot-logo.png';
+import inboxSweepLogo from '../assets/logos/inboxsweep-logo.png';
 import photoPortfolio from '../assets/585photo585-portfolio.png';
 import PersonalityButton from './personalityButton';
 import { HomeImageTrigger } from './homeLightbox';
@@ -44,6 +45,16 @@ const projects = [
     live: 'https://quangshuynh.github.io/casenotes/',
     liveLabel: 'Documentation',
     logo: caseNotesLogo,
+  },
+  {
+    name: 'InboxSweep',
+    description:
+      'Privacy-conscious native macOS Gmail cleanup assistant that groups mail by sender, explains cleanup recommendations, and previews changes before anything happens.',
+    highlight:
+      'Built with metadata-only Gmail access, explicit OAuth scope boundaries, dry-run cleanup previews, confirmed archive and undo flows, safe unsubscribe handling, and synthetic offline test data.',
+    technologies: ['Swift', 'SwiftUI', 'Gmail API', 'OAuth 2.0', 'Keychain'],
+    github: 'https://github.com/quangshuynh/inboxsweep',
+    logo: inboxSweepLogo,
   },
   {
     name: 'Repo Radar',
@@ -98,17 +109,6 @@ const projects = [
     github: 'https://github.com/quangshuynh/steam-value-lookup',
     live: 'https://steam-value-lookup.onrender.com/',
     logo: steamLogo,
-  },
-  {
-    name: 'Foody',
-    description: 
-      'Restaurant visit, rating, saved-place, and nearby-recommendation tracking in a responsive mapping application.',
-    highlight: 
-      'Authenticated, persistent CRUD with Firebase Authentication and Cloud Firestore, plus React Leaflet and public location APIs.',
-    technologies: ['React', 'Firebase Authentication', 'Cloud Firestore', 'React Leaflet'],
-    github: 'https://github.com/quangshuynh/Foody',
-    live: 'https://foody-rit.web.app/',
-    logo: foodyLogo,
   },
 ];
 
