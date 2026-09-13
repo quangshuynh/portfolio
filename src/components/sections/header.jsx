@@ -55,7 +55,7 @@ function Header() {
           </div>
           <div className="hero-actions">
             <PersonalityButton href="#projects" personality="rally" personalityKey="hero-view-work">View my work <FaArrowRight aria-hidden="true" /></PersonalityButton>
-            <a className="button button-secondary" href={`${process.env.PUBLIC_URL}/Quang_Huynh_Resume.pdf`} target="_blank" rel="noreferrer">
+            <a className="button button-secondary" href={`${import.meta.env.BASE_URL}Quang_Huynh_Resume.pdf`} target="_blank" rel="noreferrer">
               View résumé <FaFilePdf aria-hidden="true" />
             </a>
           </div>

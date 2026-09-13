@@ -40,8 +40,8 @@ export function getPersonalitySessionSeed(
   }
 }
 
-export function arePersonalityButtonsEnabled(environment = process.env) {
-  return environment.REACT_APP_PERSONALITY_BUTTONS !== 'false';
+export function arePersonalityButtonsEnabled(environment = import.meta.env) {
+  return environment.VITE_PERSONALITY_BUTTONS !== 'false';
 }
 
 const personalityButtonsEnabled = arePersonalityButtonsEnabled();

@@ -844,6 +844,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .project-visual.production-site-visual img { max-height: 520px; border: 1px solid rgba(255,255,255,.12); object-fit: cover; object-position: top; }
 .gallery-stage { display: grid; place-items: center; width: 100%; min-height: 330px; overflow: hidden; }
 .gallery-stage > img { max-height: none; }
+.gallery-stage > .gitprofilelens-logo { box-shadow: none; }
 .gallery-stage > .project-result-image { width: 100%; max-width: 100%; max-height: min(600px, 72vh); object-fit: contain; }
 .gallery-stage > .foody-logo { box-shadow: none; }
 .foody .gallery-stage { min-height: 520px; }
@@ -862,6 +863,11 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
 .steam-mark span { display: block; margin-top: .5rem; color: #c8dce8; letter-spacing: .12em; text-transform: uppercase; font-size: .74rem; }
 .project-visual .steam-corner-logo { position: absolute; top: 1rem; right: 1rem; width: 60px; height: 60px; border-radius: 50%; box-shadow: 0 8px 20px rgba(0,0,0,.24); }
 .project-copy { display: flex; flex-direction: column; justify-content: center; padding: clamp(2rem, 5vw, 4rem); }
+.gitprofilelens-project .project-copy { padding-block: clamp(1.25rem, 2vw, 2rem); }
+.gitprofilelens-project .project-copy h3 { margin-block: 0.45rem 0.75rem; }
+.gitprofilelens-project .project-purpose { margin-bottom: 0.65rem; }
+.gitprofilelens-project .project-highlights { gap: 0.4rem; margin-block: 0.2rem 0.8rem; }
+.gitprofilelens-project .project-highlights li { line-height: 1.4; }
 .project-number { color: var(--warm); font-size: 0.76rem; font-weight: 850; letter-spacing: 0.12em; text-transform: uppercase; }
 .project-copy h3 { margin: 0.6rem 0 1.1rem; font-family: Circular, sans-serif; font-size: clamp(2rem, 4vw, 3.15rem); line-height: 1; letter-spacing: -0.04em; }
 .project-copy p { margin: 0 0 1rem; color: var(--muted); line-height: 1.7; }
@@ -1148,6 +1154,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
   }
   .pipeline-row { grid-template-columns: 1fr; }
   .gallery-stage { min-height: 300px; }
+  .gitprofilelens-project .gallery-stage { min-height: 0; }
+  .gallery-stage > .gitprofilelens-logo { width: min(88%, 300px); }
   .foody .gallery-stage { min-height: 420px; }
   .gallery-stage > .project-result-image.vertical-project-shot { max-height: min(560px, 78vh); }
   .project-visual { min-height: 260px; }

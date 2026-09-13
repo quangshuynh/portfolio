@@ -4,7 +4,7 @@ import App from '../../App';
 const originalScrollIntoView = Element.prototype.scrollIntoView;
 
 beforeEach(() => {
-  Element.prototype.scrollIntoView = jest.fn();
+  Element.prototype.scrollIntoView = vi.fn();
   window.history.replaceState({}, '', '/');
 });
 

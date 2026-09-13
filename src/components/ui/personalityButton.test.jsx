@@ -22,10 +22,10 @@ test('different session seeds produce different button combinations', () => {
 test('reuses a stored session seed and only generates one when missing', () => {
   const values = new Map();
   const storage = {
-    getItem: jest.fn((key) => values.get(key) || null),
-    setItem: jest.fn((key, value) => values.set(key, value)),
+    getItem: vi.fn((key) => values.get(key) || null),
+    setItem: vi.fn((key, value) => values.set(key, value)),
   };
-  const generateSeed = jest.fn(() => 'generated-seed');
+  const generateSeed = vi.fn(() => 'generated-seed');
 
   expect(getPersonalitySessionSeed(storage, generateSeed)).toBe('generated-seed');
   expect(getPersonalitySessionSeed(storage, generateSeed)).toBe('generated-seed');
@@ -38,7 +38,7 @@ test('adjacent indexes avoid an obvious run of duplicate themes', () => {
 });
 
 test('the global environment switch can disable personality styling', () => {
-  expect(arePersonalityButtonsEnabled({ REACT_APP_PERSONALITY_BUTTONS: 'false' })).toBe(false);
+  expect(arePersonalityButtonsEnabled({ VITE_PERSONALITY_BUTTONS: 'false' })).toBe(false);
   expect(arePersonalityButtonsEnabled({})).toBe(true);
 });
 

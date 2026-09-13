@@ -20,7 +20,7 @@ const AboutPage = lazy(() => import('./components/pages/aboutPage'));
  * :returns: portfolio application markup
  */
 function App() {
-  const basePath = process.env.PUBLIC_URL || '';
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
   const path = window.location.pathname.replace(/\/$/, '');
   const isAbout = path === `${basePath}/about` || path === '/about';
 
