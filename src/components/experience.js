@@ -35,7 +35,11 @@ function Experience() {
               <img
                 className="company-logo"
                 src={koreLogo}
+                width="3000"
+                height="2000"
                 alt="KORE Wireless"
+                loading="lazy"
+                decoding="async"
               />
             </a>
             <h3>KORE Wireless</h3>

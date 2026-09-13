@@ -12,25 +12,25 @@ afterEach(() => {
   Element.prototype.scrollIntoView = originalScrollIntoView;
 });
 
-function navigateFromAbout(hash) {
+async function navigateFromAbout(hash) {
   window.history.replaceState({}, '', '/about');
   const view = render(<App />);
-  expect(screen.getByRole('heading', { name: 'Beyond software' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Beyond software' })).toBeInTheDocument();
 
   view.unmount();
   window.history.pushState({}, '', `/${hash}`);
   render(<App />);
 }
 
-test('scrolls to Projects after navigating from About to the homepage hash', () => {
-  navigateFromAbout('#projects');
+test('scrolls to Projects after navigating from About to the homepage hash', async () => {
+  await navigateFromAbout('#projects');
 
   expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
   expect(Element.prototype.scrollIntoView.mock.instances[0]).toHaveAttribute('id', 'projects');
 });
 
-test('scrolls to another homepage section after navigating from About', () => {
-  navigateFromAbout('#contact');
+test('scrolls to another homepage section after navigating from About', async () => {
+  await navigateFromAbout('#contact');
 
   expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
   expect(Element.prototype.scrollIntoView.mock.instances[0]).toHaveAttribute('id', 'contact');

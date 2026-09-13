@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { FaSearchPlus } from 'react-icons/fa';
-import { PhotoLightbox } from './aboutGallery';
+import PhotoLightbox from './photoLightbox';
 
 const HomeLightboxContext = createContext(null);
 
@@ -36,7 +36,7 @@ export function HomeImageTrigger({ src, alt, caption, className = '', imageClass
       aria-label={`Open image: ${caption || alt}`}
       onClick={(event) => openImage({ src, alt, caption }, event.currentTarget)}
     >
-      <img className={imageClassName} src={src} alt={alt} loading={loading} />
+      <img className={imageClassName} src={src} alt={alt} loading={loading} decoding="async" />
       <span className="photography-gallery-zoom-hint" aria-hidden="true"><FaSearchPlus /></span>
     </button>
   );

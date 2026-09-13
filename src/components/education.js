@@ -50,8 +50,11 @@ function Education() {
                 <img
                   className="institution-logo"
                   src={ritLogo}
+                  width="860"
+                  height="860"
                   alt="Rochester Institute of Technology"
                   loading="lazy"
+                  decoding="async"
                 />
               </a>
               <div><h3>Rochester Institute of Technology</h3><p className="degree">BS/MS Computer Science – Accelerated Program</p></div>

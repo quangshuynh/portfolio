@@ -361,13 +361,13 @@ describe('image lightbox', () => {
 });
 
 describe('About Quang route', () => {
-  test('renders the dedicated About page', () => {
+  test('renders the dedicated About page', async () => {
     window.history.pushState({}, '', '/about');
 
     render(<App />);
 
     expect(
-      screen.getByRole('heading', {
+      await screen.findByRole('heading', {
         name: 'Hi, I’m Quang.',
       })
     ).toBeInTheDocument();
