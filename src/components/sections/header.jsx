@@ -59,6 +59,14 @@ function Header() {
               View résumé <FaFilePdf aria-hidden="true" />
             </a>
           </div>
+          <a className="meet-quang-card" href={aboutHref}>
+            <img className="meet-quang-card__photo" src={quangPhoto} alt="" />
+            <span className="meet-quang-card__copy">
+              <strong>Meet Quang</strong>
+              <span>A little more about me</span>
+            </span>
+            <FaArrowRight className="meet-quang-card__arrow" aria-hidden="true" />
+          </a>
           </div>
           <div className="hero-photo-wrap">
             <a className="hero-photo-link" href={aboutHref} aria-label="About Quang">

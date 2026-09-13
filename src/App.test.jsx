@@ -44,6 +44,15 @@ describe('portfolio homepage', () => {
     ).toBeInTheDocument();
   });
 
+  test('uses the existing About destination for both Meet Quang treatments', () => {
+    render(<App />);
+
+    expect(document.querySelector('.meet-quang-card'))
+      .toHaveAttribute('href', '/about');
+    expect(screen.getByRole('link', { name: 'Meet Quang' }))
+      .toHaveAttribute('href', '/about');
+  });
+
   test('shows featured additional projects and expands the full project grid', () => {
     render(<App />);
 
