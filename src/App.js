@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import './App.css';
 import { FaMoon, FaSun } from 'react-icons/fa';
 import Header from './components/header';
@@ -8,10 +8,12 @@ import TechStack from './components/techstack';
 import MoreProjects from './components/moreProjects';
 import Education from './components/education';
 import Footer from './components/footer';
-import AboutPage from './components/aboutPage';
 import HashScroll from './components/hashScroll';
 import { HomeLightboxProvider } from './components/homeLightbox';
 import SiteNav from './components/siteNav';
+import RevealAnimations from './components/revealAnimations';
+
+const AboutPage = lazy(() => import('./components/aboutPage'));
 
 /**
  * renders the portfolio application
@@ -36,33 +38,8 @@ function App() {
     document.querySelector('link[rel="canonical"]')?.setAttribute('href', canonicalUrl);
   }, [isAbout]);
 
-  useEffect(() => {
-    const stops = Array.from(document.querySelectorAll('.scroll-enter'));
-    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-
-    if (reducedMotion || !('IntersectionObserver' in window)) {
-      stops.forEach((stop) => stop.classList.add('is-visible'));
-      return undefined;
-    }
-
-    document.documentElement.classList.add('reveal-ready');
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        entry.target.classList.add('is-visible');
-        observer.unobserve(entry.target);
-      });
-    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
-
-    stops.forEach((stop) => observer.observe(stop));
-    return () => {
-      observer.disconnect();
-      document.documentElement.classList.remove('reveal-ready');
-    };
-  }, [isAbout]);
-
   if (isAbout) {
-    return <><AboutPage /><ThemeToggle /></>;
+    return <><Suspense fallback={null}><AboutPage /><RevealAnimations /></Suspense><ThemeToggle /></>;
   }
 
   return (
@@ -81,6 +58,7 @@ function App() {
       </main>
       <Footer />
       <ThemeToggle />
+      <RevealAnimations />
     </div>
     </HomeLightboxProvider>
   );

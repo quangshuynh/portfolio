@@ -100,7 +100,7 @@ function SiteNav({ collapsible = false }) {
       <div className="nav-inner">
         <a className="brand brand-lockup" href={homeHref('#top')} aria-label="quanghuynh.com — back to homepage">
           <span className="brand-cat" aria-hidden="true">
-            <img src={chiTheCat} alt="" />
+            <img src={chiTheCat} width="1024" height="1024" alt="" decoding="async" />
           </span>
           <span className="brand-name">
             <span className="brand-domain">quanghuynh</span>

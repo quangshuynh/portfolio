@@ -112,7 +112,7 @@ function GitProfileLensVisual() {
     <div className="project-visual gallery">
       <div className="gallery-stage">
         {slide === 'logo' ? (
-          <img src={gitProfileLensLogo} alt="GitProfileLens project logo" loading="lazy" />
+          <img src={gitProfileLensLogo} width="1254" height="1254" alt="GitProfileLens project logo" loading="lazy" decoding="async" />
         ) : (
           <HomeImageTrigger src={gitProfileLensResults} imageClassName="project-result-image" alt="GitProfileLens audit dashboard showing presentation and discoverability scores with prioritized recommendations" caption="GitProfileLens audit results" />
         )}
@@ -135,7 +135,7 @@ function ScribeKitGallery() {
   return (
     <div className="project-visual gallery">
       <div className="gallery-stage">
-        {slide === 'logo' && <img src={scribeKitLogo} alt="ScribeKit app logo" loading="lazy" />}
+        {slide === 'logo' && <img src={scribeKitLogo} width="788" height="737" alt="ScribeKit app logo" loading="lazy" decoding="async" />}
         {slide === 'app' && <HomeImageTrigger src={scribeKitApp} imageClassName="project-result-image vertical-project-shot" alt="ScribeKit macOS meeting window showing selected application audio, on-device transcription status, and a live transcript" caption="ScribeKit macOS meeting window" />}
         {slide === 'transcript' && <HomeImageTrigger src={scribeKitTranscript} imageClassName="project-result-image vertical-project-shot" alt="ScribeKit timestamped Markdown transcript output" caption="ScribeKit timestamped Markdown transcript" />}
       </div>

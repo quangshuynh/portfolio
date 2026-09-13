@@ -38,7 +38,8 @@ import woodlandStream from '../assets/about/photography/optimized/woodland-strea
 import koreTeamLunch from '../assets/about/kore/mission-bbq-kore-team-lunch-web.jpg';
 import Footer from './footer';
 import SiteNav, { homeHref } from './siteNav';
-import { ImageTrigger, InterestCard, InterestGalleryModal, PhotoLightbox } from './aboutGallery';
+import { ImageTrigger, InterestCard, InterestGalleryModal } from './aboutGallery';
+import PhotoLightbox from './photoLightbox';
 
 const interests = [
   [

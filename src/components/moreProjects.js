@@ -159,6 +159,7 @@ function MoreProjects() {
                   src={project.logo}
                   alt={`${project.name} project logo`}
                   loading="lazy"
+                  decoding="async"
                 />
               )}
               <h3>{project.name}</h3>
