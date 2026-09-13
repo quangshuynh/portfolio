@@ -115,6 +115,7 @@
 .about-float-link:hover { transform: translateY(-3px); background: var(--accent-soft); }
 .about-float-link svg { font-size: .72rem; transition: transform 160ms ease; }
 .about-float-link:hover svg { transform: translateX(3px); }
+.meet-quang-card { display: none; }
 
 /* personal about page */
 .about-hero { position: relative; display: grid; align-items: center; min-height: calc(100vh - var(--nav-height)); min-height: calc(100svh - var(--nav-height)); padding: clamp(4.5rem, 9vw, 8rem) 0; overflow: hidden; border-bottom: 1px solid var(--line); background: linear-gradient(135deg, var(--section-alt), color-mix(in srgb, var(--paper) 72%, var(--accent-soft))); }
@@ -1103,6 +1104,9 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
   html { scroll-snap-type: none; }
   .site-nav { position: relative; top: auto; height: auto; }
   .nav-inner, .section-inner, .hero-inner, .footer-inner { width: calc(100% - 1.5rem); }
+  .home-header { min-height: 0; }
+  .hero { padding-block: 2rem 2.5rem; }
+  .hero-inner { gap: 0; }
   #experience::before,
   .about-path::before,
   #projects::after,
@@ -1159,7 +1163,42 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
   .foody .gallery-stage { min-height: 420px; }
   .gallery-stage > .project-result-image.vertical-project-shot { max-height: min(560px, 78vh); }
   .project-visual { min-height: 260px; }
+  .hero-actions { margin-top: 1.5rem; }
   .hero-actions .button { flex: 1 1 auto; }
+  .hero-photo-wrap { display: none; }
+  .meet-quang-card {
+    display: grid;
+    grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .85rem;
+    min-height: 4.75rem;
+    margin-top: .85rem;
+    padding: .55rem .9rem .55rem .6rem;
+    border: 1px solid var(--line);
+    border-radius: .8rem;
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .16);
+    text-decoration: none;
+    transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+  }
+  .meet-quang-card:hover {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--surface) 82%, var(--accent-soft));
+    transform: translateY(-2px);
+  }
+  .meet-quang-card__photo {
+    width: 3.5rem;
+    height: 3.5rem;
+    object-fit: cover;
+    border: 2px solid var(--accent);
+    border-radius: .65rem;
+  }
+  .meet-quang-card__copy { display: grid; min-width: 0; gap: .15rem; }
+  .meet-quang-card__copy strong { font-family: Circular, sans-serif; font-size: 1rem; line-height: 1.1; }
+  .meet-quang-card__copy > span { overflow: hidden; color: var(--muted); font-size: .78rem; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+  .meet-quang-card__arrow { color: var(--accent); font-size: .85rem; transition: transform 160ms ease; }
+  .meet-quang-card:hover .meet-quang-card__arrow { transform: translateX(3px); }
   .footer-inner { flex-direction: column; }
   .kore-team-photo { width: 100%; max-width: 400px; margin-top: 1.5rem;  }
   .photo-lightbox-backdrop {
@@ -1258,6 +1297,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
   .hero-photo-link,
   .about-float-link,
   .about-float-link svg,
+  .meet-quang-card,
+  .meet-quang-card__arrow,
   .theme-toggle,
   .more-card,
   .photo-lightbox-stage img {
