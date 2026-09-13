@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import App from '../App';
+import App from '../../App';
 
 const originalScrollIntoView = Element.prototype.scrollIntoView;
 

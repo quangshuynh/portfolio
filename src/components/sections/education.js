@@ -1,5 +1,5 @@
 import React from 'react';
-import ritLogo from '../assets/logos/rit-logo.png';
+import ritLogo from '../../assets/logos/rit-logo.png';
 import { aboutHref } from './siteNav';
 
 const honors = [

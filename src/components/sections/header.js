@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { FaArrowRight, FaFilePdf, FaMapMarkerAlt } from 'react-icons/fa';
-import quangPhoto from '../assets/quang.jpg';
+import quangPhoto from '../../assets/quang.jpg';
 import { aboutHref } from './siteNav';
-import PersonalityButton from './personalityButton';
+import PersonalityButton from '../ui/personalityButton';
 
 /**
  * renders the primary navigation and portfolio introduction
@@ -62,7 +62,7 @@ function Header() {
           </div>
           <div className="hero-photo-wrap">
             <a className="hero-photo-link" href={aboutHref} aria-label="About Quang">
-              <img className="hero-photo" src={quangPhoto} width="421" height="421" alt="Quang Huynh" />
+              <img className="hero-photo" src={quangPhoto} alt="Quang Huynh" />
             </a>
             <a className="about-float-link" href={aboutHref}>
               <span>Meet Quang</span><FaArrowRight aria-hidden="true" />

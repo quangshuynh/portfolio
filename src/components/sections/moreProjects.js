@@ -1,16 +1,16 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
-import hymicalFormsLogo from '../assets/logos/hymical-forms-logo.png';
-import repoRadarLogo from '../assets/logos/repo-radar-logo.png';
-import moverGitLogo from '../assets/logos/git-mover-logo.png';
-import salonFlowLogo from '../assets/logos/salonflow-logo.png';
-import caseNotesLogo from '../assets/logos/casenotes-logo.png';
-import steamLogo from '../assets/logos/Steam-icon-logo.svg';
-import dashPilotLogo from '../assets/logos/dashpilot-logo.png';
-import inboxSweepLogo from '../assets/logos/inboxsweep-logo.png';
-import photoPortfolio from '../assets/585photo585-portfolio.png';
-import PersonalityButton from './personalityButton';
-import { HomeImageTrigger } from './homeLightbox';
+import hymicalFormsLogo from '../../assets/logos/hymical-forms-logo.png';
+import repoRadarLogo from '../../assets/logos/repo-radar-logo.png';
+import moverGitLogo from '../../assets/logos/git-mover-logo.png';
+import salonFlowLogo from '../../assets/logos/salonflow-logo.png';
+import caseNotesLogo from '../../assets/logos/casenotes-logo.png';
+import steamLogo from '../../assets/logos/Steam-icon-logo.svg';
+import dashPilotLogo from '../../assets/logos/dashpilot-logo.png';
+import inboxSweepLogo from '../../assets/logos/inboxsweep-logo.png';
+import photoPortfolio from '../../assets/585photo585-portfolio.png';
+import PersonalityButton from '../ui/personalityButton';
+import { HomeImageTrigger } from '../utilities/homeLightbox';
 
 const projects = [
   {

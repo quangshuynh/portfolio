@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import AboutPage from './aboutPage';
-import { formatRelativePlayTime, resetSpotifyCacheForTests, SpotifyListening } from './aboutGallery';
+import { formatRelativePlayTime, resetSpotifyCacheForTests, SpotifyListening } from '../about/aboutGallery';
 
 const originalFetch = global.fetch;
 

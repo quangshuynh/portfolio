@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef } from 'react';
-import chiTheCat from '../assets/chi-the-cat.png';
+import chiTheCat from '../../assets/chi-the-cat.png';
 
 const homeHref = (hash = '') => `${process.env.PUBLIC_URL || ''}/${hash}`;
 const aboutHref = `${process.env.PUBLIC_URL || ''}/about`;

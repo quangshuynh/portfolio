@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { FaSearchPlus } from 'react-icons/fa';
-import PhotoLightbox from './photoLightbox';
+import PhotoLightbox from '../ui/photoLightbox';
 
 const HomeLightboxContext = createContext(null);
 
