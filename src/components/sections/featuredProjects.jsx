@@ -112,7 +112,7 @@ function GitProfileLensVisual() {
     <div className="project-visual gallery">
       <div className="gallery-stage">
         {slide === 'logo' ? (
-          <img className="gitprofilelens-logo" src={gitProfileLensLogo} width="1254" height="1254" alt="GitProfileLens project logo" loading="lazy" decoding="async" />
+          <img className="gitprofilelens-logo" src={gitProfileLensLogo} width="788" height="737" alt="GitProfileLens project logo" loading="lazy" decoding="async" />
         ) : (
           <HomeImageTrigger src={gitProfileLensResults} imageClassName="project-result-image" alt="GitProfileLens audit dashboard showing presentation and discoverability scores with prioritized recommendations" caption="GitProfileLens audit results" />
         )}
