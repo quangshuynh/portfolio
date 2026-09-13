@@ -1,19 +1,19 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import './App.css';
 import { FaMoon, FaSun } from 'react-icons/fa';
-import Header from './components/header';
-import Experience from './components/experience';
-import FeaturedProjects from './components/featuredProjects';
-import TechStack from './components/techstack';
-import MoreProjects from './components/moreProjects';
-import Education from './components/education';
-import Footer from './components/footer';
-import HashScroll from './components/hashScroll';
-import { HomeLightboxProvider } from './components/homeLightbox';
-import SiteNav from './components/siteNav';
-import RevealAnimations from './components/revealAnimations';
+import Header from './components/sections/header';
+import Experience from './components/sections/experience';
+import FeaturedProjects from './components/sections/featuredProjects';
+import TechStack from './components/sections/techStack';
+import MoreProjects from './components/sections/moreProjects';
+import Education from './components/sections/education';
+import Footer from './components/sections/footer';
+import HashScroll from './components/utilities/hashScroll';
+import { HomeLightboxProvider } from './components/utilities/homeLightbox';
+import SiteNav from './components/sections/siteNav';
+import RevealAnimations from './components/utilities/revealAnimations';
 
-const AboutPage = lazy(() => import('./components/aboutPage'));
+const AboutPage = lazy(() => import('./components/pages/aboutPage'));
 
 /**
  * renders the portfolio application

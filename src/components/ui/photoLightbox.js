@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { FaMinus, FaPlus, FaTimes } from 'react-icons/fa';
-import useOverlayLock from './overlayLock';
+import useOverlayLock from '../utilities/overlayLock';
 
 const focusableSelector = [
   'button:not([disabled])',

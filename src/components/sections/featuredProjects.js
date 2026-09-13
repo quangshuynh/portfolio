@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
-import dashboardImage from '../assets/business-data-dashboard.png';
-import gitProfileLensLogo from '../assets/logos/gitprofilelens-logo.png';
-import gitProfileLensResults from '../assets/gitprofilelens-results-vert.png';
-import scribeKitLogo from '../assets/logos/scribekit-logo.png';
-import scribeKitApp from '../assets/scribekit-app.png';
-import scribeKitTranscript from '../assets/scribekit-md.png';
-import dashcamStorefront from '../assets/585dashcam585-storefront.png';
-import PersonalityButton from './personalityButton';
-import { HomeImageTrigger } from './homeLightbox';
+import dashboardImage from '../../assets/business-data-dashboard.png';
+import gitProfileLensLogo from '../../assets/logos/gitprofilelens-logo.png';
+import gitProfileLensResults from '../../assets/gitprofilelens-results-vert.png';
+import scribeKitLogo from '../../assets/logos/scribekit-logo.png';
+import scribeKitApp from '../../assets/scribekit-app.png';
+import scribeKitTranscript from '../../assets/scribekit-md.png';
+import dashcamStorefront from '../../assets/585dashcam585-storefront.png';
+import PersonalityButton from '../ui/personalityButton';
+import { HomeImageTrigger } from '../utilities/homeLightbox';
 
 const projects = [
   {
