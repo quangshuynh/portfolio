@@ -2,7 +2,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import App from '../../App';
 import { photographs, sortPhotographs } from '../../data/photographs';
 import { getAppPathname, photographyHref } from '../../util/navigation';
-import { PhotographyDetails, resetPhotographyPreloadsForTests } from '../photography/photographyLightbox';
+import { calculateFittedImageDimensions, PhotographyDetails, resetPhotographyPreloadsForTests } from '../photography/photographyLightbox';
+import { distributePhotographs, getPhotographyColumnCount } from './photographyPage';
 
 const curatedSlugs = [
   '_DSC0023',
@@ -42,22 +43,22 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test('renders the photography page in the exact curated order', async () => {
+test('renders every curated photograph exactly once with its caption and target', async () => {
   render(<App />);
   expect(await screen.findByRole('heading', { name: 'Photography' })).toBeInTheDocument();
   const renderedItems = [...document.querySelectorAll('[data-photo-slug]')];
   expect(document.getElementById('photography-gallery')).toHaveClass('photography-page-grid');
   expect(document.getElementById('photography-modal-gallery')).not.toBeInTheDocument();
   expect(renderedItems).toHaveLength(18);
-  expect(renderedItems.map((item) => item.dataset.photoSlug)).toEqual(curatedSlugs);
+  expect(renderedItems.map((item) => item.dataset.photoSlug).sort()).toEqual([...curatedSlugs].sort());
   renderedItems.forEach((item) => {
     const photograph = photographs.find(({ slug }) => slug === item.dataset.photoSlug);
     expect(item.querySelector('figcaption')).toHaveTextContent(photograph.caption);
     expect(item.querySelector('a')).toHaveAttribute('href', photographyHref(photograph.slug));
   });
   expect(screen.getAllByText('My 2011 Subaru WRX after dark')).toHaveLength(1);
-  expect(renderedItems[17]).toHaveTextContent('My 2011 Subaru WRX after dark');
-  expect(renderedItems[0]).toHaveTextContent("Looking up through Cornell's brick architecture");
+  expect(document.querySelector('[data-photo-slug="IMG_0846"]')).toHaveTextContent('My 2011 Subaru WRX after dark');
+  expect(document.querySelector('[data-photo-slug="_DSC0023"]')).toHaveTextContent("Looking up through Cornell's brick architecture");
   expect(screen.getByLabelText('Order')).toHaveValue('default');
   expect(document.title).toBe('Photography | Quang Huynh');
   expect(photographs.every(({ id, slug }) => id === slug)).toBe(true);
@@ -143,6 +144,23 @@ test('date sorting is deterministic, puts missing dates last, and does not mutat
     'IMG_0758', 'IMGP0739', 'IMGP0579', '_DSC0003', '_DSC0033', 'DIBS2164',
     'NTIO3912', 'TERM5977', '_DSC0023', 'EJUT5331', 'YJMZ4301', 'PBTM8581',
   ]);
+});
+
+test('uses deterministic responsive masonry column counts and fit geometry from the stage', () => {
+  expect(getPhotographyColumnCount(1600)).toBe(3);
+  expect(getPhotographyColumnCount(1200)).toBe(3);
+  expect(getPhotographyColumnCount(821)).toBe(3);
+  expect(getPhotographyColumnCount(820)).toBe(2);
+  expect(getPhotographyColumnCount(800)).toBe(2);
+  expect(getPhotographyColumnCount(420)).toBe(2);
+
+  const portraitFit = calculateFittedImageDimensions(1200, 1600, 720, 820);
+  expect(portraitFit.width).toBeCloseTo(615, 5);
+  expect(portraitFit.height).toBeCloseTo(820, 5);
+
+  const landscapeFit = calculateFittedImageDimensions(1600, 900, 1080, 760);
+  expect(landscapeFit.width).toBeCloseTo(1080, 5);
+  expect(landscapeFit.height).toBeCloseTo(607.5, 5);
 });
 
 test('opens a photo hash, navigates between photos, and closes to the collection', async () => {
@@ -269,6 +287,19 @@ test('announces photo changes and preloads only adjacent images', async () => {
   expect(loaded).toEqual([previousPhotograph.viewerSrc, nextPhotograph.viewerSrc, followingPhotograph.viewerSrc]);
 });
 
+test('packs sorted photographs deterministically without duplicates or mutation', () => {
+  for (const order of ['default', 'newest', 'oldest']) {
+    const sorted = sortPhotographs(photographs, order);
+    const before = sorted.map(({ id }) => id);
+    const first = distributePhotographs(sorted, 3);
+    const second = distributePhotographs(sorted, 3);
+    expect(first).toEqual(second);
+    expect(first.flat().map(({ id }) => id).sort()).toEqual([...before].sort());
+    expect(new Set(first.flat().map(({ id }) => id)).size).toBe(18);
+    expect(sorted.map(({ id }) => id)).toEqual(before);
+  }
+});
+
 test('resolves direct photo hashes and rejects invalid hashes', async () => {
   window.history.replaceState({}, '', '/photography/#IMGP0739');
   const view = render(<App />);
@@ -355,11 +386,11 @@ test('the About photography modal hands off cleanly to the photography route', a
   expect(simulatedScrollY).toBe(0);
 
   const backLink = screen.getByRole('link', { name: 'Back to photography modal' });
-  expect(backLink).toHaveAttribute('href', '/about#photography');
+  expect(backLink).toHaveAttribute('href', '/about');
   fireEvent.click(backLink);
   expect(await screen.findByRole('dialog', { name: 'Photography by Quang' })).toBeInTheDocument();
   expect(window.location.pathname).toBe('/about');
-  expect(window.location.hash).toBe('#photography');
+  expect(window.location.hash).toBe('');
   expect(document.getElementById('photography-modal-gallery')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('link', { name: 'View all' }));
   expect(await screen.findByRole('heading', { name: 'Featured' })).toBeInTheDocument();

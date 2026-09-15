@@ -279,7 +279,7 @@ export function InterestGalleryModal({ activeGallery, galleries, onClose }) {
   const openLightbox = (src, alt, caption, trigger) => { lightboxTrigger.current = trigger; lightboxOpen.current = true; setLightboxImage({ src, alt, caption }); };
   let content;
   if (activeGallery === 'music') content = <SpotifyListening />;
-  else if (activeGallery === 'photography') content = <><PhotoGallery items={galleries.photography.slice(0, 4)} label="More photographs by Quang" onOpen={openLightbox} /><a className="button photography-view-all" href={photographyHref()} onClick={(event) => { event.preventDefault(); onClose(); navigate(event.currentTarget.href); }}>View all</a></>;
+  else if (activeGallery === 'photography') content = <><PhotoGallery items={galleries.photography.slice(0, 4)} label="More photographs by Quang" onOpen={openLightbox} /><a className="button photography-view-all" href={photographyHref()} onClick={(event) => { event.preventDefault(); onClose(); const nextState = { ...(window.history.state ?? {}), restorePhotographyModal: true, returnSection: 'beyond-software' }; window.history.replaceState(nextState, '', window.location.pathname + window.location.hash); navigate(event.currentTarget.href); }}>View all</a></>;
   else content = <PhotoGallery items={galleries[activeGallery]} label={galleryLabels[activeGallery]} className={`${activeGallery}-gallery`} onOpen={openLightbox} />;
 
   return createPortal(

@@ -35,9 +35,38 @@ test('renders the updated biography and section headings', () => {
   expect(screen.getByRole('heading', { name: 'From coursework to production software' })).toBeInTheDocument();
   expect(screen.getByText('How I like to work')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'How I approach engineering' })).toBeInTheDocument();
+  const beyondSection = document.getElementById('beyond-software');
+  expect(beyondSection).toHaveAttribute('aria-labelledby', 'beyond-title');
+  expect(document.getElementById('beyond-title')).toHaveTextContent('Beyond software');
   for (const value of ['Curiosity', 'Reliability', 'Usefulness']) {
     expect(screen.getByRole('heading', { name: value })).toBeInTheDocument();
   }
+});
+
+test('the scoped photography history entry positions Beyond Software before reopening the modal', () => {
+  let simulatedScrollY = 0;
+  vi.spyOn(window, 'scrollY', 'get').mockImplementation(() => simulatedScrollY);
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {
+    simulatedScrollY = 640;
+  });
+  window.history.replaceState({ restorePhotographyModal: true, returnSection: 'beyond-software' }, '', '/about');
+  render(<AboutPage />);
+  expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  expect(scrollIntoView.mock.instances[0]).toBe(document.getElementById('beyond-software'));
+  expect(screen.getByRole('dialog', { name: 'Photography by Quang' })).toBeInTheDocument();
+  expect(document.body.style.top).toBe('-640px');
+  expect(window.history.state).toMatchObject({
+    restorePhotographyModal: true,
+    returnSection: 'beyond-software'
+  });
+});
+
+test('normal About navigation does not position or open Beyond Software', () => {
+  const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+  renderAboutPage();
+  expect(scrollIntoView).not.toHaveBeenCalled();
+  expect(screen.queryByRole('dialog', { name: 'Photography by Quang' })).not.toBeInTheDocument();
 });
 
 test('only interests with additional content render actions while every featured image opens directly', () => {
