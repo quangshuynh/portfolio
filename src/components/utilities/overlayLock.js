@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 let lockCount = 0;
 let lockedScrollY = 0;
+let lockedPathname = null;
 let previousBodyStyles = null;
 let layoutFrame = null;
 let nestedLayoutFrame = null;
@@ -22,6 +23,7 @@ export default function useOverlayLock(active = true) {
     if (lockCount === 0) {
       cancelLayoutReset();
       lockedScrollY = window.scrollY;
+      lockedPathname = window.location.pathname;
       previousBodyStyles = {
         position: document.body.style.position,
         top: document.body.style.top,
@@ -44,7 +46,9 @@ export default function useOverlayLock(active = true) {
       document.documentElement.classList.add('layout-changing');
       Object.assign(document.body.style, previousBodyStyles);
       previousBodyStyles = null;
-      if (window.scrollY !== lockedScrollY) {
+      const shouldRestoreScroll = window.location.pathname === lockedPathname;
+      lockedPathname = null;
+      if (shouldRestoreScroll && window.scrollY !== lockedScrollY) {
         window.scrollTo({ top: lockedScrollY, left: 0, behavior: 'auto' });
       }
       layoutFrame = requestAnimationFrame(() => {

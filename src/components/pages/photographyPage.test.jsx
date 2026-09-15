@@ -88,6 +88,23 @@ test('keeps photography navigation and theming isolated from the homepage', asyn
   expect(screen.getByRole('button', { name: /Switch to .* mode/ })).not.toHaveClass('theme-toggle--photography');
 });
 
+test('same-path generic lightbox cleanup still restores its locked scroll position', async () => {
+  let simulatedScrollY = 420;
+  vi.spyOn(window, 'scrollY', 'get').mockImplementation(() => simulatedScrollY);
+  const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation((first, second) => {
+    simulatedScrollY = typeof first === 'object' ? first.top : second;
+  });
+  window.history.replaceState({}, '', '/');
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Open image: 585Dashcam585 storefront' }));
+
+  simulatedScrollY = 0;
+  fireEvent.keyDown(document, { key: 'Escape' });
+
+  await waitFor(() => expect(simulatedScrollY).toBe(420));
+  expect(scrollTo).toHaveBeenCalledWith({ top: 420, left: 0, behavior: 'auto' });
+});
+
 test('reacts to native hash changes without treating the hash as an anchor target', async () => {
   render(<App />);
   act(() => { window.location.hash = 'IMGP0579'; });
@@ -285,8 +302,11 @@ test('builds photography hashes for root and GitHub Pages base paths', () => {
 });
 
 test('the About photography modal hands off cleanly to the photography route', async () => {
-  const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
-  vi.spyOn(window, 'scrollY', 'get').mockReturnValue(640);
+  let simulatedScrollY = 640;
+  const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation((first, second) => {
+    simulatedScrollY = typeof first === 'object' ? first.top : second;
+  });
+  vi.spyOn(window, 'scrollY', 'get').mockImplementation(() => simulatedScrollY);
   window.history.replaceState({}, '', '/about');
   render(<App />);
   const photographyHeading = await screen.findByRole('heading', { name: 'Photography' });
@@ -301,6 +321,7 @@ test('the About photography modal hands off cleanly to the photography route', a
   await waitFor(() => expect(document.documentElement).not.toHaveClass('overlay-open'));
   expect(document.body.style.overflow).toBe('');
   expect(scrollTo).toHaveBeenCalledWith(0, 0);
+  expect(simulatedScrollY).toBe(0);
 
   scrollTo.mockClear();
   fireEvent.change(screen.getByLabelText('Order'), { target: { value: 'newest' } });
