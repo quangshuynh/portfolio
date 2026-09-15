@@ -39,3 +39,13 @@ npm run build
 No manual deployment step is required after merging to `main`.
 
 Portfolio content is maintained locally in `src/components`, keeping featured project information available without depending on the GitHub API at runtime.
+
+## Photography preparation
+
+Retained originals live outside this public repository. Generate public gallery and viewer derivatives by passing their directory explicitly:
+
+```bash
+npm run prepare:photography -- --source-dir /path/to/retained/originals
+```
+
+The command validates source identity, reads EXIF locally, auto-orients and resizes each image, strips embedded metadata, and writes deterministic derivatives plus `src/data/photographs.generated.json`. Human-authored captions, alt text, IDs, and curated order remain in `src/data/photographs.overrides.mjs`. Capture times without an EXIF offset are interpreted in `America/New_York`; exact GPS coordinates are never written to public metadata.

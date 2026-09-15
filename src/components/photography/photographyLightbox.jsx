@@ -50,10 +50,20 @@ function formatCapturedAt(value) {
   }).format(date);
 }
 
+function formatMetadataValue(field, value) {
+  if (field === 'capturedAt') return formatCapturedAt(value);
+  if (field === 'focalLength') return `${value} mm`;
+  if (field === 'aperture') return `f/${value}`;
+  if (field === 'shutterSpeed') {
+    return value < 1 ? `1/${Math.round(1 / value)} s` : `${value} s`;
+  }
+  return value;
+}
+
 export function PhotographyDetails({ photograph }) {
   const rows = metadataFields.flatMap(([field, label]) => {
     const rawValue = photograph[field];
-    const value = field === 'capturedAt' ? formatCapturedAt(rawValue) : rawValue;
+    const value = formatMetadataValue(field, rawValue);
     return value === null || value === undefined || value === '' ? [] : [[label, value]];
   });
 
@@ -105,14 +115,14 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   }, [infoOpen]);
 
   useEffect(() => {
-    preloadedSources.add(photograph.src);
+    preloadedSources.add(photograph.viewerSrc);
     [previous, next].forEach((adjacent) => {
-      if (!adjacent || preloadedSources.has(adjacent.src)) return;
-      preloadedSources.add(adjacent.src);
+      if (!adjacent || preloadedSources.has(adjacent.viewerSrc)) return;
+      preloadedSources.add(adjacent.viewerSrc);
       const preload = new Image();
-      preload.src = adjacent.src;
+      preload.src = adjacent.viewerSrc;
     });
-  }, [photograph.src, previous, next]);
+  }, [photograph.viewerSrc, previous, next]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -167,7 +177,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
           <div className="photography-lightbox-stage">
             <button type="button" onClick={() => previous && onNavigate(previous)} disabled={!previous} aria-label="Previous photograph"><FaChevronLeft aria-hidden="true" /></button>
             <div className="photography-lightbox-image-wrap">
-              <img key={photograph.id} src={photograph.src} width={photograph.width} height={photograph.height} alt={photograph.alt} decoding="async" />
+              <img key={photograph.id} src={photograph.viewerSrc} width={photograph.viewerWidth} height={photograph.viewerHeight} alt={photograph.alt} decoding="async" />
             </div>
             <button type="button" onClick={() => next && onNavigate(next)} disabled={!next} aria-label="Next photograph"><FaChevronRight aria-hidden="true" /></button>
           </div>
