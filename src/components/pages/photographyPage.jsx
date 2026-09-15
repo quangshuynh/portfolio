@@ -73,7 +73,7 @@ function PhotographyViewerShell({ photograph }) {
   );
 }
 
-export default function PhotographyPage({ selectedPhotograph, invalidSlug = false }) {
+export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = false }) {
   const [sort, setSort] = useState('default');
   const sortedPhotographs = useMemo(() => sortPhotographs(photographs, sort), [sort]);
 
@@ -89,9 +89,9 @@ export default function PhotographyPage({ selectedPhotograph, invalidSlug = fals
 
   return (
     <div className="app-shell photography-page">
-      <a className="skip-link" href="#photography-gallery">Skip to photographs</a>
+      <a className="skip-link" href={photographyHref()} onClick={(event) => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>Skip to photographs</a>
       <SiteNav />
-      <main id="main-content">
+      <main id="main-content" tabIndex="-1">
         <header className="photography-page-header">
           <div className="section-inner">
             <p className="eyebrow">Away from the keyboard</p>
@@ -114,7 +114,7 @@ export default function PhotographyPage({ selectedPhotograph, invalidSlug = fals
               </label>
             </div>
 
-            {invalidSlug && <p className="photography-route-notice" role="status">That photograph could not be found. The full collection is shown below.</p>}
+            {invalidPhotoId && <p className="photography-route-notice" role="status">That photograph could not be found. The full collection is shown below.</p>}
 
             <div className="photography-page-grid" id="photography-gallery" aria-label="Photography collection">
               {sortedPhotographs.map((photograph) => (

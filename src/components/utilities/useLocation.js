@@ -15,9 +15,11 @@ export default function useLocation() {
       hash: window.location.hash,
     });
     window.addEventListener('popstate', updateLocation);
+    window.addEventListener('hashchange', updateLocation);
     window.addEventListener(locationChangeEvent, updateLocation);
     return () => {
       window.removeEventListener('popstate', updateLocation);
+      window.removeEventListener('hashchange', updateLocation);
       window.removeEventListener(locationChangeEvent, updateLocation);
     };
   }, []);
