@@ -48,6 +48,14 @@ test('renders the photography page in the exact curated order', async () => {
   const renderedItems = [...document.querySelectorAll('[data-photo-slug]')];
   expect(renderedItems).toHaveLength(18);
   expect(renderedItems.map((item) => item.dataset.photoSlug)).toEqual(curatedSlugs);
+  renderedItems.forEach((item, index) => {
+    const photograph = photographs[index];
+    expect(item.querySelector('figcaption')).toHaveTextContent(photograph.caption);
+    expect(item.querySelector('a')).toHaveAttribute('href', photographyHref(photograph.slug));
+  });
+  expect(screen.getAllByText('My 2011 Subaru WRX after dark')).toHaveLength(1);
+  expect(renderedItems[17]).toHaveTextContent('My 2011 Subaru WRX after dark');
+  expect(renderedItems[0]).toHaveTextContent("Looking up through Cornell's brick architecture");
   expect(screen.getByLabelText('Order')).toHaveValue('default');
   expect(document.title).toBe('Photography | Quang Huynh');
   expect(photographs.every(({ id, slug }) => id === slug)).toBe(true);
