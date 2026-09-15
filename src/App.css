@@ -668,13 +668,20 @@
 .photography-gallery-heading select { min-height: 2.75rem; padding: .45rem 2.3rem .45rem .75rem; border: 1px solid var(--photography-border); border-radius: .4rem; background: var(--photography-surface); color: var(--photography-text); cursor: pointer; }
 .photography-gallery-heading select:focus-visible { outline: 3px solid var(--photography-focus); outline-offset: 3px; }
 .photography-route-notice { margin: 0 0 1.5rem; padding: .85rem 1rem; border-left: 3px solid var(--photography-accent); background: var(--photography-surface); color: var(--photography-muted); }
-.photography-page-grid { column-count: 3; column-gap: clamp(1rem, 2.2vw, 2rem); }
-.photography-page-grid figure { display: inline-block; width: 100%; margin: 0 0 clamp(1.5rem, 2.5vw, 2.25rem); break-inside: avoid; vertical-align: top; }
+.photography-page-grid { --photography-columns: 3; display: grid; grid-template-columns: repeat(var(--photography-columns), minmax(0, 1fr)); gap: clamp(1rem, 2.2vw, 2rem); align-items: start; }
+.photography-masonry-column { display: flex; min-width: 0; flex-direction: column; gap: clamp(1rem, 2.2vw, 2rem); }
+.photography-page-grid figure { display: flex; flex-direction: column; width: 100%; margin: 0; }
 .photography-page-grid a { display: block; overflow: hidden; background: var(--photography-surface); }
-.photography-page-grid img { width: 100%; height: auto; transition: opacity 180ms ease, transform 220ms ease; }
+.photography-page-grid img { width: 100%; height: auto; display: block; transition: opacity 180ms ease, transform 220ms ease; }
 .photography-page-grid a:hover img, .photography-page-grid a:focus-visible img { opacity: .9; transform: scale(1.01); }
 .photography-page-grid a:focus-visible { outline: 3px solid var(--photography-focus); outline-offset: 4px; }
 .photography-page-grid figcaption { margin-top: .65rem; color: var(--photography-muted); font-size: .84rem; line-height: 1.45; }
+@media (max-width: 860px) {
+  .photography-page-grid { --photography-columns: 2; }
+}
+@media (max-width: 620px) {
+  .photography-page-grid { --photography-columns: 2; }
+}
 .photography-page .site-footer { border-top: 1px solid var(--photography-border); background: var(--photography-surface); color: var(--photography-muted); }
 .theme-toggle--photography { border-color: #2b4034; background: #0e1a14; color: #f2f0e8; }
 .theme-toggle--photography:hover { background: #14231b; }
@@ -683,17 +690,26 @@
 .photography-lightbox-backdrop { position: fixed; z-index: 1200; inset: 0; background: var(--photography-viewer); color: var(--photography-text); }
 .photography-lightbox { width: 100%; height: 100vh; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .75rem; padding: max(.8rem, env(safe-area-inset-top)) max(.8rem, env(safe-area-inset-right)) max(.8rem, env(safe-area-inset-bottom)) max(.8rem, env(safe-area-inset-left)); }
 .photography-lightbox-toolbar { display: flex; min-height: 2.75rem; align-items: center; justify-content: space-between; padding-left: .35rem; color: var(--photography-muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
-.photography-lightbox-toolbar > div { display: flex; gap: .5rem; }
+.photography-lightbox-toolbar > div { display: flex; align-items: center; gap: .5rem; }
+.photography-lightbox-zoom-controls { display: flex; align-items: center; gap: .4rem; }
 .photography-lightbox button { display: grid; min-width: 2.75rem; height: 2.75rem; place-items: center; padding: 0; border: 1px solid var(--photography-border); border-radius: 999px; background: var(--photography-surface); color: var(--photography-text); cursor: pointer; transition: background 140ms ease, border-color 140ms ease, opacity 140ms ease; }
 .photography-lightbox button:hover:not(:disabled) { border-color: var(--photography-accent); background: var(--photography-surface-strong); }
 .photography-lightbox button:focus-visible { outline: 3px solid var(--photography-focus); outline-offset: 3px; }
 .photography-lightbox button:disabled { opacity: .3; cursor: not-allowed; }
 .photography-lightbox-info { display: none !important; }
+.photography-lightbox-zoom-controls .photography-lightbox-scale { min-width: 4.5rem; padding: 0 .6rem; font-size: .8rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .photography-lightbox-layout { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(230px, 19vw); gap: clamp(1rem, 2vw, 2rem); }
 .photography-lightbox-stage { min-width: 0; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: clamp(.5rem, 1.5vw, 1.25rem); }
-.photography-lightbox-image-wrap { min-width: 0; min-height: 0; height: 100%; display: grid; place-items: center; overflow: hidden; }
-.photography-lightbox-image-wrap img { width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; animation: photography-image-in 160ms ease-out; }
+.photography-lightbox-image-wrap { position: relative; min-width: 0; min-height: 0; width: 100%; height: min(100%, 100vh - 8rem); display: grid; place-items: center; justify-self: center; align-self: center; overflow: hidden; background: var(--photography-viewer); border-radius: .8rem; cursor: zoom-in; touch-action: none; user-select: none; }
+.photography-lightbox-image-wrap.is-zoomed { cursor: grab; }
+.photography-lightbox-image-wrap.is-zoomed:active { cursor: grabbing; }
+.photography-lightbox-image-wrap img { display: block; width: auto; height: auto; max-width: none; max-height: none; object-fit: contain; transform-origin: center center; transition: transform 80ms ease-out; will-change: transform; user-select: none; pointer-events: none; }
 .photography-lightbox-details { min-width: 0; overflow-y: auto; border-left: 1px solid var(--photography-border); background: var(--photography-surface); padding: clamp(1rem, 2.5vw, 2rem) clamp(.75rem, 1.5vw, 1.25rem); scrollbar-color: var(--photography-border) transparent; }
+@media (max-width: 820px) {
+  .photography-lightbox-layout { grid-template-columns: 1fr; }
+  .photography-lightbox-details { display: none; }
+  .photography-lightbox-info { display: grid !important; }
+}
 .photography-lightbox-id { margin: 0 0 .8rem; color: var(--photography-accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .72rem; font-weight: 700; letter-spacing: .09em; }
 .photography-lightbox-caption { margin: 0; color: var(--photography-text); font-family: Circular, sans-serif; font-size: clamp(1.15rem, 1.7vw, 1.55rem); line-height: 1.25; }
 .photography-lightbox-metadata { display: grid; gap: 0; margin: 2rem 0 0; }
@@ -707,6 +723,7 @@
 @keyframes photography-sheet-in { from { opacity: 0; transform: translateY(1rem); } to { opacity: 1; transform: translateY(0); } }
 .values-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
 .value-card > span { color: var(--warm); font-size: .75rem; font-weight: 850; letter-spacing: .12em; }
+#beyond-software { scroll-margin-top: var(--nav-height); }
 .education-note { max-width: 850px; margin: 2.5rem 0 0; padding-left: 1.25rem; border-left: 3px solid var(--accent-soft); color: var(--muted); line-height: 1.75; }
 .about-cta { display: grid; align-items: center; min-height: calc(100vh - var(--nav-height)); min-height: calc(100svh - var(--nav-height)); padding: clamp(4.5rem, 9vw, 7rem) 0; border-top: 1px solid var(--line); background: var(--section-alt); }
 .about-cta h2 { max-width: 760px; }
@@ -1176,7 +1193,6 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
     grid-template-columns: 1fr;
   }
 
-  .photography-page-grid { column-count: 2; }
 }
 
 @media (max-width: 760px) {
@@ -1220,7 +1236,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
   .photography-modal { max-height: calc(100dvh - 1.5rem); padding: 1rem; }
   .photography-page-header { padding-top: 2.75rem; }
   .photography-gallery-heading { align-items: flex-start; flex-direction: column; }
-  .photography-page-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 1.35rem .75rem; column-count: initial; }
+  .photography-page-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 1.35rem .75rem; }
   .photography-page-grid figure { display: block; width: 100%; margin: 0; position: static; break-inside: auto; transform: none; }
   .photography-page-grid figcaption { position: static; width: auto; margin-top: .5rem; padding: 0; background: none; color: var(--photography-muted); font-size: .76rem; line-height: 1.4; opacity: 1; backdrop-filter: none; transform: none; }
   .photography-gallery {

@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { FaArrowRight, FaCamera, FaCar, FaGamepad, FaMapMarkerAlt, FaMountain, FaMusic, FaUsers, FaGithub } from 'react-icons/fa';
 import PersonalityButton from '../ui/personalityButton';
 import quangPhoto from '../../assets/about/quang/quang-about-portrait-web.jpg';
@@ -112,10 +112,20 @@ const galleries = { personal: personalGallery, photography: photographyGallery, 
 const interestGalleryKeys = { Photography: 'photography', Music: 'music', 'Cars & technology': 'technology', Gaming: 'gaming', 'Time with family & friends': 'family' };
 
 function AboutPage() {
-  const [activeGallery, setActiveGallery] = useState(() => window.location.hash === '#photography' ? 'photography' : null);
+  const [activeGallery, setActiveGallery] = useState(() => (
+    !window.history.state?.restorePhotographyModal && window.location.hash === '#photography' ? 'photography' : null
+  ));
   const [directLightbox, setDirectLightbox] = useState(null);
   const galleryTrigger = useRef(null);
   const lightboxTrigger = useRef(null);
+
+  useLayoutEffect(() => {
+    const shouldRestore = Boolean(window.history.state?.restorePhotographyModal);
+    if (!shouldRestore) return;
+    const sectionId = window.history.state?.returnSection ?? 'beyond-software';
+    document.getElementById(sectionId)?.scrollIntoView({ block: 'start', behavior: 'auto' });
+    setActiveGallery('photography');
+  }, []);
 
   const openGallery = useCallback((gallery, trigger) => {
     galleryTrigger.current = trigger;
@@ -233,7 +243,7 @@ function AboutPage() {
           </div>
         </section>
 
-        <section className="page-section about-beyond snap-stage scroll-enter" aria-labelledby="beyond-title">
+        <section id="beyond-software" className="page-section about-beyond snap-stage scroll-enter" aria-labelledby="beyond-title">
           <div className="section-inner reveal-content">
             <div className="section-heading"><div><p className="eyebrow">Outside the editor</p><h2 id="beyond-title">Beyond software</h2></div><p>A few of the things I make time for away from work and school.</p></div>
             <div className="interest-grid">
