@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import App from '../../App';
 import { photographs, sortPhotographs } from '../../data/photographs';
 import { getAppPathname, photographyHref } from '../../util/navigation';
+import { PhotographyDetails, resetPhotographyPreloadsForTests } from '../photography/photographyLightbox';
 
 const curatedSlugs = [
   '_DSC0023',
@@ -25,6 +26,7 @@ const curatedSlugs = [
 ];
 
 beforeEach(() => {
+  resetPhotographyPreloadsForTests();
   window.history.replaceState({}, '', '/photography/');
   document.documentElement.classList.remove('overlay-open', 'layout-changing');
   document.body.removeAttribute('style');
@@ -33,6 +35,10 @@ beforeEach(() => {
     canonical.rel = 'canonical';
     document.head.append(canonical);
   }
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 test('renders the photography page in the exact curated order', async () => {
@@ -93,6 +99,100 @@ test('opens a photo hash, navigates between photos, and closes to the collection
   expect(window.location.pathname).toBe('/photography/');
   expect(window.location.hash).toBe('');
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('focus enters the viewer, the page is inert, and normal close restores its thumbnail', async () => {
+  render(<App />);
+  const trigger = await screen.findByRole('link', { name: /Open photograph: Looking up through Cornell/i });
+  fireEvent.click(trigger);
+  expect(screen.getByRole('button', { name: 'Close photograph' })).toHaveFocus();
+  expect(document.querySelector('.photography-page')).toHaveAttribute('inert');
+  expect(document.documentElement).toHaveClass('overlay-open');
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => expect(trigger).toHaveFocus());
+  expect(window.location.hash).toBe('');
+  expect(document.querySelector('.photography-page')).not.toHaveAttribute('inert');
+  await waitFor(() => expect(document.documentElement).not.toHaveClass('overlay-open'));
+});
+
+test('direct-hash close safely focuses the matching thumbnail', async () => {
+  window.history.replaceState({}, '', '/photography/#IMGP0739');
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Close photograph' }));
+  const fallback = document.querySelector('[data-photo-slug="IMGP0739"] a');
+  await waitFor(() => expect(fallback).toHaveFocus());
+});
+
+test('arrow navigation is non-wrapping at the first and last photographs', async () => {
+  render(<App />);
+  fireEvent.click(await screen.findByRole('link', { name: /Open photograph: Looking up through Cornell/i }));
+  expect(screen.getByRole('button', { name: 'Previous photograph' })).toBeDisabled();
+  fireEvent.keyDown(document, { key: 'ArrowLeft' });
+  expect(window.location.hash).toBe('#_DSC0023');
+  fireEvent.keyDown(document, { key: 'ArrowRight' });
+  expect(window.location.hash).toBe('#DIBS2164');
+
+  act(() => window.history.replaceState({}, '', '/photography/#IMG_0846'));
+  act(() => window.dispatchEvent(new Event('portfolio:locationchange')));
+  expect(screen.getByRole('button', { name: 'Next photograph' })).toBeDisabled();
+  fireEvent.keyDown(document, { key: 'ArrowRight' });
+  expect(window.location.hash).toBe('#IMG_0846');
+  fireEvent.keyDown(document, { key: 'ArrowLeft' });
+  expect(window.location.hash).toBe('#IMG_0811');
+});
+
+test('mobile information opens as a nested dialog and Escape dismisses it first', async () => {
+  render(<App />);
+  fireEvent.click(await screen.findByRole('link', { name: /Open photograph: Looking up through Cornell/i }));
+  const info = document.querySelector('.photography-lightbox-info');
+  expect(info).toHaveAttribute('aria-label', 'Show photograph information');
+  fireEvent.click(info);
+  expect(screen.getByRole('dialog', { name: 'Photograph information' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Close photograph information' })).toHaveFocus();
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => expect(info).toHaveFocus());
+  expect(screen.queryByRole('dialog', { name: 'Photograph information' })).not.toBeInTheDocument();
+  expect(window.location.hash).toBe('#_DSC0023');
+
+  fireEvent.click(info);
+  fireEvent.click(screen.getByRole('button', { name: 'Close photograph information' }));
+  await waitFor(() => expect(info).toHaveFocus());
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => expect(window.location.hash).toBe(''));
+});
+
+test('metadata renders only populated public fields without placeholders', () => {
+  render(<PhotographyDetails photograph={{
+    id: '2C6A1754',
+    caption: 'Evening light',
+    capturedAt: '2026-04-13T14:47:00Z',
+    camera: 'Canon EOS R6 Mark II',
+    focalLength: '70 mm',
+    iso: 100,
+    location: 'Ithaca, New York',
+  }} />);
+  expect(screen.getByText('#2C6A1754')).toBeInTheDocument();
+  expect(screen.getByText('Canon EOS R6 Mark II')).toBeInTheDocument();
+  expect(screen.getByText('70 mm')).toBeInTheDocument();
+  expect(screen.getByText('Ithaca, New York')).toBeInTheDocument();
+  expect(screen.queryByText('Lens')).not.toBeInTheDocument();
+  expect(screen.queryByText(/Unknown/i)).not.toBeInTheDocument();
+});
+
+test('announces photo changes and preloads only adjacent images', async () => {
+  const loaded = [];
+  vi.stubGlobal('Image', class { set src(value) { loaded.push(value); } });
+  window.history.replaceState({}, '', '/photography/#IMGP0739');
+  render(<App />);
+  expect(await screen.findByText('Photo 6 of 18. Ithaca Falls in the summer.')).toBeInTheDocument();
+  expect(loaded).toEqual([photographs[4].src, photographs[6].src]);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
+  expect(screen.getByText('Photo 7 of 18. Pink skies over Rochester at sunset.')).toBeInTheDocument();
+  expect(loaded).toEqual([photographs[4].src, photographs[6].src, photographs[7].src]);
 });
 
 test('resolves direct photo hashes and rejects invalid hashes', async () => {
