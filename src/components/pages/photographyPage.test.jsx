@@ -44,8 +44,9 @@ afterEach(() => {
 test('renders the photography page in the exact curated order', async () => {
   render(<App />);
   expect(await screen.findByRole('heading', { name: 'Photography' })).toBeInTheDocument();
-  expect([...document.querySelectorAll('[data-photo-slug]')].map((item) => item.dataset.photoSlug))
-    .toEqual(curatedSlugs);
+  const renderedItems = [...document.querySelectorAll('[data-photo-slug]')];
+  expect(renderedItems).toHaveLength(18);
+  expect(renderedItems.map((item) => item.dataset.photoSlug)).toEqual(curatedSlugs);
   expect(screen.getByLabelText('Order')).toHaveValue('default');
   expect(document.title).toBe('Photography | Quang Huynh');
   expect(photographs.every(({ id, slug }) => id === slug)).toBe(true);
