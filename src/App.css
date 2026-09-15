@@ -1238,7 +1238,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
   }
   .photography-gallery .photography-gallery-image-button { height: 100%; }
   .photography-gallery img { width: 100%; height: 100%; object-fit: cover; }
-  .photography-modal #photography-gallery figcaption {
+  .photography-modal #photography-modal-gallery figcaption {
     position: absolute;
     right: .35rem;
     bottom: .35rem;

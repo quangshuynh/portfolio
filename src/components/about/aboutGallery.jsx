@@ -124,7 +124,7 @@ export function InterestCard({ icon: Icon, title, copy, photos, gallery, gallery
 
 function PhotoGallery({ items, label, className = '', onOpen }) {
   return (
-    <div className={`photography-gallery${className ? ` ${className}` : ''}`} id={label === 'More photographs by Quang' ? 'photography-gallery' : undefined} aria-label={label}>
+    <div className={`photography-gallery${className ? ` ${className}` : ''}`} id={label === 'More photographs by Quang' ? 'photography-modal-gallery' : undefined} aria-label={label}>
       {items.map(({ src, width, height, alt, caption, shape }) => {
         const portrait = shape === 'portrait';
         return (
