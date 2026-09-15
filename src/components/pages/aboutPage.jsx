@@ -22,7 +22,7 @@ import Footer from '../sections/footer';
 import SiteNav, { homeHref } from '../sections/siteNav';
 import { ImageTrigger, InterestCard, InterestGalleryModal } from '../about/aboutGallery';
 import PhotoLightbox from '../ui/photoLightbox';
-import { photographs as photographyGallery } from '../../data/photographs';
+import { photographs } from '../../data/photographs';
 
 const interests = [
   [
@@ -106,6 +106,7 @@ const familyGallery = [
   { src: familyPhoto, width: 1400, height: 1050, alt: 'Family gathering during a visit to Vietnam', caption: 'Visiting family in Vietnam, 2023', shape: 'landscape' },
 ];
 
+const photographyGallery = photographs.map((photograph) => ({ ...photograph, src: photograph.gallerySrc, width: photograph.galleryWidth, height: photograph.galleryHeight }));
 const galleries = { personal: personalGallery, photography: photographyGallery, technology: technologyGallery, gaming: gamingGallery, family: familyGallery };
 const interestGalleryKeys = { Photography: 'photography', Music: 'music', 'Cars & technology': 'technology', Gaming: 'gaming', 'Time with family & friends': 'family' };
 

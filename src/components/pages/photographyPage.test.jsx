@@ -50,6 +50,8 @@ test('renders the photography page in the exact curated order', async () => {
   expect(document.title).toBe('Photography | Quang Huynh');
   expect(photographs.every(({ id, slug }) => id === slug)).toBe(true);
   expect(photographs.every(({ sourceFilename }) => sourceFilename !== null)).toBe(true);
+  expect(document.querySelector('[data-photo-slug="_DSC0023"] img'))
+    .toHaveAttribute('src', photographs[0].gallerySrc);
 });
 
 test('accepts the photography gallery pathname without a trailing slash', async () => {
@@ -80,7 +82,11 @@ test('date sorting is deterministic, puts missing dates last, and does not mutat
   expect(sortPhotographs(input, 'oldest').map(({ id }) => id))
     .toEqual(['older', 'newer', 'missing-one', 'missing-two']);
   expect(input.map(({ id }) => id)).toEqual(originalOrder);
-  expect(sortPhotographs(photographs, 'newest').map(({ slug }) => slug)).toEqual(curatedSlugs);
+  expect(sortPhotographs(photographs, 'newest').map(({ slug }) => slug)).toEqual([
+    'IMG_0931', 'IMG_0858', 'IMG_0846', 'IMG_0845', 'IMG_0811', 'IMG_0776',
+    'IMG_0758', 'IMGP0739', 'IMGP0579', '_DSC0003', '_DSC0033', 'DIBS2164',
+    'NTIO3912', 'TERM5977', '_DSC0023', 'EJUT5331', 'YJMZ4301', 'PBTM8581',
+  ]);
 });
 
 test('opens a photo hash, navigates between photos, and closes to the collection', async () => {
@@ -170,13 +176,17 @@ test('metadata renders only populated public fields without placeholders', () =>
     caption: 'Evening light',
     capturedAt: '2026-04-13T14:47:00Z',
     camera: 'Canon EOS R6 Mark II',
-    focalLength: '70 mm',
+    focalLength: 70,
+    aperture: 2.8,
+    shutterSpeed: 0.004,
     iso: 100,
     location: 'Ithaca, New York',
   }} />);
   expect(screen.getByText('#2C6A1754')).toBeInTheDocument();
   expect(screen.getByText('Canon EOS R6 Mark II')).toBeInTheDocument();
   expect(screen.getByText('70 mm')).toBeInTheDocument();
+  expect(screen.getByText('f/2.8')).toBeInTheDocument();
+  expect(screen.getByText('1/250 s')).toBeInTheDocument();
   expect(screen.getByText('Ithaca, New York')).toBeInTheDocument();
   expect(screen.queryByText('Lens')).not.toBeInTheDocument();
   expect(screen.queryByText(/Unknown/i)).not.toBeInTheDocument();
@@ -188,11 +198,12 @@ test('announces photo changes and preloads only adjacent images', async () => {
   window.history.replaceState({}, '', '/photography/#IMGP0739');
   render(<App />);
   expect(await screen.findByText('Photo 6 of 18. Ithaca Falls in the summer.')).toBeInTheDocument();
-  expect(loaded).toEqual([photographs[4].src, photographs[6].src]);
+  expect(loaded).toEqual([photographs[4].viewerSrc, photographs[6].viewerSrc]);
+  expect(document.querySelector('.photography-lightbox img')).toHaveAttribute('src', photographs[5].viewerSrc);
 
   fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
   expect(screen.getByText('Photo 7 of 18. Pink skies over Rochester at sunset.')).toBeInTheDocument();
-  expect(loaded).toEqual([photographs[4].src, photographs[6].src, photographs[7].src]);
+  expect(loaded).toEqual([photographs[4].viewerSrc, photographs[6].viewerSrc, photographs[7].viewerSrc]);
 });
 
 test('resolves direct photo hashes and rejects invalid hashes', async () => {

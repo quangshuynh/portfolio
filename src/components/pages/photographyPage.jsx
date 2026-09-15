@@ -55,7 +55,7 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
               {sortedPhotographs.map((photograph) => (
                 <figure key={photograph.id} data-photo-slug={photograph.slug}>
                   <a href={photographyHref(photograph.slug)} onClick={(event) => { event.preventDefault(); viewerTrigger.current = event.currentTarget; navigate(event.currentTarget.href); }} aria-label={`Open photograph: ${photograph.caption}`}>
-                    <img src={photograph.src} width={photograph.width} height={photograph.height} alt={photograph.alt} loading="lazy" decoding="async" />
+                    <img src={photograph.gallerySrc} width={photograph.galleryWidth} height={photograph.galleryHeight} alt={photograph.alt} loading="lazy" decoding="async" />
                   </a>
                   <figcaption>{photograph.caption}</figcaption>
                 </figure>
