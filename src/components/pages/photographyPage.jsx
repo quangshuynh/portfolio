@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { photographs, sortPhotographs } from '../../data/photographs';
 import { navigate, photographyHref } from '../../util/navigation';
 import PhotographyLightbox from '../photography/photographyLightbox';
-import SiteNav, { aboutHref } from '../sections/siteNav';
+import SiteNav from '../sections/siteNav';
 import Footer from '../sections/footer';
 
 export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = false }) {
@@ -25,21 +25,20 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
   return (
     <div className="app-shell photography-page">
       <a className="skip-link" href={photographyHref()} onClick={(event) => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>Skip to photographs</a>
-      <SiteNav />
+      <SiteNav variant="photography" />
       <main id="main-content" tabIndex="-1">
         <header className="photography-page-header">
           <div className="section-inner">
             <p className="eyebrow">Away from the keyboard</p>
             <h1>Photography</h1>
             <p>A personal collection of places, light, and everyday moments I wanted to remember.</p>
-            <a className="photography-back-link" href={aboutHref}>More about me</a>
           </div>
         </header>
 
         <section className="photography-page-gallery-section" aria-labelledby="photography-collection-title">
           <div className="section-inner">
             <div className="photography-gallery-heading">
-              <h2 id="photography-collection-title">Selected photographs</h2>
+              <h2 id="photography-collection-title">Featured</h2>
               <label>Order
                 <select value={sort} onChange={(event) => setSort(event.target.value)}>
                   <option value="default">Default</option>

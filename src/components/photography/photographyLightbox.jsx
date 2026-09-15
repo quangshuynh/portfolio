@@ -43,11 +43,15 @@ function formatCapturedAt(value) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(undefined, {
+  const datePart = new Intl.DateTimeFormat(undefined, {
     dateStyle: 'long',
+    timeZone: 'America/New_York',
+  }).format(date);
+  const timePart = new Intl.DateTimeFormat(undefined, {
     timeStyle: 'short',
     timeZone: 'America/New_York',
   }).format(date);
+  return `${datePart} · ${timePart}`;
 }
 
 function formatMetadataValue(field, value) {
@@ -177,7 +181,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
           <div className="photography-lightbox-stage">
             <button type="button" onClick={() => previous && onNavigate(previous)} disabled={!previous} aria-label="Previous photograph"><FaChevronLeft aria-hidden="true" /></button>
             <div className="photography-lightbox-image-wrap">
-              <img key={photograph.id} src={photograph.viewerSrc} width={photograph.viewerWidth} height={photograph.viewerHeight} alt={photograph.alt} decoding="async" />
+              <img key={photograph.id} src={photograph.viewerSrc} width={photograph.viewerWidth} height={photograph.viewerHeight} alt={photograph.alt} loading="eager" fetchPriority="high" decoding="async" />
             </div>
             <button type="button" onClick={() => next && onNavigate(next)} disabled={!next} aria-label="Next photograph"><FaChevronRight aria-hidden="true" /></button>
           </div>

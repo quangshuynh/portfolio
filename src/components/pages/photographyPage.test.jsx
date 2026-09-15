@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import App from '../../App';
 import { photographs, sortPhotographs } from '../../data/photographs';
 import { getAppPathname, photographyHref } from '../../util/navigation';
@@ -52,6 +52,18 @@ test('renders the photography page in the exact curated order', async () => {
   expect(photographs.every(({ sourceFilename }) => sourceFilename !== null)).toBe(true);
   expect(document.querySelector('[data-photo-slug="_DSC0023"] img'))
     .toHaveAttribute('src', photographs[0].gallerySrc);
+  expect(screen.getByRole('heading', { name: 'Featured' })).toBeInTheDocument();
+
+  const nav = screen.getByRole('navigation', { name: 'Primary navigation' });
+  expect(within(nav).getByRole('link', { name: /quanghuynh.com photography/i })).toHaveAttribute('href', '/photography/');
+  expect(nav).toHaveTextContent('quanghuynh.com/photography');
+  expect(nav.querySelector('.brand-cat img')).toBeInTheDocument();
+  expect(nav.querySelector('.photography-brand-camera')).toHaveAttribute('aria-hidden', 'true');
+  expect(within(nav).getByRole('link', { name: 'Portfolio' })).toHaveAttribute('href', '/');
+  expect(within(nav).getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about');
+  expect(within(nav).queryByRole('link', { name: 'Projects' })).not.toBeInTheDocument();
+  expect(within(nav).queryByRole('link', { name: 'Contact' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'More about me' })).not.toBeInTheDocument();
 });
 
 test('accepts the photography gallery pathname without a trailing slash', async () => {
@@ -59,6 +71,19 @@ test('accepts the photography gallery pathname without a trailing slash', async 
   render(<App />);
   expect(await screen.findByRole('heading', { name: 'Photography' })).toBeInTheDocument();
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('keeps photography navigation and theming isolated from the homepage', async () => {
+  window.history.replaceState({}, '', '/');
+  render(<App />);
+  const nav = screen.getByRole('navigation', { name: 'Primary navigation' });
+  expect(document.querySelector('.photography-page')).not.toBeInTheDocument();
+  expect(nav).not.toHaveClass('photography-nav');
+  expect(nav.querySelector('.photography-brand-camera')).not.toBeInTheDocument();
+  expect(within(nav).getByRole('link', { name: 'Experience' })).toBeInTheDocument();
+  expect(within(nav).getByRole('link', { name: 'Projects' })).toBeInTheDocument();
+  expect(within(nav).getByRole('link', { name: 'Contact' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Switch to .* mode/ })).not.toHaveClass('theme-toggle--photography');
 });
 
 test('reacts to native hash changes without treating the hash as an anchor target', async () => {
@@ -187,6 +212,7 @@ test('metadata renders only populated public fields without placeholders', () =>
   expect(screen.getByText('70 mm')).toBeInTheDocument();
   expect(screen.getByText('f/2.8')).toBeInTheDocument();
   expect(screen.getByText('1/250 s')).toBeInTheDocument();
+  expect(screen.getByText(/April 13, 2026 · 10:47 AM/)).toBeInTheDocument();
   expect(screen.getByText('Ithaca, New York')).toBeInTheDocument();
   expect(screen.queryByText('Lens')).not.toBeInTheDocument();
   expect(screen.queryByText(/Unknown/i)).not.toBeInTheDocument();
@@ -264,7 +290,7 @@ test('the About photography modal hands off cleanly to the photography route', a
   expect(screen.getByRole('dialog', { name: 'Photography by Quang' })).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('link', { name: 'View all' }));
-  expect(await screen.findByRole('heading', { name: 'Selected photographs' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Featured' })).toBeInTheDocument();
   expect(window.location.pathname).toBe('/photography/');
   expect(window.location.hash).toBe('');
   expect(screen.queryByRole('dialog', { name: 'Photography by Quang' })).not.toBeInTheDocument();

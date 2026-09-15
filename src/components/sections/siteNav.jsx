@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef } from 'react';
+import { FaCamera } from 'react-icons/fa';
 import chiTheCat from '../../assets/chi-the-cat.png';
 
 const basePath = import.meta.env.BASE_URL;
@@ -37,8 +38,8 @@ const writeNavProgress = (nav, progress, metrics) => {
   nav.style.setProperty('--nav-background-mix', `${mix(92, 100, progress)}%`);
 };
 
-/** Renders navigation that works from both the homepage and the About page. */
-function SiteNav({ collapsible = false }) {
+/** Renders the shared site navigation with a narrowly scoped Photography variant. */
+function SiteNav({ collapsible = false, variant = 'default' }) {
   const navRef = useRef(null);
   const initialProgress = typeof window !== 'undefined'
     && window.location.hash
@@ -91,29 +92,38 @@ function SiteNav({ collapsible = false }) {
     };
   }, [collapsible]);
 
+  const isPhotography = variant === 'photography';
+
   return (
     <nav
       ref={navRef}
-      className={`site-nav${collapsible ? ' site-nav--collapsible' : ''}`}
+      className={`site-nav${collapsible ? ' site-nav--collapsible' : ''}${isPhotography ? ' photography-nav' : ''}`}
       style={collapsible ? { '--nav-progress': initialProgress } : undefined}
       aria-label="Primary navigation"
     >
       <div className="nav-inner">
-        <a className="brand brand-lockup" href={homeHref('#top')} aria-label="quanghuynh.com — back to homepage">
+        <a className="brand brand-lockup" href={isPhotography ? `${basePath}photography/` : homeHref('#top')} aria-label={isPhotography ? 'quanghuynh.com photography — back to photography gallery' : 'quanghuynh.com — back to homepage'}>
           <span className="brand-cat" aria-hidden="true">
             <img src={chiTheCat} width="1024" height="1024" alt="" decoding="async" />
           </span>
           <span className="brand-name">
             <span className="brand-domain">quanghuynh</span>
             <span className="brand-tld">.com</span>
+            {isPhotography && <span className="photography-brand-section">/photography</span>}
           </span>
+          {isPhotography && <FaCamera className="photography-brand-camera" aria-hidden="true" focusable="false" />}
         </a>
         <div className="nav-links">
-          <a href={homeHref('#experience')}>Experience</a>
-          <a href={homeHref('#projects')}>Projects</a>
-          <a href={homeHref('#skills')}>Skills</a>
-          <a href={homeHref('#about')}>About</a>
-          <a href={homeHref('#contact')}>Contact</a>
+          {isPhotography ? <>
+            <a href={homeHref()}>Portfolio</a>
+            <a href={aboutHref}>About</a>
+          </> : <>
+            <a href={homeHref('#experience')}>Experience</a>
+            <a href={homeHref('#projects')}>Projects</a>
+            <a href={homeHref('#skills')}>Skills</a>
+            <a href={homeHref('#about')}>About</a>
+            <a href={homeHref('#contact')}>Contact</a>
+          </>}
         </div>
       </div>
     </nav>
