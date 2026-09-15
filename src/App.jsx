@@ -12,34 +12,54 @@ import HashScroll from './components/utilities/hashScroll';
 import { HomeLightboxProvider } from './components/utilities/homeLightbox';
 import SiteNav from './components/sections/siteNav';
 import RevealAnimations from './components/utilities/revealAnimations';
+import useLocation from './components/utilities/useLocation';
+import { findPhotograph } from './data/photographs';
+import { getAppPathname } from './util/navigation';
 
 const AboutPage = lazy(() => import('./components/pages/aboutPage'));
+const PhotographyPage = lazy(() => import('./components/pages/photographyPage'));
 
 /**
  * renders the portfolio application
  * :returns: portfolio application markup
  */
 function App() {
-  const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-  const path = window.location.pathname.replace(/\/$/, '');
-  const isAbout = path === `${basePath}/about` || path === '/about';
+  const location = useLocation();
+  const path = getAppPathname(location.pathname);
+  const isAbout = path === '/about';
+  const photographyMatch = path?.match(/^\/photography(?:\/([^/]+))?$/);
+  let photoSlug = null;
+  try { photoSlug = photographyMatch?.[1] ? decodeURIComponent(photographyMatch[1]) : null; } catch { photoSlug = '__invalid__'; }
+  const selectedPhotograph = photoSlug ? findPhotograph(photoSlug) : null;
+  const isPhotography = Boolean(photographyMatch);
 
   useEffect(() => {
-    const title = isAbout ? 'Quang Huynh | About Quang' : 'Quang Huynh | Software Engineer';
-    const description = isAbout
-      ? 'Learn more about Quang Huynh, a software developer and Computer Science student in Rochester, NY, including his background, interests, and approach to engineering.'
-      : 'Software developer building production web applications, backend systems, developer tools, automation, and native applications.';
-    const canonicalUrl = `https://quanghuynh.com${isAbout ? '/about' : '/'}`;
+    const title = selectedPhotograph
+      ? `${selectedPhotograph.caption} | Quang Huynh Photography`
+      : isPhotography
+        ? 'Photography | Quang Huynh'
+        : isAbout ? 'Quang Huynh | About Quang' : 'Quang Huynh | Software Engineer';
+    const description = isPhotography
+      ? 'A curated collection of amateur photography by Quang Huynh.'
+      : isAbout
+        ? 'Learn more about Quang Huynh, a software developer and Computer Science student in Rochester, NY, including his background, interests, and approach to engineering.'
+        : 'Software developer building production web applications, backend systems, developer tools, automation, and native applications.';
+    const canonicalPath = selectedPhotograph ? `/photography/${selectedPhotograph.slug}` : isPhotography ? '/photography' : isAbout ? '/about' : '/';
+    const canonicalUrl = `https://quanghuynh.com${canonicalPath}`;
     document.title = title;
     document.querySelector('meta[name="description"]')?.setAttribute('content', description);
     document.querySelector('meta[property="og:title"]')?.setAttribute('content', title);
     document.querySelector('meta[property="og:description"]')?.setAttribute('content', description);
     document.querySelector('meta[property="og:url"]')?.setAttribute('content', canonicalUrl);
     document.querySelector('link[rel="canonical"]')?.setAttribute('href', canonicalUrl);
-  }, [isAbout]);
+  }, [isAbout, isPhotography, selectedPhotograph]);
 
   if (isAbout) {
     return <><Suspense fallback={null}><AboutPage /><RevealAnimations /></Suspense><ThemeToggle /></>;
+  }
+
+  if (isPhotography) {
+    return <><Suspense fallback={null}><PhotographyPage selectedPhotograph={selectedPhotograph} invalidSlug={Boolean(photoSlug && !selectedPhotograph)} /></Suspense><ThemeToggle /></>;
   }
 
   return (
