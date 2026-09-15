@@ -10,7 +10,7 @@ const curatedSlugs = [
   'EJUT5331',
   'YJMZ4301',
   'IMG_0758',
-  'IMG_0858',
+  'IMGP0739',
   'IMG_0931',
   '_DSC0003',
   '_DSC0033',
@@ -20,7 +20,7 @@ const curatedSlugs = [
   'PBTM8581',
   'IMG_0845',
   'TERM5977',
-  'IMGP0739',
+  'IMG_0858',
   'IMG_0811',
   'IMG_0846',
 ];
@@ -62,8 +62,8 @@ test('renders the photography page in the exact curated order', async () => {
   expect(document.title).toBe('Photography | Quang Huynh');
   expect(photographs.every(({ id, slug }) => id === slug)).toBe(true);
   expect(photographs.every(({ sourceFilename }) => sourceFilename !== null)).toBe(true);
-  expect(photographs.find(({ id }) => id === 'IMG_0858').curatedOrder).toBe(6);
-  expect(photographs.find(({ id }) => id === 'IMGP0739').curatedOrder).toBe(16);
+  expect(photographs.find(({ id }) => id === 'IMGP0739').curatedOrder).toBe(6);
+  expect(photographs.find(({ id }) => id === 'IMG_0858').curatedOrder).toBe(16);
   expect(document.querySelector('[data-photo-slug="_DSC0023"] img'))
     .toHaveAttribute('src', photographs[0].gallerySrc);
   expect(screen.getByRole('heading', { name: 'Featured' })).toBeInTheDocument();
@@ -251,16 +251,22 @@ test('metadata renders only populated public fields without placeholders', () =>
 
 test('announces photo changes and preloads only adjacent images', async () => {
   const loaded = [];
+  const orderedPhotographs = sortPhotographs(photographs);
+  const ithacaIndex = orderedPhotographs.findIndex(({ id }) => id === 'IMGP0739');
+  const previousPhotograph = orderedPhotographs[ithacaIndex - 1];
+  const ithacaPhotograph = orderedPhotographs[ithacaIndex];
+  const nextPhotograph = orderedPhotographs[ithacaIndex + 1];
+  const followingPhotograph = orderedPhotographs[ithacaIndex + 2];
   vi.stubGlobal('Image', class { set src(value) { loaded.push(value); } });
   window.history.replaceState({}, '', '/photography/#IMGP0739');
   render(<App />);
-  expect(await screen.findByText('Photo 16 of 18. Ithaca Falls in the summer.')).toBeInTheDocument();
-  expect(loaded).toEqual([photographs[14].viewerSrc, photographs[16].viewerSrc]);
-  expect(document.querySelector('.photography-lightbox img')).toHaveAttribute('src', photographs[5].viewerSrc);
+  expect(await screen.findByText('Photo 6 of 18. Ithaca Falls in the summer.')).toBeInTheDocument();
+  expect(loaded).toEqual([previousPhotograph.viewerSrc, nextPhotograph.viewerSrc]);
+  expect(document.querySelector('.photography-lightbox img')).toHaveAttribute('src', ithacaPhotograph.viewerSrc);
 
   fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
-  expect(screen.getByText('Photo 17 of 18. Rochester Lower Falls overlook.')).toBeInTheDocument();
-  expect(loaded).toEqual([photographs[14].viewerSrc, photographs[16].viewerSrc, photographs[17].viewerSrc]);
+  expect(screen.getByText(`Photo 7 of 18. ${nextPhotograph.caption}.`)).toBeInTheDocument();
+  expect(loaded).toEqual([previousPhotograph.viewerSrc, nextPhotograph.viewerSrc, followingPhotograph.viewerSrc]);
 });
 
 test('resolves direct photo hashes and rejects invalid hashes', async () => {
@@ -277,7 +283,7 @@ test('resolves direct photo hashes and rejects invalid hashes', async () => {
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
-test('keeps the swapped waterfall photographs on their stable hashes', async () => {
+test('keeps the waterfall photographs on their stable hashes', async () => {
   window.history.replaceState({}, '', '/photography/#IMG_0858');
   const view = render(<App />);
   expect(await screen.findByRole('dialog', { name: /Mist and skyline at Niagara Falls/i })).toBeInTheDocument();
@@ -347,6 +353,16 @@ test('the About photography modal hands off cleanly to the photography route', a
   expect(document.body.style.overflow).toBe('');
   expect(scrollTo).toHaveBeenCalledWith(0, 0);
   expect(simulatedScrollY).toBe(0);
+
+  const backLink = screen.getByRole('link', { name: 'Back to photography modal' });
+  expect(backLink).toHaveAttribute('href', '/about#photography');
+  fireEvent.click(backLink);
+  expect(await screen.findByRole('dialog', { name: 'Photography by Quang' })).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/about');
+  expect(window.location.hash).toBe('#photography');
+  expect(document.getElementById('photography-modal-gallery')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('link', { name: 'View all' }));
+  expect(await screen.findByRole('heading', { name: 'Featured' })).toBeInTheDocument();
 
   scrollTo.mockClear();
   fireEvent.change(screen.getByLabelText('Order'), { target: { value: 'newest' } });
