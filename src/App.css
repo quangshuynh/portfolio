@@ -670,6 +670,7 @@
 .photography-route-notice { margin: 0 0 1.5rem; padding: .85rem 1rem; border-left: 3px solid var(--photography-accent); background: var(--photography-surface); color: var(--photography-muted); }
 .photography-page-grid { --photography-columns: 3; display: grid; grid-template-columns: repeat(var(--photography-columns), minmax(0, 1fr)); gap: clamp(1rem, 2.2vw, 2rem); align-items: start; }
 .photography-masonry-column { display: flex; min-width: 0; flex-direction: column; gap: clamp(1rem, 2.2vw, 2rem); }
+.photography-page-grid--chronological { row-gap: clamp(1.5rem, 2.5vw, 2.25rem); }
 .photography-page-grid figure { display: flex; flex-direction: column; width: 100%; margin: 0; }
 .photography-page-grid a { display: block; overflow: hidden; background: var(--photography-surface); }
 .photography-page-grid img { width: 100%; height: auto; display: block; transition: opacity 180ms ease, transform 220ms ease; }
