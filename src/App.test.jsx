@@ -452,7 +452,7 @@ describe('About Quang route', () => {
     );
   });
 
-  test('opens the photography gallery and expands it', () => {
+  test('opens the photography gallery and links to the dedicated collection', () => {
     window.history.pushState({}, '', '/about');
 
     render(<App />);
@@ -484,17 +484,14 @@ describe('About Quang route', () => {
       )
     ).toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'View all',
-      })
-    );
-
     expect(
       screen.getByRole('img', {
         name: /church spire/i,
       })
     ).toHaveAttribute('loading', 'lazy');
+
+    expect(screen.getByRole('link', { name: 'View all' }))
+      .toHaveAttribute('href', '/photography/');
 
     fireEvent.click(
       screen.getByRole('button', {
