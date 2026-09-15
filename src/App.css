@@ -655,6 +655,9 @@
 .photography-nav .brand-lockup:focus-visible,
 .photography-nav .nav-links a:focus-visible { outline: 3px solid var(--photography-focus); outline-offset: 4px; border-radius: .35rem; }
 .photography-page-header { padding: clamp(3.5rem, 8vw, 6.5rem) 0 clamp(2.5rem, 5vw, 4rem); }
+.photography-modal-back-link { display: inline-flex; align-items: center; gap: .55rem; margin-bottom: clamp(1.75rem, 4vw, 3rem); color: var(--photography-muted); font-size: .9rem; font-weight: 750; text-decoration: none; }
+.photography-modal-back-link:hover { color: var(--photography-accent); }
+.photography-modal-back-link:focus-visible { outline: 3px solid var(--photography-focus); outline-offset: 4px; }
 .photography-page-header h1 { margin: .35rem 0 1rem; font-family: Circular, sans-serif; font-size: clamp(3rem, 8vw, 6.5rem); line-height: .95; letter-spacing: -.055em; }
 .photography-page-header .eyebrow { color: var(--photography-accent); }
 .photography-page-header > .section-inner > p:not(.eyebrow) { max-width: 610px; margin: 0; color: var(--photography-muted); font-size: clamp(1rem, 2vw, 1.15rem); line-height: 1.7; }

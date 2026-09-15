@@ -23,6 +23,7 @@ import SiteNav, { homeHref } from '../sections/siteNav';
 import { ImageTrigger, InterestCard, InterestGalleryModal } from '../about/aboutGallery';
 import PhotoLightbox from '../ui/photoLightbox';
 import { photographs } from '../../data/photographs';
+import { appHref, navigate } from '../../util/navigation';
 
 const interests = [
   [
@@ -111,7 +112,7 @@ const galleries = { personal: personalGallery, photography: photographyGallery, 
 const interestGalleryKeys = { Photography: 'photography', Music: 'music', 'Cars & technology': 'technology', Gaming: 'gaming', 'Time with family & friends': 'family' };
 
 function AboutPage() {
-  const [activeGallery, setActiveGallery] = useState(null);
+  const [activeGallery, setActiveGallery] = useState(() => window.location.hash === '#photography' ? 'photography' : null);
   const [directLightbox, setDirectLightbox] = useState(null);
   const galleryTrigger = useRef(null);
   const lightboxTrigger = useRef(null);
@@ -123,6 +124,7 @@ function AboutPage() {
 
   const closeGallery = useCallback(() => {
     setActiveGallery(null);
+    if (window.location.hash === '#photography') navigate(appHref('/about'), { replace: true });
     requestAnimationFrame(() => galleryTrigger.current?.focus());
   }, []);
 

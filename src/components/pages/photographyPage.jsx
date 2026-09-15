@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FaArrowLeft } from 'react-icons/fa';
 import { photographs, sortPhotographs } from '../../data/photographs';
-import { navigate, photographyHref } from '../../util/navigation';
+import { appHref, navigate, photographyHref } from '../../util/navigation';
 import PhotographyLightbox from '../photography/photographyLightbox';
 import SiteNav from '../sections/siteNav';
 import Footer from '../sections/footer';
@@ -30,6 +31,9 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
       <main id="main-content" tabIndex="-1">
         <header className="photography-page-header">
           <div className="section-inner">
+            <a className="photography-modal-back-link" href={`${appHref('/about')}#photography`} onClick={(event) => { event.preventDefault(); navigate(event.currentTarget.href); }}>
+              <FaArrowLeft aria-hidden="true" /> Back to photography modal
+            </a>
             <p className="eyebrow">Away from the keyboard</p>
             <h1>Photography</h1>
             <p>A personal collection of places, light, and everyday moments I wanted to remember.</p>
