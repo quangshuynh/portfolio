@@ -31,6 +31,17 @@ export function distributePhotographs(orderedPhotographs, columnCount) {
   return columns.map(({ photographs: columnPhotographs }) => columnPhotographs);
 }
 
+function PhotographFigure({ photograph, onOpen }) {
+  return (
+    <figure data-photo-slug={photograph.slug}>
+      <a href={photographyHref(photograph.slug)} onClick={(event) => onOpen(event, photograph)} aria-label={`Open photograph: ${photograph.caption}`}>
+        <img src={photograph.gallerySrc} width={photograph.galleryWidth} height={photograph.galleryHeight} alt={photograph.alt} loading="lazy" decoding="async" />
+      </a>
+      <figcaption>{photograph.caption}</figcaption>
+    </figure>
+  );
+}
+
 export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = false }) {
   const [sort, setSort] = useState('default');
   const [columnCount, setColumnCount] = useState(() => getPhotographyColumnCount());
@@ -38,11 +49,16 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
   const viewerTrigger = useRef(null);
   const sortedPhotographs = useMemo(() => sortPhotographs(photographs, sort), [sort]);
   const photographColumns = useMemo(
-    () => distributePhotographs(sortedPhotographs, columnCount),
-    [columnCount, sortedPhotographs]
+    () => sort === 'default' ? distributePhotographs(sortedPhotographs, columnCount) : [],
+    [columnCount, sort, sortedPhotographs]
   );
   const navigateToPhotograph = useCallback((photograph) => navigate(photographyHref(photograph.slug)), []);
   const closePhotograph = useCallback(() => navigate(photographyHref()), []);
+  const openPhotograph = useCallback((event) => {
+    event.preventDefault();
+    viewerTrigger.current = event.currentTarget;
+    navigate(event.currentTarget.href);
+  }, []);
 
   useEffect(() => {
     // This component mounts on route entry, but remains mounted for sort and photo-hash state.
@@ -105,20 +121,15 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
 
             {invalidPhotoId && <p className="photography-route-notice" role="status">That photograph could not be found. The full collection is shown below.</p>}
 
-            {/* Explicit columns trade row-major keyboard order for compact, deterministic packing. */}
-            <div ref={galleryRef} className="photography-page-grid" id="photography-gallery" aria-label="Photography collection" style={{ '--photography-columns': columnCount }}>
-              {photographColumns.map((column, columnIndex) => (
-                <div className="photography-masonry-column" key={columnIndex}>
-                  {column.map((photograph) => (
-                    <figure key={photograph.id} data-photo-slug={photograph.slug}>
-                      <a href={photographyHref(photograph.slug)} onClick={(event) => { event.preventDefault(); viewerTrigger.current = event.currentTarget; navigate(event.currentTarget.href); }} aria-label={`Open photograph: ${photograph.caption}`}>
-                        <img src={photograph.gallerySrc} width={photograph.galleryWidth} height={photograph.galleryHeight} alt={photograph.alt} loading="lazy" decoding="async" />
-                      </a>
-                      <figcaption>{photograph.caption}</figcaption>
-                    </figure>
-                  ))}
-                </div>
-              ))}
+            <div ref={galleryRef} className={`photography-page-grid photography-page-grid--${sort === 'default' ? 'masonry' : 'chronological'}`} id="photography-gallery" aria-label="Photography collection" style={{ '--photography-columns': columnCount }}>
+              {sort === 'default'
+                ? photographColumns.map((column, columnIndex) => (
+                  // Explicit columns trade row-major keyboard order for compact curated packing.
+                  <div className="photography-masonry-column" key={columnIndex}>
+                    {column.map((photograph) => <PhotographFigure photograph={photograph} onOpen={openPhotograph} key={photograph.id} />)}
+                  </div>
+                ))
+                : sortedPhotographs.map((photograph) => <PhotographFigure photograph={photograph} onOpen={openPhotograph} key={photograph.id} />)}
             </div>
           </div>
         </section>

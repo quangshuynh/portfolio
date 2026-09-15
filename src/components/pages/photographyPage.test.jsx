@@ -287,17 +287,35 @@ test('announces photo changes and preloads only adjacent images', async () => {
   expect(loaded).toEqual([previousPhotograph.viewerSrc, nextPhotograph.viewerSrc, followingPhotograph.viewerSrc]);
 });
 
-test('packs sorted photographs deterministically without duplicates or mutation', () => {
-  for (const order of ['default', 'newest', 'oldest']) {
-    const sorted = sortPhotographs(photographs, order);
-    const before = sorted.map(({ id }) => id);
-    const first = distributePhotographs(sorted, 3);
-    const second = distributePhotographs(sorted, 3);
-    expect(first).toEqual(second);
-    expect(first.flat().map(({ id }) => id).sort()).toEqual([...before].sort());
-    expect(new Set(first.flat().map(({ id }) => id)).size).toBe(18);
-    expect(sorted.map(({ id }) => id)).toEqual(before);
-  }
+test('packs the curated Default sequence deterministically without duplicates or mutation', () => {
+  const sorted = sortPhotographs(photographs, 'default');
+  const before = sorted.map(({ id }) => id);
+  const first = distributePhotographs(sorted, 3);
+  const second = distributePhotographs(sorted, 3);
+  expect(first).toEqual(second);
+  expect(first.flat().map(({ id }) => id).sort()).toEqual([...before].sort());
+  expect(new Set(first.flat().map(({ id }) => id)).size).toBe(18);
+  expect(sorted.map(({ id }) => id)).toEqual(before);
+});
+
+test.each(['newest', 'oldest'])('%s renders chronological DOM order directly without mutating photographs', async (order) => {
+  const canonicalOrder = photographs.map(({ id }) => id);
+  render(<App />);
+  await screen.findByRole('heading', { name: 'Photography' });
+  fireEvent.change(screen.getByLabelText('Order'), { target: { value: order } });
+
+  const expected = sortPhotographs(photographs, order);
+  const renderedItems = [...document.querySelectorAll('[data-photo-slug]')];
+  expect(document.getElementById('photography-gallery')).toHaveClass('photography-page-grid--chronological');
+  expect(renderedItems).toHaveLength(18);
+  expect(renderedItems.map((item) => item.dataset.photoSlug)).toEqual(expected.map(({ slug }) => slug));
+  expect(photographs.map(({ id }) => id)).toEqual(canonicalOrder);
+
+  renderedItems.forEach((item, index) => {
+    expect(item.querySelector('img')).toHaveAttribute('alt', expected[index].alt);
+    expect(item.querySelector('figcaption')).toHaveTextContent(expected[index].caption);
+    expect(item.querySelector('a')).toHaveAttribute('href', photographyHref(expected[index].slug));
+  });
 });
 
 test('resolves direct photo hashes and rejects invalid hashes', async () => {
