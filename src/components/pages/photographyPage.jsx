@@ -13,7 +13,8 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
   const closePhotograph = useCallback(() => navigate(photographyHref()), []);
 
   useEffect(() => {
-    if (window.scrollY) window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    // This component mounts on route entry, but remains mounted for sort and photo-hash state.
+    if (window.scrollY) window.scrollTo(0, 0);
   }, []);
 
   useEffect(() => {

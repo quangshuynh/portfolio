@@ -39,6 +39,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 test('renders the photography page in the exact curated order', async () => {
@@ -284,6 +285,8 @@ test('builds photography hashes for root and GitHub Pages base paths', () => {
 });
 
 test('the About photography modal hands off cleanly to the photography route', async () => {
+  const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  vi.spyOn(window, 'scrollY', 'get').mockReturnValue(640);
   window.history.replaceState({}, '', '/about');
   render(<App />);
   const photographyHeading = await screen.findByRole('heading', { name: 'Photography' });
@@ -297,4 +300,12 @@ test('the About photography modal hands off cleanly to the photography route', a
   expect(screen.queryByRole('dialog', { name: 'Photography by Quang' })).not.toBeInTheDocument();
   await waitFor(() => expect(document.documentElement).not.toHaveClass('overlay-open'));
   expect(document.body.style.overflow).toBe('');
+  expect(scrollTo).toHaveBeenCalledWith(0, 0);
+
+  scrollTo.mockClear();
+  fireEvent.change(screen.getByLabelText('Order'), { target: { value: 'newest' } });
+  fireEvent.click(screen.getByRole('link', { name: /Open photograph: Pink skies over Rochester/i }));
+  fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Close photograph' }));
+  expect(scrollTo).not.toHaveBeenCalled();
 });
