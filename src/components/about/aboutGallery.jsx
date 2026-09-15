@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { FaSearchPlus, FaTimes } from 'react-icons/fa';
 import useOverlayLock from '../utilities/overlayLock';
 import PhotoLightbox from '../ui/photoLightbox';
+import { navigate, photographyHref } from '../../util/navigation';
 
 const SPOTIFY_ENDPOINT = 'https://spotify-portfolio-api.quangs.workers.dev/recent';
 const SPOTIFY_PROFILE = 'https://open.spotify.com/user/foahrtqqvuuvt7wscxub4uerd';
@@ -123,7 +124,7 @@ export function InterestCard({ icon: Icon, title, copy, photos, gallery, gallery
 
 function PhotoGallery({ items, label, className = '', onOpen }) {
   return (
-    <div className={`photography-gallery${className ? ` ${className}` : ''}`} id={label === 'More photographs by Quang' ? 'photography-gallery' : undefined} aria-label={label}>
+    <div className={`photography-gallery${className ? ` ${className}` : ''}`} id={label === 'More photographs by Quang' ? 'photography-modal-gallery' : undefined} aria-label={label}>
       {items.map(({ src, width, height, alt, caption, shape }) => {
         const portrait = shape === 'portrait';
         return (
@@ -251,7 +252,6 @@ export function SpotifyListening() {
 }
 
 export function InterestGalleryModal({ activeGallery, galleries, onClose }) {
-  const [showAllPhotography, setShowAllPhotography] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
   const lightboxTrigger = useRef(null);
   const lightboxOpen = useRef(false);
@@ -279,7 +279,7 @@ export function InterestGalleryModal({ activeGallery, galleries, onClose }) {
   const openLightbox = (src, alt, caption, trigger) => { lightboxTrigger.current = trigger; lightboxOpen.current = true; setLightboxImage({ src, alt, caption }); };
   let content;
   if (activeGallery === 'music') content = <SpotifyListening />;
-  else if (activeGallery === 'photography') content = <><PhotoGallery items={showAllPhotography ? galleries.photography : galleries.photography.slice(0, 4)} label="More photographs by Quang" onOpen={openLightbox} />{!showAllPhotography && <button className="button photography-view-all" type="button" onClick={() => setShowAllPhotography(true)}>View all</button>}</>;
+  else if (activeGallery === 'photography') content = <><PhotoGallery items={galleries.photography.slice(0, 4)} label="More photographs by Quang" onOpen={openLightbox} /><a className="button photography-view-all" href={photographyHref()} onClick={(event) => { event.preventDefault(); onClose(); navigate(event.currentTarget.href); }}>View all</a></>;
   else content = <PhotoGallery items={galleries[activeGallery]} label={galleryLabels[activeGallery]} className={`${activeGallery}-gallery`} onOpen={openLightbox} />;
 
   return createPortal(

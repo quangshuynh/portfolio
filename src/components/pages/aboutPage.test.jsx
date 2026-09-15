@@ -173,7 +173,7 @@ test('gallery and lightbox trap Tab within the active dialog', () => {
   fireEvent.click(photographyTrigger());
   const galleryClose = screen.getByRole('button', { name: 'Close photography gallery' });
   fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
-  expect(screen.getByRole('button', { name: 'View all' })).toHaveFocus();
+  expect(screen.getByRole('link', { name: 'View all' })).toHaveFocus();
 
   fireEvent.click(screen.getByRole('button', { name: /Open image: Looking up through Cornell/i }));
   const lightboxClose = screen.getByRole('button', { name: 'Close image viewer' });

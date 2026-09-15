@@ -12,34 +12,53 @@ import HashScroll from './components/utilities/hashScroll';
 import { HomeLightboxProvider } from './components/utilities/homeLightbox';
 import SiteNav from './components/sections/siteNav';
 import RevealAnimations from './components/utilities/revealAnimations';
+import useLocation from './components/utilities/useLocation';
+import { findPhotograph } from './data/photographs';
+import { getAppPathname } from './util/navigation';
 
 const AboutPage = lazy(() => import('./components/pages/aboutPage'));
+const PhotographyPage = lazy(() => import('./components/pages/photographyPage'));
 
 /**
  * renders the portfolio application
  * :returns: portfolio application markup
  */
 function App() {
-  const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-  const path = window.location.pathname.replace(/\/$/, '');
-  const isAbout = path === `${basePath}/about` || path === '/about';
+  const location = useLocation();
+  const path = getAppPathname(location.pathname);
+  const isAbout = path === '/about';
+  const isPhotography = path === '/photography';
+  let photoId = null;
+  try { photoId = isPhotography && location.hash ? decodeURIComponent(location.hash.slice(1)) : null; } catch { photoId = '__invalid__'; }
+  const selectedPhotograph = photoId ? findPhotograph(photoId) : null;
 
   useEffect(() => {
-    const title = isAbout ? 'Quang Huynh | About Quang' : 'Quang Huynh | Software Engineer';
-    const description = isAbout
-      ? 'Learn more about Quang Huynh, a software developer and Computer Science student in Rochester, NY, including his background, interests, and approach to engineering.'
-      : 'Software developer building production web applications, backend systems, developer tools, automation, and native applications.';
-    const canonicalUrl = `https://quanghuynh.com${isAbout ? '/about' : '/'}`;
+    const title = selectedPhotograph
+      ? `${selectedPhotograph.caption} | Quang Huynh Photography`
+      : isPhotography
+        ? 'Photography | Quang Huynh'
+        : isAbout ? 'Quang Huynh | About Quang' : 'Quang Huynh | Software Engineer';
+    const description = isPhotography
+      ? 'A curated collection of amateur photography by Quang Huynh.'
+      : isAbout
+        ? 'Learn more about Quang Huynh, a software developer and Computer Science student in Rochester, NY, including his background, interests, and approach to engineering.'
+        : 'Software developer building production web applications, backend systems, developer tools, automation, and native applications.';
+    const canonicalPath = isPhotography ? '/photography/' : isAbout ? '/about' : '/';
+    const canonicalUrl = `https://quanghuynh.com${canonicalPath}`;
     document.title = title;
     document.querySelector('meta[name="description"]')?.setAttribute('content', description);
     document.querySelector('meta[property="og:title"]')?.setAttribute('content', title);
     document.querySelector('meta[property="og:description"]')?.setAttribute('content', description);
     document.querySelector('meta[property="og:url"]')?.setAttribute('content', canonicalUrl);
     document.querySelector('link[rel="canonical"]')?.setAttribute('href', canonicalUrl);
-  }, [isAbout]);
+  }, [isAbout, isPhotography, selectedPhotograph]);
 
   if (isAbout) {
     return <><Suspense fallback={null}><AboutPage /><RevealAnimations /></Suspense><ThemeToggle /></>;
+  }
+
+  if (isPhotography) {
+    return <><Suspense fallback={null}><PhotographyPage selectedPhotograph={selectedPhotograph} invalidPhotoId={Boolean(photoId && !selectedPhotograph)} /></Suspense><ThemeToggle variant="photography" /></>;
   }
 
   return (
@@ -64,7 +83,7 @@ function App() {
   );
 }
 
-function ThemeToggle() {
+function ThemeToggle({ variant = 'default' }) {
   const [theme, setTheme] = useState(() => localStorage.getItem('portfolio-theme') || 'dark');
 
   useEffect(() => {
@@ -76,7 +95,7 @@ function ThemeToggle() {
 
   const toggleTheme = () => setTheme((current) => current === 'dark' ? 'light' : 'dark');
 
-  return <button className="theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === 'light'} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+  return <button className={`theme-toggle${variant === 'photography' ? ' theme-toggle--photography' : ''}`} type="button" onClick={toggleTheme} aria-pressed={theme === 'light'} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
     {theme === 'dark' ? <FaSun aria-hidden="true" /> : <FaMoon aria-hidden="true" />}<span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
   </button>;
 }

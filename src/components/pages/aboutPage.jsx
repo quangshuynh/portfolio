@@ -17,29 +17,12 @@ import quangArtSpace from '../../assets/about/quang/quang-art-space-web.jpg';
 import quangWaterfront from '../../assets/about/quang/quang-waterfront-web.jpg';
 import musicPhoto from '../../assets/about/music/quang-guitar-web.jpg';
 import familyPhoto from '../../assets/about/family/vietnam2023-web.jpg';
-import architectureSpire from '../../assets/about/photography/optimized/architecture-spire-web.jpg';
-import birdOnLawn from '../../assets/about/photography/optimized/bird-on-lawn-web.jpg';
-import blueCactusSign from '../../assets/about/photography/optimized/blue-cactus-sign-web.jpg';
-import forestCanopy from '../../assets/about/photography/optimized/forest-canopy-web.jpg';
-import hilltopCastle from '../../assets/about/photography/optimized/hilltop-castle-web.jpg';
-import historicBuilding from '../../assets/about/photography/optimized/historic-building-web.jpg';
-import horizonSunset from '../../assets/about/photography/optimized/horizon-sunset-web.jpg';
-import lakesideSunset from '../../assets/about/photography/optimized/lakeside-sunset-web.jpg';
-import libraryReadingRoom from '../../assets/about/photography/optimized/library-reading-room-web.jpg';
-import niagaraOverlook from '../../assets/about/photography/optimized/niagara-overlook-web.jpg';
-import riversideBridge from '../../assets/about/photography/optimized/riverside-bridge-web.jpg';
-import riversideWaterfall from '../../assets/about/photography/optimized/riverside-waterfall-web.jpg';
-import waterfallCliffs from '../../assets/about/photography/optimized/waterfall-cliffs-web.jpg';
-import whiteCarAtNight from '../../assets/about/photography/optimized/white-car-at-night-web.jpg';
-import pinkSkySunset from '../../assets/about/photography/IMG_0931.JPG';
-import rochesterSkyline from '../../assets/about/photography/rochester-skyline.jpg';
-import trainTracks from '../../assets/about/photography/around-the-bend.jpg';
-import woodlandStream from '../../assets/about/photography/optimized/woodland-stream-web.jpg';
 import koreTeamLunch from '../../assets/about/kore/mission-bbq-kore-team-lunch-web.jpg';
 import Footer from '../sections/footer';
 import SiteNav, { homeHref } from '../sections/siteNav';
 import { ImageTrigger, InterestCard, InterestGalleryModal } from '../about/aboutGallery';
 import PhotoLightbox from '../ui/photoLightbox';
+import { photographs } from '../../data/photographs';
 
 const interests = [
   [
@@ -101,27 +84,6 @@ const values = [
   ]
 ];
 
-const photographyGallery = [
-  { src: architectureSpire, width: 933, height: 1400, alt: 'A church spire rising between brick buildings at Cornell', caption: "Looking up through Cornell's brick architecture", shape: 'portrait' },
-  { src: birdOnLawn, width: 933, height: 1400, alt: 'A small bird standing in vivid green grass at Cornell', caption: 'A quiet moment on the grass at Cornell', shape: 'portrait' },
-  { src: libraryReadingRoom, width: 1400, height: 933, alt: 'Warm reading lamps glowing inside the wood-paneled Rush Rhees Library', caption: 'Warm light inside Rush Rhees Library', shape: 'landscape' },
-  { src: blueCactusSign, width: 1400, height: 933, alt: 'A colorful Blue Cactus sign on a brick street at the University of Rochester', caption: 'A little color at the University of Rochester', shape: 'landscape' },
-  { src: riversideBridge, width: 1050, height: 1400, alt: 'A red metal bridge crossing the Genesee River', caption: 'Red steel bridge over the Genesee River', shape: 'portrait' },
-  { src: waterfallCliffs, width: 927, height: 1400, alt: 'Layered waterfalls flowing over a rocky cliff in Ithaca', caption: 'Ithaca Falls in the summer', shape: 'portrait' },
-  { src: pinkSkySunset, width: 3648, height: 2736, alt: 'A vivid pink and purple sunset above silhouetted trees and a parking lot in Rochester', caption: 'Pink skies over Rochester at sunset', shape: 'landscape' },
-  { src: rochesterSkyline, width: 1400, height: 1050, alt: 'Rochester skyline at night', caption: 'Rochester skyline at night', shape: 'landscape' },
-  { src: trainTracks, width: 1400, height: 1050, alt: 'Train tracks curving around a bend in the distance', caption: 'Train tracks curving around a bend', shape: 'portrait' },
-  { src: forestCanopy, width: 927, height: 1400, alt: 'Looking upward through a dense green forest canopy at Bristol Mountain', caption: 'Looking up through the trees at Bristol Mountain', shape: 'portrait' },
-  { src: horizonSunset, width: 1050, height: 1400, alt: 'The sun meeting a dark lake at the horizon', caption: 'Watching the last light disappear over the water', shape: 'portrait' },
-  { src: woodlandStream, width: 933, height: 1400, alt: 'A narrow stream winding through a sunlit woodland at Cornell', caption: 'Following a stream through the woods at Cornell', shape: 'portrait' },
-  { src: historicBuilding, width: 1400, height: 933, alt: 'Rush Rhees Library framed by bare winter branches', caption: 'Rush Rhees Library through bare winter branches', shape: 'landscape' },
-  { src: lakesideSunset, width: 1400, height: 1050, alt: 'Pink sunset clouds above a calm lakeshore in Irondequoit Bay', caption: 'Pastel skies over Irondequoit Bay', shape: 'landscape' },
-  { src: hilltopCastle, width: 933, height: 1400, alt: 'A stone building overlooking a wide valley at Cornell', caption: 'Looking out from Cornell stone architecture', shape: 'portrait' },
-  { src: niagaraOverlook, width: 1050, height: 1400, alt: 'A distant city skyline beyond a misty waterfall at Niagara Falls', caption: 'Mist and skyline at Niagara Falls', shape: 'portrait' },
-  { src: riversideWaterfall, width: 1400, height: 1050, alt: 'A broad waterfall surrounded by summer greenery at Rochester Lower Falls', caption: 'Rochester Lower Falls overlook', shape: 'landscape' },
-  { src: whiteCarAtNight, width: 1400, height: 1050, alt: '2011 Subaru WRX at night', caption: 'My 2011 Subaru WRX after dark', shape: 'landscape' }
-];
-
 const personalGallery = [
   { src: quangBeachSunset, width: 927, height: 1400, alt: 'Quang standing at the shoreline at sunset', caption: 'Sunset at Charlotte Beach', shape: 'portrait' },
   { src: quangArtSpace, width: 927, height: 1400, alt: 'Quang seated on a large illuminated sphere in a modern interior', caption: 'Exploring Cornell architecture', shape: 'portrait' },
@@ -144,6 +106,7 @@ const familyGallery = [
   { src: familyPhoto, width: 1400, height: 1050, alt: 'Family gathering during a visit to Vietnam', caption: 'Visiting family in Vietnam, 2023', shape: 'landscape' },
 ];
 
+const photographyGallery = photographs.map((photograph) => ({ ...photograph, src: photograph.gallerySrc, width: photograph.galleryWidth, height: photograph.galleryHeight }));
 const galleries = { personal: personalGallery, photography: photographyGallery, technology: technologyGallery, gaming: gamingGallery, family: familyGallery };
 const interestGalleryKeys = { Photography: 'photography', Music: 'music', 'Cars & technology': 'technology', Gaming: 'gaming', 'Time with family & friends': 'family' };
 
