@@ -491,7 +491,7 @@ describe('About Quang route', () => {
     ).toHaveAttribute('loading', 'lazy');
 
     expect(screen.getByRole('link', { name: 'View all' }))
-      .toHaveAttribute('href', '/photography');
+      .toHaveAttribute('href', '/photography/');
 
     fireEvent.click(
       screen.getByRole('button', {

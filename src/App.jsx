@@ -27,11 +27,10 @@ function App() {
   const location = useLocation();
   const path = getAppPathname(location.pathname);
   const isAbout = path === '/about';
-  const photographyMatch = path?.match(/^\/photography(?:\/([^/]+))?$/);
-  let photoSlug = null;
-  try { photoSlug = photographyMatch?.[1] ? decodeURIComponent(photographyMatch[1]) : null; } catch { photoSlug = '__invalid__'; }
-  const selectedPhotograph = photoSlug ? findPhotograph(photoSlug) : null;
-  const isPhotography = Boolean(photographyMatch);
+  const isPhotography = path === '/photography';
+  let photoId = null;
+  try { photoId = isPhotography && location.hash ? decodeURIComponent(location.hash.slice(1)) : null; } catch { photoId = '__invalid__'; }
+  const selectedPhotograph = photoId ? findPhotograph(photoId) : null;
 
   useEffect(() => {
     const title = selectedPhotograph
@@ -44,7 +43,7 @@ function App() {
       : isAbout
         ? 'Learn more about Quang Huynh, a software developer and Computer Science student in Rochester, NY, including his background, interests, and approach to engineering.'
         : 'Software developer building production web applications, backend systems, developer tools, automation, and native applications.';
-    const canonicalPath = selectedPhotograph ? `/photography/${selectedPhotograph.slug}` : isPhotography ? '/photography' : isAbout ? '/about' : '/';
+    const canonicalPath = isPhotography ? '/photography/' : isAbout ? '/about' : '/';
     const canonicalUrl = `https://quanghuynh.com${canonicalPath}`;
     document.title = title;
     document.querySelector('meta[name="description"]')?.setAttribute('content', description);
@@ -59,7 +58,7 @@ function App() {
   }
 
   if (isPhotography) {
-    return <><Suspense fallback={null}><PhotographyPage selectedPhotograph={selectedPhotograph} invalidSlug={Boolean(photoSlug && !selectedPhotograph)} /></Suspense><ThemeToggle /></>;
+    return <><Suspense fallback={null}><PhotographyPage selectedPhotograph={selectedPhotograph} invalidPhotoId={Boolean(photoId && !selectedPhotograph)} /></Suspense><ThemeToggle /></>;
   }
 
   return (
