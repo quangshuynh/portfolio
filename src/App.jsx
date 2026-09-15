@@ -58,7 +58,7 @@ function App() {
   }
 
   if (isPhotography) {
-    return <><Suspense fallback={null}><PhotographyPage selectedPhotograph={selectedPhotograph} invalidPhotoId={Boolean(photoId && !selectedPhotograph)} /></Suspense><ThemeToggle /></>;
+    return <><Suspense fallback={null}><PhotographyPage selectedPhotograph={selectedPhotograph} invalidPhotoId={Boolean(photoId && !selectedPhotograph)} /></Suspense><ThemeToggle variant="photography" /></>;
   }
 
   return (
@@ -83,7 +83,7 @@ function App() {
   );
 }
 
-function ThemeToggle() {
+function ThemeToggle({ variant = 'default' }) {
   const [theme, setTheme] = useState(() => localStorage.getItem('portfolio-theme') || 'dark');
 
   useEffect(() => {
@@ -95,7 +95,7 @@ function ThemeToggle() {
 
   const toggleTheme = () => setTheme((current) => current === 'dark' ? 'light' : 'dark');
 
-  return <button className="theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === 'light'} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+  return <button className={`theme-toggle${variant === 'photography' ? ' theme-toggle--photography' : ''}`} type="button" onClick={toggleTheme} aria-pressed={theme === 'light'} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
     {theme === 'dark' ? <FaSun aria-hidden="true" /> : <FaMoon aria-hidden="true" />}<span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
   </button>;
 }
