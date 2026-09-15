@@ -665,8 +665,8 @@
 .photography-gallery-heading select { min-height: 2.75rem; padding: .45rem 2.3rem .45rem .75rem; border: 1px solid var(--photography-border); border-radius: .4rem; background: var(--photography-surface); color: var(--photography-text); cursor: pointer; }
 .photography-gallery-heading select:focus-visible { outline: 3px solid var(--photography-focus); outline-offset: 3px; }
 .photography-route-notice { margin: 0 0 1.5rem; padding: .85rem 1rem; border-left: 3px solid var(--photography-accent); background: var(--photography-surface); color: var(--photography-muted); }
-.photography-page-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: clamp(1rem, 2.2vw, 2rem); }
-.photography-page-grid figure { margin: 0; }
+.photography-page-grid { column-count: 3; column-gap: clamp(1rem, 2.2vw, 2rem); }
+.photography-page-grid figure { display: inline-block; width: 100%; margin: 0 0 clamp(1.5rem, 2.5vw, 2.25rem); break-inside: avoid; vertical-align: top; }
 .photography-page-grid a { display: block; overflow: hidden; background: var(--photography-surface); }
 .photography-page-grid img { width: 100%; height: auto; transition: opacity 180ms ease, transform 220ms ease; }
 .photography-page-grid a:hover img, .photography-page-grid a:focus-visible img { opacity: .9; transform: scale(1.01); }
@@ -1173,7 +1173,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
     grid-template-columns: 1fr;
   }
 
-  .photography-page-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .photography-page-grid { column-count: 2; }
 }
 
 @media (max-width: 760px) {
@@ -1217,7 +1217,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #d57a4f; outline-offs
   .photography-modal { max-height: calc(100dvh - 1.5rem); padding: 1rem; }
   .photography-page-header { padding-top: 2.75rem; }
   .photography-gallery-heading { align-items: flex-start; flex-direction: column; }
-  .photography-page-grid { grid-template-columns: 1fr; gap: 1.75rem; }
+  .photography-page-grid { column-count: 1; }
   .photography-gallery {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-auto-rows: auto;
