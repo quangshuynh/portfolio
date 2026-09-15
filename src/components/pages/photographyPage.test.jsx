@@ -3,30 +3,35 @@ import App from '../../App';
 import { photographs, sortPhotographs } from '../../data/photographs';
 
 const curatedSlugs = [
-  'cornell-architecture-spire',
-  'cornell-bird-on-lawn',
-  'rush-rhees-reading-room',
-  'blue-cactus-rochester',
-  'genesee-red-bridge',
-  'ithaca-falls',
-  'rochester-pink-sunset',
-  'rochester-skyline-at-night',
-  'train-tracks-around-the-bend',
-  'bristol-mountain-forest-canopy',
-  'last-light-over-the-water',
-  'cornell-woodland-stream',
-  'rush-rhees-in-winter',
-  'irondequoit-bay-sunset',
-  'cornell-hilltop-stone-architecture',
-  'niagara-mist-and-skyline',
-  'rochester-lower-falls',
-  'subaru-wrx-after-dark',
+  '_DSC0023',
+  'DIBS2164',
+  'EJUT5331',
+  'YJMZ4301',
+  'IMG_0758',
+  'IMGP0739',
+  'IMG_0931',
+  '_DSC0003',
+  '_DSC0033',
+  'IMGP0579',
+  'IMG_0776',
+  'NTIO3912',
+  'PBTM8581',
+  'IMG_0845',
+  'TERM5977',
+  'IMG_0858',
+  'IMG_0811',
+  'IMG_0846',
 ];
 
 beforeEach(() => {
   window.history.replaceState({}, '', '/photography');
   document.documentElement.classList.remove('overlay-open', 'layout-changing');
   document.body.removeAttribute('style');
+  if (!document.querySelector('link[rel="canonical"]')) {
+    const canonical = document.createElement('link');
+    canonical.rel = 'canonical';
+    document.head.append(canonical);
+  }
 });
 
 test('renders the photography page in the exact curated order', async () => {
@@ -36,6 +41,8 @@ test('renders the photography page in the exact curated order', async () => {
     .toEqual(curatedSlugs);
   expect(screen.getByLabelText('Order')).toHaveValue('default');
   expect(document.title).toBe('Photography | Quang Huynh');
+  expect(photographs.every(({ id, slug }) => id === slug)).toBe(true);
+  expect(photographs.every(({ sourceFilename }) => sourceFilename !== null)).toBe(true);
 });
 
 test('date sorting is deterministic, puts missing dates last, and does not mutate input', () => {
@@ -58,11 +65,11 @@ test('date sorting is deterministic, puts missing dates last, and does not mutat
 test('opens a photo URL, navigates between photos, and closes to the collection', async () => {
   render(<App />);
   fireEvent.click(await screen.findByRole('link', { name: /Open photograph: Looking up through Cornell/i }));
-  expect(window.location.pathname).toBe('/photography/cornell-architecture-spire');
+  expect(window.location.pathname).toBe('/photography/_DSC0023');
   expect(screen.getByRole('dialog', { name: /Looking up through Cornell/i })).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
-  expect(window.location.pathname).toBe('/photography/cornell-bird-on-lawn');
+  expect(window.location.pathname).toBe('/photography/DIBS2164');
   expect(screen.getByRole('dialog', { name: /A quiet moment on the grass/i })).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Close photograph' }));
@@ -71,9 +78,11 @@ test('opens a photo URL, navigates between photos, and closes to the collection'
 });
 
 test('resolves direct photo URLs and rejects invalid slugs', async () => {
-  window.history.replaceState({}, '', '/photography/ithaca-falls');
+  window.history.replaceState({}, '', '/photography/IMGP0739');
   const view = render(<App />);
   expect(await screen.findByRole('dialog', { name: /Ithaca Falls in the summer/i })).toBeInTheDocument();
+  expect(document.querySelector('link[rel="canonical"]'))
+    .toHaveAttribute('href', 'https://quanghuynh.com/photography/IMGP0739');
 
   view.unmount();
   window.history.replaceState({}, '', '/photography/not-a-real-photo');
@@ -88,11 +97,11 @@ test('Back and Forward update the selected photograph', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
 
   await act(async () => { window.history.back(); });
-  await waitFor(() => expect(window.location.pathname).toBe('/photography/cornell-architecture-spire'));
+  await waitFor(() => expect(window.location.pathname).toBe('/photography/_DSC0023'));
   expect(screen.getByRole('dialog', { name: /Looking up through Cornell/i })).toBeInTheDocument();
 
   await act(async () => { window.history.forward(); });
-  await waitFor(() => expect(window.location.pathname).toBe('/photography/cornell-bird-on-lawn'));
+  await waitFor(() => expect(window.location.pathname).toBe('/photography/DIBS2164'));
   expect(screen.getByRole('dialog', { name: /A quiet moment on the grass/i })).toBeInTheDocument();
 });
 
