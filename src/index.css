@@ -61,6 +61,9 @@
 /* global element defaults */
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-snap-type: y mandatory; scroll-padding-top: var(--nav-height); }
+/* The continuous photo gallery has no snap stages before the shared footer.
+   Mandatory document snapping would pull route entry/overlay unlock to Contact. */
+html:has(.photography-page) { scroll-snap-type: none; }
 html.overlay-open,
 html.layout-changing { scroll-snap-type: none; }
 body { margin: 0; min-width: 320px; background: var(--paper); color: var(--ink); transition: background 180ms ease, color 180ms ease; }
