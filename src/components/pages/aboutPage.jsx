@@ -123,7 +123,9 @@ function AboutPage() {
     const shouldRestore = Boolean(window.history.state?.restorePhotographyModal);
     if (!shouldRestore) return;
     const sectionId = window.history.state?.returnSection ?? 'beyond-software';
-    document.getElementById(sectionId)?.scrollIntoView({ block: 'start', behavior: 'auto' });
+    // Complete restoration before the modal locks the body. `auto` inherits the
+    // document's smooth scrolling, which can continue into a quick View all exit.
+    document.getElementById(sectionId)?.scrollIntoView({ block: 'start', behavior: 'instant' });
     setActiveGallery('photography');
   }, []);
 
