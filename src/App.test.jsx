@@ -56,61 +56,81 @@ describe('portfolio homepage', () => {
   test('shows featured additional projects and expands the full project grid', () => {
     render(<App />);
 
-    expect(
-      screen.getByRole('heading', { name: 'Hymical Forms' })
-    ).toBeInTheDocument();
+ expect(
+  screen.getByRole('heading', { name: 'Hymical Forms' })
+).toBeInTheDocument();
 
-    expect(
-      screen.getByRole('heading', { name: 'DashPilot' })
-    ).toBeInTheDocument();
+expect(
+  screen.getByRole('heading', { name: 'Flipper' })
+).toBeInTheDocument();
 
-    expect(
-      screen.getByRole('heading', { name: 'CaseNotes' })
-    ).toBeInTheDocument();
+expect(
+  screen.getByRole('heading', { name: 'Repo Radar' })
+).toBeInTheDocument();
 
-    expect(
-      screen.queryByRole('heading', { name: 'InboxSweep' })
-    ).not.toBeInTheDocument();
+expect(
+  screen.queryByRole('heading', { name: 'Chessed' })
+).not.toBeInTheDocument();
 
-    expect(
-      screen.queryByRole('heading', { name: '585photo585' })
-    ).not.toBeInTheDocument();
+expect(
+  screen.queryByRole('heading', { name: 'DashPilot' })
+).not.toBeInTheDocument();
 
-    expect(
-      screen.queryByRole('heading', { name: 'SalonFlow' })
-    ).not.toBeInTheDocument();
+expect(
+  screen.queryByRole('heading', { name: 'CaseNotes' })
+).not.toBeInTheDocument();
 
-    const toggle = screen.getByRole('button', {
-      name: 'View more projects',
-    });
+expect(
+  screen.queryByRole('heading', { name: 'InboxSweep' })
+).not.toBeInTheDocument();
 
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+expect(
+  screen.queryByRole('heading', { name: '585photo585' })
+).not.toBeInTheDocument();
 
-    fireEvent.click(toggle);
+expect(
+  screen.queryByRole('heading', { name: 'SalonFlow' })
+).not.toBeInTheDocument();
 
-    expect(
-      screen.getByRole('heading', { name: 'InboxSweep' })
-    ).toBeInTheDocument();
+const toggle = screen.getByRole('button', {
+  name: 'View more projects',
+});
 
-    expect(
-      screen.getByRole('heading', { name: 'Repo Radar' })
-    ).toBeInTheDocument();
+expect(toggle).toHaveAttribute('aria-expanded', 'false');
 
-    expect(
-      screen.getByRole('heading', { name: '585photo585' })
-    ).toBeInTheDocument();
+fireEvent.click(toggle);
 
-    expect(
-      screen.getByRole('heading', { name: 'SalonFlow' })
-    ).toBeInTheDocument();
+expect(
+  screen.getByRole('heading', { name: 'Chessed' })
+).toBeInTheDocument();
 
-    expect(
-      screen.getByRole('heading', { name: 'mover-git' })
-    ).toBeInTheDocument();
+expect(
+  screen.getByRole('heading', { name: 'DashPilot' })
+).toBeInTheDocument();
 
-    expect(
-      screen.getByRole('heading', { name: 'Steam Value Lookup' })
-    ).toBeInTheDocument();
+expect(
+  screen.getByRole('heading', { name: 'CaseNotes' })
+).toBeInTheDocument();
+
+expect(
+  screen.getByRole('heading', { name: 'InboxSweep' })
+).toBeInTheDocument();
+
+expect(
+  screen.getByRole('heading', { name: '585photo585' })
+).toBeInTheDocument();
+
+expect(
+  screen.getByRole('heading', { name: 'SalonFlow' })
+).toBeInTheDocument();
+
+expect(
+  screen.getByRole('heading', { name: 'mover-git' })
+).toBeInTheDocument();
+
+expect(
+  screen.getByRole('heading', { name: 'Steam Value Lookup' })
+).toBeInTheDocument();
 
     const collapseButton = screen.getByRole('button', {
       name: 'Show fewer projects',
