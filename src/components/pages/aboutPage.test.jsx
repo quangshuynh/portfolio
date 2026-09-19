@@ -53,6 +53,7 @@ test('the scoped photography history entry positions Beyond Software before reop
   window.history.replaceState({ restorePhotographyModal: true, returnSection: 'beyond-software' }, '', '/about');
   render(<AboutPage />);
   expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'instant' });
   expect(scrollIntoView.mock.instances[0]).toBe(document.getElementById('beyond-software'));
   expect(screen.getByRole('dialog', { name: 'Photography by Quang' })).toBeInTheDocument();
   expect(document.body.style.top).toBe('-640px');

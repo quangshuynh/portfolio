@@ -115,7 +115,7 @@ test('same-path generic lightbox cleanup still restores its locked scroll positi
   fireEvent.keyDown(document, { key: 'Escape' });
 
   await waitFor(() => expect(simulatedScrollY).toBe(420));
-  expect(scrollTo).toHaveBeenCalledWith({ top: 420, left: 0, behavior: 'auto' });
+  expect(scrollTo).toHaveBeenCalledWith({ top: 420, left: 0, behavior: 'instant' });
 });
 
 test('reacts to native hash changes without treating the hash as an anchor target', async () => {
@@ -182,6 +182,7 @@ test('opens a photo hash, navigates between photos, and closes to the collection
 });
 
 test('focus enters the viewer, the page is inert, and normal close restores its thumbnail', async () => {
+  const focus = vi.spyOn(HTMLElement.prototype, 'focus');
   render(<App />);
   const trigger = await screen.findByRole('link', { name: /Open photograph: Looking up through Cornell/i });
   fireEvent.click(trigger);
@@ -191,17 +192,20 @@ test('focus enters the viewer, the page is inert, and normal close restores its 
 
   fireEvent.keyDown(document, { key: 'Escape' });
   await waitFor(() => expect(trigger).toHaveFocus());
+  expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
   expect(window.location.hash).toBe('');
   expect(document.querySelector('.photography-page')).not.toHaveAttribute('inert');
   await waitFor(() => expect(document.documentElement).not.toHaveClass('overlay-open'));
 });
 
 test('direct-hash close safely focuses the matching thumbnail', async () => {
-  window.history.replaceState({}, '', '/photography/#IMGP0739');
+  const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+  window.history.replaceState({}, '', '/photography/#IMG_0846');
   render(<App />);
   fireEvent.click(await screen.findByRole('button', { name: 'Close photograph' }));
-  const fallback = document.querySelector('[data-photo-slug="IMGP0739"] a');
+  const fallback = document.querySelector('[data-photo-slug="IMG_0846"] a');
   await waitFor(() => expect(fallback).toHaveFocus());
+  expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
 });
 
 test('arrow navigation is non-wrapping at the first and last photographs', async () => {

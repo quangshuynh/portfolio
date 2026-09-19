@@ -173,7 +173,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   useEffect(() => { closeButtonRef.current?.focus(); }, []);
   useEffect(() => () => requestAnimationFrame(() => {
     const fallback = document.querySelector(`[data-photo-slug="${latestPhotograph.current.slug}"] a`);
-    (returnFocusRef?.current?.isConnected ? returnFocusRef.current : fallback)?.focus();
+    (returnFocusRef?.current?.isConnected ? returnFocusRef.current : fallback)?.focus({ preventScroll: true });
   }), [returnFocusRef]);
 
   useEffect(() => {
