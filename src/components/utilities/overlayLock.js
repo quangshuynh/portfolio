@@ -49,7 +49,9 @@ export default function useOverlayLock(active = true) {
       const shouldRestoreScroll = window.location.pathname === lockedPathname;
       lockedPathname = null;
       if (shouldRestoreScroll && window.scrollY !== lockedScrollY) {
-        window.scrollTo({ top: lockedScrollY, left: 0, behavior: 'auto' });
+        // Restore synchronously; `auto` inherits smooth scrolling and can leave
+        // an animation running after a new overlay or route takes ownership.
+        window.scrollTo({ top: lockedScrollY, left: 0, behavior: 'instant' });
       }
       layoutFrame = requestAnimationFrame(() => {
         layoutFrame = null;
