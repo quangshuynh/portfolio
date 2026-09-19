@@ -9,6 +9,7 @@ import steamLogo from '../../assets/logos/Steam-icon-logo.svg';
 import dashPilotLogo from '../../assets/logos/dashpilot-logo.png';
 import inboxSweepLogo from '../../assets/logos/inboxsweep-logo.png';
 import photoPortfolio from '../../assets/585photo585-portfolio.png';
+import flipperLogo from '../../assets/logos/flipper-logo.png';
 import PersonalityButton from '../ui/personalityButton';
 import { HomeImageTrigger } from '../utilities/homeLightbox';
 
@@ -22,6 +23,37 @@ const projects = [
     technologies: ['Python', 'FastAPI', 'PostgreSQL', 'SQLAlchemy'],
     github: 'https://github.com/hymical/forms',
     logo: hymicalFormsLogo,
+  },
+  {
+    name: 'Flipper',
+    description:
+      'Local-first reseller toolkit for researching deals, modeling sourcing economics, managing inventory, and reconciling marketplace sales.',
+    highlight:
+      'Separates research estimates from accounting facts with immutable snapshots, exact money semantics, explicit acquisition workflows, travel-cost modeling, and decision-versus-outcome tracking.',
+    technologies: ['Python', 'FastAPI', 'SQLite', 'eBay API'],
+    github: 'https://github.com/quangshuynh/flipper',
+    logo: flipperLogo,
+  },
+  {
+    name: 'Repo Radar',
+    description:
+      'Personalized GitHub discovery tool that recommends relevant repositories and open-source contribution opportunities using preference signals, feedback, and discovery history.',
+    highlight:
+      'Uses deterministic, explainable ranking to balance relevance, quality, activity, novelty, and diversity, with bounded GitHub issue discovery and reproducible offline evaluation.',
+    technologies: ['Python', 'FastAPI', 'GitHub API', 'Recommendation Systems'],
+    github: 'https://github.com/quangshuynh/repo-radar',
+    logo: repoRadarLogo,
+    logoClass: 'repo-radar-logo',
+  },
+  {
+    name: 'Chessed',
+    description:
+      'Chess game review app that analyzes PGNs with Stockfish and explains move quality through engine-backed classifications and evaluations.',
+    highlight:
+      'Runs Stockfish in a Web Worker with cancellable MultiPV analysis, mover-relative evaluation, deterministic move classification, and calibration/regression testing across curated chess positions.',
+    technologies: ['Next.js', 'TypeScript', 'Stockfish', 'Web Workers'],
+    github: 'https://github.com/quangshuynh/chessed',
+    logo: chessedLogo,
   },
   {
     name: 'DashPilot',
@@ -54,17 +86,6 @@ const projects = [
     technologies: ['Swift', 'SwiftUI', 'Gmail API', 'OAuth 2.0', 'Keychain'],
     github: 'https://github.com/quangshuynh/inboxsweep',
     logo: inboxSweepLogo,
-  },
-  {
-    name: 'Repo Radar',
-    description:
-      'Personalized GitHub discovery tool that recommends relevant repositories and open-source contribution opportunities using preference signals, feedback, and discovery history.',
-    highlight:
-      'Uses deterministic, explainable ranking to balance relevance, quality, activity, novelty, and diversity, with bounded GitHub issue discovery and reproducible offline evaluation.',
-    technologies: ['Python', 'FastAPI', 'GitHub API', 'Recommendation Systems'],
-    github: 'https://github.com/quangshuynh/repo-radar',
-    logo: repoRadarLogo,
-    logoClass: 'repo-radar-logo',
   },
   {
     name: '585photo585',
