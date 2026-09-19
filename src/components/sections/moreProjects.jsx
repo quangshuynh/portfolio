@@ -10,6 +10,7 @@ import dashPilotLogo from '../../assets/logos/dashpilot-logo.png';
 import inboxSweepLogo from '../../assets/logos/inboxsweep-logo.png';
 import photoPortfolio from '../../assets/585photo585-portfolio.png';
 import flipperLogo from '../../assets/logos/flipper-logo.png';
+import chessedLogo from '../../assets/logos/chessed-logo.png';
 import PersonalityButton from '../ui/personalityButton';
 import { HomeImageTrigger } from '../utilities/homeLightbox';
 
