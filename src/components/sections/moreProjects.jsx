@@ -11,6 +11,7 @@ import inboxSweepLogo from '../../assets/logos/inboxsweep-logo.png';
 import photoPortfolio from '../../assets/585photo585-portfolio.png';
 import flipperLogo from '../../assets/logos/flipper-logo.png';
 import chessedLogo from '../../assets/logos/chessed-logo.png';
+import photo585Logo from '../../assets/logos/585photo585-logo.png';
 import PersonalityButton from '../ui/personalityButton';
 import { HomeImageTrigger } from '../utilities/homeLightbox';
 
@@ -97,6 +98,7 @@ const projects = [
     technologies: ['React', 'Vite', 'Supabase', 'PostgreSQL', 'Storage', 'Auth & RLS'],
     live: 'https://www.585photo585.com',
     liveLabel: 'Live Site',
+    logo: photo585Logo,
     image: photoPortfolio,
     imageAlt: '585photo585 editorial photography portfolio homepage with Featured, Portraits, and Clips collections',
   },
