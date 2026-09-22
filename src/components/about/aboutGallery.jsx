@@ -50,9 +50,9 @@ const galleryMetadata = {
   hiking: ['On the trail', 'Hiking', 'Close hiking gallery'],
   personal: ['Beyond the résumé', 'More about Quang', 'Close personal photo gallery'],
   gaming: ['In the game', 'Gaming', 'Close gaming gallery'],
-  family: ['Close to home', 'Family & friends', 'Close family and friends gallery'],
   music: ['On repeat', 'What I’ve been listening to', 'Close music activity'],
-  technology: ['Under the hood', 'Cars & technology', 'Close cars and technology gallery']
+  cars: ['Under the hood', 'Cars', 'Close cars gallery'],
+  technology: ['Inside the hardware', 'Technology', 'Close technology gallery']
 };
 
 const focusableSelector = [
@@ -66,8 +66,8 @@ const focusableSelector = [
 const galleryLabels = {
   personal: 'More photos of Quang',
   gaming: 'More gaming screenshots',
-  technology: 'More cars and technology photos',
-  family: 'Family and friends photos'
+  cars: 'More car photos',
+  technology: 'More technology photos'
 };
 
 function trapTabKey(event, container) {
@@ -101,7 +101,7 @@ export function InterestCard({ icon: Icon, title, copy, photos, gallery, gallery
   );
   const featuredImage = photos?.[0];
   const media = photos && (
-    <div className={`interest-card-media${photos.length > 1 ? ' interest-card-media-pair' : ''}${title === 'Photography' ? ' interest-card-media-photography' : ''}${title === 'Music' ? ' interest-card-media-music' : ''}${title === 'Hiking' ? ' interest-card-media-hiking' : ''}${title === 'Time with family & friends' ? ' interest-card-media-family' : ''}`}>
+    <div className={`interest-card-media${photos.length > 1 ? ' interest-card-media-pair' : ''}${title === 'Photography' ? ' interest-card-media-photography' : ''}${title === 'Music' ? ' interest-card-media-music' : ''}${title === 'Hiking' ? ' interest-card-media-hiking' : ''}`}>
       {photos.map(({ src, width, height, alt }) => <img src={src} width={width} height={height} alt={alt} key={src} />)}
     </div>
   );

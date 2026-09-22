@@ -72,16 +72,11 @@ test('normal About navigation does not position or open Beyond Software', () => 
 
 test('only interests with additional content render actions while every featured image opens directly', () => {
   renderAboutPage();
-  const familyCard = screen.getByRole('heading', {
-    name: 'Time with family & friends'
-  }).closest('article');
   const hikingCard = screen.getByRole('heading', { name: 'Hiking' }).closest('article');
-  expect(within(familyCard).queryByRole('button', { name: 'View more' })).not.toBeInTheDocument();
   expect(within(hikingCard).queryByRole('button', { name: 'View more' })).not.toBeInTheDocument();
-  expect(within(familyCard).getByRole('button', { name: 'Open featured Time with family & friends image' })).toBeInTheDocument();
   expect(within(hikingCard).getByRole('button', { name: 'Open featured Hiking image' })).toBeInTheDocument();
 
-  for (const title of ['Photography', 'Cars & technology', 'Gaming']) {
+  for (const title of ['Photography', 'Cars', 'Gaming', 'Technology']) {
     const card = screen.getByRole('heading', { name: title }).closest('article');
     expect(within(card).getAllByRole('button')).toHaveLength(2);
     expect(within(card).getByRole('button', { name: 'View more' })).toBeInTheDocument();
@@ -92,11 +87,18 @@ test('only interests with additional content render actions while every featured
 
 test('links to the Blue 2.5RS photo archive from the cars interest', () => {
   renderAboutPage();
-  const carsCard = screen.getByRole('heading', { name: 'Cars & technology' }).closest('article');
+  const carsCard = screen.getByRole('heading', { name: 'Cars' }).closest('article');
   expect(within(carsCard).getByRole('link', { name: 'photo archive of my blue Subaru Impreza 2.5RS' })).toHaveAttribute(
     'href',
     'https://gc8quang.vercel.app/'
   );
+});
+
+test('renders the six interests in the intended order without the family and friends card', () => {
+  renderAboutPage();
+  const headings = [...document.querySelectorAll('.interest-card h3')].map((heading) => heading.textContent);
+  expect(headings).toEqual(['Photography', 'Hiking', 'Music', 'Cars', 'Gaming', 'Technology']);
+  expect(screen.queryByRole('heading', { name: 'Time with family & friends' })).not.toBeInTheDocument();
 });
 
 test.each([
