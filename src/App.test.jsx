@@ -526,14 +526,14 @@ describe('About Quang route', () => {
     ).not.toBeInTheDocument();
   });
 
-  test('opens and closes the cars and technology gallery', () => {
+  test('opens and closes the separate cars and technology galleries', () => {
     window.history.pushState({}, '', '/about');
 
     render(<App />);
 
     const carsCard = screen
       .getByRole('heading', {
-        name: 'Cars & technology',
+        name: 'Cars',
       })
       .closest('article');
 
@@ -545,26 +545,33 @@ describe('About Quang route', () => {
 
     expect(
       screen.getByRole('dialog', {
-        name: 'Cars & technology',
+        name: 'Cars',
       })
     ).toBeInTheDocument();
 
-    expect(
-      screen.getByRole('img', {
-        name: /computer hardware/i,
-      })
-    ).toBeInTheDocument();
+    const carsDialog = screen.getByRole('dialog', { name: 'Cars' });
+    expect(within(carsDialog).getByRole('img', { name: /Singer Porsche/i })).toBeInTheDocument();
+    expect(within(carsDialog).queryByRole('img', { name: /computer hardware/i })).not.toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'Close cars and technology gallery',
+        name: 'Close cars gallery',
       })
     );
 
     expect(
       screen.queryByRole('dialog', {
-        name: 'Cars & technology',
+        name: 'Cars',
       })
     ).not.toBeInTheDocument();
+
+    const technologyCard = screen
+      .getByRole('heading', { name: 'Technology' })
+      .closest('article');
+
+    fireEvent.click(within(technologyCard).getByRole('button', { name: 'View more' }));
+    const technologyDialog = screen.getByRole('dialog', { name: 'Technology' });
+    expect(within(technologyDialog).getByRole('img', { name: /computer hardware/i })).toBeInTheDocument();
+    expect(within(technologyDialog).queryByRole('img', { name: /Singer Porsche/i })).not.toBeInTheDocument();
   });
 });

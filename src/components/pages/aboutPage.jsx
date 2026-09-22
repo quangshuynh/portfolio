@@ -1,5 +1,5 @@
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { FaArrowRight, FaCamera, FaCar, FaGamepad, FaMapMarkerAlt, FaMountain, FaMusic, FaUsers, FaGithub } from 'react-icons/fa';
+import { FaArrowRight, FaCamera, FaCar, FaDesktop, FaGamepad, FaMapMarkerAlt, FaMountain, FaMusic, FaGithub } from 'react-icons/fa';
 import PersonalityButton from '../ui/personalityButton';
 import quangPhoto from '../../assets/about/quang/quang-about-portrait-web.jpg';
 import photographySunset from '../../assets/about/photography/quang-photography-sunset-web.jpg';
@@ -16,7 +16,6 @@ import quangBeachSunset from '../../assets/about/quang/quang-beach-sunset-web.jp
 import quangArtSpace from '../../assets/about/quang/quang-art-space-web.jpg';
 import quangWaterfront from '../../assets/about/quang/quang-waterfront-web.jpg';
 import musicPhoto from '../../assets/about/music/quang-guitar-web.jpg';
-import familyPhoto from '../../assets/about/family/vietnam2023-web.jpg';
 import koreTeamLunch from '../../assets/about/kore/mission-bbq-kore-team-lunch-web.jpg';
 import Footer from '../sections/footer';
 import SiteNav, { homeHref } from '../sections/siteNav';
@@ -43,9 +42,9 @@ const interests = [
   ],
   [
     FaCar,
-    'Cars & technology',
+    'Cars',
     <>
-      I enjoy understanding how hardware works, from building and upgrading PCs to learning what is happening under the hood of a car. I also keep a{' '}
+      I enjoy learning how cars work, from understanding what is happening under the hood to maintaining, upgrading, and documenting them. I also keep a{' '}
       <a href="https://gc8quang.vercel.app/" target="_blank" rel="noreferrer">photo archive of my blue Subaru Impreza 2.5RS</a>.
     </>
   ],
@@ -55,9 +54,9 @@ const interests = [
     'I like games that reward exploration, strategy, progression, and building things over time.'
   ],
   [
-    FaUsers,
-    'Time with family & friends',
-    'Spending time with family and friends is an important part of my life, especially over a meal, a game, or a shared activity.'
+    FaDesktop,
+    'Technology',
+    'I enjoy understanding how technology works beyond the software, from building and upgrading PCs to experimenting with hardware and different devices.'
   ]
 ];
 
@@ -65,9 +64,9 @@ const interestPhotos = {
   Photography: [{ src: photographySunset, width: 1200, height: 1500, alt: 'Golden sunset clouds reflected across waves at the edge of a lake' }],
   Hiking: [{ src: hikingOverlook, width: 1600, height: 1150, alt: 'Quang standing with arms outstretched at a scenic lake overlook' }],
   Music: [{ src: musicPhoto, width: 1200, height: 1600, alt: 'Quang playing guitar' }],
-  'Cars & technology': [{ src: carsPhoto, width: 1400, height: 933, alt: 'A blue classic sports car displayed behind a fence' }],
+  Cars: [{ src: carsPhoto, width: 1400, height: 933, alt: 'A blue classic sports car displayed behind a fence' }],
   Gaming: [{ src: minecraftWorld, width: 1600, height: 861, alt: 'A detailed Minecraft survival world with a castle, village, farms, and modern buildings at sunset' }],
-  'Time with family & friends': [{ src: familyPhoto, width: 1400, height: 1050, alt: 'Family gathering during a visit to Vietnam' }]
+  Technology: [{ src: customPcGreen, width: 1050, height: 1400, alt: 'Computer hardware and a custom desktop PC during a hands-on build' }]
 };
 
 const values = [
@@ -91,25 +90,23 @@ const personalGallery = [
   { src: quangWaterfront, width: 933, height: 1400, alt: 'Quang standing beside a wide body of water at dusk', caption: 'An evening at Webster Park', shape: 'portrait' }
 ];
 
-const technologyGallery = [
-  { src: techPhoto, width: 1050, height: 1400, alt: 'Computer hardware and a custom desktop PC during a hands-on build', caption: 'Building a PC from the ground up', shape: 'portrait' },
-  { src: customPcGreen, width: 1050, height: 1400, alt: 'A custom desktop PC illuminated by green lighting', caption: 'My finished RTX 4070 Ti build', shape: 'portrait' },
-  { src: graphicsCard, width: 1050, height: 1400, alt: 'An RTX 3080 Ti graphics card held above a work surface', caption: 'Getting an RTX 3080 Ti Founders Edition ready for its next build', shape: 'portrait' },
+const carsGallery = [
   { src: carShowPorsche, width: 1400, height: 984, alt: 'A black Singer Porsche 930 displayed at Little Speed Shop Cars & Coffee', caption: 'A Singer Porsche 930 at The Little Speed Shop Cars & Coffee', shape: 'landscape' },
   { src: carShowSubaruEngine, width: 1400, height: 889, alt: 'Modified blue Blobeye STI with its engine bay open at a car show', caption: 'Taking a closer look under the hood of this Blobeye STI', shape: 'landscape' }
+];
+
+const technologyGallery = [
+  { src: techPhoto, width: 1050, height: 1400, alt: 'Computer hardware and a custom desktop PC during a hands-on build', caption: 'Building a PC from the ground up', shape: 'portrait' },
+  { src: graphicsCard, width: 1050, height: 1400, alt: 'An RTX 3080 Ti graphics card held above a work surface', caption: 'Getting an RTX 3080 Ti Founders Edition ready for its next build', shape: 'portrait' }
 ];
 
 const gamingGallery = [
   { src: csgoScreenshot, width: 1152, height: 864, alt: 'Counter-Strike: Global Offensive menu screenshot', caption: 'CS:GO, 2022', shape: 'landscape' }
 ];
 
-const familyGallery = [
-  { src: familyPhoto, width: 1400, height: 1050, alt: 'Family gathering during a visit to Vietnam', caption: 'Visiting family in Vietnam, 2023', shape: 'landscape' },
-];
-
 const photographyGallery = photographs.map((photograph) => ({ ...photograph, src: photograph.gallerySrc, width: photograph.galleryWidth, height: photograph.galleryHeight }));
-const galleries = { personal: personalGallery, photography: photographyGallery, technology: technologyGallery, gaming: gamingGallery, family: familyGallery };
-const interestGalleryKeys = { Photography: 'photography', Music: 'music', 'Cars & technology': 'technology', Gaming: 'gaming', 'Time with family & friends': 'family' };
+const galleries = { personal: personalGallery, photography: photographyGallery, cars: carsGallery, technology: technologyGallery, gaming: gamingGallery };
+const interestGalleryKeys = { Photography: 'photography', Music: 'music', Cars: 'cars', Gaming: 'gaming', Technology: 'technology' };
 
 function AboutPage() {
   const [activeGallery, setActiveGallery] = useState(() => (
