@@ -22,6 +22,7 @@ import subaruWaterfront from '../../assets/about/cars-tech/subaru-25rs-waterfron
 import subaruEngineBay from '../../assets/about/cars-tech/subaru-25rs-engine-bay.jpg';
 import technologyWorkstation from '../../assets/about/cars-tech/technology-workstation.jpg';
 import motherboardUpgrade from '../../assets/about/cars-tech/motherboard-upgrade-2024.jpg';
+import roomSetup2025 from '../../assets/about/cars-tech/room-setup-2025.jpg';
 import quangBeachSunset from '../../assets/about/quang/quang-beach-sunset-web.jpg';
 import quangArtSpace from '../../assets/about/quang/quang-art-space-web.jpg';
 import quangWaterfront from '../../assets/about/quang/quang-waterfront-web.jpg';
@@ -113,6 +114,7 @@ const carsGallery = [
 ];
 
 const technologyGallery = [
+  { src: roomSetup2025, width: 1500, height: 2000, alt: 'Room setup with dual monitors, a custom desktop PC, and illuminated peripherals', caption: 'Room setup, 2025', shape: 'portrait' },
   { src: techPhoto, width: 1050, height: 1400, alt: 'Computer hardware and a custom desktop PC during a hands-on build', caption: 'Building a PC from the ground up', shape: 'portrait' },
   { src: graphicsCard, width: 1050, height: 1400, alt: 'An RTX 3080 Ti graphics card held above a work surface', caption: 'Getting an RTX 3080 Ti Founders Edition ready for its next build', shape: 'portrait' },
   { src: motherboardUpgrade, width: 1500, height: 2000, alt: 'Desktop motherboard and Intel CPU cooler removed during a computer upgrade', caption: 'Between upgrades, 2024', shape: 'portrait' },
