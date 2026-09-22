@@ -4,14 +4,21 @@ import PersonalityButton from '../ui/personalityButton';
 import quangPhoto from '../../assets/about/quang/quang-about-portrait-web.jpg';
 import photographySunset from '../../assets/about/photography/quang-photography-sunset-web.jpg';
 import hikingOverlook from '../../assets/about/hiking/quang-hiking-overlook-web.jpg';
+import hikingDuskOverlook from '../../assets/about/hiking/hiking-dusk-overlook.jpg';
 import minecraftWorld from '../../assets/about/gaming/quang-minecraft-survival-world-web.jpg';
 import csgoScreenshot from '../../assets/about/gaming/csgo-web.jpg';
+import fortniteLifetimeStats from '../../assets/about/gaming/fortnite-lifetime-stats.png';
+import marvelRivalsMvpStats from '../../assets/about/gaming/marvel-rivals-mvp-stats.png';
+import minecraftCherryHouse from '../../assets/about/gaming/minecraft-cherry-house.jpg';
 import carsPhoto from '../../assets/about/cars-tech/quang-cars-web.jpg';
 import techPhoto from '../../assets/about/cars-tech/quang-tech-web.jpg';
 import carShowPorsche from '../../assets/about/cars-tech/car-show-porsche-web.jpg';
 import carShowSubaruEngine from '../../assets/about/cars-tech/car-show-subaru-engine-web.jpg';
 import customPcGreen from '../../assets/about/cars-tech/custom-pc-green-web.jpg';
 import graphicsCard from '../../assets/about/cars-tech/graphics-card-rtx-3080-ti-web.jpg';
+import subaruWaterfront from '../../assets/about/cars-tech/subaru-25rs-waterfront.jpg';
+import subaruEngineBay from '../../assets/about/cars-tech/subaru-25rs-engine-bay.jpg';
+import technologyWorkstation from '../../assets/about/cars-tech/technology-workstation.jpg';
 import quangBeachSunset from '../../assets/about/quang/quang-beach-sunset-web.jpg';
 import quangArtSpace from '../../assets/about/quang/quang-art-space-web.jpg';
 import quangWaterfront from '../../assets/about/quang/quang-waterfront-web.jpg';
@@ -90,23 +97,33 @@ const personalGallery = [
   { src: quangWaterfront, width: 933, height: 1400, alt: 'Quang standing beside a wide body of water at dusk', caption: 'An evening at Webster Park', shape: 'portrait' }
 ];
 
+const hikingGallery = [
+  { src: hikingDuskOverlook, width: 1500, height: 2000, alt: 'Dusk settling over a valley and distant city lights from an overlook', caption: 'Staying at the overlook long enough to watch daylight turn into city lights', shape: 'portrait' }
+];
+
 const carsGallery = [
+  { src: subaruWaterfront, width: 1500, height: 2000, alt: 'Blue Subaru Impreza 2.5RS parked beside the waterfront', caption: 'My Subaru Impreza 2.5RS. One of the reasons cars became more than transportation to me', shape: 'portrait' },
+  { src: subaruEngineBay, width: 2000, height: 1500, alt: 'Engine bay of a blue Subaru Impreza 2.5RS during maintenance', caption: 'I enjoy the mechanical side just as much as the photography, learning what is under the hood and keeping an older car going', shape: 'landscape' },
   { src: carShowPorsche, width: 1400, height: 984, alt: 'A black Singer Porsche 930 displayed at Little Speed Shop Cars & Coffee', caption: 'A Singer Porsche 930 at The Little Speed Shop Cars & Coffee', shape: 'landscape' },
   { src: carShowSubaruEngine, width: 1400, height: 889, alt: 'Modified blue Blobeye STI with its engine bay open at a car show', caption: 'Taking a closer look under the hood of this Blobeye STI', shape: 'landscape' }
 ];
 
 const technologyGallery = [
   { src: techPhoto, width: 1050, height: 1400, alt: 'Computer hardware and a custom desktop PC during a hands-on build', caption: 'Building a PC from the ground up', shape: 'portrait' },
-  { src: graphicsCard, width: 1050, height: 1400, alt: 'An RTX 3080 Ti graphics card held above a work surface', caption: 'Getting an RTX 3080 Ti Founders Edition ready for its next build', shape: 'portrait' }
+  { src: graphicsCard, width: 1050, height: 1400, alt: 'An RTX 3080 Ti graphics card held above a work surface', caption: 'Getting an RTX 3080 Ti Founders Edition ready for its next build', shape: 'portrait' },
+  { src: technologyWorkstation, width: 2000, height: 1500, alt: 'Multi-monitor desktop computer and workstation setup', caption: 'My dorm setup', shape: 'landscape' }
 ];
 
 const gamingGallery = [
+ { src: minecraftCherryHouse, width: 2000, height: 1084, alt: 'Minecraft house built among cherry trees with a mountain backdrop', caption: 'A cozy cabin, 2026', shape: 'landscape' },
+  { src: marvelRivalsMvpStats, width: 2000, height: 887, alt: 'Marvel Rivals victory scoreboard showing an MVP performance with 67 KOs', caption: '67 KOs, 2025', shape: 'landscape' },
+  { src: fortniteLifetimeStats, width: 1196, height: 969, alt: 'Fortnite lifetime statistics profile showing wins, matches and eliminations', caption: 'Fortnite, 2023', shape: 'landscape' },
   { src: csgoScreenshot, width: 1152, height: 864, alt: 'Counter-Strike: Global Offensive menu screenshot', caption: 'CS:GO, 2022', shape: 'landscape' }
 ];
 
 const photographyGallery = photographs.map((photograph) => ({ ...photograph, src: photograph.gallerySrc, width: photograph.galleryWidth, height: photograph.galleryHeight }));
-const galleries = { personal: personalGallery, photography: photographyGallery, cars: carsGallery, technology: technologyGallery, gaming: gamingGallery };
-const interestGalleryKeys = { Photography: 'photography', Music: 'music', Cars: 'cars', Gaming: 'gaming', Technology: 'technology' };
+const galleries = { personal: personalGallery, photography: photographyGallery, hiking: hikingGallery, cars: carsGallery, technology: technologyGallery, gaming: gamingGallery };
+const interestGalleryKeys = { Photography: 'photography', Hiking: 'hiking', Music: 'music', Cars: 'cars', Gaming: 'gaming', Technology: 'technology' };
 
 function AboutPage() {
   const [activeGallery, setActiveGallery] = useState(() => (

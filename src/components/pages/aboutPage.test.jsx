@@ -72,11 +72,7 @@ test('normal About navigation does not position or open Beyond Software', () => 
 
 test('only interests with additional content render actions while every featured image opens directly', () => {
   renderAboutPage();
-  const hikingCard = screen.getByRole('heading', { name: 'Hiking' }).closest('article');
-  expect(within(hikingCard).queryByRole('button', { name: 'View more' })).not.toBeInTheDocument();
-  expect(within(hikingCard).getByRole('button', { name: 'Open featured Hiking image' })).toBeInTheDocument();
-
-  for (const title of ['Photography', 'Cars', 'Gaming', 'Technology']) {
+  for (const title of ['Photography', 'Hiking', 'Cars', 'Gaming', 'Technology']) {
     const card = screen.getByRole('heading', { name: title }).closest('article');
     expect(within(card).getAllByRole('button')).toHaveLength(2);
     expect(within(card).getByRole('button', { name: 'View more' })).toBeInTheDocument();
@@ -92,6 +88,20 @@ test('links to the Blue 2.5RS photo archive from the cars interest', () => {
     'href',
     'https://gc8quang.vercel.app/'
   );
+});
+
+test('the new interest galleries expose curated images and captions', () => {
+  renderAboutPage();
+  const hikingCard = screen.getByRole('heading', { name: 'Hiking' }).closest('article');
+  fireEvent.click(within(hikingCard).getByRole('button', { name: 'View more' }));
+  expect(screen.getByRole('dialog', { name: 'Hiking' })).toBeInTheDocument();
+  expect(screen.getByText('Chasing the view is usually my favorite part of the hike.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Close hiking gallery' }));
+
+  const gamingCard = screen.getByRole('heading', { name: 'Gaming' }).closest('article');
+  fireEvent.click(within(gamingCard).getByRole('button', { name: 'View more' }));
+  expect(screen.getByText('A snapshot of a lot of Fortnite over the years.')).toBeInTheDocument();
+  expect(screen.getByText('One of my better Marvel Rivals matches—MVP with 67 KOs.')).toBeInTheDocument();
 });
 
 test('renders the six interests in the intended order without the family and friends card', () => {

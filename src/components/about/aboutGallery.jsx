@@ -65,6 +65,7 @@ const focusableSelector = [
 ].join(',');
 const galleryLabels = {
   personal: 'More photos of Quang',
+  hiking: 'More hiking photos',
   gaming: 'More gaming screenshots',
   cars: 'More car photos',
   technology: 'More technology photos'
