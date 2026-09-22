@@ -92,16 +92,29 @@ test('links to the Blue 2.5RS photo archive from the cars interest', () => {
 
 test('the new interest galleries expose curated images and captions', () => {
   renderAboutPage();
+  const photographyCard = screen.getByRole('heading', { name: 'Photography' }).closest('article');
+  fireEvent.click(within(photographyCard).getByRole('button', { name: 'View more' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Close photography gallery' }));
+
   const hikingCard = screen.getByRole('heading', { name: 'Hiking' }).closest('article');
   fireEvent.click(within(hikingCard).getByRole('button', { name: 'View more' }));
   expect(screen.getByRole('dialog', { name: 'Hiking' })).toBeInTheDocument();
-  expect(screen.getByText('Chasing the view is usually my favorite part of the hike.')).toBeInTheDocument();
+  expect(screen.getByText('Frozen falls, 2026')).toBeInTheDocument();
+  expect(screen.getByAltText('Frozen waterfall and long icicles in a wooded gorge')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Close hiking gallery' }));
 
   const gamingCard = screen.getByRole('heading', { name: 'Gaming' }).closest('article');
   fireEvent.click(within(gamingCard).getByRole('button', { name: 'View more' }));
-  expect(screen.getByText('A snapshot of a lot of Fortnite over the years.')).toBeInTheDocument();
-  expect(screen.getByText('One of my better Marvel Rivals matches—MVP with 67 KOs.')).toBeInTheDocument();
+  expect(screen.getByText('Sim racing, 2026')).toBeInTheDocument();
+  expect(screen.getByAltText('Steering wheel, shifter, pedals, and curved monitor arranged for sim racing')).toBeInTheDocument();
+  expect(screen.getByText('Fortnite, 2023')).toBeInTheDocument();
+  expect(screen.getByText('Marvel Rivals 67 KOs, 2025')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Close gaming gallery' }));
+
+  const technologyCard = screen.getByRole('heading', { name: 'Technology' }).closest('article');
+  fireEvent.click(within(technologyCard).getByRole('button', { name: 'View more' }));
+  expect(screen.getByText('Between upgrades, 2024')).toBeInTheDocument();
+  expect(screen.getByAltText('Desktop motherboard and Intel CPU cooler removed during a computer upgrade')).toBeInTheDocument();
 });
 
 test('renders the six interests in the intended order without the family and friends card', () => {

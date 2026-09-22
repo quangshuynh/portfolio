@@ -5,11 +5,13 @@ import quangPhoto from '../../assets/about/quang/quang-about-portrait-web.jpg';
 import photographySunset from '../../assets/about/photography/quang-photography-sunset-web.jpg';
 import hikingOverlook from '../../assets/about/hiking/quang-hiking-overlook-web.jpg';
 import hikingDuskOverlook from '../../assets/about/hiking/hiking-dusk-overlook.jpg';
+import frozenWaterfall from '../../assets/about/hiking/frozen-waterfall-2026.jpg';
 import minecraftWorld from '../../assets/about/gaming/quang-minecraft-survival-world-web.jpg';
 import csgoScreenshot from '../../assets/about/gaming/csgo-web.jpg';
 import fortniteLifetimeStats from '../../assets/about/gaming/fortnite-lifetime-stats.png';
 import marvelRivalsMvpStats from '../../assets/about/gaming/marvel-rivals-mvp-stats.png';
 import minecraftCherryHouse from '../../assets/about/gaming/minecraft-cherry-house.jpg';
+import simRacingSetup from '../../assets/about/gaming/sim-racing-setup-2024.jpg';
 import carsPhoto from '../../assets/about/cars-tech/quang-cars-web.jpg';
 import techPhoto from '../../assets/about/cars-tech/quang-tech-web.jpg';
 import carShowPorsche from '../../assets/about/cars-tech/car-show-porsche-web.jpg';
@@ -19,6 +21,7 @@ import graphicsCard from '../../assets/about/cars-tech/graphics-card-rtx-3080-ti
 import subaruWaterfront from '../../assets/about/cars-tech/subaru-25rs-waterfront.jpg';
 import subaruEngineBay from '../../assets/about/cars-tech/subaru-25rs-engine-bay.jpg';
 import technologyWorkstation from '../../assets/about/cars-tech/technology-workstation.jpg';
+import motherboardUpgrade from '../../assets/about/cars-tech/motherboard-upgrade-2024.jpg';
 import quangBeachSunset from '../../assets/about/quang/quang-beach-sunset-web.jpg';
 import quangArtSpace from '../../assets/about/quang/quang-art-space-web.jpg';
 import quangWaterfront from '../../assets/about/quang/quang-waterfront-web.jpg';
@@ -98,6 +101,7 @@ const personalGallery = [
 ];
 
 const hikingGallery = [
+  { src: frozenWaterfall, width: 1500, height: 2000, alt: 'Frozen waterfall and long icicles in a wooded gorge', caption: 'Frozen falls, 2026', shape: 'portrait' },
   { src: hikingDuskOverlook, width: 1500, height: 2000, alt: 'Dusk settling over a valley and distant city lights from an overlook', caption: 'Staying at the overlook long enough to watch daylight turn into city lights', shape: 'portrait' }
 ];
 
@@ -111,17 +115,21 @@ const carsGallery = [
 const technologyGallery = [
   { src: techPhoto, width: 1050, height: 1400, alt: 'Computer hardware and a custom desktop PC during a hands-on build', caption: 'Building a PC from the ground up', shape: 'portrait' },
   { src: graphicsCard, width: 1050, height: 1400, alt: 'An RTX 3080 Ti graphics card held above a work surface', caption: 'Getting an RTX 3080 Ti Founders Edition ready for its next build', shape: 'portrait' },
+  { src: motherboardUpgrade, width: 1500, height: 2000, alt: 'Desktop motherboard and Intel CPU cooler removed during a computer upgrade', caption: 'Between upgrades, 2024', shape: 'portrait' },
   { src: technologyWorkstation, width: 2000, height: 1500, alt: 'Multi-monitor desktop computer and workstation setup', caption: 'My dorm setup', shape: 'landscape' }
 ];
 
 const gamingGallery = [
- { src: minecraftCherryHouse, width: 2000, height: 1084, alt: 'Minecraft house built among cherry trees with a mountain backdrop', caption: 'A cozy cabin, 2026', shape: 'landscape' },
-  { src: marvelRivalsMvpStats, width: 2000, height: 887, alt: 'Marvel Rivals victory scoreboard showing an MVP performance with 67 KOs', caption: '67 KOs, 2025', shape: 'landscape' },
+  { src: simRacingSetup, width: 1500, height: 2000, alt: 'Steering wheel, shifter, pedals, and curved monitor arranged for sim racing', caption: 'Sim racing, 2026', shape: 'portrait' },
+  { src: minecraftCherryHouse, width: 2000, height: 1084, alt: 'Minecraft house built among cherry trees with a mountain backdrop', caption: 'Cozy Minecraft cabin, 2026', shape: 'landscape' },
+  { src: marvelRivalsMvpStats, width: 2000, height: 887, alt: 'Marvel Rivals victory scoreboard showing an MVP performance with 67 KOs', caption: 'Marvel Rivals 67 KOs, 2025', shape: 'landscape' },
   { src: fortniteLifetimeStats, width: 1196, height: 969, alt: 'Fortnite lifetime statistics profile showing wins, matches and eliminations', caption: 'Fortnite, 2023', shape: 'landscape' },
   { src: csgoScreenshot, width: 1152, height: 864, alt: 'Counter-Strike: Global Offensive menu screenshot', caption: 'CS:GO, 2022', shape: 'landscape' }
 ];
 
-const photographyGallery = photographs.map((photograph) => ({ ...photograph, src: photograph.gallerySrc, width: photograph.galleryWidth, height: photograph.galleryHeight }));
+const photographyGallery = [
+  ...photographs.map((photograph) => ({ ...photograph, src: photograph.gallerySrc, width: photograph.galleryWidth, height: photograph.galleryHeight }))
+];
 const galleries = { personal: personalGallery, photography: photographyGallery, hiking: hikingGallery, cars: carsGallery, technology: technologyGallery, gaming: gamingGallery };
 const interestGalleryKeys = { Photography: 'photography', Hiking: 'hiking', Music: 'music', Cars: 'cars', Gaming: 'gaming', Technology: 'technology' };
 
