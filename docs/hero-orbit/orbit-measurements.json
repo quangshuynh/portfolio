@@ -1,0 +1,304 @@
+{
+  "measurements": [
+    {
+      "name": "desktop-large",
+      "front": {
+        "frames": 3,
+        "angle": 0,
+        "target": 0,
+        "drags": 0,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "left": {
+        "frames": 77,
+        "angle": -1.5707963267948966,
+        "target": -1.5707963267948966,
+        "drags": 1,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "right": {
+        "frames": 122,
+        "angle": 1.5707963267948966,
+        "target": 1.5707963267948966,
+        "drags": 2,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      }
+    },
+    {
+      "name": "desktop",
+      "front": {
+        "frames": 3,
+        "angle": 0,
+        "target": 0,
+        "drags": 0,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "left": {
+        "frames": 76,
+        "angle": -1.5707963267948966,
+        "target": -1.5707963267948966,
+        "drags": 1,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "right": {
+        "frames": 121,
+        "angle": 1.5707963267948966,
+        "target": 1.5707963267948966,
+        "drags": 2,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      }
+    },
+    {
+      "name": "laptop",
+      "front": {
+        "frames": 3,
+        "angle": 0,
+        "target": 0,
+        "drags": 0,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "left": {
+        "frames": 77,
+        "angle": -1.5707963267948966,
+        "target": -1.5707963267948966,
+        "drags": 1,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "right": {
+        "frames": 122,
+        "angle": 1.5707963267948966,
+        "target": 1.5707963267948966,
+        "drags": 2,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      }
+    },
+    {
+      "name": "mac-short",
+      "front": {
+        "frames": 3,
+        "angle": 0,
+        "target": 0,
+        "drags": 0,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "left": {
+        "frames": 76,
+        "angle": -1.5707963267948966,
+        "target": -1.5707963267948966,
+        "drags": 1,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "right": {
+        "frames": 121,
+        "angle": 1.5707963267948966,
+        "target": 1.5707963267948966,
+        "drags": 2,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      }
+    },
+    {
+      "name": "laptop-tall",
+      "front": {
+        "frames": 3,
+        "angle": 0,
+        "target": 0,
+        "drags": 0,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "left": {
+        "frames": 76,
+        "angle": -1.5707963267948966,
+        "target": -1.5707963267948966,
+        "drags": 1,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "right": {
+        "frames": 121,
+        "angle": 1.5707963267948966,
+        "target": 1.5707963267948966,
+        "drags": 2,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      }
+    },
+    {
+      "name": "tablet-landscape",
+      "front": {
+        "frames": 3,
+        "angle": 0,
+        "target": 0,
+        "drags": 0,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "left": {
+        "frames": 76,
+        "angle": -1.5707963267948966,
+        "target": -1.5707963267948966,
+        "drags": 1,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "right": {
+        "frames": 121,
+        "angle": 1.5707963267948966,
+        "target": 1.5707963267948966,
+        "drags": 2,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      }
+    },
+    {
+      "name": "tablet-portrait",
+      "front": {
+        "frames": 3,
+        "angle": 0,
+        "target": 0,
+        "drags": 0,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "left": {
+        "frames": 76,
+        "angle": -1.5707963267948966,
+        "target": -1.5707963267948966,
+        "drags": 1,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "right": {
+        "frames": 121,
+        "angle": 1.5707963267948966,
+        "target": 1.5707963267948966,
+        "drags": 2,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      }
+    },
+    {
+      "name": "iphone",
+      "front": {
+        "frames": 25,
+        "angle": 0,
+        "target": 0,
+        "drags": 0,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "left": {
+        "frames": 98,
+        "angle": -1.5707963267948966,
+        "target": -1.5707963267948966,
+        "drags": 1,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "right": {
+        "frames": 143,
+        "angle": 1.5707963267948966,
+        "target": 1.5707963267948966,
+        "drags": 2,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      }
+    },
+    {
+      "name": "small",
+      "front": {
+        "frames": 24,
+        "angle": 0,
+        "target": 0,
+        "drags": 0,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "left": {
+        "frames": 97,
+        "angle": -1.5707963267948966,
+        "target": -1.5707963267948966,
+        "drags": 1,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "right": {
+        "frames": 142,
+        "angle": 1.5707963267948966,
+        "target": 1.5707963267948966,
+        "drags": 2,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      }
+    }
+  ],
+  "start": {
+    "nav": 90,
+    "slot": 90,
+    "heroDocumentTop": 90,
+    "introTop": 179.078125,
+    "navBottom": 90
+  },
+  "midway": {
+    "nav": 84.265625,
+    "slot": 90,
+    "heroDocumentTop": 90,
+    "introTop": 39.078125,
+    "navBottom": 84.265625
+  },
+  "collapsed": {
+    "nav": 72,
+    "slot": 90,
+    "heroDocumentTop": 90,
+    "introTop": -370.921875,
+    "navBottom": 72
+  },
+  "offscreen": {
+    "frames": 34,
+    "angle": 0.04074074074074074,
+    "target": 0.04074074074074074,
+    "drags": 0,
+    "dragging": false,
+    "calls": 15,
+    "triangles": 2902
+  }
+}

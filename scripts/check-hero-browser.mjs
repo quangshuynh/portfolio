@@ -16,9 +16,9 @@ await send('Network.enable');
 await send('Network.setCacheDisabled', { cacheDisabled: true });
 await send('Page.addScriptToEvaluateOnNewDocument', {
   source: `
-  window.heroMetrics={cls:0,lcp:0,errors:[]};
+  window.heroMetrics={cls:0,lcp:0,errors:[],shifts:[]};
   addEventListener('error',e=>heroMetrics.errors.push(e.message));
-  new PerformanceObserver(l=>{for(const e of l.getEntries())if(!e.hadRecentInput)heroMetrics.cls+=e.value}).observe({type:'layout-shift',buffered:true});
+  new PerformanceObserver(l=>{for(const e of l.getEntries())if(!e.hadRecentInput){heroMetrics.cls+=e.value;heroMetrics.shifts.push({value:e.value,time:e.startTime,sources:e.sources.map(s=>({node:(s.node?.outerHTML || s.node?.parentElement?.outerHTML || "unknown").slice(0,200),before:{x:s.previousRect.x,y:s.previousRect.y,width:s.previousRect.width,height:s.previousRect.height},after:{x:s.currentRect.x,y:s.currentRect.y,width:s.currentRect.width,height:s.currentRect.height}}))})}}).observe({type:'layout-shift',buffered:true});
   new PerformanceObserver(l=>{heroMetrics.lcp=l.getEntries().at(-1).startTime}).observe({type:'largest-contentful-paint',buffered:true});
 `,
 });
@@ -63,12 +63,25 @@ try {
     await send('Emulation.setTouchEmulationEnabled', { enabled: mobile });
     await navigate();
     const initial = await evaluate(
-      `({...heroMetrics,navBottom:document.querySelector('.site-nav').getBoundingClientRect().bottom,introTop:document.querySelector('.hero .eyebrow').getBoundingClientRect().top,captionBottom:document.querySelector('.hero-desk__caption').getBoundingClientRect().bottom,overflow:document.documentElement.scrollWidth>innerWidth,cta:document.querySelector('.hero-actions').getBoundingClientRect().toJSON(),entry:performance.getEntriesByType('resource').find(r=>r.name.includes('/assets/index-') && r.name.endsWith('.js'))?.encodedBodySize})`,
+      `({...heroMetrics,navBottom:document.querySelector('.site-nav').getBoundingClientRect().bottom,introTop:document.querySelector('.hero .eyebrow').getBoundingClientRect().top,sceneBottom:document.querySelector('.hero-desk__stage').getBoundingClientRect().bottom,overflow:document.documentElement.scrollWidth>innerWidth,cta:document.querySelector('.hero-actions').getBoundingClientRect().toJSON(),entry:performance.getEntriesByType('resource').find(r=>r.name.includes('/assets/index-') && r.name.endsWith('.js'))?.encodedBodySize})`,
     );
     assert.equal(initial.overflow, false, `${name}: initial overflow`);
+    // Cold Circular font swapping shifts these same text nodes in the retained
+    // baseline. Any new initial source (including the scene) is a regression.
+    assert.ok(
+      initial.shifts.every((shift) =>
+        shift.sources.every(
+          (source) =>
+            source.node.startsWith('<h1 id="hero-title"') ||
+            source.node.startsWith('<span class="brand-domain"') ||
+            source.node.startsWith('<span class="brand-tld"'),
+        ),
+      ),
+      `${name}: new initial layout shift ${JSON.stringify(initial.shifts)}`,
+    );
     if (width > 620) {
       assert.ok(
-        initial.captionBottom <= height,
+        initial.sceneBottom <= height,
         `${name}: incomplete initial hero`,
       );
       assert.ok(
@@ -79,7 +92,7 @@ try {
     assert.equal(initial.errors.length, 0, `${name}: script errors`);
     await screenshot(`${output}/${name}-initial.png`);
     await showScene();
-    await pause(300);
+    await pause(900);
     const stats = await evaluate(
       `({...document.querySelector('.hero-desk canvas').dataset,buffer:[document.querySelector('.hero-desk canvas').width,document.querySelector('.hero-desk canvas').height],cls:heroMetrics.cls})`,
     );
@@ -110,7 +123,7 @@ try {
     await evaluate(
       `window.scrollTo({top:document.body.scrollHeight,behavior:'instant'})`,
     );
-    await pause(200);
+    await pause(350);
     const offscreen = await sceneFrames();
     await pause(600);
     assert.equal(await sceneFrames(), offscreen, 'Offscreen rendering');
@@ -123,7 +136,7 @@ try {
       deviceScaleFactor: 1,
       mobile,
     });
-    await pause(250);
+    await pause(900);
     assert.equal(
       await evaluate(`document.documentElement.scrollWidth>innerWidth`),
       false,
@@ -135,7 +148,7 @@ try {
       deviceScaleFactor: 1,
       mobile,
     });
-    await pause(250);
+    await pause(900);
     if (mobile) {
       await showScene();
       const touchRect = await evaluate(

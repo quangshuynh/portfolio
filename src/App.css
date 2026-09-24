@@ -1,7 +1,22 @@
 /* application shell and accessibility */
-.app-shell { min-height: 100vh; overflow-x: clip; }
+.app-shell { --home-nav-footprint: var(--nav-height); min-height: 100vh; overflow-x: clip; }
 .skip-link { position: fixed; top: 0.75rem; left: 0.75rem; z-index: 100; padding: 0.7rem 1rem; background: var(--primary-bg); color: var(--primary-text); border-radius: 0.5rem; transform: translateY(-160%); }
 .skip-link:focus { transform: translateY(0); }
+
+/* The homepage reserves the expanded nav footprint even while its inner bar
+   collapses. No negative margin or scroll-dependent document reflow. */
+.home-nav-slot { position: sticky; top: 0; z-index: 100; height: var(--home-nav-footprint); pointer-events: none; }
+.home-nav-slot > .site-nav { position: relative; pointer-events: auto; margin-bottom: 0; max-height: 100%; }
+.app-shell > .home-header { min-height: calc(100svh - var(--home-nav-footprint)); }
+/* Snap/anchor alignment must reserve the expanded bar on return to the top. */
+.home-header, .home-header > .hero { scroll-margin-top: calc(var(--home-nav-footprint) - var(--nav-height)); }
+@media (min-width: 1024px) {
+  .app-shell { --home-nav-footprint: clamp(4.5rem, 10svh, 6.75rem); }
+}
+@media (max-width: 620px) {
+  .home-nav-slot { position: relative; height: auto; }
+  .app-shell > .home-header { min-height: 0; }
+}
 
 /* primary navigation */
 .site-nav { position: sticky; top: 0; z-index: 100; height: var(--nav-height); border-bottom: 1px solid var(--line); background: var(--nav-bg); backdrop-filter: blur(12px); }
@@ -34,8 +49,8 @@
 
 @media (min-width: 1024px) {
   .site-nav--collapsible {
-    --expanded-nav-height: clamp(4.5rem, 10svh, 6.75rem);
-    --expanded-logo-size: clamp(54px, calc(10svh - 20px), 88px);
+    --expanded-nav-height: var(--home-nav-footprint);
+    --expanded-logo-size: clamp(54px, calc(var(--home-nav-footprint) - 20px), 88px);
     --expanded-brand-size: clamp(1.2rem, 2vw, 1.8rem);
     --nav-progress: 0;
     --nav-current-height: var(--expanded-nav-height);
@@ -50,7 +65,7 @@
     --tld-current-padding-x: .68rem;
     --nav-background-mix: 92%;
     height: var(--nav-current-height);
-    margin-bottom: calc(var(--nav-height) - var(--nav-current-height));
+    margin-bottom: 0;
     background: color-mix(in srgb, var(--nav-bg) var(--nav-background-mix), transparent);
   }
   .site-nav--collapsible .nav-inner {

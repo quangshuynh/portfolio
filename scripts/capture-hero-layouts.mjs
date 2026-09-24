@@ -25,7 +25,7 @@ try {
     await send('Page.navigate', { url: origin });
     await pause(2600);
     const bounds = await evaluate(
-      `(()=>{const selectors=['.site-nav','.hero .eyebrow','.hero-intro','.hero h1','.hero-lede','.hero-meta','.hero-actions','.hero-photo-wrap','.about-float-link','.meet-quang-card','.hero-desk__stage','.hero-desk__caption'];return {width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth,elements:Object.fromEntries(selectors.map(s=>{const e=document.querySelector(s);return [s,!e.getClientRects().length?null:e.getBoundingClientRect().toJSON()]})),font: getComputedStyle(document.querySelector('.hero h1')).fontSize}})()`,
+      `(()=>{const selectors=['.site-nav','.hero .eyebrow','.hero-intro','.hero h1','.hero-lede','.hero-meta','.hero-actions','.hero-photo-wrap','.about-float-link','.meet-quang-card','.hero-desk__stage'];return {width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth,elements:Object.fromEntries(selectors.map(s=>{const e=document.querySelector(s);return [s,!e.getClientRects().length?null:e.getBoundingClientRect().toJSON()]})),font: getComputedStyle(document.querySelector('.hero h1')).fontSize}})()`,
     );
     if (process.env.HERO_ASSERT_FIT === '1') {
       assert.equal(bounds.overflow, false, `${name}: horizontal overflow`);
@@ -56,7 +56,7 @@ try {
       measurements.map((x) => ({
         name: x.name,
         headline: x.font,
-        captionBottom: x.elements['.hero-desk__caption'].bottom,
+        sceneBottom: x.elements['.hero-desk__stage'].bottom,
         height: x.height,
       })),
       null,

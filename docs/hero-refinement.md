@@ -1,5 +1,7 @@
 # Hero refinement: fit, monitor mount and stereo speakers
 
+Latest follow-up: [navigation and bounded orbit refinement](hero-orbit.md). The measurements below describe the preceding interval.
+
 This refines the existing scene and progressive-enhancement architecture. No new dependencies or unrelated section changes. No commit, push, PR or deployment.
 
 ## What caused the clipping
