@@ -161,13 +161,20 @@ export default function HeroVisual({ load = loadScene }) {
   }, [load]);
   return (
     <div className="hero-desk" data-ready={ready}>
-      <div className="hero-desk__stage" aria-hidden="true">
+      <div className="hero-desk__stage">
         <StaticHeroScene />
-        <div className="hero-desk__canvas" ref={host} />
+        <div
+          className="hero-desk__canvas"
+          ref={host}
+          tabIndex={ready ? 0 : undefined}
+          role={ready ? 'slider' : undefined}
+          aria-label={ready ? 'Desk viewing angle' : undefined}
+          aria-valuemin={ready ? -90 : undefined}
+          aria-valuemax={ready ? 90 : undefined}
+          aria-valuenow={ready ? 0 : undefined}
+          aria-orientation={ready ? 'horizontal' : undefined}
+        />
       </div>
-      <p className="hero-desk__caption">
-        A little of my world <span>Software · cars · photography</span>
-      </p>
     </div>
   );
 }

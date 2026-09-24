@@ -81,8 +81,8 @@ export function createDeskScene() {
   box(ink, [3.5, -0.38, 0], [0.16, 0.66, 2.7]);
   const shadow = material('#292521');
   for (const [x, z, w, d] of [
-    [-2.05, -0.45, 0.7, 0.7],
-    [1.65, -0.05, 0.7, 0.7],
+    [-2.15, -1.1, 0.7, 0.7],
+    [1.78, -0.7, 0.7, 0.7],
     [2.95, -0.1, 1.5, 2],
     [-2.9, 1.05, 1, 0.6],
     [-3.4, -0.9, 1.3, 0.65],
@@ -125,6 +125,9 @@ export function createDeskScene() {
   }
   function monitor(x, y, width, height, portrait = false) {
     box(ink, [x, y, -0.82], [width, height, 0.12]);
+    // Inexpensive rear casing detail, visible at the allowed rear-quarter view.
+    for (const offset of [-0.2, 0, 0.2])
+      box(edge, [x + offset, y + 0.24, -0.889], [0.12, 0.025, 0.015]);
 
     const display = new THREE.MeshBasicMaterial({
       map: screenTexture(portrait),
@@ -190,15 +193,15 @@ export function createDeskScene() {
   speakerMesh.map.repeat.set(4, 2);
   const speakerBlue = new THREE.MeshBasicMaterial({ color: '#4d8fc9' });
   materials.push(speakerBlue);
-  const speakerBody = new THREE.CylinderGeometry(0.23, 0.3, 0.46, 16);
+  const speakerBody = new THREE.CylinderGeometry(0.23, 0.3, 0.28, 16);
   for (const [x, z] of [
-    [-2.05, -0.45],
-    [1.65, -0.05],
+    [-2.15, -1.1],
+    [1.78, -0.7],
   ]) {
     cylinder(silver, [x, 0.155, z], [0.32, 0.055, 0.32]);
     cylinder(speakerBlue, [x, 0.195, z], [0.305, 0.025, 0.305]);
-    add(speakerBody.clone(), speakerMesh, [x, 0.437, z]);
-    cylinder(ink, [x, 0.675, z], [0.232, 0.02, 0.232]);
+    add(speakerBody.clone(), speakerMesh, [x, 0.347, z]);
+    cylinder(ink, [x, 0.495, z], [0.232, 0.02, 0.232]);
   }
   speakerBody.dispose();
 
@@ -280,6 +283,53 @@ export function createDeskScene() {
   for (const z of [-0.95, -0.7, -0.45, -0.2, 0.05])
     box(edge, [3.633, 1.35, z], [0.01, 1.7, 0.035]);
   box(glow, [3.64, 2.13, 0.25], [0.014, 0.055, 0.055]);
+
+  // Rear I/O panel and vent: the closed tower is coherent from either side.
+  box(edge, [2.9, 1.18, -1.29], [0.86, 1.66, 0.025]);
+  for (const y of [0.48, 0.58, 0.68])
+    box(ink, [2.9, y, -1.309], [0.57, 0.035, 0.016]);
+  cylinder(ink, [2.9, 1.6, -1.315], [0.26, 0.015, 0.26], [Math.PI / 2, 0, 0]);
+
+  // Four static runs, including the left-to-right stereo interconnect. Cable
+  // vertices are kept on/above the wood surface, with short rises at connectors.
+  function cable(points) {
+    const curve = new THREE.CatmullRomCurve3(
+      points.map((p) => new THREE.Vector3(...p)),
+    );
+    const geometry = new THREE.TubeGeometry(curve, 12, 0.014, 4, false);
+    const positions = geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++)
+      positions.setY(i, Math.max(0.111, positions.getY(i)));
+    add(geometry, ink, [0, 0, 0]);
+  }
+  cable([
+    [-1.45, 0.23, 0.24],
+    [-1.65, 0.125, 0.04],
+    [-1.5, 0.125, -1.25],
+    [0.2, 0.125, -1.55],
+    [2.35, 0.125, -1.53],
+    [2.65, 0.36, -1.31],
+  ]);
+  cable([
+    [0.49, 0.18, -0.16],
+    [0.26, 0.125, -0.32],
+    [0.3, 0.125, -1.25],
+    [1.8, 0.125, -1.43],
+    [2.82, 0.32, -1.31],
+  ]);
+  cable([
+    [-2.15, 0.2, -1.3],
+    [-2, 0.125, -1.54],
+    [-0.7, 0.125, -1.6],
+    [0.85, 0.125, -1.48],
+    [1.78, 0.2, -0.95],
+  ]);
+  cable([
+    [1.78, 0.2, -0.95],
+    [1.8, 0.125, -1.22],
+    [2.22, 0.125, -1.6],
+    [3.08, 0.36, -1.31],
+  ]);
 
   // Photography: small mirrorless camera with a stepped lens and visible glass.
   box(ink, [-2.98, 0.44, 1.05], [0.69, 0.48, 0.38]);

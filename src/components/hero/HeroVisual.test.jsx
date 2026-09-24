@@ -81,10 +81,9 @@ test('static fallback is immediate, decorative and has a distinct mobile source'
     'media',
     '(max-width: 620px)',
   );
-  expect(container.querySelector('.hero-desk__stage')).toHaveAttribute(
-    'aria-hidden',
-    'true',
-  );
+  expect(container.querySelector('picture img')).toHaveAttribute('alt', '');
+  expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+  expect(screen.queryByText('A little of my world')).not.toBeInTheDocument();
   expect(load).not.toHaveBeenCalled();
 });
 test('loads only after entering the viewport and keeps fallback until the first frame', async () => {

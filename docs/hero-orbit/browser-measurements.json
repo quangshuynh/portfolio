@@ -1,0 +1,416 @@
+[
+  {
+    "name": "desktop-large",
+    "initial": {
+      "cls": 0,
+      "lcp": 220,
+      "errors": [],
+      "shifts": [],
+      "navBottom": 108,
+      "introTop": 238.375,
+      "sceneBottom": 949.609375,
+      "overflow": false,
+      "cta": {
+        "x": 400,
+        "y": 584.828125,
+        "width": 940,
+        "height": 44,
+        "top": 584.828125,
+        "right": 1340,
+        "bottom": 628.828125,
+        "left": 400
+      },
+      "entry": 84408
+    },
+    "scene": {
+      "engine": "three.js r186",
+      "frames": "2",
+      "drawCalls": "15",
+      "triangles": "2902",
+      "orbit": "0",
+      "target": "0",
+      "buffer": [
+        678,
+        297
+      ],
+      "cls": 0
+    },
+    "resources": [
+      {
+        "name": "interactiveHeroScene-BvHvt5Sy.js",
+        "bytes": 145063,
+        "start": 1002.4000000022352
+      }
+    ],
+    "idleFrames": 0,
+    "offscreenFrames": 0
+  },
+  {
+    "name": "desktop",
+    "initial": {
+      "cls": 0,
+      "lcp": 284,
+      "errors": [],
+      "shifts": [],
+      "navBottom": 90,
+      "introTop": 179.078125,
+      "sceneBottom": 810.921875,
+      "overflow": false,
+      "cta": {
+        "x": 160,
+        "y": 449.734375,
+        "width": 940,
+        "height": 44,
+        "top": 449.734375,
+        "right": 1100,
+        "bottom": 493.734375,
+        "left": 160
+      },
+      "entry": 84408
+    },
+    "scene": {
+      "engine": "three.js r186",
+      "frames": "2",
+      "drawCalls": "15",
+      "triangles": "2902",
+      "orbit": "0",
+      "target": "0",
+      "buffer": [
+        678,
+        297
+      ],
+      "cls": 0
+    },
+    "resources": [
+      {
+        "name": "interactiveHeroScene-BvHvt5Sy.js",
+        "bytes": 145063,
+        "start": 1035.699999999255
+      }
+    ],
+    "idleFrames": 0,
+    "offscreenFrames": 0
+  },
+  {
+    "name": "laptop",
+    "initial": {
+      "cls": 0,
+      "lcp": 220,
+      "errors": [],
+      "shifts": [],
+      "navBottom": 76.796875,
+      "introTop": 143.171875,
+      "sceneBottom": 701.59375,
+      "overflow": false,
+      "cta": {
+        "x": 123,
+        "y": 387.1875,
+        "width": 940,
+        "height": 44,
+        "top": 387.1875,
+        "right": 1063,
+        "bottom": 431.1875,
+        "left": 123
+      },
+      "entry": 84408
+    },
+    "scene": {
+      "engine": "three.js r186",
+      "frames": "2",
+      "drawCalls": "15",
+      "triangles": "2902",
+      "orbit": "0",
+      "target": "0",
+      "buffer": [
+        581,
+        254
+      ],
+      "cls": 0
+    },
+    "resources": [
+      {
+        "name": "interactiveHeroScene-BvHvt5Sy.js",
+        "bytes": 145063,
+        "start": 1001.0999999977648
+      }
+    ],
+    "idleFrames": 0,
+    "offscreenFrames": 0
+  },
+  {
+    "name": "mac-short",
+    "initial": {
+      "cls": 0,
+      "lcp": 204,
+      "errors": [],
+      "shifts": [],
+      "navBottom": 72,
+      "introTop": 105.53125,
+      "sceneBottom": 616.46875,
+      "overflow": false,
+      "cta": {
+        "x": 160,
+        "y": 341.515625,
+        "width": 940,
+        "height": 44,
+        "top": 341.515625,
+        "right": 1100,
+        "bottom": 385.515625,
+        "left": 160
+      },
+      "entry": 84408
+    },
+    "scene": {
+      "engine": "three.js r186",
+      "frames": "2",
+      "drawCalls": "15",
+      "triangles": "2902",
+      "orbit": "0",
+      "target": "0",
+      "buffer": [
+        492,
+        215
+      ],
+      "cls": 0
+    },
+    "resources": [
+      {
+        "name": "interactiveHeroScene-BvHvt5Sy.js",
+        "bytes": 145063,
+        "start": 998.1999999992549
+      }
+    ],
+    "idleFrames": 0,
+    "offscreenFrames": 0
+  },
+  {
+    "name": "laptop-tall",
+    "initial": {
+      "cls": 0,
+      "lcp": 224,
+      "errors": [],
+      "shifts": [],
+      "navBottom": 80,
+      "introTop": 153.546875,
+      "sceneBottom": 726.4375,
+      "overflow": false,
+      "cta": {
+        "x": 80,
+        "y": 401.328125,
+        "width": 941.609375,
+        "height": 44,
+        "top": 401.328125,
+        "right": 1021.609375,
+        "bottom": 445.328125,
+        "left": 80
+      },
+      "entry": 84408
+    },
+    "scene": {
+      "engine": "three.js r186",
+      "frames": "2",
+      "drawCalls": "15",
+      "triangles": "2902",
+      "orbit": "0",
+      "target": "0",
+      "buffer": [
+        606,
+        265
+      ],
+      "cls": 0
+    },
+    "resources": [
+      {
+        "name": "interactiveHeroScene-BvHvt5Sy.js",
+        "bytes": 145063,
+        "start": 1029.800000000745
+      }
+    ],
+    "idleFrames": 0,
+    "offscreenFrames": 0
+  },
+  {
+    "name": "tablet-landscape",
+    "initial": {
+      "cls": 0,
+      "lcp": 240,
+      "errors": [],
+      "shifts": [],
+      "navBottom": 76.796875,
+      "introTop": 140.640625,
+      "sceneBottom": 704.140625,
+      "overflow": false,
+      "cta": {
+        "x": 20,
+        "y": 377.75,
+        "width": 851.375,
+        "height": 44,
+        "top": 377.75,
+        "right": 871.375,
+        "bottom": 421.75,
+        "left": 20
+      },
+      "entry": 84408
+    },
+    "scene": {
+      "engine": "three.js r186",
+      "frames": "2",
+      "drawCalls": "15",
+      "triangles": "2902",
+      "orbit": "0",
+      "target": "0",
+      "buffer": [
+        535,
+        266
+      ],
+      "cls": 0
+    },
+    "resources": [
+      {
+        "name": "interactiveHeroScene-BvHvt5Sy.js",
+        "bytes": 145063,
+        "start": 1047.9000000022352
+      }
+    ],
+    "idleFrames": 0,
+    "offscreenFrames": 0
+  },
+  {
+    "name": "tablet-portrait",
+    "initial": {
+      "cls": 0,
+      "lcp": 204,
+      "errors": [],
+      "shifts": [],
+      "navBottom": 72,
+      "introTop": 184.890625,
+      "sceneBottom": 911.09375,
+      "overflow": false,
+      "cta": {
+        "x": 20,
+        "y": 526.625,
+        "width": 604,
+        "height": 44,
+        "top": 526.625,
+        "right": 624,
+        "bottom": 570.625,
+        "left": 20
+      },
+      "entry": 84408
+    },
+    "scene": {
+      "engine": "three.js r186",
+      "frames": "2",
+      "drawCalls": "15",
+      "triangles": "2902",
+      "orbit": "0",
+      "target": "0",
+      "buffer": [
+        638,
+        318
+      ],
+      "cls": 0
+    },
+    "resources": [
+      {
+        "name": "interactiveHeroScene-BvHvt5Sy.js",
+        "bytes": 145063,
+        "start": 1033
+      }
+    ],
+    "idleFrames": 0,
+    "offscreenFrames": 0
+  },
+  {
+    "name": "iphone",
+    "initial": {
+      "cls": 0,
+      "lcp": 104,
+      "errors": [],
+      "shifts": [],
+      "navBottom": 116.796875,
+      "introTop": 148.796875,
+      "sceneBottom": 1316.234375,
+      "overflow": false,
+      "cta": {
+        "x": 12,
+        "y": 878.546875,
+        "width": 366,
+        "height": 45.59375,
+        "top": 878.546875,
+        "right": 378,
+        "bottom": 924.140625,
+        "left": 12
+      },
+      "entry": 84408
+    },
+    "scene": {
+      "engine": "three.js r186",
+      "frames": "18",
+      "drawCalls": "15",
+      "triangles": "2902",
+      "orbit": "0.036645655791437644",
+      "target": "0.036645655791437644",
+      "buffer": [
+        364,
+        272
+      ],
+      "cls": 0
+    },
+    "resources": [
+      {
+        "name": "interactiveHeroScene-BvHvt5Sy.js",
+        "bytes": 145063,
+        "start": 2797.199999999255
+      }
+    ],
+    "idleFrames": 0,
+    "offscreenFrames": 0
+  },
+  {
+    "name": "small",
+    "initial": {
+      "cls": 0,
+      "lcp": 96,
+      "errors": [],
+      "shifts": [],
+      "navBottom": 141.796875,
+      "introTop": 173.796875,
+      "sceneBottom": 1341.53125,
+      "overflow": false,
+      "cta": {
+        "x": 12,
+        "y": 898.75,
+        "width": 296,
+        "height": 103.1875,
+        "top": 898.75,
+        "right": 308,
+        "bottom": 1001.9375,
+        "left": 12
+      },
+      "entry": 84408
+    },
+    "scene": {
+      "engine": "three.js r186",
+      "frames": "18",
+      "drawCalls": "15",
+      "triangles": "2902",
+      "orbit": "0.041670216654273215",
+      "target": "0.041670216654273215",
+      "buffer": [
+        294,
+        220
+      ],
+      "cls": 0
+    },
+    "resources": [
+      {
+        "name": "interactiveHeroScene-BvHvt5Sy.js",
+        "bytes": 145063,
+        "start": 2805.599999997765
+      }
+    ],
+    "idleFrames": 0,
+    "offscreenFrames": 0
+  }
+]

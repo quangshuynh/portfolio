@@ -47,17 +47,23 @@
 .hero-desk[data-ready='true'] .hero-desk__fallback {
   visibility: hidden;
 }
-.hero-desk__caption {
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.3rem 1rem;
-  margin: 0.6rem 0.25rem 0;
-  color: var(--muted);
-  font-size: 0.75rem;
+.hero-desk__canvas {
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
 }
-.hero-desk__caption > span {
-  color: var(--muted);
+.hero-desk[data-ready='true'] .hero-desk__canvas {
+  cursor: grab;
+}
+.hero-desk[data-ready='true'] .hero-desk__canvas[data-dragging='true'] {
+  cursor: grabbing;
+}
+.hero-desk__canvas:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -5px;
+  border-radius: inherit;
+}
+.hero-desk__fallback {
+  pointer-events: none;
 }
 @media (max-width: 620px) {
   .hero-desk {
