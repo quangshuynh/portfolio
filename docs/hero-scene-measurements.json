@@ -1,0 +1,508 @@
+{
+  "environment": "Local headless Brave/Chromium; HTTP cache disabled; no network or CPU throttle; paired n=3; initial baseline first cold LCP 1328ms not used in paired comparison",
+  "builds": [
+    {
+      "directory": "/tmp/portfolio-baseline-dist",
+      "chunks": [
+        {
+          "name": "aboutPage-BmACAf8S.js",
+          "bytes": 23284,
+          "gzip": 8086,
+          "brotli": 6807
+        },
+        {
+          "name": "index-BMxKBZ-W.css",
+          "bytes": 62432,
+          "gzip": 12816,
+          "brotli": 10987
+        },
+        {
+          "name": "index-BjnoIFY4.js",
+          "bytes": 268314,
+          "gzip": 83467,
+          "brotli": 71649
+        },
+        {
+          "name": "photographyPage-CxHLislS.js",
+          "bytes": 12690,
+          "gzip": 4334,
+          "brotli": 3828
+        }
+      ],
+      "fallbacks": []
+    },
+    {
+      "directory": "dist",
+      "chunks": [
+        {
+          "name": "aboutPage-Dx1DAUEI.js",
+          "bytes": 23284,
+          "gzip": 8085,
+          "brotli": 6785
+        },
+        {
+          "name": "index-C3oOlmfW.js",
+          "bytes": 270714,
+          "gzip": 84296,
+          "brotli": 72337
+        },
+        {
+          "name": "index-Dv39fRBO.css",
+          "bytes": 63481,
+          "gzip": 13049,
+          "brotli": 11208
+        },
+        {
+          "name": "interactiveHeroScene-Cfwx2zcy.js",
+          "bytes": 568882,
+          "gzip": 142668,
+          "brotli": 117133
+        },
+        {
+          "name": "photographyPage-BdU6cmcu.js",
+          "bytes": 12690,
+          "gzip": 4334,
+          "brotli": 3829
+        }
+      ],
+      "fallbacks": [
+        {
+          "name": "desk-desktop.webp",
+          "bytes": 15704
+        },
+        {
+          "name": "desk-mobile.webp",
+          "bytes": 10026
+        }
+      ]
+    }
+  ],
+  "paired": [
+    {
+      "name": "desktop",
+      "label": "baseline",
+      "run": 0,
+      "lcp": 152,
+      "initialCLS": 0,
+      "scrollCLS": 0.009185900419950484,
+      "shiftSources": [
+        {
+          "value": 0.009185900419950484,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    },
+    {
+      "name": "desktop",
+      "label": "baseline",
+      "run": 1,
+      "lcp": 76,
+      "initialCLS": 0,
+      "scrollCLS": 0.009185900419950484,
+      "shiftSources": [
+        {
+          "value": 0.009185900419950484,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    },
+    {
+      "name": "desktop",
+      "label": "baseline",
+      "run": 2,
+      "lcp": 88,
+      "initialCLS": 0,
+      "scrollCLS": 0.009185900419950484,
+      "shiftSources": [
+        {
+          "value": 0.009185900419950484,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    },
+    {
+      "name": "desktop",
+      "label": "after",
+      "run": 0,
+      "lcp": 92,
+      "initialCLS": 0,
+      "scrollCLS": 0.009185900419950484,
+      "shiftSources": [
+        {
+          "value": 0.009185900419950484,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    },
+    {
+      "name": "desktop",
+      "label": "after",
+      "run": 1,
+      "lcp": 76,
+      "initialCLS": 0,
+      "scrollCLS": 0.009185900419950484,
+      "shiftSources": [
+        {
+          "value": 0.009185900419950484,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    },
+    {
+      "name": "desktop",
+      "label": "after",
+      "run": 2,
+      "lcp": 84,
+      "initialCLS": 0,
+      "scrollCLS": 0.009185900419950484,
+      "shiftSources": [
+        {
+          "value": 0.009185900419950484,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    },
+    {
+      "name": "laptop",
+      "label": "baseline",
+      "run": 0,
+      "lcp": 76,
+      "initialCLS": 0,
+      "scrollCLS": 0.012268658875823645,
+      "shiftSources": [
+        {
+          "value": 0.012268658875823645,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    },
+    {
+      "name": "laptop",
+      "label": "baseline",
+      "run": 1,
+      "lcp": 84,
+      "initialCLS": 0,
+      "scrollCLS": 0.012268658875823645,
+      "shiftSources": [
+        {
+          "value": 0.012268658875823645,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    },
+    {
+      "name": "laptop",
+      "label": "baseline",
+      "run": 2,
+      "lcp": 76,
+      "initialCLS": 0,
+      "scrollCLS": 0.012268658875823645,
+      "shiftSources": [
+        {
+          "value": 0.012268658875823645,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    },
+    {
+      "name": "laptop",
+      "label": "after",
+      "run": 0,
+      "lcp": 88,
+      "initialCLS": 0,
+      "scrollCLS": 0.012268658875823645,
+      "shiftSources": [
+        {
+          "value": 0.012268658875823645,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    },
+    {
+      "name": "laptop",
+      "label": "after",
+      "run": 1,
+      "lcp": 68,
+      "initialCLS": 0,
+      "scrollCLS": 0.012268658875823645,
+      "shiftSources": [
+        {
+          "value": 0.012268658875823645,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    },
+    {
+      "name": "laptop",
+      "label": "after",
+      "run": 2,
+      "lcp": 72,
+      "initialCLS": 0,
+      "scrollCLS": 0.012268658875823645,
+      "shiftSources": [
+        {
+          "value": 0.012268658875823645,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    },
+    {
+      "name": "iphone",
+      "label": "baseline",
+      "run": 0,
+      "lcp": 68,
+      "initialCLS": 0,
+      "scrollCLS": 0,
+      "shiftSources": []
+    },
+    {
+      "name": "iphone",
+      "label": "baseline",
+      "run": 1,
+      "lcp": 100,
+      "initialCLS": 0,
+      "scrollCLS": 0,
+      "shiftSources": []
+    },
+    {
+      "name": "iphone",
+      "label": "baseline",
+      "run": 2,
+      "lcp": 88,
+      "initialCLS": 0,
+      "scrollCLS": 0,
+      "shiftSources": []
+    },
+    {
+      "name": "iphone",
+      "label": "after",
+      "run": 0,
+      "lcp": 84,
+      "initialCLS": 0,
+      "scrollCLS": 0,
+      "shiftSources": []
+    },
+    {
+      "name": "iphone",
+      "label": "after",
+      "run": 1,
+      "lcp": 76,
+      "initialCLS": 0,
+      "scrollCLS": 0,
+      "shiftSources": []
+    },
+    {
+      "name": "iphone",
+      "label": "after",
+      "run": 2,
+      "lcp": 88,
+      "initialCLS": 0,
+      "scrollCLS": 0,
+      "shiftSources": []
+    },
+    {
+      "name": "small",
+      "label": "baseline",
+      "run": 0,
+      "lcp": 84,
+      "initialCLS": 0,
+      "scrollCLS": 0,
+      "shiftSources": []
+    },
+    {
+      "name": "small",
+      "label": "baseline",
+      "run": 1,
+      "lcp": 76,
+      "initialCLS": 0,
+      "scrollCLS": 0,
+      "shiftSources": []
+    },
+    {
+      "name": "small",
+      "label": "baseline",
+      "run": 2,
+      "lcp": 84,
+      "initialCLS": 0,
+      "scrollCLS": 0,
+      "shiftSources": []
+    },
+    {
+      "name": "small",
+      "label": "after",
+      "run": 0,
+      "lcp": 76,
+      "initialCLS": 0,
+      "scrollCLS": 0,
+      "shiftSources": []
+    },
+    {
+      "name": "small",
+      "label": "after",
+      "run": 1,
+      "lcp": 92,
+      "initialCLS": 0,
+      "scrollCLS": 0,
+      "shiftSources": []
+    },
+    {
+      "name": "small",
+      "label": "after",
+      "run": 2,
+      "lcp": 80,
+      "initialCLS": 0,
+      "scrollCLS": 0,
+      "shiftSources": []
+    }
+  ],
+  "checks": [
+    {
+      "name": "desktop",
+      "initial": {
+        "cls": 0,
+        "lcp": 140,
+        "errors": [],
+        "overflow": false,
+        "cta": {
+          "x": 160,
+          "y": 933.046875,
+          "width": 858,
+          "height": 45.59375,
+          "top": 933.046875,
+          "right": 1018,
+          "bottom": 978.640625,
+          "left": 160
+        },
+        "entry": 84296
+      },
+      "scene": {
+        "engine": "three.js r186",
+        "frames": "2",
+        "drawCalls": "13",
+        "triangles": "1530",
+        "buffer": [758, 332],
+        "cls": 0.009185900419950484
+      },
+      "resources": [
+        {
+          "name": "interactiveHeroScene-Cfwx2zcy.js",
+          "bytes": 142668,
+          "start": 2842.9000000003725
+        }
+      ],
+      "idleFrames": 0,
+      "offscreenFrames": 0
+    },
+    {
+      "name": "laptop",
+      "initial": {
+        "cls": 0,
+        "lcp": 80,
+        "errors": [],
+        "overflow": false,
+        "cta": {
+          "x": 123,
+          "y": 511.109375,
+          "width": 914.03125,
+          "height": 40.796875,
+          "top": 511.109375,
+          "right": 1037.03125,
+          "bottom": 551.90625,
+          "left": 123
+        },
+        "entry": 84296
+      },
+      "scene": {
+        "engine": "three.js r186",
+        "frames": "2",
+        "drawCalls": "13",
+        "triangles": "1530",
+        "buffer": [758, 332],
+        "cls": 0.0038727871419937665
+      },
+      "resources": [
+        {
+          "name": "interactiveHeroScene-Cfwx2zcy.js",
+          "bytes": 142668,
+          "start": 969.6999999992549
+        }
+      ],
+      "idleFrames": 0,
+      "offscreenFrames": 0
+    },
+    {
+      "name": "iphone",
+      "initial": {
+        "cls": 0,
+        "lcp": 68,
+        "errors": [],
+        "overflow": false,
+        "cta": {
+          "x": 12,
+          "y": 878.546875,
+          "width": 366,
+          "height": 45.59375,
+          "top": 878.546875,
+          "right": 378,
+          "bottom": 924.140625,
+          "left": 12
+        },
+        "entry": 84296
+      },
+      "scene": {
+        "engine": "three.js r186",
+        "frames": "2",
+        "drawCalls": "13",
+        "triangles": "1530",
+        "buffer": [364, 272],
+        "cls": 0
+      },
+      "resources": [
+        {
+          "name": "interactiveHeroScene-Cfwx2zcy.js",
+          "bytes": 142668,
+          "start": 2766.0999999996275
+        }
+      ],
+      "idleFrames": 0,
+      "offscreenFrames": 0
+    },
+    {
+      "name": "small",
+      "initial": {
+        "cls": 0,
+        "lcp": 88,
+        "errors": [],
+        "overflow": false,
+        "cta": {
+          "x": 12,
+          "y": 898.75,
+          "width": 296,
+          "height": 103.1875,
+          "top": 898.75,
+          "right": 308,
+          "bottom": 1001.9375,
+          "left": 12
+        },
+        "entry": 84296
+      },
+      "scene": {
+        "engine": "three.js r186",
+        "frames": "2",
+        "drawCalls": "13",
+        "triangles": "1530",
+        "buffer": [294, 220],
+        "cls": 0
+      },
+      "resources": [
+        {
+          "name": "interactiveHeroScene-Cfwx2zcy.js",
+          "bytes": 142668,
+          "start": 2778.699999999255
+        }
+      ],
+      "idleFrames": 0,
+      "offscreenFrames": 0
+    }
+  ]
+}

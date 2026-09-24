@@ -1,0 +1,100 @@
+[
+  {
+    "directory": "/tmp/hero-refine-baseline-dist",
+    "chunks": [
+      {
+        "name": "aboutPage-Dx1DAUEI.js",
+        "bytes": 23284,
+        "gzip": 8085,
+        "brotli": 6785
+      },
+      {
+        "name": "index-C3oOlmfW.js",
+        "bytes": 270714,
+        "gzip": 84296,
+        "brotli": 72337
+      },
+      {
+        "name": "index-Dv39fRBO.css",
+        "bytes": 63481,
+        "gzip": 13049,
+        "brotli": 11208
+      },
+      {
+        "name": "interactiveHeroScene-Cfwx2zcy.js",
+        "bytes": 568882,
+        "gzip": 142668,
+        "brotli": 117133
+      },
+      {
+        "name": "photographyPage-BdU6cmcu.js",
+        "bytes": 12690,
+        "gzip": 4334,
+        "brotli": 3829
+      }
+    ],
+    "fallbacks": [
+      {
+        "name": "desk-desktop.webp",
+        "bytes": 15704
+      },
+      {
+        "name": "desk-mobile.webp",
+        "bytes": 10026
+      }
+    ]
+  },
+  {
+    "directory": "dist",
+    "chunks": [
+      {
+        "name": "aboutPage-BBDcL1ly.js",
+        "bytes": 23284,
+        "gzip": 8085,
+        "brotli": 6778
+      },
+      {
+        "name": "index-C3-049ln.css",
+        "bytes": 64995,
+        "gzip": 13334,
+        "brotli": 11481
+      },
+      {
+        "name": "index-DlphMGOC.js",
+        "bytes": 270880,
+        "gzip": 84325,
+        "brotli": 72303
+      },
+      {
+        "name": "interactiveHeroScene-Bd7OLwT4.js",
+        "bytes": 569965,
+        "gzip": 143102,
+        "brotli": 117660
+      },
+      {
+        "name": "photographyPage-DpEMABji.js",
+        "bytes": 12690,
+        "gzip": 4335,
+        "brotli": 3831
+      }
+    ],
+    "fallbacks": [
+      {
+        "name": "desk-desktop.webp",
+        "bytes": 16308
+      },
+      {
+        "name": "desk-compact.webp",
+        "bytes": 17296
+      },
+      {
+        "name": "desk-tablet.webp",
+        "bytes": 17354
+      },
+      {
+        "name": "desk-mobile.webp",
+        "bytes": 10478
+      }
+    ]
+  }
+]

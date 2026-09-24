@@ -1,0 +1,166 @@
+/* A bounded addition to the existing hero; copy, portrait and CTAs keep their grid. */
+.hero-desk {
+  grid-column: 1 / -1;
+  width: min(100%, 760px);
+  min-width: 0;
+  justify-self: center;
+  margin-top: 0.75rem;
+}
+.hero-desk__stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 25 / 11;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  background: radial-gradient(
+    ellipse at 48% 36%,
+    #263b3c 0%,
+    #142128 55%,
+    #0e171c 100%
+  );
+  touch-action: pan-y pinch-zoom;
+}
+.hero-desk__fallback,
+.hero-desk__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.hero-desk__fallback img,
+.hero-desk__canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.hero-desk__fallback img {
+  object-fit: contain;
+}
+.hero-desk__canvas {
+  visibility: hidden;
+}
+.hero-desk[data-ready='true'] .hero-desk__canvas {
+  visibility: visible;
+}
+.hero-desk[data-ready='true'] .hero-desk__fallback {
+  visibility: hidden;
+}
+.hero-desk__canvas {
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
+}
+.hero-desk[data-ready='true'] .hero-desk__canvas {
+  cursor: grab;
+}
+.hero-desk[data-ready='true'] .hero-desk__canvas[data-dragging='true'] {
+  cursor: grabbing;
+}
+.hero-desk__canvas:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -5px;
+  border-radius: inherit;
+}
+.hero-desk__fallback {
+  pointer-events: none;
+}
+@media (max-width: 620px) {
+  .hero-desk {
+    margin-top: 1.75rem;
+  }
+  .hero-desk__stage {
+    aspect-ratio: 4 / 3;
+    border-radius: 1rem;
+  }
+}
+
+/* Budget the whole introduction against viewport height, not just the canvas.
+   On phones the original readable, scrolling composition remains unchanged. */
+@media (min-width: 621px) {
+  .home-header .hero {
+    padding-block: clamp(1rem, 2svh, 1.75rem);
+  }
+  .home-header .hero-inner {
+    grid-template-columns: minmax(0, 1fr) clamp(104px, 11vw, 140px);
+    column-gap: clamp(1.25rem, 3vw, 2.5rem);
+    row-gap: clamp(0.75rem, 2svh, 1.5rem);
+    align-items: end;
+  }
+  .home-header .hero .eyebrow {
+    margin-bottom: 0.5rem;
+    font-size: 0.72rem;
+  }
+  .home-header .hero-intro {
+    margin-bottom: 0.5rem;
+    font-size: 1.05rem;
+  }
+  .home-header .hero h1 {
+    max-width: 100%;
+    font-size: clamp(2.1rem, 4.8svh, 3.6rem);
+    line-height: 1.06;
+    letter-spacing: -0.04em;
+  }
+  .home-header .hero-lede {
+    max-width: 850px;
+    margin-top: clamp(0.65rem, 1.5svh, 1rem);
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+  .home-header .hero-meta {
+    gap: 0.4rem 1rem;
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+  }
+  .home-header .hero-actions {
+    margin-top: 1rem;
+  }
+  .home-header .hero-actions .button,
+  .home-header .hero-actions .personality-button {
+    min-height: 2.75rem;
+    padding-block: 0.6rem;
+  }
+  .home-header .hero-photo-wrap {
+    display: block;
+    width: 100%;
+    margin: 0 0 1.5rem;
+  }
+  .home-header .about-float-link {
+    right: -0.25rem;
+  }
+  .home-header .hero-desk {
+    width: min(100%, 680px, 76svh);
+    margin-top: 0;
+  }
+}
+@media (min-width: 621px) and (max-width: 1100px) {
+  .home-header .hero h1 {
+    font-size: clamp(2.1rem, 4.2svh, 2.75rem);
+  }
+  .home-header .hero-inner {
+    column-gap: 1.25rem;
+  }
+  .home-header .hero-desk {
+    width: min(100%, 640px, 70svh);
+  }
+  .home-header .hero-desk__stage {
+    aspect-ratio: 2 / 1;
+  }
+}
+@media (min-width: 621px) and (max-height: 820px) {
+  .home-header .hero .eyebrow {
+    margin-bottom: 0.35rem;
+  }
+  .home-header .hero-intro {
+    margin-bottom: 0.35rem;
+  }
+  .home-header .hero-meta {
+    margin-top: 0.6rem;
+  }
+  .home-header .hero-actions {
+    margin-top: 0.75rem;
+  }
+  .home-header .hero-inner {
+    row-gap: 0.85rem;
+  }
+}

@@ -11,13 +11,15 @@ const collapseDistance = 440;
 
 const mix = (expanded, compact, progress) => expanded + (compact - expanded) * progress;
 
-const readNavMetrics = () => {
+// Match the homepage-only expanded CSS sizes; reserve room for the full hero.
+const readNavMetrics = (nav) => {
   const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const footprint = nav.parentElement.getBoundingClientRect().height || 4.5 * rootFontSize;
   return {
     rootFontSize,
-    expandedNavHeight: Math.min(12 * rootFontSize, Math.max(10 * rootFontSize, window.innerHeight * 0.2)),
-    expandedLogoSize: Math.min(9.25 * rootFontSize, Math.max(8 * rootFontSize, window.innerWidth * 0.08)),
-    expandedBrandSize: Math.min(2.9 * rootFontSize, Math.max(2.5 * rootFontSize, window.innerWidth * 0.03)),
+    expandedNavHeight: footprint,
+    expandedLogoSize: Math.min(88, Math.max(54, footprint - 20)),
+    expandedBrandSize: Math.min(1.8 * rootFontSize, Math.max(1.2 * rootFontSize, window.innerWidth * 0.02)),
   };
 };
 
@@ -64,7 +66,7 @@ function SiteNav({ collapsible = false, variant = 'default' }) {
       const progress = Math.min(1, Math.max(0, window.scrollY / collapseDistance));
 
       if (Math.abs(progress - previousProgress) >= 0.001) {
-        metrics ||= readNavMetrics();
+        metrics ||= readNavMetrics(nav);
         writeNavProgress(nav, progress, metrics);
         previousProgress = progress;
       }
@@ -79,6 +81,9 @@ function SiteNav({ collapsible = false, variant = 'default' }) {
       requestProgressUpdate();
     };
 
+    const resizeObserver = typeof ResizeObserver === 'function'
+      ? new ResizeObserver(requestResizedProgressUpdate) : null;
+    resizeObserver?.observe(nav.parentElement);
     updateProgress();
     window.addEventListener('scroll', requestProgressUpdate, { passive: true });
     window.addEventListener('resize', requestResizedProgressUpdate, { passive: true });
@@ -86,6 +91,7 @@ function SiteNav({ collapsible = false, variant = 'default' }) {
 
     return () => {
       if (animationFrame !== undefined) window.cancelAnimationFrame(animationFrame);
+      resizeObserver?.disconnect();
       window.removeEventListener('scroll', requestProgressUpdate);
       window.removeEventListener('resize', requestResizedProgressUpdate);
       desktopQuery.removeEventListener?.('change', requestResizedProgressUpdate);
@@ -94,7 +100,7 @@ function SiteNav({ collapsible = false, variant = 'default' }) {
 
   const isPhotography = variant === 'photography';
 
-  return (
+  const navigation = (
     <nav
       ref={navRef}
       className={`site-nav${collapsible ? ' site-nav--collapsible' : ''}${isPhotography ? ' photography-nav' : ''}`}
@@ -128,6 +134,7 @@ function SiteNav({ collapsible = false, variant = 'default' }) {
       </div>
     </nav>
   );
+  return collapsible ? <div className="home-nav-slot">{navigation}</div> : navigation;
 }
 
 export { aboutHref, homeHref };
