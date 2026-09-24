@@ -3,6 +3,7 @@ import { FaArrowRight, FaFilePdf, FaMapMarkerAlt } from 'react-icons/fa';
 import quangPhoto from '../../assets/quang.jpg';
 import { aboutHref } from './siteNav';
 import PersonalityButton from '../ui/personalityButton';
+import HeroVisual from '../hero/HeroVisual';
 
 /**
  * renders the primary navigation and portfolio introduction
@@ -76,6 +77,7 @@ function Header() {
               <span>Meet Quang</span><FaArrowRight aria-hidden="true" />
             </a>
           </div>
+          <HeroVisual />
         </div>
       </section>
     </header>

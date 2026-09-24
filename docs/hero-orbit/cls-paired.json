@@ -1,0 +1,274 @@
+[
+  {
+    "port": 4174,
+    "shifts": [
+      {
+        "time": 3263.300000000745,
+        "value": 0.00042381837368011475,
+        "scroll": 0,
+        "sources": [
+          {
+            "node": "<h1 id=\"hero-title\">I build reliable backend systems, developer tools, automation, and native applications.</h1>",
+            "before": {
+              "x": 160,
+              "y": 135.421875,
+              "width": 940,
+              "height": 83.609375
+            },
+            "after": {
+              "x": 160,
+              "y": 130.421875,
+              "width": 940,
+              "height": 83.609375
+            }
+          },
+          {
+            "node": "<span class=\"brand-domain\">quanghuynh</span>",
+            "before": {
+              "x": 235.59375,
+              "y": 21.71875,
+              "width": 169,
+              "height": 41
+            },
+            "after": {
+              "x": 235.59375,
+              "y": 17.71875,
+              "width": 162.671875,
+              "height": 41
+            }
+          },
+          {
+            "node": "<span class=\"brand-tld\">.com</span>",
+            "before": {
+              "x": 405.9328918457031,
+              "y": 15.61760139465332,
+              "width": 81.75283813476562,
+              "height": 48.632568359375
+            },
+            "after": {
+              "x": 399.94110107421875,
+              "y": 15.964326858520508,
+              "width": 81.12872314453125,
+              "height": 48.59986114501953
+            }
+          }
+        ]
+      }
+    ],
+    "fontTimes": [
+      3257.699999999255
+    ],
+    "scroll": 0,
+    "resources": [
+      {
+        "name": "http://localhost:4174/assets/CircularSpotifyText-Bold-mw-sX5s9.otf",
+        "start": 1881.300000000745,
+        "end": 3242.800000000745
+      }
+    ]
+  },
+  {
+    "port": 4173,
+    "shifts": [
+      {
+        "time": 3992.800000000745,
+        "value": 0.00041963962596139787,
+        "scroll": 0,
+        "sources": [
+          {
+            "node": "<h1 id=\"hero-title\">I build reliable backend systems, developer tools, automation, and native applications.</h1>",
+            "before": {
+              "x": 160,
+              "y": 147.71875,
+              "width": 940,
+              "height": 83.609375
+            },
+            "after": {
+              "x": 160,
+              "y": 142.71875,
+              "width": 940,
+              "height": 83.609375
+            }
+          },
+          {
+            "node": "<span class=\"brand-domain\">quanghuynh</span>",
+            "before": {
+              "x": 235.59375,
+              "y": 21.71875,
+              "width": 169,
+              "height": 41
+            },
+            "after": {
+              "x": 235.59375,
+              "y": 17.71875,
+              "width": 162.671875,
+              "height": 41
+            }
+          },
+          {
+            "node": "<span class=\"brand-tld\">.com</span>",
+            "before": {
+              "x": 405.9328918457031,
+              "y": 15.61760139465332,
+              "width": 81.75283813476562,
+              "height": 48.632568359375
+            },
+            "after": {
+              "x": 399.94110107421875,
+              "y": 15.964326858520508,
+              "width": 81.12872314453125,
+              "height": 48.59986114501953
+            }
+          }
+        ]
+      }
+    ],
+    "fontTimes": [
+      3992.300000000745
+    ],
+    "scroll": 0,
+    "resources": [
+      {
+        "name": "http://localhost:4173/assets/CircularSpotifyText-Bold-mw-sX5s9.otf",
+        "start": 1516.9000000022352,
+        "end": 3976.400000002235
+      }
+    ]
+  },
+  {
+    "port": 4174,
+    "shifts": [
+      {
+        "time": 6064.800000000745,
+        "value": 0.00042381837368011475,
+        "scroll": 0,
+        "sources": [
+          {
+            "node": "<h1 id=\"hero-title\">I build reliable backend systems, developer tools, automation, and native applications.</h1>",
+            "before": {
+              "x": 160,
+              "y": 135.421875,
+              "width": 940,
+              "height": 83.609375
+            },
+            "after": {
+              "x": 160,
+              "y": 130.421875,
+              "width": 940,
+              "height": 83.609375
+            }
+          },
+          {
+            "node": "<span class=\"brand-domain\">quanghuynh</span>",
+            "before": {
+              "x": 235.59375,
+              "y": 21.71875,
+              "width": 169,
+              "height": 41
+            },
+            "after": {
+              "x": 235.59375,
+              "y": 17.71875,
+              "width": 162.671875,
+              "height": 41
+            }
+          },
+          {
+            "node": "<span class=\"brand-tld\">.com</span>",
+            "before": {
+              "x": 405.9328918457031,
+              "y": 15.61760139465332,
+              "width": 81.75283813476562,
+              "height": 48.632568359375
+            },
+            "after": {
+              "x": 399.94110107421875,
+              "y": 15.964326858520508,
+              "width": 81.12872314453125,
+              "height": 48.59986114501953
+            }
+          }
+        ]
+      }
+    ],
+    "fontTimes": [
+      6063.39999999851
+    ],
+    "scroll": 0,
+    "resources": [
+      {
+        "name": "http://localhost:4174/assets/CircularSpotifyText-Bold-mw-sX5s9.otf",
+        "start": 3879.699999999255,
+        "end": 6058.39999999851
+      }
+    ]
+  },
+  {
+    "port": 4173,
+    "shifts": [
+      {
+        "time": 3941.10000000149,
+        "value": 0.00041963962596139787,
+        "scroll": 0,
+        "sources": [
+          {
+            "node": "<h1 id=\"hero-title\">I build reliable backend systems, developer tools, automation, and native applications.</h1>",
+            "before": {
+              "x": 160,
+              "y": 147.71875,
+              "width": 940,
+              "height": 83.609375
+            },
+            "after": {
+              "x": 160,
+              "y": 142.71875,
+              "width": 940,
+              "height": 83.609375
+            }
+          },
+          {
+            "node": "<span class=\"brand-domain\">quanghuynh</span>",
+            "before": {
+              "x": 235.59375,
+              "y": 21.71875,
+              "width": 169,
+              "height": 41
+            },
+            "after": {
+              "x": 235.59375,
+              "y": 17.71875,
+              "width": 162.671875,
+              "height": 41
+            }
+          },
+          {
+            "node": "<span class=\"brand-tld\">.com</span>",
+            "before": {
+              "x": 405.9328918457031,
+              "y": 15.61760139465332,
+              "width": 81.75283813476562,
+              "height": 48.632568359375
+            },
+            "after": {
+              "x": 399.94110107421875,
+              "y": 15.964326858520508,
+              "width": 81.12872314453125,
+              "height": 48.59986114501953
+            }
+          }
+        ]
+      }
+    ],
+    "fontTimes": [
+      3940.2000000029802
+    ],
+    "scroll": 0,
+    "resources": [
+      {
+        "name": "http://localhost:4173/assets/CircularSpotifyText-Bold-mw-sX5s9.otf",
+        "start": 2087,
+        "end": 3933.10000000149
+      }
+    ]
+  }
+]
