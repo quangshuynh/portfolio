@@ -1,0 +1,70 @@
+/* A bounded addition to the existing hero; copy, portrait and CTAs keep their grid. */
+.hero-desk {
+  grid-column: 1 / -1;
+  width: min(100%, 760px);
+  min-width: 0;
+  justify-self: center;
+  margin-top: 0.75rem;
+}
+.hero-desk__stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 25 / 11;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  background: radial-gradient(
+    ellipse at 48% 36%,
+    #263b3c 0%,
+    #142128 55%,
+    #0e171c 100%
+  );
+  touch-action: pan-y pinch-zoom;
+}
+.hero-desk__fallback,
+.hero-desk__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.hero-desk__fallback img,
+.hero-desk__canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.hero-desk__fallback img {
+  object-fit: contain;
+}
+.hero-desk__canvas {
+  visibility: hidden;
+}
+.hero-desk[data-ready='true'] .hero-desk__canvas {
+  visibility: visible;
+}
+.hero-desk[data-ready='true'] .hero-desk__fallback {
+  visibility: hidden;
+}
+.hero-desk__caption {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  margin: 0.6rem 0.25rem 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.hero-desk__caption > span {
+  color: var(--muted);
+}
+@media (max-width: 539px) {
+  .hero-desk {
+    margin-top: 1.75rem;
+  }
+  .hero-desk__stage {
+    aspect-ratio: 4 / 3;
+    border-radius: 1rem;
+  }
+}
