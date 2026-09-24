@@ -81,11 +81,11 @@ export function createDeskScene() {
   box(ink, [3.5, -0.38, 0], [0.16, 0.66, 2.7]);
   const shadow = material('#292521');
   for (const [x, z, w, d] of [
-    [-1.65, -0.6, 2, 1],
-    [0.9, -0.6, 1.4, 1],
+    [-2.05, -0.45, 0.7, 0.7],
+    [1.65, -0.05, 0.7, 0.7],
     [2.95, -0.1, 1.5, 2],
     [-2.9, 1.05, 1, 0.6],
-    [1.35, 1.15, 1.3, 0.65],
+    [-3.4, -0.9, 1.3, 0.65],
   ]) {
     plane(shadow, [x, 0.116, z], [w, d, 1], top);
   }
@@ -125,8 +125,7 @@ export function createDeskScene() {
   }
   function monitor(x, y, width, height, portrait = false) {
     box(ink, [x, y, -0.82], [width, height, 0.12]);
-    box(edge, [x, 0.62, -0.92], [0.12, 1.05, 0.16]);
-    box(ink, [x, 0.16, -0.65], [0.85, 0.09, 0.65]);
+
     const display = new THREE.MeshBasicMaterial({
       map: screenTexture(portrait),
     });
@@ -140,6 +139,68 @@ export function createDeskScene() {
   }
   monitor(-1.75, 1.95, 3, 1.69);
   monitor(0.72, 2.32, 1.69, 3, true);
+
+  // Shared desk-clamped dual arm: each branch folds below the display before
+  // rising to a small rear VESA plate. No individual feet occupy the desktop.
+  box(ink, [-0.45, 0.03, -1.65], [0.42, 0.32, 0.28]);
+  cylinder(edge, [-0.45, -0.2, -1.64], [0.045, 0.22, 0.045]);
+  cylinder(ink, [-0.45, 0.78, -1.48], [0.08, 1.32, 0.08]);
+  function armSegment(from, to) {
+    const a = new THREE.Vector3(...from),
+      b = new THREE.Vector3(...to);
+    const direction = b.clone().sub(a);
+    const rotation = new THREE.Euler().setFromQuaternion(
+      new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.clone().normalize(),
+      ),
+    );
+    box(
+      edge,
+      a.add(b).multiplyScalar(0.5).toArray(),
+      [0.13, direction.length(), 0.16],
+      [rotation.x, rotation.y, rotation.z],
+    );
+  }
+  for (const [x, y, elbow] of [
+    [-1.75, 1.95, -2.45],
+    [0.72, 2.32, 1.28],
+  ]) {
+    const pivot = [-0.45, 0.65, -1.48];
+    const joint = [elbow, 0.72, -1.18];
+    armSegment(pivot, joint);
+    armSegment(joint, [x, y, -1.0]);
+    cylinder(ink, joint, [0.115, 0.18, 0.115]);
+    box(ink, [x, y, -0.94], [0.34, 0.34, 0.1]);
+  }
+
+  // Stereo pair: shared 16-sided tapered body and a tiny repeating mesh texture.
+  // Static blue material suggests illumination without adding lights or bloom.
+  const speakerMesh = material(
+    '#ffffff',
+    texture(32, 32, (c, w, h) => {
+      c.fillStyle = '#202a30';
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = '#10171c';
+      for (let y = 0; y < h; y += 4)
+        for (let x = 0; x < w; x += 4) c.fillRect(x + (y % 8 ? 2 : 0), y, 1, 2);
+    }),
+  );
+  speakerMesh.map.wrapS = speakerMesh.map.wrapT = THREE.RepeatWrapping;
+  speakerMesh.map.repeat.set(4, 2);
+  const speakerBlue = new THREE.MeshBasicMaterial({ color: '#4d8fc9' });
+  materials.push(speakerBlue);
+  const speakerBody = new THREE.CylinderGeometry(0.23, 0.3, 0.46, 16);
+  for (const [x, z] of [
+    [-2.05, -0.45],
+    [1.65, -0.05],
+  ]) {
+    cylinder(silver, [x, 0.155, z], [0.32, 0.055, 0.32]);
+    cylinder(speakerBlue, [x, 0.195, z], [0.305, 0.025, 0.305]);
+    add(speakerBody.clone(), speakerMesh, [x, 0.437, z]);
+    cylinder(ink, [x, 0.675, z], [0.232, 0.02, 0.232]);
+  }
+  speakerBody.dispose();
 
   // Keyboard: one textured surface, not eighty individually drawn meshes.
   const keys = material(
@@ -235,9 +296,9 @@ export function createDeskScene() {
   );
 
   // Blue 22B-inspired display coupe: box arches, gold wheels, scoop and rear wing.
-  const cx = 1.65,
+  const cx = -3.4,
     cy = 0.29,
-    cz = 1.4;
+    cz = -0.9;
   box(blue, [cx, cy, cz], [1.22, 0.24, 0.53]);
   const cabin = new THREE.Shape();
   cabin.moveTo(-0.36, 0);
@@ -295,14 +356,21 @@ export function createDeskScene() {
 }
 
 export function frameDesk(camera, width, height) {
-  const mobile = width < 540;
+  const mobile = window.matchMedia('(max-width: 620px)').matches;
+  const tablet = !mobile && window.matchMedia('(max-width: 1100px)').matches;
+  const compact =
+    !mobile && !tablet && window.matchMedia('(max-height: 820px)').matches;
   const aspect = width / height;
-  const span = Math.max(mobile ? 6.5 : 6.2, 10.4 / aspect);
+  const span = Math.max(mobile ? 6.5 : tablet ? 6.4 : 6.2, 10.4 / aspect);
   camera.left = (-span * aspect) / 2;
   camera.right = (span * aspect) / 2;
   camera.top = span / 2;
   camera.bottom = -span / 2;
-  camera.position.set(mobile ? 4.5 : 5, mobile ? 7.4 : 5.3, mobile ? 11.5 : 10);
+  camera.position.set(
+    mobile ? 4.5 : tablet ? 4 : 5,
+    mobile ? 7.4 : tablet ? 6.6 : compact ? 5.8 : 5.3,
+    mobile ? 11.5 : 10,
+  );
   camera.lookAt(0, 1.35, 0);
   camera.updateProjectionMatrix();
   return camera.position.clone();

@@ -1,0 +1,920 @@
+[
+  {
+    "name": "desktop",
+    "label": "baseline",
+    "run": 0,
+    "initial": {
+      "cls": 0,
+      "lcp": 108,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-C3oOlmfW.js",
+          "bytes": 84296,
+          "start": 8.900000002235174
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 13.900000002235174
+        },
+        {
+          "name": "desk-desktop.webp",
+          "bytes": 15704,
+          "start": 64.40000000223517
+        },
+        {
+          "name": "interactiveHeroScene-Cfwx2zcy.js",
+          "bytes": 142668,
+          "start": 982.1000000014901
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0.010206556022167204,
+      "lcp": 108,
+      "shifts": [
+        {
+          "value": 0.010206556022167204,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    }
+  },
+  {
+    "name": "desktop",
+    "label": "baseline",
+    "run": 1,
+    "initial": {
+      "cls": 0,
+      "lcp": 92,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-C3oOlmfW.js",
+          "bytes": 84296,
+          "start": 16.400000002235174
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 23.800000000745058
+        },
+        {
+          "name": "desk-desktop.webp",
+          "bytes": 15704,
+          "start": 58.80000000074506
+        },
+        {
+          "name": "interactiveHeroScene-Cfwx2zcy.js",
+          "bytes": 142668,
+          "start": 974
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0.010206556022167204,
+      "lcp": 92,
+      "shifts": [
+        {
+          "value": 0.010206556022167204,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    }
+  },
+  {
+    "name": "desktop",
+    "label": "baseline",
+    "run": 2,
+    "initial": {
+      "cls": 0,
+      "lcp": 100,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-C3oOlmfW.js",
+          "bytes": 84296,
+          "start": 20.600000001490116
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 33.400000002235174
+        },
+        {
+          "name": "desk-desktop.webp",
+          "bytes": 15704,
+          "start": 75.69999999925494
+        },
+        {
+          "name": "interactiveHeroScene-Cfwx2zcy.js",
+          "bytes": 142668,
+          "start": 985.6999999992549
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0.010206556022167204,
+      "lcp": 100,
+      "shifts": [
+        {
+          "value": 0.010206556022167204,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    }
+  },
+  {
+    "name": "desktop",
+    "label": "after",
+    "run": 0,
+    "initial": {
+      "cls": 0,
+      "lcp": 120,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-DlphMGOC.js",
+          "bytes": 84325,
+          "start": 13.600000001490116
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 21.700000002980232
+        },
+        {
+          "name": "desk-desktop.webp",
+          "bytes": 16308,
+          "start": 80.80000000074506
+        },
+        {
+          "name": "interactiveHeroScene-Bd7OLwT4.js",
+          "bytes": 143102,
+          "start": 994.3000000007451
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0.001843793294475566,
+      "lcp": 120,
+      "shifts": [
+        {
+          "value": 0.001843793294475566,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", ""]
+        }
+      ]
+    }
+  },
+  {
+    "name": "desktop",
+    "label": "after",
+    "run": 1,
+    "initial": {
+      "cls": 0,
+      "lcp": 100,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-DlphMGOC.js",
+          "bytes": 84325,
+          "start": 23.700000002980232
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 32.600000001490116
+        },
+        {
+          "name": "desk-desktop.webp",
+          "bytes": 16308,
+          "start": 69.5
+        },
+        {
+          "name": "interactiveHeroScene-Bd7OLwT4.js",
+          "bytes": 143102,
+          "start": 985.2000000029802
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0.001843793294475566,
+      "lcp": 100,
+      "shifts": [
+        {
+          "value": 0.001843793294475566,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", ""]
+        }
+      ]
+    }
+  },
+  {
+    "name": "desktop",
+    "label": "after",
+    "run": 2,
+    "initial": {
+      "cls": 0,
+      "lcp": 92,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-DlphMGOC.js",
+          "bytes": 84325,
+          "start": 20.100000001490116
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 29
+        },
+        {
+          "name": "desk-desktop.webp",
+          "bytes": 16308,
+          "start": 65.20000000298023
+        },
+        {
+          "name": "interactiveHeroScene-Bd7OLwT4.js",
+          "bytes": 143102,
+          "start": 976.5
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0.001843793294475566,
+      "lcp": 92,
+      "shifts": [
+        {
+          "value": 0.001843793294475566,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", ""]
+        }
+      ]
+    }
+  },
+  {
+    "name": "laptop",
+    "label": "baseline",
+    "run": 0,
+    "initial": {
+      "cls": 0,
+      "lcp": 76,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-C3oOlmfW.js",
+          "bytes": 84296,
+          "start": 10.199999999254942
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 17.199999999254942
+        },
+        {
+          "name": "desk-desktop.webp",
+          "bytes": 15704,
+          "start": 47.30000000074506
+        },
+        {
+          "name": "interactiveHeroScene-Cfwx2zcy.js",
+          "bytes": 142668,
+          "start": 958.6000000014901
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0.012268658875823645,
+      "lcp": 76,
+      "shifts": [
+        {
+          "value": 0.012268658875823645,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    }
+  },
+  {
+    "name": "laptop",
+    "label": "baseline",
+    "run": 1,
+    "initial": {
+      "cls": 0,
+      "lcp": 80,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-C3oOlmfW.js",
+          "bytes": 84296,
+          "start": 18.100000001490116
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 28.100000001490116
+        },
+        {
+          "name": "desk-desktop.webp",
+          "bytes": 15704,
+          "start": 61
+        },
+        {
+          "name": "interactiveHeroScene-Cfwx2zcy.js",
+          "bytes": 142668,
+          "start": 971.3000000007451
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0.012268658875823645,
+      "lcp": 80,
+      "shifts": [
+        {
+          "value": 0.012268658875823645,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    }
+  },
+  {
+    "name": "laptop",
+    "label": "baseline",
+    "run": 2,
+    "initial": {
+      "cls": 0,
+      "lcp": 88,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-C3oOlmfW.js",
+          "bytes": 84296,
+          "start": 20.399999998509884
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 32.19999999925494
+        },
+        {
+          "name": "desk-desktop.webp",
+          "bytes": 15704,
+          "start": 64.69999999925494
+        },
+        {
+          "name": "interactiveHeroScene-Cfwx2zcy.js",
+          "bytes": 142668,
+          "start": 976.6000000014901
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0.012268658875823645,
+      "lcp": 88,
+      "shifts": [
+        {
+          "value": 0.012268658875823645,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld", null, ""]
+        }
+      ]
+    }
+  },
+  {
+    "name": "laptop",
+    "label": "after",
+    "run": 0,
+    "initial": {
+      "cls": 0,
+      "lcp": 68,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-DlphMGOC.js",
+          "bytes": 84325,
+          "start": 7.199999999254942
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 13.399999998509884
+        },
+        {
+          "name": "desk-compact.webp",
+          "bytes": 17296,
+          "start": 36.5
+        },
+        {
+          "name": "interactiveHeroScene-Bd7OLwT4.js",
+          "bytes": 143102,
+          "start": 955.5999999977648
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0.0018418074646203474,
+      "lcp": 68,
+      "shifts": [
+        {
+          "value": 0.0018418074646203474,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld"]
+        }
+      ]
+    }
+  },
+  {
+    "name": "laptop",
+    "label": "after",
+    "run": 1,
+    "initial": {
+      "cls": 0,
+      "lcp": 88,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-DlphMGOC.js",
+          "bytes": 84325,
+          "start": 10.100000001490116
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 15.800000000745058
+        },
+        {
+          "name": "desk-compact.webp",
+          "bytes": 17296,
+          "start": 49.80000000074506
+        },
+        {
+          "name": "interactiveHeroScene-Bd7OLwT4.js",
+          "bytes": 143102,
+          "start": 962
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0.0018418074646203474,
+      "lcp": 88,
+      "shifts": [
+        {
+          "value": 0.0018418074646203474,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld"]
+        }
+      ]
+    }
+  },
+  {
+    "name": "laptop",
+    "label": "after",
+    "run": 2,
+    "initial": {
+      "cls": 0,
+      "lcp": 88,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-DlphMGOC.js",
+          "bytes": 84325,
+          "start": 19.5
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 29.300000000745058
+        },
+        {
+          "name": "desk-compact.webp",
+          "bytes": 17296,
+          "start": 62
+        },
+        {
+          "name": "interactiveHeroScene-Bd7OLwT4.js",
+          "bytes": 143102,
+          "start": 973.8000000007451
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0.0018418074646203474,
+      "lcp": 88,
+      "shifts": [
+        {
+          "value": 0.0018418074646203474,
+          "sources": ["brand brand-lockup", "nav-links", "brand-tld"]
+        }
+      ]
+    }
+  },
+  {
+    "name": "iphone",
+    "label": "baseline",
+    "run": 0,
+    "initial": {
+      "cls": 0,
+      "lcp": 68,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-C3oOlmfW.js",
+          "bytes": 84296,
+          "start": 9.899999998509884
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 16.199999999254942
+        },
+        {
+          "name": "desk-mobile.webp",
+          "bytes": 10026,
+          "start": 40.80000000074506
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0,
+      "lcp": 68,
+      "shifts": []
+    }
+  },
+  {
+    "name": "iphone",
+    "label": "baseline",
+    "run": 1,
+    "initial": {
+      "cls": 0,
+      "lcp": 96,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-C3oOlmfW.js",
+          "bytes": 84296,
+          "start": 20.400000002235174
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 32.900000002235174
+        },
+        {
+          "name": "desk-mobile.webp",
+          "bytes": 10026,
+          "start": 65.60000000149012
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0,
+      "lcp": 96,
+      "shifts": []
+    }
+  },
+  {
+    "name": "iphone",
+    "label": "baseline",
+    "run": 2,
+    "initial": {
+      "cls": 0,
+      "lcp": 60,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-C3oOlmfW.js",
+          "bytes": 84296,
+          "start": 12.299999997019768
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 17.599999997764826
+        },
+        {
+          "name": "desk-mobile.webp",
+          "bytes": 10026,
+          "start": 38.899999998509884
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0,
+      "lcp": 60,
+      "shifts": []
+    }
+  },
+  {
+    "name": "iphone",
+    "label": "after",
+    "run": 0,
+    "initial": {
+      "cls": 0,
+      "lcp": 84,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-DlphMGOC.js",
+          "bytes": 84325,
+          "start": 12.599999997764826
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 22.800000000745058
+        },
+        {
+          "name": "desk-mobile.webp",
+          "bytes": 10478,
+          "start": 57.5
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0,
+      "lcp": 84,
+      "shifts": []
+    }
+  },
+  {
+    "name": "iphone",
+    "label": "after",
+    "run": 1,
+    "initial": {
+      "cls": 0,
+      "lcp": 88,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-DlphMGOC.js",
+          "bytes": 84325,
+          "start": 14.300000000745058
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 24.5
+        },
+        {
+          "name": "desk-mobile.webp",
+          "bytes": 10478,
+          "start": 56.70000000298023
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0,
+      "lcp": 88,
+      "shifts": []
+    }
+  },
+  {
+    "name": "iphone",
+    "label": "after",
+    "run": 2,
+    "initial": {
+      "cls": 0,
+      "lcp": 84,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-DlphMGOC.js",
+          "bytes": 84325,
+          "start": 15.399999998509884
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 27.899999998509884
+        },
+        {
+          "name": "desk-mobile.webp",
+          "bytes": 10478,
+          "start": 56.099999997764826
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0,
+      "lcp": 84,
+      "shifts": []
+    }
+  },
+  {
+    "name": "tablet",
+    "label": "baseline",
+    "run": 0,
+    "initial": {
+      "cls": 0,
+      "lcp": 116,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-C3oOlmfW.js",
+          "bytes": 84296,
+          "start": 19.399999998509884
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 29.099999997764826
+        },
+        {
+          "name": "desk-desktop.webp",
+          "bytes": 15704,
+          "start": 77.5
+        },
+        {
+          "name": "interactiveHeroScene-Cfwx2zcy.js",
+          "bytes": 142668,
+          "start": 991.0999999977648
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0,
+      "lcp": 116,
+      "shifts": []
+    }
+  },
+  {
+    "name": "tablet",
+    "label": "baseline",
+    "run": 1,
+    "initial": {
+      "cls": 0,
+      "lcp": 68,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-C3oOlmfW.js",
+          "bytes": 84296,
+          "start": 15.700000002980232
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 22.300000000745058
+        },
+        {
+          "name": "desk-desktop.webp",
+          "bytes": 15704,
+          "start": 48.20000000298023
+        },
+        {
+          "name": "interactiveHeroScene-Cfwx2zcy.js",
+          "bytes": 142668,
+          "start": 962.4000000022352
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0,
+      "lcp": 68,
+      "shifts": []
+    }
+  },
+  {
+    "name": "tablet",
+    "label": "baseline",
+    "run": 2,
+    "initial": {
+      "cls": 0,
+      "lcp": 64,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-C3oOlmfW.js",
+          "bytes": 84296,
+          "start": 15.599999997764826
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 21.699999999254942
+        },
+        {
+          "name": "desk-desktop.webp",
+          "bytes": 15704,
+          "start": 46.19999999925494
+        },
+        {
+          "name": "interactiveHeroScene-Cfwx2zcy.js",
+          "bytes": 142668,
+          "start": 958.3000000007451
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0,
+      "lcp": 64,
+      "shifts": []
+    }
+  },
+  {
+    "name": "tablet",
+    "label": "after",
+    "run": 0,
+    "initial": {
+      "cls": 0,
+      "lcp": 176,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-DlphMGOC.js",
+          "bytes": 84325,
+          "start": 29.5
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 45.599999997764826
+        },
+        {
+          "name": "desk-tablet.webp",
+          "bytes": 17354,
+          "start": 126.59999999776483
+        },
+        {
+          "name": "interactiveHeroScene-Bd7OLwT4.js",
+          "bytes": 143102,
+          "start": 1036.3999999985099
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0,
+      "lcp": 176,
+      "shifts": []
+    }
+  },
+  {
+    "name": "tablet",
+    "label": "after",
+    "run": 1,
+    "initial": {
+      "cls": 0,
+      "lcp": 68,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-DlphMGOC.js",
+          "bytes": 84325,
+          "start": 14
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 22.800000000745058
+        },
+        {
+          "name": "desk-tablet.webp",
+          "bytes": 17354,
+          "start": 47.5
+        },
+        {
+          "name": "interactiveHeroScene-Bd7OLwT4.js",
+          "bytes": 143102,
+          "start": 964.3000000007451
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0,
+      "lcp": 68,
+      "shifts": []
+    }
+  },
+  {
+    "name": "tablet",
+    "label": "after",
+    "run": 2,
+    "initial": {
+      "cls": 0,
+      "lcp": 80,
+      "shifts": [],
+      "resources": [
+        {
+          "name": "index-DlphMGOC.js",
+          "bytes": 84325,
+          "start": 16.5
+        },
+        {
+          "name": "manifest.json",
+          "bytes": 436,
+          "start": 22.400000002235174
+        },
+        {
+          "name": "desk-tablet.webp",
+          "bytes": 17354,
+          "start": 59.5
+        },
+        {
+          "name": "interactiveHeroScene-Bd7OLwT4.js",
+          "bytes": 143102,
+          "start": 976
+        }
+      ]
+    },
+    "scroll": {
+      "cls": 0,
+      "lcp": 80,
+      "shifts": []
+    }
+  }
+]

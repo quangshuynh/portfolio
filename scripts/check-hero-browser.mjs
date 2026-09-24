@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { heroViewports } from './hero-viewports.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import {
   send,
@@ -52,12 +53,7 @@ async function showScene() {
 }
 const results = [];
 try {
-  for (const [name, width, height, mobile] of [
-    ['desktop', 1440, 1000, false],
-    ['laptop', 1366, 768, false],
-    ['iphone', 390, 844, true],
-    ['small', 320, 740, true],
-  ]) {
+  for (const [name, width, height, mobile] of heroViewports) {
     await send('Emulation.setDeviceMetricsOverride', {
       width,
       height,
@@ -67,9 +63,19 @@ try {
     await send('Emulation.setTouchEmulationEnabled', { enabled: mobile });
     await navigate();
     const initial = await evaluate(
-      `({...heroMetrics,overflow:document.documentElement.scrollWidth>innerWidth,cta:document.querySelector('.hero-actions').getBoundingClientRect().toJSON(),entry:performance.getEntriesByType('resource').find(r=>r.name.includes('/assets/index-') && r.name.endsWith('.js'))?.encodedBodySize})`,
+      `({...heroMetrics,navBottom:document.querySelector('.site-nav').getBoundingClientRect().bottom,introTop:document.querySelector('.hero .eyebrow').getBoundingClientRect().top,captionBottom:document.querySelector('.hero-desk__caption').getBoundingClientRect().bottom,overflow:document.documentElement.scrollWidth>innerWidth,cta:document.querySelector('.hero-actions').getBoundingClientRect().toJSON(),entry:performance.getEntriesByType('resource').find(r=>r.name.includes('/assets/index-') && r.name.endsWith('.js'))?.encodedBodySize})`,
     );
     assert.equal(initial.overflow, false, `${name}: initial overflow`);
+    if (width > 620) {
+      assert.ok(
+        initial.captionBottom <= height,
+        `${name}: incomplete initial hero`,
+      );
+      assert.ok(
+        initial.introTop >= initial.navBottom,
+        `${name}: navigation overlaps introduction`,
+      );
+    }
     assert.equal(initial.errors.length, 0, `${name}: script errors`);
     await screenshot(`${output}/${name}-initial.png`);
     await showScene();
@@ -131,17 +137,22 @@ try {
     });
     await pause(250);
     if (mobile) {
+      await showScene();
+      const touchRect = await evaluate(
+        `document.querySelector('.hero-desk__stage').getBoundingClientRect().toJSON()`,
+      );
       const before = await evaluate('scrollY');
       await send('Input.synthesizeScrollGesture', {
-        x: width / 2,
-        y: height / 2,
-        yDistance: -150,
+        x: touchRect.x + touchRect.width / 2,
+        y: Math.min(height - 32, touchRect.y + touchRect.height / 2),
+        // Tablets retain the existing page scroll-snap: cross its threshold.
+        yDistance: -Math.max(200, height * 0.8),
         gestureSourceType: 'touch',
       });
       await pause(200);
       assert.ok(
         (await evaluate('scrollY')) > before,
-        'Touch failed to scroll through scene',
+        `${name}: touch failed to scroll through scene`,
       );
     }
     results.push({

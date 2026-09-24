@@ -7,8 +7,16 @@ export function StaticHeroScene() {
   return (
     <picture className="hero-desk__fallback">
       <source
-        media="(max-width: 539px)"
+        media="(max-width: 620px)"
         srcSet={`${import.meta.env.BASE_URL}hero/desk-mobile.webp`}
+      />
+      <source
+        media="(max-width: 1100px)"
+        srcSet={`${import.meta.env.BASE_URL}hero/desk-tablet.webp`}
+      />
+      <source
+        media="(max-height: 820px)"
+        srcSet={`${import.meta.env.BASE_URL}hero/desk-compact.webp`}
       />
       <img
         src={`${import.meta.env.BASE_URL}hero/desk-desktop.webp`}

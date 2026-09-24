@@ -34,9 +34,9 @@
 
 @media (min-width: 1024px) {
   .site-nav--collapsible {
-    --expanded-nav-height: clamp(10rem, 20vh, 12rem);
-    --expanded-logo-size: clamp(8rem, 8vw, 9.25rem);
-    --expanded-brand-size: clamp(2.5rem, 3vw, 2.9rem);
+    --expanded-nav-height: clamp(4.5rem, 10svh, 6.75rem);
+    --expanded-logo-size: clamp(54px, calc(10svh - 20px), 88px);
+    --expanded-brand-size: clamp(1.2rem, 2vw, 1.8rem);
     --nav-progress: 0;
     --nav-current-height: var(--expanded-nav-height);
     --logo-current-size: var(--expanded-logo-size);

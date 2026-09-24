@@ -79,7 +79,7 @@ test('static fallback is immediate, decorative and has a distinct mobile source'
   );
   expect(container.querySelector('source')).toHaveAttribute(
     'media',
-    '(max-width: 539px)',
+    '(max-width: 620px)',
   );
   expect(container.querySelector('.hero-desk__stage')).toHaveAttribute(
     'aria-hidden',
@@ -193,4 +193,18 @@ test('browsers without IntersectionObserver retain the static scene', async () =
   });
   expect(load).not.toHaveBeenCalled();
   expect(container.firstChild).toHaveAttribute('data-ready', 'false');
+});
+
+test('fallback selects matching phone, tablet, short-laptop and desktop framing', () => {
+  const { container } = render(<HeroVisual load={load} />);
+  const sources = [...container.querySelectorAll('picture source')];
+  expect(sources.map((source) => [source.media, source.srcset])).toEqual([
+    ['(max-width: 620px)', '/hero/desk-mobile.webp'],
+    ['(max-width: 1100px)', '/hero/desk-tablet.webp'],
+    ['(max-height: 820px)', '/hero/desk-compact.webp'],
+  ]);
+  expect(container.querySelector('picture img')).toHaveAttribute(
+    'src',
+    '/hero/desk-desktop.webp',
+  );
 });
