@@ -17,7 +17,12 @@ for (const directory of directories) {
     });
   }
   const fallbacks = [];
-  for (const name of ['desk-desktop.webp', 'desk-mobile.webp']) {
+  for (const name of [
+    'desk-desktop.webp',
+    'desk-compact.webp',
+    'desk-tablet.webp',
+    'desk-mobile.webp',
+  ]) {
     try {
       fallbacks.push({
         name,

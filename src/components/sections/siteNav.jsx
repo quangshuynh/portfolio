@@ -11,13 +11,14 @@ const collapseDistance = 440;
 
 const mix = (expanded, compact, progress) => expanded + (compact - expanded) * progress;
 
+// Match the homepage-only expanded CSS sizes; reserve room for the full hero.
 const readNavMetrics = () => {
   const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
   return {
     rootFontSize,
-    expandedNavHeight: Math.min(12 * rootFontSize, Math.max(10 * rootFontSize, window.innerHeight * 0.2)),
-    expandedLogoSize: Math.min(9.25 * rootFontSize, Math.max(8 * rootFontSize, window.innerWidth * 0.08)),
-    expandedBrandSize: Math.min(2.9 * rootFontSize, Math.max(2.5 * rootFontSize, window.innerWidth * 0.03)),
+    expandedNavHeight: Math.min(6.75 * rootFontSize, Math.max(4.5 * rootFontSize, window.innerHeight * 0.1)),
+    expandedLogoSize: Math.min(88, Math.max(54, window.innerHeight * 0.1 - 20)),
+    expandedBrandSize: Math.min(1.8 * rootFontSize, Math.max(1.2 * rootFontSize, window.innerWidth * 0.02)),
   };
 };
 

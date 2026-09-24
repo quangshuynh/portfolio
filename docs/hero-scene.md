@@ -1,5 +1,7 @@
 # Hero desk prototype — implementation and measurements
 
+> Historical first-interval report. The [hero refinement report](hero-refinement.md) supersedes the layout, monitor mount, car position, speakers, camera profiles and current measurements below.
+
 Implemented locally only. No commit, push, PR or deployment. Recommend **keeping this bounded prototype**, subject to a physical iPhone/Safari check before release. The measured scene cost is comfortably below the requested 1–2 MB compressed budget.
 
 ## Existing architecture and scope
