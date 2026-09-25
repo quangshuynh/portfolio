@@ -1,0 +1,1396 @@
+[
+  {
+    "name": "desktop",
+    "start": {
+      "y": 178,
+      "angle": 0.013185185185185183,
+      "target": 0.013185185185185183,
+      "dragging": false,
+      "capture": false,
+      "frames": 36,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": []
+    },
+    "wheel": {
+      "y": 478,
+      "angle": 0.03540740740740741,
+      "target": 0.03540740740740741,
+      "dragging": false,
+      "capture": false,
+      "frames": 127,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        }
+      ]
+    },
+    "trackpad": {
+      "before": 178,
+      "after": 274
+    },
+    "duringDrag": {
+      "y": 178,
+      "angle": -0.3169998546353742,
+      "target": -0.4501765631318934,
+      "dragging": true,
+      "capture": true,
+      "frames": 345,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        }
+      ]
+    },
+    "afterDrag": {
+      "y": 178,
+      "angle": -0.4501765631318934,
+      "target": -0.4501765631318934,
+      "dragging": false,
+      "capture": false,
+      "frames": 406,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        }
+      ]
+    },
+    "pastHero": {
+      "y": 1946,
+      "angle": -1.5381391782310063,
+      "target": -1.5287222527208224,
+      "dragging": false,
+      "capture": false,
+      "frames": 778,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 70
+        },
+        {
+          "prevented": false,
+          "x": 100,
+          "y": 0
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        }
+      ]
+    },
+    "idleFrames": 0
+  },
+  {
+    "name": "laptop",
+    "start": {
+      "y": 156,
+      "angle": 0.01354191156524098,
+      "target": 0.01354191156524098,
+      "dragging": false,
+      "capture": false,
+      "frames": 37,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": []
+    },
+    "wheel": {
+      "y": 456,
+      "angle": 0.03958404919070441,
+      "target": 0.03958404919070441,
+      "dragging": false,
+      "capture": false,
+      "frames": 135,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        }
+      ]
+    },
+    "trackpad": {
+      "before": 156,
+      "after": 252
+    },
+    "duringDrag": {
+      "y": 156,
+      "angle": -0.36121704372814994,
+      "target": -0.5265551411914859,
+      "dragging": true,
+      "capture": true,
+      "frames": 348,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        }
+      ]
+    },
+    "afterDrag": {
+      "y": 156,
+      "angle": -0.5265551411914859,
+      "target": -0.5265551411914859,
+      "dragging": false,
+      "capture": false,
+      "frames": 408,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        }
+      ]
+    },
+    "pastHero": {
+      "y": 1812,
+      "angle": -1.5419505138673295,
+      "target": -1.531212277604192,
+      "dragging": false,
+      "capture": false,
+      "frames": 764,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 70
+        },
+        {
+          "prevented": false,
+          "x": 100,
+          "y": 0
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        }
+      ]
+    },
+    "idleFrames": 0
+  },
+  {
+    "name": "mac-short",
+    "start": {
+      "y": 149,
+      "angle": 0.015467128027681661,
+      "target": 0.015467128027681661,
+      "dragging": false,
+      "capture": false,
+      "frames": 43,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": []
+    },
+    "wheel": {
+      "y": 449,
+      "angle": 0.046608996539792384,
+      "target": 0.046608996539792384,
+      "dragging": false,
+      "capture": false,
+      "frames": 161,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        }
+      ]
+    },
+    "trackpad": {
+      "before": 149,
+      "after": 245
+    },
+    "duringDrag": {
+      "y": 149,
+      "angle": -0.47026923779232666,
+      "target": -0.6230679641653657,
+      "dragging": true,
+      "capture": true,
+      "frames": 442,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        }
+      ]
+    },
+    "afterDrag": {
+      "y": 149,
+      "angle": -0.6230679641653657,
+      "target": -0.6230679641653657,
+      "dragging": false,
+      "capture": false,
+      "frames": 512,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        }
+      ]
+    },
+    "pastHero": {
+      "y": 1693,
+      "angle": -1.527686504103032,
+      "target": -1.5262634548225782,
+      "dragging": false,
+      "capture": false,
+      "frames": 975,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 70
+        },
+        {
+          "prevented": false,
+          "x": 100,
+          "y": 0
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        }
+      ]
+    },
+    "idleFrames": 0
+  },
+  {
+    "name": "tablet",
+    "start": {
+      "y": 206,
+      "angle": 0.012983193277310925,
+      "target": 0.012983193277310925,
+      "dragging": false,
+      "capture": false,
+      "frames": 35,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": []
+    },
+    "horizontal": {
+      "before": {
+        "y": 206,
+        "angle": 0.012983193277310925,
+        "target": 0.012983193277310925,
+        "dragging": false,
+        "capture": false,
+        "frames": 35,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      },
+      "after": {
+        "y": 206,
+        "angle": -0.47942944835118334,
+        "target": -0.47942944835118334,
+        "dragging": false,
+        "capture": false,
+        "frames": 149,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      }
+    },
+    "vertical": {
+      "before": {
+        "y": 206,
+        "angle": -0.47942944835118334,
+        "target": -0.47942944835118334,
+        "dragging": false,
+        "capture": false,
+        "frames": 149,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      },
+      "after": {
+        "y": 341,
+        "angle": -0.4709210449898388,
+        "target": -0.4709210449898388,
+        "dragging": false,
+        "capture": false,
+        "frames": 221,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      }
+    },
+    "diagonal": {
+      "before": {
+        "y": 206,
+        "angle": -0.47942944835118334,
+        "target": -0.47942944835118334,
+        "dragging": false,
+        "capture": false,
+        "frames": 250,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      },
+      "after": {
+        "y": 295,
+        "angle": -0.47382020465370434,
+        "target": -0.47382020465370434,
+        "dragging": false,
+        "capture": false,
+        "frames": 321,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      }
+    },
+    "idleFrames": 0
+  },
+  {
+    "name": "mobile",
+    "start": {
+      "y": 769,
+      "angle": 0.02070099715879792,
+      "target": 0.036949873620460975,
+      "dragging": false,
+      "capture": false,
+      "frames": 3,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": []
+    },
+    "horizontal": {
+      "before": {
+        "y": 769,
+        "angle": 0.03684958153964711,
+        "target": 0.036949873620460975,
+        "dragging": false,
+        "capture": false,
+        "frames": 67,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      },
+      "after": {
+        "y": 769,
+        "angle": -0.8261250312118998,
+        "target": -0.8261250312118998,
+        "dragging": false,
+        "capture": false,
+        "frames": 274,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      }
+    },
+    "vertical": {
+      "before": {
+        "y": 769,
+        "angle": -0.8261250312118998,
+        "target": -0.8261250312118998,
+        "dragging": false,
+        "capture": false,
+        "frames": 274,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      },
+      "after": {
+        "y": 904,
+        "angle": -0.8196383823968645,
+        "target": -0.8196383823968645,
+        "dragging": false,
+        "capture": false,
+        "frames": 392,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      }
+    },
+    "diagonal": {
+      "before": {
+        "y": 769,
+        "angle": -0.8261250312118998,
+        "target": -0.8261250312118998,
+        "dragging": false,
+        "capture": false,
+        "frames": 443,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      },
+      "after": {
+        "y": 858,
+        "angle": -0.8218486479190247,
+        "target": -0.8218486479190247,
+        "dragging": false,
+        "capture": false,
+        "frames": 564,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      }
+    },
+    "idleFrames": 0
+  }
+]

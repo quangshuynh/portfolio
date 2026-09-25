@@ -44,9 +44,9 @@ export default function HeroVisual({ load = loadScene }) {
       idle,
       timer,
       generation = 0;
+    // Reduced motion controls automatic movement in the renderer, not manual input.
     const allowed = () =>
       motion &&
-      !motion.matches &&
       !connection?.saveData &&
       !/^(slow-2g|2g|3g)$/.test(connection?.effectiveType || '') &&
       !(navigator.deviceMemory && navigator.deviceMemory <= 2) &&

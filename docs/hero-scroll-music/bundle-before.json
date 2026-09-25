@@ -1,0 +1,53 @@
+{
+  "directory": "dist",
+  "chunks": [
+    {
+      "name": "aboutPage-ktbrAH5o.js",
+      "bytes": 23284,
+      "gzip": 8044,
+      "brotli": 6804
+    },
+    {
+      "name": "index-B14Oeooe.css",
+      "bytes": 65752,
+      "gzip": 13472,
+      "brotli": 11562
+    },
+    {
+      "name": "index-BdXpxfdN.js",
+      "bytes": 271073,
+      "gzip": 84745,
+      "brotli": 72459
+    },
+    {
+      "name": "interactiveHeroScene-BvHvt5Sy.js",
+      "bytes": 575713,
+      "gzip": 145830,
+      "brotli": 119362
+    },
+    {
+      "name": "photographyPage-C59qKzw7.js",
+      "bytes": 12690,
+      "gzip": 4334,
+      "brotli": 3832
+    }
+  ],
+  "fallbacks": [
+    {
+      "name": "desk-desktop.webp",
+      "bytes": 16846
+    },
+    {
+      "name": "desk-compact.webp",
+      "bytes": 17850
+    },
+    {
+      "name": "desk-tablet.webp",
+      "bytes": 17778
+    },
+    {
+      "name": "desk-mobile.webp",
+      "bytes": 10834
+    }
+  ]
+}

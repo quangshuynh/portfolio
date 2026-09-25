@@ -1,0 +1,96 @@
+[
+  {
+    "name": "mobile",
+    "start": {
+      "y": 769,
+      "angle": 0.021764518904213905,
+      "target": 0.036949873620460975,
+      "dragging": false,
+      "capture": false,
+      "frames": 3,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": []
+    },
+    "horizontal": {
+      "before": {
+        "y": 769,
+        "angle": 0.036843215861020545,
+        "target": 0.036949873620460975,
+        "dragging": false,
+        "capture": false,
+        "frames": 65,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      },
+      "after": {
+        "y": 769,
+        "angle": -0.8261250312118998,
+        "target": -0.8261250312118998,
+        "dragging": false,
+        "capture": false,
+        "frames": 280,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      }
+    },
+    "vertical": {
+      "before": {
+        "y": 769,
+        "angle": -0.8261250312118998,
+        "target": -0.8261250312118998,
+        "dragging": false,
+        "capture": false,
+        "frames": 280,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      },
+      "after": {
+        "y": 904,
+        "angle": -0.8196383823968645,
+        "target": -0.8196383823968645,
+        "dragging": false,
+        "capture": false,
+        "frames": 407,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      }
+    },
+    "diagonal": {
+      "before": {
+        "y": 769,
+        "angle": -0.8261250312118998,
+        "target": -0.8261250312118998,
+        "dragging": false,
+        "capture": false,
+        "frames": 458,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      },
+      "after": {
+        "y": 858,
+        "angle": -0.8218486479190247,
+        "target": -0.8218486479190247,
+        "dragging": false,
+        "capture": false,
+        "frames": 577,
+        "calls": 15,
+        "triangles": 2902,
+        "selection": "",
+        "wheels": []
+      }
+    },
+    "idleFrames": 0
+  }
+]

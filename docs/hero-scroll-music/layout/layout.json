@@ -1,0 +1,974 @@
+[
+  {
+    "name": "desktop-large",
+    "width": 1920,
+    "height": 1080,
+    "overflow": false,
+    "elements": {
+      ".site-nav": {
+        "x": 0,
+        "y": 0,
+        "width": 1905,
+        "height": 108,
+        "top": 0,
+        "right": 1905,
+        "bottom": 108,
+        "left": 0
+      },
+      ".hero .eyebrow": {
+        "x": 392.5,
+        "y": 235.671875,
+        "width": 940,
+        "height": 15,
+        "top": 235.671875,
+        "right": 1332.5,
+        "bottom": 250.671875,
+        "left": 392.5
+      },
+      ".hero-intro": {
+        "x": 392.5,
+        "y": 258.671875,
+        "width": 940,
+        "height": 22,
+        "top": 258.671875,
+        "right": 1332.5,
+        "bottom": 280.671875,
+        "left": 392.5
+      },
+      ".hero h1": {
+        "x": 392.5,
+        "y": 288.671875,
+        "width": 940,
+        "height": 164.859375,
+        "top": 288.671875,
+        "right": 1332.5,
+        "bottom": 453.53125,
+        "left": 392.5
+      },
+      ".hero-lede": {
+        "x": 392.5,
+        "y": 469.53125,
+        "width": 850,
+        "height": 72,
+        "top": 469.53125,
+        "right": 1242.5,
+        "bottom": 541.53125,
+        "left": 392.5
+      },
+      ".hero-meta": {
+        "x": 392.5,
+        "y": 553.53125,
+        "width": 940,
+        "height": 18,
+        "top": 553.53125,
+        "right": 1332.5,
+        "bottom": 571.53125,
+        "left": 392.5
+      },
+      ".hero-actions": {
+        "x": 392.5,
+        "y": 587.53125,
+        "width": 940,
+        "height": 44,
+        "top": 587.53125,
+        "right": 1332.5,
+        "bottom": 631.53125,
+        "left": 392.5
+      },
+      ".hero-photo-wrap": {
+        "x": 1372.5,
+        "y": 467.53125,
+        "width": 140,
+        "height": 140,
+        "top": 467.53125,
+        "right": 1512.5,
+        "bottom": 607.53125,
+        "left": 1372.5
+      },
+      ".about-float-link": {
+        "x": 1384.78125,
+        "y": 583.53125,
+        "width": 131.71875,
+        "height": 44,
+        "top": 583.53125,
+        "right": 1516.5,
+        "bottom": 627.53125,
+        "left": 1384.78125
+      },
+      ".meet-quang-card": null,
+      ".hero-desk__stage": {
+        "x": 612.5,
+        "y": 653.125,
+        "width": 680,
+        "height": 299.1875,
+        "top": 653.125,
+        "right": 1292.5,
+        "bottom": 952.3125,
+        "left": 612.5
+      }
+    },
+    "font": "51.84px"
+  },
+  {
+    "name": "desktop",
+    "width": 1440,
+    "height": 900,
+    "overflow": false,
+    "elements": {
+      ".site-nav": {
+        "x": 0,
+        "y": 0,
+        "width": 1425,
+        "height": 90,
+        "top": 0,
+        "right": 1425,
+        "bottom": 90,
+        "left": 0
+      },
+      ".hero .eyebrow": {
+        "x": 152.5,
+        "y": 176.375,
+        "width": 940,
+        "height": 15,
+        "top": 176.375,
+        "right": 1092.5,
+        "bottom": 191.375,
+        "left": 152.5
+      },
+      ".hero-intro": {
+        "x": 152.5,
+        "y": 199.375,
+        "width": 940,
+        "height": 22,
+        "top": 199.375,
+        "right": 1092.5,
+        "bottom": 221.375,
+        "left": 152.5
+      },
+      ".hero h1": {
+        "x": 152.5,
+        "y": 229.375,
+        "width": 940,
+        "height": 91.5625,
+        "top": 229.375,
+        "right": 1092.5,
+        "bottom": 320.9375,
+        "left": 152.5
+      },
+      ".hero-lede": {
+        "x": 152.5,
+        "y": 334.4375,
+        "width": 850,
+        "height": 72,
+        "top": 334.4375,
+        "right": 1002.5,
+        "bottom": 406.4375,
+        "left": 152.5
+      },
+      ".hero-meta": {
+        "x": 152.5,
+        "y": 418.4375,
+        "width": 940,
+        "height": 18,
+        "top": 418.4375,
+        "right": 1092.5,
+        "bottom": 436.4375,
+        "left": 152.5
+      },
+      ".hero-actions": {
+        "x": 152.5,
+        "y": 452.4375,
+        "width": 940,
+        "height": 44,
+        "top": 452.4375,
+        "right": 1092.5,
+        "bottom": 496.4375,
+        "left": 152.5
+      },
+      ".hero-photo-wrap": {
+        "x": 1132.5,
+        "y": 332.4375,
+        "width": 140,
+        "height": 140,
+        "top": 332.4375,
+        "right": 1272.5,
+        "bottom": 472.4375,
+        "left": 1132.5
+      },
+      ".about-float-link": {
+        "x": 1144.78125,
+        "y": 448.4375,
+        "width": 131.71875,
+        "height": 44,
+        "top": 448.4375,
+        "right": 1276.5,
+        "bottom": 492.4375,
+        "left": 1144.78125
+      },
+      ".meet-quang-card": null,
+      ".hero-desk__stage": {
+        "x": 372.5,
+        "y": 514.4375,
+        "width": 680,
+        "height": 299.1875,
+        "top": 514.4375,
+        "right": 1052.5,
+        "bottom": 813.625,
+        "left": 372.5
+      }
+    },
+    "font": "43.2px"
+  },
+  {
+    "name": "laptop",
+    "width": 1366,
+    "height": 768,
+    "overflow": false,
+    "elements": {
+      ".site-nav": {
+        "x": 0,
+        "y": 0,
+        "width": 1351,
+        "height": 76.796875,
+        "top": 0,
+        "right": 1351,
+        "bottom": 76.796875,
+        "left": 0
+      },
+      ".hero .eyebrow": {
+        "x": 115.5,
+        "y": 140.46875,
+        "width": 940,
+        "height": 15,
+        "top": 140.46875,
+        "right": 1055.5,
+        "bottom": 155.46875,
+        "left": 115.5
+      },
+      ".hero-intro": {
+        "x": 115.5,
+        "y": 161.0625,
+        "width": 940,
+        "height": 22,
+        "top": 161.0625,
+        "right": 1055.5,
+        "bottom": 183.0625,
+        "left": 115.5
+      },
+      ".hero h1": {
+        "x": 115.5,
+        "y": 188.65625,
+        "width": 940,
+        "height": 78.125,
+        "top": 188.65625,
+        "right": 1055.5,
+        "bottom": 266.78125,
+        "left": 115.5
+      },
+      ".hero-lede": {
+        "x": 115.5,
+        "y": 278.296875,
+        "width": 850,
+        "height": 72,
+        "top": 278.296875,
+        "right": 965.5,
+        "bottom": 350.296875,
+        "left": 115.5
+      },
+      ".hero-meta": {
+        "x": 115.5,
+        "y": 359.890625,
+        "width": 940,
+        "height": 18,
+        "top": 359.890625,
+        "right": 1055.5,
+        "bottom": 377.890625,
+        "left": 115.5
+      },
+      ".hero-actions": {
+        "x": 115.5,
+        "y": 389.890625,
+        "width": 940,
+        "height": 44,
+        "top": 389.890625,
+        "right": 1055.5,
+        "bottom": 433.890625,
+        "left": 115.5
+      },
+      ".hero-photo-wrap": {
+        "x": 1095.5,
+        "y": 269.890625,
+        "width": 140,
+        "height": 140,
+        "top": 269.890625,
+        "right": 1235.5,
+        "bottom": 409.890625,
+        "left": 1095.5
+      },
+      ".about-float-link": {
+        "x": 1107.78125,
+        "y": 385.890625,
+        "width": 131.71875,
+        "height": 44,
+        "top": 385.890625,
+        "right": 1239.5,
+        "bottom": 429.890625,
+        "left": 1107.78125
+      },
+      ".meet-quang-card": null,
+      ".hero-desk__stage": {
+        "x": 383.65625,
+        "y": 447.484375,
+        "width": 583.671875,
+        "height": 256.8125,
+        "top": 447.484375,
+        "right": 967.328125,
+        "bottom": 704.296875,
+        "left": 383.65625
+      }
+    },
+    "font": "36.864px"
+  },
+  {
+    "name": "mac-short",
+    "width": 1440,
+    "height": 650,
+    "overflow": false,
+    "elements": {
+      ".site-nav": {
+        "x": 0,
+        "y": 0,
+        "width": 1425,
+        "height": 72,
+        "top": 0,
+        "right": 1425,
+        "bottom": 72,
+        "left": 0
+      },
+      ".hero .eyebrow": {
+        "x": 152.5,
+        "y": 102.828125,
+        "width": 940,
+        "height": 15,
+        "top": 102.828125,
+        "right": 1092.5,
+        "bottom": 117.828125,
+        "left": 152.5
+      },
+      ".hero-intro": {
+        "x": 152.5,
+        "y": 123.421875,
+        "width": 940,
+        "height": 22,
+        "top": 123.421875,
+        "right": 1092.5,
+        "bottom": 145.421875,
+        "left": 152.5
+      },
+      ".hero h1": {
+        "x": 152.5,
+        "y": 151.015625,
+        "width": 940,
+        "height": 71.21875,
+        "top": 151.015625,
+        "right": 1092.5,
+        "bottom": 222.234375,
+        "left": 152.5
+      },
+      ".hero-lede": {
+        "x": 152.5,
+        "y": 232.625,
+        "width": 850,
+        "height": 72,
+        "top": 232.625,
+        "right": 1002.5,
+        "bottom": 304.625,
+        "left": 152.5
+      },
+      ".hero-meta": {
+        "x": 152.5,
+        "y": 314.21875,
+        "width": 940,
+        "height": 18,
+        "top": 314.21875,
+        "right": 1092.5,
+        "bottom": 332.21875,
+        "left": 152.5
+      },
+      ".hero-actions": {
+        "x": 152.5,
+        "y": 344.21875,
+        "width": 940,
+        "height": 44,
+        "top": 344.21875,
+        "right": 1092.5,
+        "bottom": 388.21875,
+        "left": 152.5
+      },
+      ".hero-photo-wrap": {
+        "x": 1132.5,
+        "y": 224.21875,
+        "width": 140,
+        "height": 140,
+        "top": 224.21875,
+        "right": 1272.5,
+        "bottom": 364.21875,
+        "left": 1132.5
+      },
+      ".about-float-link": {
+        "x": 1144.78125,
+        "y": 340.21875,
+        "width": 131.71875,
+        "height": 44,
+        "top": 340.21875,
+        "right": 1276.5,
+        "bottom": 384.21875,
+        "left": 1144.78125
+      },
+      ".meet-quang-card": null,
+      ".hero-desk__stage": {
+        "x": 465.5,
+        "y": 401.8125,
+        "width": 494,
+        "height": 217.359375,
+        "top": 401.8125,
+        "right": 959.5,
+        "bottom": 619.171875,
+        "left": 465.5
+      }
+    },
+    "font": "33.6px"
+  },
+  {
+    "name": "laptop-tall",
+    "width": 1280,
+    "height": 800,
+    "overflow": false,
+    "elements": {
+      ".site-nav": {
+        "x": 0,
+        "y": 0,
+        "width": 1265,
+        "height": 80,
+        "top": 0,
+        "right": 1265,
+        "bottom": 80,
+        "left": 0
+      },
+      ".hero .eyebrow": {
+        "x": 72.5,
+        "y": 150.84375,
+        "width": 941.609375,
+        "height": 15,
+        "top": 150.84375,
+        "right": 1014.109375,
+        "bottom": 165.84375,
+        "left": 72.5
+      },
+      ".hero-intro": {
+        "x": 72.5,
+        "y": 171.4375,
+        "width": 941.609375,
+        "height": 22,
+        "top": 171.4375,
+        "right": 1014.109375,
+        "bottom": 193.4375,
+        "left": 72.5
+      },
+      ".hero h1": {
+        "x": 72.5,
+        "y": 199.03125,
+        "width": 941.609375,
+        "height": 81.40625,
+        "top": 199.03125,
+        "right": 1014.109375,
+        "bottom": 280.4375,
+        "left": 72.5
+      },
+      ".hero-lede": {
+        "x": 72.5,
+        "y": 292.4375,
+        "width": 850,
+        "height": 72,
+        "top": 292.4375,
+        "right": 922.5,
+        "bottom": 364.4375,
+        "left": 72.5
+      },
+      ".hero-meta": {
+        "x": 72.5,
+        "y": 374.03125,
+        "width": 941.609375,
+        "height": 18,
+        "top": 374.03125,
+        "right": 1014.109375,
+        "bottom": 392.03125,
+        "left": 72.5
+      },
+      ".hero-actions": {
+        "x": 72.5,
+        "y": 404.03125,
+        "width": 941.609375,
+        "height": 44,
+        "top": 404.03125,
+        "right": 1014.109375,
+        "bottom": 448.03125,
+        "left": 72.5
+      },
+      ".hero-photo-wrap": {
+        "x": 1052.5,
+        "y": 284.03125,
+        "width": 140,
+        "height": 140,
+        "top": 284.03125,
+        "right": 1192.5,
+        "bottom": 424.03125,
+        "left": 1052.5
+      },
+      ".about-float-link": {
+        "x": 1064.78125,
+        "y": 400.03125,
+        "width": 131.71875,
+        "height": 44,
+        "top": 400.03125,
+        "right": 1196.5,
+        "bottom": 444.03125,
+        "left": 1064.78125
+      },
+      ".meet-quang-card": null,
+      ".hero-desk__stage": {
+        "x": 328.5,
+        "y": 461.625,
+        "width": 608,
+        "height": 267.515625,
+        "top": 461.625,
+        "right": 936.5,
+        "bottom": 729.140625,
+        "left": 328.5
+      }
+    },
+    "font": "38.4px"
+  },
+  {
+    "name": "tablet-landscape",
+    "width": 1024,
+    "height": 768,
+    "overflow": false,
+    "elements": {
+      ".site-nav": {
+        "x": 0,
+        "y": 0,
+        "width": 1024,
+        "height": 76.796875,
+        "top": 0,
+        "right": 1024,
+        "bottom": 76.796875,
+        "left": 0
+      },
+      ".hero .eyebrow": {
+        "x": 20,
+        "y": 137.9375,
+        "width": 851.375,
+        "height": 15,
+        "top": 137.9375,
+        "right": 871.375,
+        "bottom": 152.9375,
+        "left": 20
+      },
+      ".hero-intro": {
+        "x": 20,
+        "y": 158.53125,
+        "width": 851.375,
+        "height": 22,
+        "top": 158.53125,
+        "right": 871.375,
+        "bottom": 180.53125,
+        "left": 20
+      },
+      ".hero h1": {
+        "x": 20,
+        "y": 186.125,
+        "width": 851.375,
+        "height": 71.21875,
+        "top": 186.125,
+        "right": 871.375,
+        "bottom": 257.34375,
+        "left": 20
+      },
+      ".hero-lede": {
+        "x": 20,
+        "y": 268.859375,
+        "width": 850,
+        "height": 72,
+        "top": 268.859375,
+        "right": 870,
+        "bottom": 340.859375,
+        "left": 20
+      },
+      ".hero-meta": {
+        "x": 20,
+        "y": 350.453125,
+        "width": 851.375,
+        "height": 18,
+        "top": 350.453125,
+        "right": 871.375,
+        "bottom": 368.453125,
+        "left": 20
+      },
+      ".hero-actions": {
+        "x": 20,
+        "y": 380.453125,
+        "width": 851.375,
+        "height": 44,
+        "top": 380.453125,
+        "right": 871.375,
+        "bottom": 424.453125,
+        "left": 20
+      },
+      ".hero-photo-wrap": {
+        "x": 891.375,
+        "y": 287.828125,
+        "width": 112.625,
+        "height": 112.625,
+        "top": 287.828125,
+        "right": 1004,
+        "bottom": 400.453125,
+        "left": 891.375
+      },
+      ".about-float-link": {
+        "x": 876.28125,
+        "y": 376.453125,
+        "width": 131.71875,
+        "height": 44,
+        "top": 376.453125,
+        "right": 1008,
+        "bottom": 420.453125,
+        "left": 876.28125
+      },
+      ".meet-quang-card": null,
+      ".hero-desk__stage": {
+        "x": 243.203125,
+        "y": 438.046875,
+        "width": 537.59375,
+        "height": 268.796875,
+        "top": 438.046875,
+        "right": 780.796875,
+        "bottom": 706.84375,
+        "left": 243.203125
+      }
+    },
+    "font": "33.6px"
+  },
+  {
+    "name": "tablet-portrait",
+    "width": 768,
+    "height": 1024,
+    "overflow": false,
+    "elements": {
+      ".site-nav": {
+        "x": 0,
+        "y": 0,
+        "width": 768,
+        "height": 72,
+        "top": 0,
+        "right": 768,
+        "bottom": 72,
+        "left": 0
+      },
+      ".hero .eyebrow": {
+        "x": 20,
+        "y": 182.1875,
+        "width": 604,
+        "height": 15,
+        "top": 182.1875,
+        "right": 624,
+        "bottom": 197.1875,
+        "left": 20
+      },
+      ".hero-intro": {
+        "x": 20,
+        "y": 205.1875,
+        "width": 604,
+        "height": 22,
+        "top": 205.1875,
+        "right": 624,
+        "bottom": 227.1875,
+        "left": 20
+      },
+      ".hero h1": {
+        "x": 20,
+        "y": 235.1875,
+        "width": 604,
+        "height": 136.78125,
+        "top": 235.1875,
+        "right": 624,
+        "bottom": 371.96875,
+        "left": 20
+      },
+      ".hero-lede": {
+        "x": 20,
+        "y": 387.328125,
+        "width": 604,
+        "height": 96,
+        "top": 387.328125,
+        "right": 624,
+        "bottom": 483.328125,
+        "left": 20
+      },
+      ".hero-meta": {
+        "x": 20,
+        "y": 495.328125,
+        "width": 604,
+        "height": 18,
+        "top": 495.328125,
+        "right": 624,
+        "bottom": 513.328125,
+        "left": 20
+      },
+      ".hero-actions": {
+        "x": 20,
+        "y": 529.328125,
+        "width": 604,
+        "height": 44,
+        "top": 529.328125,
+        "right": 624,
+        "bottom": 573.328125,
+        "left": 20
+      },
+      ".hero-photo-wrap": {
+        "x": 644,
+        "y": 445.328125,
+        "width": 104,
+        "height": 104,
+        "top": 445.328125,
+        "right": 748,
+        "bottom": 549.328125,
+        "left": 644
+      },
+      ".about-float-link": {
+        "x": 620.28125,
+        "y": 525.328125,
+        "width": 131.71875,
+        "height": 44,
+        "top": 525.328125,
+        "right": 752,
+        "bottom": 569.328125,
+        "left": 620.28125
+      },
+      ".meet-quang-card": null,
+      ".hero-desk__stage": {
+        "x": 64,
+        "y": 593.796875,
+        "width": 640,
+        "height": 320,
+        "top": 593.796875,
+        "right": 704,
+        "bottom": 913.796875,
+        "left": 64
+      }
+    },
+    "font": "43.008px"
+  },
+  {
+    "name": "iphone",
+    "width": 390,
+    "height": 844,
+    "overflow": false,
+    "elements": {
+      ".site-nav": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 119.796875,
+        "top": 0,
+        "right": 390,
+        "bottom": 119.796875,
+        "left": 0
+      },
+      ".hero .eyebrow": {
+        "x": 12,
+        "y": 151.796875,
+        "width": 366,
+        "height": 32,
+        "top": 151.796875,
+        "right": 378,
+        "bottom": 183.796875,
+        "left": 12
+      },
+      ".hero-intro": {
+        "x": 12,
+        "y": 203.796875,
+        "width": 366,
+        "height": 22,
+        "top": 203.796875,
+        "right": 378,
+        "bottom": 225.796875,
+        "left": 12
+      },
+      ".hero h1": {
+        "x": 12,
+        "y": 238.59375,
+        "width": 366,
+        "height": 361.921875,
+        "top": 238.59375,
+        "right": 378,
+        "bottom": 600.515625,
+        "left": 12
+      },
+      ".hero-lede": {
+        "x": 12,
+        "y": 629.3125,
+        "width": 366,
+        "height": 163.125,
+        "top": 629.3125,
+        "right": 378,
+        "bottom": 792.4375,
+        "left": 12
+      },
+      ".hero-meta": {
+        "x": 12,
+        "y": 816.4375,
+        "width": 366,
+        "height": 50.390625,
+        "top": 816.4375,
+        "right": 378,
+        "bottom": 866.828125,
+        "left": 12
+      },
+      ".hero-actions": {
+        "x": 12,
+        "y": 890.828125,
+        "width": 366,
+        "height": 45.59375,
+        "top": 890.828125,
+        "right": 378,
+        "bottom": 936.421875,
+        "left": 12
+      },
+      ".hero-photo-wrap": null,
+      ".about-float-link": null,
+      ".meet-quang-card": {
+        "x": 12,
+        "y": 950.015625,
+        "width": 366,
+        "height": 76,
+        "top": 950.015625,
+        "right": 378,
+        "bottom": 1026.015625,
+        "left": 12
+      },
+      ".hero-desk__stage": {
+        "x": 12,
+        "y": 1054.015625,
+        "width": 366,
+        "height": 274.5,
+        "top": 1054.015625,
+        "right": 378,
+        "bottom": 1328.515625,
+        "left": 12
+      }
+    },
+    "font": "50.7px"
+  },
+  {
+    "name": "small",
+    "width": 320,
+    "height": 740,
+    "overflow": false,
+    "elements": {
+      ".site-nav": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 147.796875,
+        "top": 0,
+        "right": 320,
+        "bottom": 147.796875,
+        "left": 0
+      },
+      ".hero .eyebrow": {
+        "x": 12,
+        "y": 179.796875,
+        "width": 296,
+        "height": 32,
+        "top": 179.796875,
+        "right": 308,
+        "bottom": 211.796875,
+        "left": 12
+      },
+      ".hero-intro": {
+        "x": 12,
+        "y": 231.796875,
+        "width": 296,
+        "height": 22,
+        "top": 231.796875,
+        "right": 308,
+        "bottom": 253.796875,
+        "left": 12
+      },
+      ".hero h1": {
+        "x": 12,
+        "y": 266.59375,
+        "width": 296,
+        "height": 302.75,
+        "top": 266.59375,
+        "right": 308,
+        "bottom": 569.34375,
+        "left": 12
+      },
+      ".hero-lede": {
+        "x": 12,
+        "y": 598.140625,
+        "width": 296,
+        "height": 217.5,
+        "top": 598.140625,
+        "right": 308,
+        "bottom": 815.640625,
+        "left": 12
+      },
+      ".hero-meta": {
+        "x": 12,
+        "y": 839.640625,
+        "width": 296,
+        "height": 50.390625,
+        "top": 839.640625,
+        "right": 308,
+        "bottom": 890.03125,
+        "left": 12
+      },
+      ".hero-actions": {
+        "x": 12,
+        "y": 914.03125,
+        "width": 296,
+        "height": 103.1875,
+        "top": 914.03125,
+        "right": 308,
+        "bottom": 1017.21875,
+        "left": 12
+      },
+      ".hero-photo-wrap": null,
+      ".about-float-link": null,
+      ".meet-quang-card": {
+        "x": 12,
+        "y": 1030.8125,
+        "width": 296,
+        "height": 76,
+        "top": 1030.8125,
+        "right": 308,
+        "bottom": 1106.8125,
+        "left": 12
+      },
+      ".hero-desk__stage": {
+        "x": 12,
+        "y": 1134.8125,
+        "width": 296,
+        "height": 222,
+        "top": 1134.8125,
+        "right": 308,
+        "bottom": 1356.8125,
+        "left": 12
+      }
+    },
+    "font": "42.4px"
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "environment": "Brave/Chromium on Windows, original production build",
+  "normalMouseDrag": "passed on desktop, laptop and mac-short",
+  "probe": "primary press; horizontal move; dispatch window blur; move with buttons=0",
+  "afterBlur": {
+    "dragging": true
+  },
+  "afterButtonlessMove": {
+    "dragging": true,
+    "target": -0.9267234966341572
+  },
+  "limitation": "Blur event was injected; OS focus switching was not automated."
+}

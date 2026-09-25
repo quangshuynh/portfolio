@@ -66,6 +66,7 @@ async function expectTop(label) {
 }
 
 try {
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await enter('/photography', galleryReady);
   await expectTop('Normal Photography entry stays at the top');
@@ -112,9 +113,9 @@ try {
   await expectTop('Forward to the gallery stays at the top');
 
   await enter('/', "!!document.querySelector('.home-header')");
-  assert.equal(await evaluate('getComputedStyle(document.documentElement).scrollSnapType'), 'y mandatory', 'Home snapping remains enabled');
+  assert.equal(await evaluate('getComputedStyle(document.documentElement).scrollSnapType'), 'none', 'Home preserves native scrolling');
   assert.equal(await evaluate('history.scrollRestoration'), 'auto');
-  console.log('PASS: normal entry, image layout, direct photo, focus/scroll restoration, previous/next, history, About modal return, home snapping.');
+  console.log('PASS: normal entry, image layout, direct photo, focus/scroll restoration, previous/next, history, About modal return, native home scrolling.');
 } finally {
   socket.close();
   await fetch(`${debuggerUrl}/json/close/${tab.id}`);

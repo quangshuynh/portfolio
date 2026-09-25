@@ -152,13 +152,9 @@ try {
     if (touch) {
       const before = await state();
       const scrollBefore = await evaluate('scrollY');
-      const r = await rect();
-      await send('Input.synthesizeScrollGesture', {
-        x: r.x + r.width / 2,
-        y: Math.min(height - 30, r.y + r.height / 2),
-        yDistance: -height * 0.85,
-        gestureSourceType: 'touch',
-      });
+      // Dispatch the same touch stream used by the horizontal drag checks.
+      // synthesizeScrollGesture does not pan on this Windows headless backend.
+      await drag(true, 0, -Math.min(150, height * 0.2));
       await pause(500);
       const after = await state();
       assert.ok(
@@ -173,8 +169,7 @@ try {
     }
     measurements.push({ name, front, left, right });
   }
-  // Use intermediate positions to inspect actual sticky/collapse geometry and
-  // scroll movement; temporarily disable native snapping only for this probe.
+  // Inspect actual sticky/collapse geometry and native scroll movement.
   await send('Emulation.setDeviceMetricsOverride', {
     width: 1440,
     height: 900,
@@ -184,7 +179,6 @@ try {
   await send('Emulation.setTouchEmulationEnabled', { enabled: false });
   await send('Page.navigate', { url: origin });
   await waitFor(`document.querySelector('.hero-desk')?.dataset.ready==='true'`);
-  await evaluate(`document.documentElement.style.scrollSnapType='none'`);
   await key('Escape');
   const geometry = () =>
     evaluate(
@@ -262,19 +256,23 @@ try {
   await send('Emulation.setEmulatedMedia', {
     features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
   });
-  await waitFor(`!document.querySelector('.hero-desk canvas')`);
+  await settle();
+  const reducedBefore = await state();
   await evaluate(`window.scrollTo({top:150,behavior:'instant'})`);
   await pause(500);
   assert.equal(
     await evaluate(`document.querySelectorAll('.hero-desk canvas').length`),
-    0,
+    1,
   );
   assert.equal(
     await evaluate(
       `document.querySelector('.hero-desk__canvas').getAttribute('tabindex')`,
     ),
-    null,
+    '0',
   );
+  assert.equal((await state()).target, reducedBefore.target);
+  await key('ArrowLeft');
+  assert.ok((await state()).angle < reducedBefore.angle);
   await writeFile(
     `${output}/metrics.json`,
     JSON.stringify(

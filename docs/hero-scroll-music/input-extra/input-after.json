@@ -1,0 +1,404 @@
+[
+  {
+    "name": "desktop",
+    "start": {
+      "y": 178,
+      "angle": 0.013185185185185183,
+      "target": 0.013185185185185183,
+      "dragging": false,
+      "capture": false,
+      "frames": 35,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": []
+    },
+    "wheel": {
+      "y": 478,
+      "angle": 0.03540740740740741,
+      "target": 0.03540740740740741,
+      "dragging": false,
+      "capture": false,
+      "frames": 130,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        }
+      ]
+    },
+    "trackpad": {
+      "before": 178,
+      "after": 274
+    },
+    "duringDrag": {
+      "y": 178,
+      "angle": -0.3107102135618936,
+      "target": -0.4501765631318934,
+      "dragging": true,
+      "capture": true,
+      "frames": 346,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        }
+      ]
+    },
+    "afterDrag": {
+      "y": 178,
+      "angle": -0.4501765631318934,
+      "target": -0.4501765631318934,
+      "dragging": false,
+      "capture": false,
+      "frames": 408,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        }
+      ]
+    },
+    "pastHero": {
+      "y": 2102,
+      "angle": -1.5707963267948966,
+      "target": -1.5707963267948966,
+      "dragging": false,
+      "capture": false,
+      "frames": 804,
+      "calls": 15,
+      "triangles": 2902,
+      "selection": "",
+      "wheels": [
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 8
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 70
+        },
+        {
+          "prevented": false,
+          "x": 100,
+          "y": 0
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 60
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        },
+        {
+          "prevented": false,
+          "x": 0,
+          "y": 100
+        }
+      ]
+    },
+    "idleFrames": 0
+  }
+]
