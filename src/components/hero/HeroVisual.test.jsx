@@ -98,11 +98,11 @@ test('loads only after entering the viewport and keeps fallback until the first 
   act(() => callbacks.onReady());
   expect(container.firstChild).toHaveAttribute('data-ready', 'true');
 });
-test('reduced motion skips all scene loading', async () => {
+test('reduced motion still loads the scene for deliberate user rotation', async () => {
   motion.matches = true;
   render(<HeroVisual load={load} />);
   await enter();
-  expect(load).not.toHaveBeenCalled();
+  expect(load).toHaveBeenCalledTimes(1);
 });
 test('save-data and slow connections skip scene loading', async () => {
   Object.defineProperty(navigator, 'connection', {
@@ -159,7 +159,7 @@ test('leaving and returning to the viewport toggles rendering without reimportin
   expect(setActive).toHaveBeenLastCalledWith(true);
   expect(load).toHaveBeenCalledTimes(1);
 });
-test('enabling reduced motion at runtime disposes the renderer', async () => {
+test('enabling reduced motion keeps the existing interaction surface', async () => {
   const { container } = render(<HeroVisual load={load} />);
   await enter();
   act(() => callbacks.onReady());
@@ -167,8 +167,8 @@ test('enabling reduced motion at runtime disposes the renderer', async () => {
     motion.matches = true;
     preference();
   });
-  expect(dispose).toHaveBeenCalled();
-  expect(container.firstChild).toHaveAttribute('data-ready', 'false');
+  expect(dispose).not.toHaveBeenCalled();
+  expect(container.firstChild).toHaveAttribute('data-ready', 'true');
 });
 test('unmount during import does not initialize a late renderer', async () => {
   let resolve;

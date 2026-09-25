@@ -20,18 +20,12 @@ export function mountDeskScene(host, { onReady, onError }) {
   const camera = new OrthographicCamera(-5, 5, 3, -3, 0.1, 60);
   const fine = window.matchMedia('(hover: hover) and (pointer: fine)');
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  motion.setReducedMotion(reduced.matches);
   const hero = host.closest('.hero');
   const canvas = document.createElement('canvas');
   canvas.setAttribute('aria-hidden', 'true');
   function eligible() {
-    if (
-      disposed ||
-      !active ||
-      document.hidden ||
-      reduced.matches ||
-      !width ||
-      !height
-    )
+    if (disposed || !active || document.hidden || !width || !height)
       return false;
     const rect = host.getBoundingClientRect();
     return (
@@ -63,6 +57,7 @@ export function mountDeskScene(host, { onReady, onError }) {
       lastTime = time;
       let unsettled = motion.step(dt);
       for (const key of ['azimuth', 'radius', 'elevation']) {
+        if (reduced.matches) base[key] = baseTarget[key];
         base[key] += (baseTarget[key] - base[key]) * (1 - Math.exp(-dt / 85));
         if (Math.abs(baseTarget[key] - base[key]) < 0.0001)
           base[key] = baseTarget[key];
@@ -89,6 +84,7 @@ export function mountDeskScene(host, { onReady, onError }) {
       canvas.dataset.triangles = String(renderer.info.render.triangles);
       canvas.dataset.orbit = String(motion.angle);
       canvas.dataset.target = String(motion.target);
+
       host.setAttribute(
         'aria-valuenow',
         String(Math.round((motion.angle * 180) / Math.PI)),
@@ -143,6 +139,8 @@ export function mountDeskScene(host, { onReady, onError }) {
   }
   function down(event) {
     if (!eligible() || !event.isPrimary || event.button !== 0) return;
+    // A fresh mouse press also recovers a release missed outside the window.
+    if (event.pointerType === 'mouse') endGesture();
     suppressClick = false;
     motion.begin(
       event.pointerId,
@@ -155,6 +153,15 @@ export function mountDeskScene(host, { onReady, onError }) {
   function move(event) {
     if (!eligible()) return;
     if (motion.gesture) {
+      if (
+        event.pointerType === 'mouse' &&
+        event.pointerId === motion.gesture.id &&
+        !(event.buttons & 1)
+      ) {
+        endGesture();
+        invalidate();
+        return;
+      }
       if (motion.move(event.pointerId, event.clientX, event.clientY)) {
         if (!host.hasPointerCapture(event.pointerId)) {
           host.setPointerCapture(event.pointerId);
@@ -167,6 +174,7 @@ export function mountDeskScene(host, { onReady, onError }) {
     }
     if (
       event.pointerType !== 'mouse' ||
+      reduced.matches ||
       !fine.matches ||
       !host.contains(event.target)
     )
@@ -186,6 +194,7 @@ export function mountDeskScene(host, { onReady, onError }) {
     if (event.target === host) up(event);
   }
   function leave() {
+    if (reduced.matches) return;
     if (!motion.gesture) {
       motion.setParallax(0);
       invalidate();
@@ -214,13 +223,14 @@ export function mountDeskScene(host, { onReady, onError }) {
     invalidate();
   }
   function scroll() {
+    if (reduced.matches) return;
     if (eligible()) {
       syncScroll();
       invalidate();
     }
   }
   function visibility() {
-    if (document.hidden || reduced.matches) {
+    if (document.hidden) {
       endGesture();
       cancelAnimationFrame(frame);
       frame = 0;
@@ -229,6 +239,17 @@ export function mountDeskScene(host, { onReady, onError }) {
       syncScroll();
       invalidate();
     }
+  }
+  function blur() {
+    endGesture();
+    motion.setParallax(0);
+    invalidate();
+  }
+  function preferences() {
+    endGesture();
+    motion.setReducedMotion(reduced.matches);
+    if (!reduced.matches && eligible()) syncScroll();
+    invalidate();
   }
   function lost(event) {
     event.preventDefault();
@@ -248,10 +269,11 @@ export function mountDeskScene(host, { onReady, onError }) {
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
     window.removeEventListener('pointercancel', up);
+    window.removeEventListener('blur', blur);
     window.removeEventListener('scroll', scroll);
     window.removeEventListener('resize', resize);
     document.removeEventListener('visibilitychange', visibility);
-    reduced.removeEventListener('change', visibility);
+    reduced.removeEventListener('change', preferences);
     canvas.removeEventListener('webglcontextlost', lost);
     desk?.dispose();
     renderer?.dispose();
@@ -277,10 +299,11 @@ export function mountDeskScene(host, { onReady, onError }) {
     window.addEventListener('pointermove', move, { passive: true });
     window.addEventListener('pointerup', up, { passive: true });
     window.addEventListener('pointercancel', up, { passive: true });
+    window.addEventListener('blur', blur);
     window.addEventListener('scroll', scroll, { passive: true });
     window.addEventListener('resize', resize, { passive: true });
     document.addEventListener('visibilitychange', visibility);
-    reduced.addEventListener('change', visibility);
+    reduced.addEventListener('change', preferences);
     observer = new ResizeObserver(resize);
     observer.observe(host);
     resize();

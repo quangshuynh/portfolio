@@ -1,0 +1,6205 @@
+{
+  "native": {
+    "url": "http://localhost:5173/",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+    "viewport": [
+      1440,
+      900
+    ],
+    "preferences": {
+      "reducedMotion": true,
+      "fine": true,
+      "coarse": false,
+      "hover": true,
+      "maxTouchPoints": 0
+    },
+    "webgl": false,
+    "ready": "false",
+    "blockers": [
+      "loader: reduced-motion disables WebGL and all orbit input"
+    ],
+    "state": null,
+    "counts": {
+      "down": 0,
+      "move": 0,
+      "up": 0
+    },
+    "lastEventTarget": null,
+    "geometry": {
+      "desk": {
+        "element": "div.hero-desk",
+        "rect": {
+          "x": 372.5,
+          "y": 514.4375,
+          "width": 680,
+          "height": 299.1875,
+          "top": 514.4375,
+          "right": 1052.5,
+          "bottom": 813.625,
+          "left": 372.5
+        },
+        "styles": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "block",
+          "content": "normal"
+        },
+        "before": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        },
+        "after": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        }
+      },
+      "stage": {
+        "element": "div.hero-desk__stage",
+        "rect": {
+          "x": 372.5,
+          "y": 514.4375,
+          "width": 680,
+          "height": 299.1875,
+          "top": 514.4375,
+          "right": 1052.5,
+          "bottom": 813.625,
+          "left": 372.5
+        },
+        "styles": {
+          "pointer-events": "auto",
+          "touch-action": "pan-y pinch-zoom",
+          "user-select": "auto",
+          "position": "relative",
+          "z-index": "auto",
+          "overflow": "hidden",
+          "visibility": "visible",
+          "display": "block",
+          "content": "normal"
+        },
+        "before": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        },
+        "after": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        }
+      },
+      "interaction": {
+        "element": "div.hero-desk__canvas",
+        "rect": {
+          "x": 373.5,
+          "y": 515.4375,
+          "width": 678,
+          "height": 297.1875,
+          "top": 515.4375,
+          "right": 1051.5,
+          "bottom": 812.625,
+          "left": 373.5
+        },
+        "styles": {
+          "pointer-events": "auto",
+          "touch-action": "pan-y pinch-zoom",
+          "user-select": "none",
+          "position": "absolute",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "hidden",
+          "display": "block",
+          "content": "normal"
+        },
+        "before": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "none",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "hidden",
+          "display": "inline",
+          "content": "none"
+        },
+        "after": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "none",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "hidden",
+          "display": "inline",
+          "content": "none"
+        }
+      },
+      "canvas": null,
+      "fallback": {
+        "element": "picture.hero-desk__fallback",
+        "rect": {
+          "x": 373.5,
+          "y": 515.4375,
+          "width": 678,
+          "height": 297.1875,
+          "top": 515.4375,
+          "right": 1051.5,
+          "bottom": 812.625,
+          "left": 373.5
+        },
+        "styles": {
+          "pointer-events": "none",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "absolute",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "block",
+          "content": "normal"
+        },
+        "before": {
+          "pointer-events": "none",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        },
+        "after": {
+          "pointer-events": "none",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        }
+      },
+      "image": {
+        "element": "img",
+        "rect": {
+          "x": 373.5,
+          "y": 515.4375,
+          "width": 678,
+          "height": 297.1875,
+          "top": 515.4375,
+          "right": 1051.5,
+          "bottom": 812.625,
+          "left": 373.5
+        },
+        "styles": {
+          "pointer-events": "none",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "clip",
+          "visibility": "visible",
+          "display": "block",
+          "content": "normal"
+        },
+        "before": {
+          "pointer-events": "none",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        },
+        "after": {
+          "pointer-events": "none",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        }
+      }
+    },
+    "hitTests": {
+      "center": {
+        "x": 712.5,
+        "y": 664.03125,
+        "stack": [
+          {
+            "element": "div.hero-desk__stage",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "hidden",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-inner.reveal-content",
+            "rect": {
+              "x": 152.5,
+              "y": 176.375,
+              "width": 1120,
+              "height": 637.25,
+              "top": 176.375,
+              "right": 1272.5,
+              "bottom": 813.625,
+              "left": 152.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "1",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "section#top.hero",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "none",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "\"\""
+            }
+          },
+          {
+            "element": "header.home-header.snap-stage.scroll-enter.is-visible",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.app-shell",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div#root",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "body",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "html",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          }
+        ]
+      },
+      "leftMonitor": {
+        "x": 644.5,
+        "y": 619.153125,
+        "stack": [
+          {
+            "element": "div.hero-desk__stage",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "hidden",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-inner.reveal-content",
+            "rect": {
+              "x": 152.5,
+              "y": 176.375,
+              "width": 1120,
+              "height": 637.25,
+              "top": 176.375,
+              "right": 1272.5,
+              "bottom": 813.625,
+              "left": 152.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "1",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "section#top.hero",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "none",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "\"\""
+            }
+          },
+          {
+            "element": "header.home-header.snap-stage.scroll-enter.is-visible",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.app-shell",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div#root",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "body",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "html",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          }
+        ]
+      },
+      "rightMonitor": {
+        "x": 760.0999999999999,
+        "y": 604.19375,
+        "stack": [
+          {
+            "element": "div.hero-desk__stage",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "hidden",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-inner.reveal-content",
+            "rect": {
+              "x": 152.5,
+              "y": 176.375,
+              "width": 1120,
+              "height": 637.25,
+              "top": 176.375,
+              "right": 1272.5,
+              "bottom": 813.625,
+              "left": 152.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "1",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "section#top.hero",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "none",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "\"\""
+            }
+          },
+          {
+            "element": "header.home-header.snap-stage.scroll-enter.is-visible",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.app-shell",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div#root",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "body",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "html",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          }
+        ]
+      },
+      "keyboard": {
+        "x": 685.3,
+        "y": 717.885,
+        "stack": [
+          {
+            "element": "div.hero-desk__stage",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "hidden",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-inner.reveal-content",
+            "rect": {
+              "x": 152.5,
+              "y": 176.375,
+              "width": 1120,
+              "height": 637.25,
+              "top": 176.375,
+              "right": 1272.5,
+              "bottom": 813.625,
+              "left": 152.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "1",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "section#top.hero",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "none",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "\"\""
+            }
+          },
+          {
+            "element": "header.home-header.snap-stage.scroll-enter.is-visible",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.app-shell",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div#root",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "body",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "html",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          }
+        ]
+      },
+      "pc": {
+        "x": 841.7,
+        "y": 693.95,
+        "stack": [
+          {
+            "element": "div.hero-desk__stage",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "hidden",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-inner.reveal-content",
+            "rect": {
+              "x": 152.5,
+              "y": 176.375,
+              "width": 1120,
+              "height": 637.25,
+              "top": 176.375,
+              "right": 1272.5,
+              "bottom": 813.625,
+              "left": 152.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "1",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "section#top.hero",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "none",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "\"\""
+            }
+          },
+          {
+            "element": "header.home-header.snap-stage.scroll-enter.is-visible",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.app-shell",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div#root",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "body",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "html",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          }
+        ]
+      },
+      "background": {
+        "x": 426.9,
+        "y": 550.34,
+        "stack": [
+          {
+            "element": "div.hero-desk__stage",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "hidden",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-inner.reveal-content",
+            "rect": {
+              "x": 152.5,
+              "y": 176.375,
+              "width": 1120,
+              "height": 637.25,
+              "top": 176.375,
+              "right": 1272.5,
+              "bottom": 813.625,
+              "left": 152.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "1",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "section#top.hero",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "none",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "\"\""
+            }
+          },
+          {
+            "element": "header.home-header.snap-stage.scroll-enter.is-visible",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.app-shell",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div#root",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "body",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "html",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          }
+        ]
+      }
+    },
+    "registeredListeners": []
+  },
+  "forcedControl": {
+    "url": "http://localhost:5173/",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+    "viewport": [
+      1440,
+      900
+    ],
+    "preferences": {
+      "reducedMotion": false,
+      "fine": true,
+      "coarse": false,
+      "hover": true,
+      "maxTouchPoints": 0
+    },
+    "webgl": true,
+    "ready": "true",
+    "blockers": [],
+    "state": {
+      "gesture": null,
+      "orbitTarget": 0,
+      "displayedOrbitAngle": 0,
+      "framePending": false,
+      "frames": 2,
+      "eligible": true,
+      "disposed": false,
+      "active": true,
+      "hidden": false,
+      "reduced": false,
+      "fineHover": true,
+      "width": 678,
+      "height": 297.1875,
+      "listenerElementConnected": true,
+      "liveCanvas": true
+    },
+    "counts": {
+      "down": 6,
+      "move": 30,
+      "up": 6
+    },
+    "lastEventTarget": "div.hero-desk__stage",
+    "geometry": {
+      "desk": {
+        "element": "div.hero-desk",
+        "rect": {
+          "x": 372.5,
+          "y": 514.4375,
+          "width": 680,
+          "height": 299.1875,
+          "top": 514.4375,
+          "right": 1052.5,
+          "bottom": 813.625,
+          "left": 372.5
+        },
+        "styles": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "block",
+          "content": "normal"
+        },
+        "before": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        },
+        "after": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        }
+      },
+      "stage": {
+        "element": "div.hero-desk__stage",
+        "rect": {
+          "x": 372.5,
+          "y": 514.4375,
+          "width": 680,
+          "height": 299.1875,
+          "top": 514.4375,
+          "right": 1052.5,
+          "bottom": 813.625,
+          "left": 372.5
+        },
+        "styles": {
+          "pointer-events": "auto",
+          "touch-action": "pan-y pinch-zoom",
+          "user-select": "auto",
+          "position": "relative",
+          "z-index": "auto",
+          "overflow": "hidden",
+          "visibility": "visible",
+          "display": "block",
+          "content": "normal"
+        },
+        "before": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        },
+        "after": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        }
+      },
+      "interaction": {
+        "element": "div.hero-desk__canvas",
+        "rect": {
+          "x": 373.5,
+          "y": 515.4375,
+          "width": 678,
+          "height": 297.1875,
+          "top": 515.4375,
+          "right": 1051.5,
+          "bottom": 812.625,
+          "left": 373.5
+        },
+        "styles": {
+          "pointer-events": "auto",
+          "touch-action": "pan-y pinch-zoom",
+          "user-select": "none",
+          "position": "absolute",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "block",
+          "content": "normal"
+        },
+        "before": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "none",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        },
+        "after": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "none",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        }
+      },
+      "canvas": {
+        "element": "canvas",
+        "rect": {
+          "x": 373.5,
+          "y": 515.4375,
+          "width": 678,
+          "height": 297.1875,
+          "top": 515.4375,
+          "right": 1051.5,
+          "bottom": 812.625,
+          "left": 373.5
+        },
+        "styles": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "none",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "clip",
+          "visibility": "visible",
+          "display": "block",
+          "content": "normal"
+        },
+        "before": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "none",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        },
+        "after": {
+          "pointer-events": "auto",
+          "touch-action": "auto",
+          "user-select": "none",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "visible",
+          "display": "inline",
+          "content": "none"
+        }
+      },
+      "fallback": {
+        "element": "picture.hero-desk__fallback",
+        "rect": {
+          "x": 373.5,
+          "y": 515.4375,
+          "width": 678,
+          "height": 297.1875,
+          "top": 515.4375,
+          "right": 1051.5,
+          "bottom": 812.625,
+          "left": 373.5
+        },
+        "styles": {
+          "pointer-events": "none",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "absolute",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "hidden",
+          "display": "block",
+          "content": "normal"
+        },
+        "before": {
+          "pointer-events": "none",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "hidden",
+          "display": "inline",
+          "content": "none"
+        },
+        "after": {
+          "pointer-events": "none",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "hidden",
+          "display": "inline",
+          "content": "none"
+        }
+      },
+      "image": {
+        "element": "img",
+        "rect": {
+          "x": 373.5,
+          "y": 515.4375,
+          "width": 678,
+          "height": 297.1875,
+          "top": 515.4375,
+          "right": 1051.5,
+          "bottom": 812.625,
+          "left": 373.5
+        },
+        "styles": {
+          "pointer-events": "none",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "clip",
+          "visibility": "hidden",
+          "display": "block",
+          "content": "normal"
+        },
+        "before": {
+          "pointer-events": "none",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "hidden",
+          "display": "inline",
+          "content": "none"
+        },
+        "after": {
+          "pointer-events": "none",
+          "touch-action": "auto",
+          "user-select": "auto",
+          "position": "static",
+          "z-index": "auto",
+          "overflow": "visible",
+          "visibility": "hidden",
+          "display": "inline",
+          "content": "none"
+        }
+      }
+    },
+    "hitTests": {
+      "center": {
+        "x": 712.5,
+        "y": 664.03125,
+        "stack": [
+          {
+            "element": "canvas",
+            "rect": {
+              "x": 373.5,
+              "y": 515.4375,
+              "width": 678,
+              "height": 297.1875,
+              "top": 515.4375,
+              "right": 1051.5,
+              "bottom": 812.625,
+              "left": 373.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk__canvas",
+            "rect": {
+              "x": 373.5,
+              "y": 515.4375,
+              "width": 678,
+              "height": 297.1875,
+              "top": 515.4375,
+              "right": 1051.5,
+              "bottom": 812.625,
+              "left": 373.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "none",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk__stage",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "hidden",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-inner.reveal-content",
+            "rect": {
+              "x": 152.5,
+              "y": 176.375,
+              "width": 1120,
+              "height": 637.25,
+              "top": 176.375,
+              "right": 1272.5,
+              "bottom": 813.625,
+              "left": 152.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "1",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "section#top.hero",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "none",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "\"\""
+            }
+          },
+          {
+            "element": "header.home-header.snap-stage.scroll-enter.is-visible",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.app-shell",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div#root",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "body",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "html",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          }
+        ]
+      },
+      "leftMonitor": {
+        "x": 644.5,
+        "y": 619.153125,
+        "stack": [
+          {
+            "element": "canvas",
+            "rect": {
+              "x": 373.5,
+              "y": 515.4375,
+              "width": 678,
+              "height": 297.1875,
+              "top": 515.4375,
+              "right": 1051.5,
+              "bottom": 812.625,
+              "left": 373.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk__canvas",
+            "rect": {
+              "x": 373.5,
+              "y": 515.4375,
+              "width": 678,
+              "height": 297.1875,
+              "top": 515.4375,
+              "right": 1051.5,
+              "bottom": 812.625,
+              "left": 373.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "none",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk__stage",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "hidden",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-inner.reveal-content",
+            "rect": {
+              "x": 152.5,
+              "y": 176.375,
+              "width": 1120,
+              "height": 637.25,
+              "top": 176.375,
+              "right": 1272.5,
+              "bottom": 813.625,
+              "left": 152.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "1",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "section#top.hero",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "none",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "\"\""
+            }
+          },
+          {
+            "element": "header.home-header.snap-stage.scroll-enter.is-visible",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.app-shell",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div#root",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "body",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "html",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          }
+        ]
+      },
+      "rightMonitor": {
+        "x": 760.0999999999999,
+        "y": 604.19375,
+        "stack": [
+          {
+            "element": "canvas",
+            "rect": {
+              "x": 373.5,
+              "y": 515.4375,
+              "width": 678,
+              "height": 297.1875,
+              "top": 515.4375,
+              "right": 1051.5,
+              "bottom": 812.625,
+              "left": 373.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk__canvas",
+            "rect": {
+              "x": 373.5,
+              "y": 515.4375,
+              "width": 678,
+              "height": 297.1875,
+              "top": 515.4375,
+              "right": 1051.5,
+              "bottom": 812.625,
+              "left": 373.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "none",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk__stage",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "hidden",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-inner.reveal-content",
+            "rect": {
+              "x": 152.5,
+              "y": 176.375,
+              "width": 1120,
+              "height": 637.25,
+              "top": 176.375,
+              "right": 1272.5,
+              "bottom": 813.625,
+              "left": 152.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "1",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "section#top.hero",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "none",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "\"\""
+            }
+          },
+          {
+            "element": "header.home-header.snap-stage.scroll-enter.is-visible",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.app-shell",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div#root",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "body",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "html",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          }
+        ]
+      },
+      "keyboard": {
+        "x": 685.3,
+        "y": 717.885,
+        "stack": [
+          {
+            "element": "canvas",
+            "rect": {
+              "x": 373.5,
+              "y": 515.4375,
+              "width": 678,
+              "height": 297.1875,
+              "top": 515.4375,
+              "right": 1051.5,
+              "bottom": 812.625,
+              "left": 373.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk__canvas",
+            "rect": {
+              "x": 373.5,
+              "y": 515.4375,
+              "width": 678,
+              "height": 297.1875,
+              "top": 515.4375,
+              "right": 1051.5,
+              "bottom": 812.625,
+              "left": 373.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "none",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk__stage",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "hidden",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-inner.reveal-content",
+            "rect": {
+              "x": 152.5,
+              "y": 176.375,
+              "width": 1120,
+              "height": 637.25,
+              "top": 176.375,
+              "right": 1272.5,
+              "bottom": 813.625,
+              "left": 152.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "1",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "section#top.hero",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "none",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "\"\""
+            }
+          },
+          {
+            "element": "header.home-header.snap-stage.scroll-enter.is-visible",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.app-shell",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div#root",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "body",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "html",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          }
+        ]
+      },
+      "pc": {
+        "x": 841.7,
+        "y": 693.95,
+        "stack": [
+          {
+            "element": "canvas",
+            "rect": {
+              "x": 373.5,
+              "y": 515.4375,
+              "width": 678,
+              "height": 297.1875,
+              "top": 515.4375,
+              "right": 1051.5,
+              "bottom": 812.625,
+              "left": 373.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk__canvas",
+            "rect": {
+              "x": 373.5,
+              "y": 515.4375,
+              "width": 678,
+              "height": 297.1875,
+              "top": 515.4375,
+              "right": 1051.5,
+              "bottom": 812.625,
+              "left": 373.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "none",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk__stage",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "hidden",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-inner.reveal-content",
+            "rect": {
+              "x": 152.5,
+              "y": 176.375,
+              "width": 1120,
+              "height": 637.25,
+              "top": 176.375,
+              "right": 1272.5,
+              "bottom": 813.625,
+              "left": 152.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "1",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "section#top.hero",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "none",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "\"\""
+            }
+          },
+          {
+            "element": "header.home-header.snap-stage.scroll-enter.is-visible",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.app-shell",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div#root",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "body",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "html",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          }
+        ]
+      },
+      "background": {
+        "x": 426.9,
+        "y": 550.34,
+        "stack": [
+          {
+            "element": "canvas",
+            "rect": {
+              "x": 373.5,
+              "y": 515.4375,
+              "width": 678,
+              "height": 297.1875,
+              "top": 515.4375,
+              "right": 1051.5,
+              "bottom": 812.625,
+              "left": 373.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk__canvas",
+            "rect": {
+              "x": 373.5,
+              "y": 515.4375,
+              "width": 678,
+              "height": 297.1875,
+              "top": 515.4375,
+              "right": 1051.5,
+              "bottom": 812.625,
+              "left": 373.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "none",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "none",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk__stage",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "pan-y pinch-zoom",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "hidden",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-desk",
+            "rect": {
+              "x": 372.5,
+              "y": 514.4375,
+              "width": 680,
+              "height": 299.1875,
+              "top": 514.4375,
+              "right": 1052.5,
+              "bottom": 813.625,
+              "left": 372.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.hero-inner.reveal-content",
+            "rect": {
+              "x": 152.5,
+              "y": 176.375,
+              "width": 1120,
+              "height": 637.25,
+              "top": 176.375,
+              "right": 1272.5,
+              "bottom": 813.625,
+              "left": 152.5
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "1",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "section#top.hero",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "relative",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "none",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "absolute",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "\"\""
+            }
+          },
+          {
+            "element": "header.home-header.snap-stage.scroll-enter.is-visible",
+            "rect": {
+              "x": 0,
+              "y": 90,
+              "width": 1425,
+              "height": 810,
+              "top": 90,
+              "right": 1425,
+              "bottom": 900,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "grid",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div.app-shell",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "clip visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "div#root",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "body",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          },
+          {
+            "element": "html",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "width": 1425,
+              "height": 9049.078125,
+              "top": 0,
+              "right": 1425,
+              "bottom": 9049.078125,
+              "left": 0
+            },
+            "styles": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "block",
+              "content": "normal"
+            },
+            "before": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            },
+            "after": {
+              "pointer-events": "auto",
+              "touch-action": "auto",
+              "user-select": "auto",
+              "position": "static",
+              "z-index": "auto",
+              "overflow": "visible",
+              "visibility": "visible",
+              "display": "inline",
+              "content": "none"
+            }
+          }
+        ]
+      }
+    },
+    "registeredListeners": [
+      {
+        "type": "click",
+        "useCapture": true,
+        "passive": false
+      },
+      {
+        "type": "pointerdown",
+        "useCapture": false,
+        "passive": true
+      },
+      {
+        "type": "pointerleave",
+        "useCapture": false,
+        "passive": true
+      },
+      {
+        "type": "lostpointercapture",
+        "useCapture": false,
+        "passive": false
+      },
+      {
+        "type": "keydown",
+        "useCapture": false,
+        "passive": false
+      }
+    ]
+  }
+}

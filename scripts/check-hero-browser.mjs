@@ -155,12 +155,23 @@ try {
         `document.querySelector('.hero-desk__stage').getBoundingClientRect().toJSON()`,
       );
       const before = await evaluate('scrollY');
-      await send('Input.synthesizeScrollGesture', {
-        x: touchRect.x + touchRect.width / 2,
-        y: Math.min(height - 32, touchRect.y + touchRect.height / 2),
-        // Tablets retain the existing page scroll-snap: cross its threshold.
-        yDistance: -Math.max(200, height * 0.8),
-        gestureSourceType: 'touch',
+      const x = touchRect.x + touchRect.width / 2;
+      const y = Math.min(height - 32, touchRect.y + touchRect.height / 2);
+      // Real touch events exercise browser pan arbitration on Windows too.
+      await send('Input.dispatchTouchEvent', {
+        type: 'touchStart',
+        touchPoints: [{ x, y, id: 1 }],
+      });
+      for (let i = 1; i <= 10; i++) {
+        await send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [{ x, y: y - i * 15, id: 1 }],
+        });
+        await pause(30);
+      }
+      await send('Input.dispatchTouchEvent', {
+        type: 'touchEnd',
+        touchPoints: [],
       });
       await pause(200);
       assert.ok(
@@ -228,7 +239,7 @@ try {
       identifier: injection.identifier,
     });
   }
-  // Real browser, reduced-motion preference: static source loaded, no 3D request.
+  // Reduced motion retains deliberate orbit; automatic scene motion is disabled.
   await send('Emulation.setEmulatedMedia', {
     features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
   });
@@ -239,8 +250,8 @@ try {
   await pause(1800);
   assert.equal(
     (await sceneResources()).length,
-    0,
-    'Reduced motion downloaded 3D',
+    1,
+    'Reduced motion must retain deliberate scene interaction',
   );
   assert.ok(
     await evaluate(
@@ -248,7 +259,9 @@ try {
     ),
   );
   await screenshot(`${output}/reduced-motion.png`);
-  await send('Emulation.setEmulatedMedia', { features: [] });
+  await send('Emulation.setEmulatedMedia', {
+    features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }],
+  });
   await showScene();
   // Context loss after readiness restores fallback and disposes the canvas.
   await evaluate(

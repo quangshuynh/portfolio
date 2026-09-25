@@ -10,7 +10,8 @@ export function createDeskMotion() {
     manual = 0,
     scroll = 0,
     parallax = 0,
-    gesture = null;
+    gesture = null,
+    reducedMotion = false;
   const retarget = () => {
     if (gesture?.intent !== 'horizontal')
       target = clamp(manual + scroll + parallax);
@@ -25,11 +26,20 @@ export function createDeskMotion() {
     get gesture() {
       return gesture;
     },
+    setReducedMotion(value) {
+      if (reducedMotion === value) return;
+      reducedMotion = value;
+      // Preserve the visible view when switching policy; discard automatic offsets.
+      manual = target = angle;
+      scroll = parallax = 0;
+    },
     setScroll(progress) {
+      if (reducedMotion) return;
       scroll = clamp(progress, 0, 1) * 0.06;
       retarget();
     },
     setParallax(value) {
+      if (reducedMotion) return;
       parallax = gesture ? 0 : clamp(value, -1, 1) * 0.018;
       retarget();
     },
@@ -52,7 +62,11 @@ export function createDeskMotion() {
       const dx = x - gesture.x,
         dy = y - gesture.y;
       if (gesture.intent === 'pending') {
-        if (Math.abs(dy) >= gesture.threshold && Math.abs(dy) >= Math.abs(dx))
+        // Once movement is meaningful, ambiguous diagonals belong to the page.
+        if (
+          Math.max(Math.abs(dx), Math.abs(dy)) >= gesture.threshold &&
+          Math.abs(dx) <= Math.abs(dy) * 1.4
+        )
           gesture.intent = 'vertical';
         else if (
           Math.abs(dx) >= gesture.threshold &&
@@ -79,6 +93,10 @@ export function createDeskMotion() {
       parallax = 0;
     },
     step(milliseconds) {
+      if (reducedMotion) {
+        angle = target;
+        return false;
+      }
       angle +=
         (target - angle) * (1 - Math.exp(-Math.min(milliseconds, 64) / 65));
       if (Math.abs(target - angle) < 0.0001) angle = target;

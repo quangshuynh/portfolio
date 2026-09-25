@@ -103,7 +103,8 @@ export function createDeskScene() {
         c.fill();
       });
       c.fillStyle = '#38505c';
-      c.fillRect(8, 33, portrait ? 20 : 55, h - 43);
+      const codeHeight = portrait ? 213 : h;
+      c.fillRect(8, 33, portrait ? 20 : 55, codeHeight - 43);
       c.font = '10px monospace';
       c.fillStyle = '#bfdbd5';
       c.fillText(
@@ -111,7 +112,7 @@ export function createDeskScene() {
         portrait ? 36 : 76,
         45,
       );
-      for (let row = 0; row < (portrait ? 24 : 13); row++) {
+      for (let row = 0; row < (portrait ? 16 : 13); row++) {
         const x = (portrait ? 36 : 76) + (row % 4) * 7;
         c.fillStyle = ['#75b6a0', '#799bb7', '#c2b58e'][row % 3];
         c.fillRect(
@@ -120,6 +121,60 @@ export function createDeskScene() {
           24 + ((row * 19) % (portrait ? 75 : 175)),
           3,
         );
+      }
+      if (portrait) {
+        // Static lower third, baked into the same 192 x 320 screen texture.
+        c.fillStyle = '#121816';
+        c.fillRect(0, codeHeight, w, h - codeHeight);
+        c.fillStyle = '#294237';
+        c.fillRect(0, codeHeight, w, 1);
+        // Original abstract album art: dusk, a sun and layered hills.
+        c.fillStyle = '#33475b';
+        c.fillRect(12, 225, 44, 44);
+        c.fillStyle = '#d5b988';
+        c.beginPath();
+        c.arc(42, 237, 8, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#759d8b';
+        c.beginPath();
+        c.moveTo(12, 255);
+        c.lineTo(28, 239);
+        c.lineTo(56, 263);
+        c.lineTo(56, 269);
+        c.lineTo(12, 269);
+        c.fill();
+        c.fillStyle = '#dce8df';
+        c.font = 'bold 10px sans-serif';
+        c.fillText('Evening drive', 65, 240);
+        c.fillStyle = '#8c9c92';
+        c.font = '9px sans-serif';
+        c.fillText('Studio notes', 65, 254);
+        c.fillStyle = '#1db954';
+        c.beginPath();
+        c.arc(96, 284, 11, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#102218';
+        c.beginPath();
+        c.moveTo(93, 278);
+        c.lineTo(93, 290);
+        c.lineTo(102, 284);
+        c.fill();
+        c.fillStyle = '#bac7bf';
+        for (const [x, direction] of [
+          [66, -1],
+          [126, 1],
+        ]) {
+          c.fillRect(x + direction * 5, 280, 2, 8);
+          c.beginPath();
+          c.moveTo(x + direction * 4, 284);
+          c.lineTo(x - direction * 3, 280);
+          c.lineTo(x - direction * 3, 288);
+          c.fill();
+        }
+        c.fillStyle = '#3b4940';
+        c.fillRect(16, 305, 160, 2);
+        c.fillStyle = '#1db954';
+        c.fillRect(16, 305, 57, 2);
       }
     });
   }

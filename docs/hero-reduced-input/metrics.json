@@ -1,0 +1,242 @@
+[
+  {
+    "url": "http://localhost:5173",
+    "width": 1440,
+    "height": 900,
+    "nativePreferences": {
+      "reduced": true,
+      "fine": true,
+      "hover": true,
+      "touch": 0
+    },
+    "hits": [
+      {
+        "name": "center",
+        "hit": "CANVAS",
+        "angle": -0.347521311237809,
+        "idleFrames": 0
+      },
+      {
+        "name": "left-monitor",
+        "hit": "CANVAS",
+        "angle": -0.347521311237809,
+        "idleFrames": 0
+      },
+      {
+        "name": "right-monitor",
+        "hit": "CANVAS",
+        "angle": -0.347521311237809,
+        "idleFrames": 0
+      },
+      {
+        "name": "keyboard",
+        "hit": "CANVAS",
+        "angle": -0.347521311237809,
+        "idleFrames": 0
+      },
+      {
+        "name": "pc",
+        "hit": "CANVAS",
+        "angle": -0.347521311237809,
+        "idleFrames": 0
+      },
+      {
+        "name": "background",
+        "hit": "CANVAS",
+        "angle": -0.347521311237809,
+        "idleFrames": 0
+      }
+    ],
+    "scrolled": {
+      "angle": 0,
+      "target": 0,
+      "frames": 47,
+      "calls": 15,
+      "triangles": 2902,
+      "dragging": false,
+      "capture": false,
+      "y": 80
+    },
+    "offscreenFrames": 0
+  },
+  {
+    "url": "http://localhost:5173",
+    "width": 742,
+    "height": 1277,
+    "nativePreferences": {
+      "reduced": true,
+      "fine": true,
+      "hover": true,
+      "touch": 0
+    },
+    "hits": [
+      {
+        "name": "center",
+        "hit": "CANVAS",
+        "angle": -0.3693094812213707,
+        "idleFrames": 0
+      },
+      {
+        "name": "left-monitor",
+        "hit": "CANVAS",
+        "angle": -0.3693094812213707,
+        "idleFrames": 0
+      },
+      {
+        "name": "right-monitor",
+        "hit": "CANVAS",
+        "angle": -0.3693094812213707,
+        "idleFrames": 0
+      },
+      {
+        "name": "keyboard",
+        "hit": "CANVAS",
+        "angle": -0.3693094812213707,
+        "idleFrames": 0
+      },
+      {
+        "name": "pc",
+        "hit": "CANVAS",
+        "angle": -0.36930933094895807,
+        "idleFrames": 0
+      },
+      {
+        "name": "background",
+        "hit": "CANVAS",
+        "angle": -0.3693094436532675,
+        "idleFrames": 0
+      }
+    ],
+    "scrolled": {
+      "angle": 0,
+      "target": 0,
+      "frames": 47,
+      "calls": 15,
+      "triangles": 2902,
+      "dragging": false,
+      "capture": false,
+      "y": 80
+    },
+    "offscreenFrames": 0
+  },
+  {
+    "url": "http://localhost:4173",
+    "width": 1440,
+    "height": 900,
+    "nativePreferences": {
+      "reduced": true,
+      "fine": true,
+      "hover": true,
+      "touch": 0
+    },
+    "hits": [
+      {
+        "name": "center",
+        "hit": "CANVAS",
+        "angle": -0.347521311237809,
+        "idleFrames": 0
+      },
+      {
+        "name": "left-monitor",
+        "hit": "CANVAS",
+        "angle": -0.347521311237809,
+        "idleFrames": 0
+      },
+      {
+        "name": "right-monitor",
+        "hit": "CANVAS",
+        "angle": -0.347521311237809,
+        "idleFrames": 0
+      },
+      {
+        "name": "keyboard",
+        "hit": "CANVAS",
+        "angle": -0.347521311237809,
+        "idleFrames": 0
+      },
+      {
+        "name": "pc",
+        "hit": "CANVAS",
+        "angle": -0.347521311237809,
+        "idleFrames": 0
+      },
+      {
+        "name": "background",
+        "hit": "CANVAS",
+        "angle": -0.347521311237809,
+        "idleFrames": 0
+      }
+    ],
+    "scrolled": {
+      "angle": 0,
+      "target": 0,
+      "frames": 47,
+      "calls": 15,
+      "triangles": 2902,
+      "dragging": false,
+      "capture": false,
+      "y": 80
+    },
+    "offscreenFrames": 0
+  },
+  {
+    "url": "http://localhost:4173",
+    "width": 742,
+    "height": 1277,
+    "nativePreferences": {
+      "reduced": true,
+      "fine": true,
+      "hover": true,
+      "touch": 0
+    },
+    "hits": [
+      {
+        "name": "center",
+        "hit": "CANVAS",
+        "angle": -0.3693094812213707,
+        "idleFrames": 0
+      },
+      {
+        "name": "left-monitor",
+        "hit": "CANVAS",
+        "angle": -0.3693094812213707,
+        "idleFrames": 0
+      },
+      {
+        "name": "right-monitor",
+        "hit": "CANVAS",
+        "angle": -0.3693094812213707,
+        "idleFrames": 0
+      },
+      {
+        "name": "keyboard",
+        "hit": "CANVAS",
+        "angle": -0.3693094812213707,
+        "idleFrames": 0
+      },
+      {
+        "name": "pc",
+        "hit": "CANVAS",
+        "angle": -0.36930933094895807,
+        "idleFrames": 0
+      },
+      {
+        "name": "background",
+        "hit": "CANVAS",
+        "angle": -0.3693094436532675,
+        "idleFrames": 0
+      }
+    ],
+    "scrolled": {
+      "angle": 0,
+      "target": 0,
+      "frames": 47,
+      "calls": 15,
+      "triangles": 2902,
+      "dragging": false,
+      "capture": false,
+      "y": 80
+    },
+    "offscreenFrames": 0
+  }
+]

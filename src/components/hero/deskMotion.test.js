@@ -1,4 +1,25 @@
 import { createDeskMotion, ORBIT_LIMIT } from './deskMotion';
+test('reduced motion suppresses automatic offsets and easing, not deliberate orbit', () => {
+  const m = createDeskMotion();
+  m.setReducedMotion(true);
+  m.setScroll(1);
+  m.setParallax(1);
+  expect(m.target).toBe(0);
+  m.begin(1, 0, 0, 300, false);
+  m.move(1, 100, 0);
+  expect(m.step(16)).toBe(false);
+  expect(m.angle).toBeCloseTo(-Math.PI / 3);
+  m.end(1);
+  m.setScroll(0.5);
+  expect(m.target).toBe(m.angle);
+  m.select(100);
+  m.step(16);
+  expect(m.angle).toBe(ORBIT_LIMIT);
+  m.setReducedMotion(false);
+  m.setScroll(0.5);
+  m.select(0);
+  expect(m.step(16)).toBe(true);
+});
 const settle = (m) => {
   let frames = 0;
   while (m.step(16) && frames++ < 150) {}

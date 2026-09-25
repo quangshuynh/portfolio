@@ -42,3 +42,8 @@ export async function close() {
 }
 await send('Page.enable');
 await send('Runtime.enable');
+// Make interactive checks independent of the host OS animation preference.
+// Individual reduced-motion probes explicitly override this later.
+await send('Emulation.setEmulatedMedia', {
+  features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }],
+});

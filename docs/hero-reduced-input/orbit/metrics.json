@@ -1,0 +1,64 @@
+{
+  "measurements": [
+    {
+      "name": "desktop",
+      "front": {
+        "frames": 3,
+        "angle": 0,
+        "target": 0,
+        "drags": 0,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "left": {
+        "frames": 288,
+        "angle": -1.5707963267948966,
+        "target": -1.5707963267948966,
+        "drags": 1,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      },
+      "right": {
+        "frames": 443,
+        "angle": 1.5707963267948966,
+        "target": 1.5707963267948966,
+        "drags": 2,
+        "dragging": false,
+        "calls": 15,
+        "triangles": 2902
+      }
+    }
+  ],
+  "start": {
+    "nav": 90,
+    "slot": 90,
+    "heroDocumentTop": 90,
+    "introTop": 176.375,
+    "navBottom": 90
+  },
+  "midway": {
+    "nav": 84.265625,
+    "slot": 90,
+    "heroDocumentTop": 90,
+    "introTop": 36.375,
+    "navBottom": 84.265625
+  },
+  "collapsed": {
+    "nav": 72,
+    "slot": 90,
+    "heroDocumentTop": 90,
+    "introTop": -373.625,
+    "navBottom": 72
+  },
+  "offscreen": {
+    "frames": 75,
+    "angle": 0.04074074074074074,
+    "target": 0.04074074074074074,
+    "drags": 0,
+    "dragging": false,
+    "calls": 15,
+    "triangles": 2902
+  }
+}
