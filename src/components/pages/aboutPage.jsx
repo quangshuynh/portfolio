@@ -227,7 +227,7 @@ function AboutPage() {
               <div className="viewfinder about-portrait-frame">
                 <button className="about-portrait-button" type="button" aria-label="View more photos of Quang" aria-haspopup="dialog" onClick={(event) => openGallery('personal', event.currentTarget)}>
                   <img src={quangPhoto} width="1000" height="1000" alt="Quang seated on a bench outdoors" />
-                  <span>View photos</span>
+                  <span>View more photos</span>
                 </button>
               </div>
               <figcaption className="mono">Fig. A — Off the clock, Rochester</figcaption>
@@ -302,7 +302,7 @@ function AboutPage() {
                   hasNonPhotoContent={interestGalleryKeys[title] === 'music'}
                   onOpen={openGallery}
                   onOpenImage={(image, trigger) => openDirectLightbox({ src: image.src, alt: image.alt, caption: image.caption ?? title }, trigger)}
-                  accessory={title === 'Music' ? <SpotifyDisc className="interest-card-disc" label="Recently played on Spotify" onClick={(event) => openGallery('music', event.currentTarget)} /> : null}
+                  accessory={title === 'Music' ? <SpotifyDisc className="interest-card-disc" onClick={(event) => openGallery('music', event.currentTarget)} /> : null}
                 />
               ))}
             </div>

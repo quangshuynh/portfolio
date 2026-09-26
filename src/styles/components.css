@@ -13,10 +13,10 @@
 }
 .topo-field path { vector-effect: non-scaling-stroke; }
 .topo-field .topo-field__index { stroke-width: 1.8; }
-.topo-field__drift {
-  transform-origin: 70% 35%;
-  animation: topo-drift 90s var(--ease-in-out) infinite alternate;
-}
+.topo-field { transform-origin: 70% 35%; }
+/* Drift the whole layer (compositor-only) rather than the SVG group, which would repaint. */
+.hero-topo,
+.contact-topo { animation: topo-drift 90s var(--ease-in-out) infinite alternate; will-change: transform; }
 @keyframes topo-drift {
   from { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
   to { transform: translate3d(-2%, 1.5%, 0) rotate(3deg) scale(1.03); }
@@ -58,11 +58,19 @@
   background: var(--accent);
   vertical-align: .05em;
 }
-/* Only the hero's availability dot breathes; the rest stay still. */
-.hero-log .status-dot { animation: status-pulse 3.2s ease-out infinite; }
+/* Only the hero's availability dot breathes (opacity/transform only); the rest stay still. */
+.hero-log .status-dot { position: relative; }
+.hero-log .status-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: status-pulse 3.2s ease-out infinite;
+}
 @keyframes status-pulse {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); }
-  70%, 100% { box-shadow: 0 0 0 .5rem transparent; }
+  0% { opacity: .5; transform: scale(1); }
+  70%, 100% { opacity: 0; transform: scale(2.6); }
 }
 
 /* ---------- Spotify disc: Circular type set around a turning record ---------- */
@@ -95,7 +103,7 @@
   text-transform: uppercase;
 }
 .spotify-disc__ring,
-.spotify-disc__record { transform-origin: 100px 100px; transform-box: view-box; }
+.spotify-disc__record { will-change: transform; }
 .spotify-disc__ring { animation: disc-spin 38s linear infinite; }
 .spotify-disc__record { animation: disc-spin 9s linear infinite; }
 .spotify-disc[data-paused] .spotify-disc__ring,
@@ -122,8 +130,9 @@
 @keyframes disc-spin { to { transform: rotate(360deg); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .topo-field__drift,
+  .hero-topo,
+  .contact-topo,
   .spotify-disc__ring,
   .spotify-disc__record,
-  .status-dot { animation: none !important; }
+  .hero-log .status-dot::after { animation: none !important; }
 }

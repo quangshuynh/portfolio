@@ -3,6 +3,8 @@ import { FaSpotify } from 'react-icons/fa';
 import { getFreshSpotifyTracksCache, subscribeSpotifyTracks } from '../../util/spotify';
 
 const RING_TEXT = 'On repeat · recently played · Spotify · ';
+// Accessible name mirrors the visible ring text (WCAG 2.5.3 label in name).
+export const SPOTIFY_DISC_LABEL = RING_TEXT.trim();
 
 function latestTrack(tracks) {
   if (!tracks?.length) return null;
@@ -14,7 +16,7 @@ function latestTrack(tracks) {
  * fetches on its own: once listening data is cached, the latest cover sits in
  * the label. Rotation pauses offscreen and is removed for reduced motion.
  */
-export default function SpotifyDisc({ href, onClick, className = '', label = 'Recently played on Spotify' }) {
+export default function SpotifyDisc({ href, onClick, className = '', label = SPOTIFY_DISC_LABEL }) {
   const root = useRef(null);
   const ringId = `spotify-disc-ring-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const [track, setTrack] = useState(() => latestTrack(getFreshSpotifyTracksCache()));
@@ -33,22 +35,23 @@ export default function SpotifyDisc({ href, onClick, className = '', label = 'Re
   const content = (
     <>
       <svg className="spotify-disc__svg" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
-        <defs>
-          <path id={ringId} d="M100 100 m-79 0 a79 79 0 1 1 158 0 a79 79 0 1 1 -158 0" />
-        </defs>
         <circle cx="100" cy="100" r="92" className="spotify-disc__bezel" />
-        <g className="spotify-disc__record">
-          <circle cx="100" cy="100" r="62" className="spotify-disc__vinyl" />
-          {[56, 50, 44].map((r) => <circle key={r} cx="100" cy="100" r={r} className="spotify-disc__groove" />)}
-        </g>
-        <g className="spotify-disc__ring">
-          <text className="spotify-disc__text">
-            <textPath href={`#${ringId}`} textLength="492" lengthAdjust="spacing">{RING_TEXT}</textPath>
-          </text>
-        </g>
         {Array.from({ length: 24 }, (_, index) => (
           <line key={index} x1="100" y1="4" x2="100" y2={index % 6 === 0 ? 11 : 8} className="spotify-disc__tick" transform={`rotate(${index * 15} 100 100)`} />
         ))}
+      </svg>
+      {/* Rotating layers are whole elements so the compositor can spin them without repainting. */}
+      <svg className="spotify-disc__svg spotify-disc__record" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
+        <circle cx="100" cy="100" r="62" className="spotify-disc__vinyl" />
+        {[56, 50, 44].map((r) => <circle key={r} cx="100" cy="100" r={r} className="spotify-disc__groove" />)}
+      </svg>
+      <svg className="spotify-disc__svg spotify-disc__ring" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
+        <defs>
+          <path id={ringId} d="M100 100 m-79 0 a79 79 0 1 1 158 0 a79 79 0 1 1 -158 0" />
+        </defs>
+        <text className="spotify-disc__text">
+          <textPath href={`#${ringId}`} textLength="492" lengthAdjust="spacing">{RING_TEXT}</textPath>
+        </text>
       </svg>
       <span className="spotify-disc__label">
         {track?.image

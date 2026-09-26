@@ -3,7 +3,7 @@
 
 @font-face {
   font-family: 'Circular';
-  src: url('../../public/fonts/CircularSpotifyText-Bold.otf') format('opentype');
+  src: url('/fonts/CircularSpotifyText-Bold.woff2') format('woff2'), url('/fonts/CircularSpotifyText-Bold.otf') format('opentype');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -36,7 +36,7 @@
   --font-display: 'Circular', 'Schibsted Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
   --font-body: 'Schibsted Grotesk Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'Martian Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
-  --font-serif: 'Newsreader Variable', 'Iowan Old Style', Georgia, serif;
+  --font-serif: 'Newsreader', 'Iowan Old Style', Georgia, serif;
 
   --step--2: .6875rem;
   --step--1: .8125rem;

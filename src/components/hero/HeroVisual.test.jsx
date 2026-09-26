@@ -63,7 +63,7 @@ test('hero copy, portrait and CTA destinations render before the module loads', 
     '/Quang_Huynh_Resume.pdf',
   );
   // The portrait now lives inside the single Meet Quang link.
-  expect(screen.getByRole('link', { name: 'Meet Quang' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: /^Meet Quang/ })).toHaveAttribute(
     'href',
     '/about',
   );

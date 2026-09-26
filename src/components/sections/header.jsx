@@ -82,8 +82,8 @@ function Header() {
                 <span className="hero-bench__rec">Drag to orbit</span>
               </div>
             </div>
-            <SpotifyDisc className="hero-bench__disc" href={`${aboutHref}#music`} label="Recently played on Spotify" />
-            <a className="meet-quang-card" href={aboutHref} aria-label="Meet Quang">
+            <SpotifyDisc className="hero-bench__disc" href={`${aboutHref}#music`} />
+            <a className="meet-quang-card" href={aboutHref}>
               <img className="meet-quang-card__photo" src={quangPhoto} alt="" />
               <span className="meet-quang-card__copy">
                 <strong>Meet Quang</strong>

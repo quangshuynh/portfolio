@@ -4,6 +4,8 @@ import { photographs, sortPhotographs } from '../../data/photographs';
 import { appHref, navigate, photographyHref } from '../../util/navigation';
 import PhotographyLightbox from '../photography/photographyLightbox';
 import SiteNav from '../sections/siteNav';
+import coverSmall from '../../assets/photography/cover/IMGP0739-cover-640.webp';
+import coverLarge from '../../assets/photography/cover/IMGP0739-cover-1100.webp';
 import Footer from '../sections/footer';
 
 export function getPhotographyColumnCount(contentWidth = window.innerWidth) {
@@ -63,7 +65,8 @@ const captureYears = photographs
 const firstYear = captureYears.length ? Math.min(...captureYears) : null;
 const lastYear = captureYears.length ? Math.max(...captureYears) : null;
 const yearRange = firstYear && (firstYear === lastYear ? String(firstYear) : `${firstYear}–${lastYear}`);
-const coverPhotograph = photographs.find(({ id }) => id === 'IMGP0579') ?? photographs[0];
+// Cover: a lightweight WebP derivative of an existing frame (Ithaca Falls).
+const coverPhotograph = photographs.find(({ id }) => id === 'IMGP0739') ?? photographs[0];
 
 export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = false }) {
   const [sort, setSort] = useState('default');
@@ -133,9 +136,9 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
                 <div><dt>Around</dt><dd>Rochester · Ithaca · Niagara</dd></div>
               </dl>
             </div>
-            <a className="photography-cover viewfinder" href={photographyHref(coverPhotograph.slug)} onClick={openPhotograph} aria-label={`Open photograph: ${coverPhotograph.caption}`}>
-              <img src={coverPhotograph.gallerySrc} width={coverPhotograph.galleryWidth} height={coverPhotograph.galleryHeight} alt={coverPhotograph.alt} fetchPriority="high" decoding="async" />
-              <span className="photography-cover__caption mono" aria-hidden="true">Cover — {coverPhotograph.caption}</span>
+            <a className="photography-cover viewfinder" href={photographyHref(coverPhotograph.slug)} onClick={openPhotograph} aria-label={`Cover — ${coverPhotograph.caption}. Open photograph`}>
+              <img src={coverSmall} srcSet={`${coverSmall} 640w, ${coverLarge} 1100w`} sizes="(max-width: 860px) 92vw, 480px" width={coverPhotograph.viewerWidth} height={coverPhotograph.viewerHeight} alt={coverPhotograph.alt} fetchPriority="high" decoding="async" />
+              <span className="photography-cover__caption mono">Cover — {coverPhotograph.caption}</span>
             </a>
           </div>
         </header>

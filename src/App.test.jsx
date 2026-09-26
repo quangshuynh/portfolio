@@ -49,7 +49,7 @@ describe('portfolio homepage', () => {
 
     expect(document.querySelector('.meet-quang-card'))
       .toHaveAttribute('href', '/about');
-    expect(screen.getByRole('link', { name: 'Meet Quang' }))
+    expect(screen.getByRole('link', { name: /^Meet Quang/ }))
       .toHaveAttribute('href', '/about');
   });
 
