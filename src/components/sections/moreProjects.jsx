@@ -169,7 +169,7 @@ function MoreProjects() {
     <section className="page-section section-ledger" id="more-projects" aria-labelledby="more-projects-title">
       <div className="section-inner">
         <div className="section-heading" data-reveal>
-          <div><p className="eyebrow"><span className="section-index">03</span> Additional work</p><h2 id="more-projects-title">More projects</h2></div>
+          <div><p className="eyebrow">Additional work</p><h2 id="more-projects-title">More projects</h2></div>
           <p>Additional projects spanning system design, developer tooling, automation, native applications, and product engineering.</p>
         </div>
         <div className="more-grid ledger" id="more-projects-grid">

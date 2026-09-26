@@ -19,7 +19,7 @@ function TechStack() {
     <section className="page-section section-skills" id="skills" aria-labelledby="skills-title">
       <div className="section-inner">
         <div className="section-heading" data-reveal>
-          <div><p className="eyebrow"><span className="section-index">04</span> Engineering toolkit</p><h2 id="skills-title">Skills</h2></div>
+          <div><p className="eyebrow">Engineering toolkit</p><h2 id="skills-title">Skills</h2></div>
           <p>
             A focused toolkit spanning backend systems, developer tools, data workflows,
             native applications, automation, and frontend delivery.

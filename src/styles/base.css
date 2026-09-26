@@ -84,7 +84,6 @@ h1, h2, h3, h4 { margin: 0; font-weight: 700; }
 }
 
 /* ---------- type primitives ---------- */
-.eyebrow,
 .mono {
   font-family: var(--font-mono);
   font-size: var(--step--2);
@@ -93,7 +92,16 @@ h1, h2, h3, h4 { margin: 0; font-weight: 700; }
   text-transform: uppercase;
   line-height: 1.5;
 }
-.eyebrow { margin: 0 0 1.1rem; color: var(--accent); }
+/* Eyebrows: the original portfolio's bold, letter-spaced sans labels. */
+.eyebrow {
+  margin: 0 0 1.1rem;
+  color: var(--accent);
+  font-size: .76rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
 
 .display {
   font-family: var(--font-display);
@@ -126,8 +134,6 @@ h1, h2, h3, h4 { margin: 0; font-weight: 700; }
   padding-top: 1.25rem;
   border-top: 1px solid var(--border);
 }
-.section-heading .eyebrow { display: flex; gap: .9rem; }
-.section-heading .eyebrow .section-index { color: var(--text-tertiary); }
 .section-heading h2 {
   font-family: var(--font-display);
   font-size: var(--step-4);
