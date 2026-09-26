@@ -60,9 +60,9 @@ function PhotographFigure({ photograph, onOpen }) {
 const captureYears = photographs
   .map(({ capturedAt }) => (capturedAt ? new Date(capturedAt).getFullYear() : null))
   .filter((year) => Number.isFinite(year));
-const yearRange = captureYears.length
-  ? `${Math.min(...captureYears)}–${Math.max(...captureYears)}`
-  : null;
+const firstYear = captureYears.length ? Math.min(...captureYears) : null;
+const lastYear = captureYears.length ? Math.max(...captureYears) : null;
+const yearRange = firstYear && (firstYear === lastYear ? String(firstYear) : `${firstYear}–${lastYear}`);
 const coverPhotograph = photographs.find(({ id }) => id === 'IMGP0579') ?? photographs[0];
 
 export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = false }) {

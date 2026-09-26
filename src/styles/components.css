@@ -89,9 +89,9 @@
 .spotify-disc__text {
   fill: currentColor;
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: .04em;
+  letter-spacing: .02em;
   text-transform: uppercase;
 }
 .spotify-disc__ring,

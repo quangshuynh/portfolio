@@ -161,7 +161,7 @@
 .case-file__meta dd { margin: .3rem 0 0; color: var(--text-secondary); font-size: .82rem; line-height: 1.45; }
 .project-stack dd { display: flex; flex-wrap: wrap; gap: .15rem .6rem; }
 .project-stack dd span { white-space: nowrap; }
-.project-stack dd span + span::before { content: '/'; margin-right: .6rem; color: var(--border-strong); }
+.project-stack dd span:not(:last-child)::after { content: '/'; margin-left: .6rem; color: var(--border-strong); }
 
 .case-file__visual {
   --vf-inset: -8px;

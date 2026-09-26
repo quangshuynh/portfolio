@@ -164,6 +164,7 @@
     right: 0;
     left: 0;
     display: grid;
+    justify-content: stretch;
     gap: 1.5rem;
     max-height: calc(100dvh - var(--nav-height));
     overflow-y: auto;

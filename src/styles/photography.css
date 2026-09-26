@@ -7,7 +7,7 @@
 .photography-header-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, .9fr);
-  align-items: end;
+  align-items: center;
   gap: clamp(2rem, 6vw, 6rem);
 }
 .photography-modal-back-link {
@@ -194,6 +194,8 @@
   .photo-frame figcaption { font-size: .8rem; }
   .photo-frame__exposure { display: none; }
   :root[data-theme='light'] .photo-frame a { padding: .3rem; }
+  .photography-stats { display: grid; grid-template-columns: auto 1fr; }
   .photography-stats > div { padding-right: 1rem; }
   .photography-stats > div + div { padding-left: 1rem; }
+  .photography-stats > div:nth-child(3) { grid-column: 1 / -1; padding-left: 0; border-left: 0; border-top: 1px solid var(--border); }
 }

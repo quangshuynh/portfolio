@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { FaSpotify } from 'react-icons/fa';
 import { getFreshSpotifyTracksCache, subscribeSpotifyTracks } from '../../util/spotify';
 
-const RING_TEXT = 'Recently played on Spotify · on repeat · ';
+const RING_TEXT = 'On repeat · recently played · Spotify · ';
 
 function latestTrack(tracks) {
   if (!tracks?.length) return null;
@@ -16,6 +16,7 @@ function latestTrack(tracks) {
  */
 export default function SpotifyDisc({ href, onClick, className = '', label = 'Recently played on Spotify' }) {
   const root = useRef(null);
+  const ringId = `spotify-disc-ring-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const [track, setTrack] = useState(() => latestTrack(getFreshSpotifyTracksCache()));
   const [visible, setVisible] = useState(true);
 
@@ -33,18 +34,18 @@ export default function SpotifyDisc({ href, onClick, className = '', label = 'Re
     <>
       <svg className="spotify-disc__svg" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
         <defs>
-          <path id="spotify-disc-ring" d="M100 100 m-78 0 a78 78 0 1 1 156 0 a78 78 0 1 1 -156 0" />
+          <path id={ringId} d="M100 100 m-79 0 a79 79 0 1 1 158 0 a79 79 0 1 1 -158 0" />
         </defs>
+        <circle cx="100" cy="100" r="92" className="spotify-disc__bezel" />
         <g className="spotify-disc__record">
           <circle cx="100" cy="100" r="62" className="spotify-disc__vinyl" />
           {[56, 50, 44].map((r) => <circle key={r} cx="100" cy="100" r={r} className="spotify-disc__groove" />)}
         </g>
         <g className="spotify-disc__ring">
           <text className="spotify-disc__text">
-            <textPath href="#spotify-disc-ring" textLength="486" lengthAdjust="spacing">{RING_TEXT}</textPath>
+            <textPath href={`#${ringId}`} textLength="492" lengthAdjust="spacing">{RING_TEXT}</textPath>
           </text>
         </g>
-        <circle cx="100" cy="100" r="92" className="spotify-disc__bezel" />
         {Array.from({ length: 24 }, (_, index) => (
           <line key={index} x1="100" y1="4" x2="100" y2={index % 6 === 0 ? 11 : 8} className="spotify-disc__tick" transform={`rotate(${index * 15} 100 100)`} />
         ))}

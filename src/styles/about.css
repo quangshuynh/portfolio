@@ -266,6 +266,7 @@
 }
 
 @media (max-width: 760px) {
+  .about-location span { display: none; }
   .interest-grid { grid-template-columns: 1fr; }
   .interest-card--hiking .interest-card-media,
   .interest-card--music .interest-card-media,
