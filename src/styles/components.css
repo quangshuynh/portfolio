@@ -1,0 +1,129 @@
+/* Shared decorative components: terrain, ridgelines, Spotify disc, status dot. */
+
+.topo-field {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  fill: none;
+  stroke: var(--topo);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.topo-field path { vector-effect: non-scaling-stroke; }
+.topo-field .topo-field__index { stroke-width: 1.8; }
+.topo-field__drift {
+  transform-origin: 70% 35%;
+  animation: topo-drift 90s var(--ease-in-out) infinite alternate;
+}
+@keyframes topo-drift {
+  from { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+  to { transform: translate3d(-2%, 1.5%, 0) rotate(3deg) scale(1.03); }
+}
+
+.ridgeline {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: clamp(90px, 14vw, 220px);
+  pointer-events: none;
+}
+.ridgeline__layer--1 { fill: var(--ridge-1); }
+.ridgeline__layer--2 { fill: var(--ridge-2); }
+.ridgeline__layer--3 { fill: var(--ridge-3); }
+
+/* Scroll-linked parallax: layers drift at different rates. No JS, no scroll-jacking. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .ridgeline__layer { animation: ridge-parallax linear both; animation-timeline: view(); animation-range: cover 40% cover 100%; }
+    .ridgeline__layer--1 { --ridge-shift: 34px; }
+    .ridgeline__layer--2 { --ridge-shift: 18px; }
+    .ridgeline__layer--3 { --ridge-shift: 0px; }
+  }
+}
+@keyframes ridge-parallax {
+  from { transform: translateY(0); }
+  to { transform: translateY(var(--ridge-shift, 0px)); }
+}
+
+.status-dot {
+  display: inline-block;
+  width: .5rem;
+  height: .5rem;
+  margin-right: .5rem;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: .05em;
+}
+/* Only the hero's availability dot breathes; the rest stay still. */
+.hero-log .status-dot { animation: status-pulse 3.2s ease-out infinite; }
+@keyframes status-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 .5rem transparent; }
+}
+
+/* ---------- Spotify disc: Circular type set around a turning record ---------- */
+.spotify-disc {
+  --disc-size: 9.5rem;
+  position: relative;
+  display: grid;
+  width: var(--disc-size);
+  height: var(--disc-size);
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-decoration: none;
+}
+.spotify-disc__svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.spotify-disc__bezel { fill: color-mix(in srgb, var(--bg-primary) 82%, transparent); stroke: var(--border-strong); stroke-width: 1; }
+.spotify-disc__tick { stroke: var(--text-tertiary); stroke-width: 1; }
+.spotify-disc__vinyl { fill: #0b0f0c; stroke: #232d26; }
+.spotify-disc__groove { fill: none; stroke: rgba(236, 231, 218, .08); stroke-width: .8; }
+.spotify-disc__text {
+  fill: currentColor;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.spotify-disc__ring,
+.spotify-disc__record { transform-origin: 100px 100px; transform-box: view-box; }
+.spotify-disc__ring { animation: disc-spin 38s linear infinite; }
+.spotify-disc__record { animation: disc-spin 9s linear infinite; }
+.spotify-disc[data-paused] .spotify-disc__ring,
+.spotify-disc[data-paused] .spotify-disc__record { animation-play-state: paused; }
+.spotify-disc__label {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 34%;
+  aspect-ratio: 1;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 1.35rem;
+  box-shadow: 0 0 0 3px #0b0f0c;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.spotify-disc__label img { width: 100%; height: 100%; object-fit: cover; }
+.spotify-disc:hover .spotify-disc__label,
+.spotify-disc:focus-visible .spotify-disc__label { transform: scale(1.12); }
+.spotify-disc:focus-visible { outline-offset: 4px; border-radius: 50%; }
+@keyframes disc-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .topo-field__drift,
+  .spotify-disc__ring,
+  .spotify-disc__record,
+  .status-dot { animation: none !important; }
+}

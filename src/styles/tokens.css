@@ -1,0 +1,151 @@
+/* Design tokens: "field notes" — forest dusk (dark) and stone paper (light).
+   Raw palette values live once; components only consume semantic tokens. */
+
+@font-face {
+  font-family: 'Circular';
+  src: url('../../public/fonts/CircularSpotifyText-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* raw palette */
+  --forest-950: #0c130f;
+  --forest-900: #101913;
+  --forest-850: #141f18;
+  --forest-800: #1a271f;
+  --forest-750: #213026;
+  --moss-700: #33483a;
+  --moss-500: #5e765b;
+  --sage-300: #a9c09b;
+  --sage-200: #c7d8b9;
+  --stone-100: #f1ede3;
+  --stone-150: #ebe6d9;
+  --stone-200: #e2dccd;
+  --stone-300: #d3cbb9;
+  --stone-400: #bab19d;
+  --cream: #f3efe4;
+  --sky-300: #9db4c2;
+  --sky-600: #4c6a7d;
+  --earth-300: #cfa98a;
+  --earth-600: #7a5a41;
+  --ink-900: #1b221e;
+
+  /* type */
+  --font-display: 'Circular', 'Schibsted Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Schibsted Grotesk Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Martian Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  --font-serif: 'Newsreader Variable', 'Iowan Old Style', Georgia, serif;
+
+  --step--2: .6875rem;
+  --step--1: .8125rem;
+  --step-0: 1.0625rem;
+  --step-1: clamp(1.2rem, 1.1rem + .4vw, 1.4rem);
+  --step-2: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+  --step-3: clamp(2rem, 1.5rem + 2.2vw, 3.25rem);
+  --step-4: clamp(2.5rem, 1.6rem + 4vw, 5rem);
+  --step-5: clamp(3rem, 1.5rem + 6.4vw, 7rem);
+
+  /* space + layout */
+  --gutter: clamp(1.25rem, 4.2vw, 3.75rem);
+  --page-max: 1360px;
+  --measure: 62ch;
+  --nav-height: 4.25rem;
+  --section-pad: clamp(4.5rem, 9vw, 8rem);
+  --radius-sm: 4px;
+  --radius-md: 10px;
+  --radius-lg: 18px;
+
+  /* motion */
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --dur-fast: 160ms;
+  --dur-base: 320ms;
+  --dur-slow: 760ms;
+
+  font-family: var(--font-body);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+/* Dark: forest at dusk, matte instrument panels, warm cream type. */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg-primary: var(--forest-900);
+  --bg-secondary: var(--forest-950);
+  --bg-inverse: var(--forest-950);
+  --surface: var(--forest-850);
+  --surface-elevated: var(--forest-800);
+  --surface-sunken: #0a100c;
+  --text-primary: #ece7da;
+  --text-secondary: #b3b8aa;
+  --text-tertiary: #858f82;
+  --text-on-inverse: #ece7da;
+  --text-on-inverse-muted: #a9b0a2;
+  --border: #26342b;
+  --border-strong: #3a4a3f;
+  --accent: var(--sage-300);
+  --accent-strong: var(--sage-200);
+  --accent-soft: rgba(169, 192, 155, .12);
+  --accent-contrast: #111a14;
+  --forest: #0d1a14;
+  --moss: var(--moss-500);
+  --stone: #c6c0b2;
+  --sky: var(--sky-300);
+  --earth: var(--earth-300);
+  --signal: #e3b36e;
+  --focus: #e8bd7c;
+  --topo: rgba(169, 192, 155, .11);
+  --sky-haze: #16221b;
+  --ridge-1: #1c2b22;
+  --ridge-2: #16231b;
+  --ridge-3: var(--bg-primary);
+  --instrument: #0b110d;
+  --instrument-line: #26342b;
+  --shadow-soft: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 24px 60px -30px rgba(0, 0, 0, .7);
+  --shadow-lift: 0 30px 80px -40px rgba(0, 0, 0, .85);
+  --grain-opacity: .06;
+  --selection: rgba(169, 192, 155, .28);
+}
+
+/* Light: stone paper, field notebook, sage ink. Designed, not inverted. */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg-primary: var(--stone-100);
+  --bg-secondary: var(--stone-150);
+  --bg-inverse: #18231c;
+  --surface: #f7f4ec;
+  --surface-elevated: #fbf9f4;
+  --surface-sunken: var(--stone-200);
+  --text-primary: var(--ink-900);
+  --text-secondary: #4a544d;
+  --text-tertiary: #5e675f;
+  --text-on-inverse: #efeadf;
+  --text-on-inverse-muted: #b4bbac;
+  --border: #d9d1c0;
+  --border-strong: #bfb6a2;
+  --accent: #3d5d40;
+  --accent-strong: #2a432d;
+  --accent-soft: rgba(61, 93, 64, .09);
+  --accent-contrast: #f7f4ec;
+  --forest: #1d2e23;
+  --moss: #56704f;
+  --stone: #8b8472;
+  --sky: var(--sky-600);
+  --earth: var(--earth-600);
+  --signal: #9c5a24;
+  --focus: #a0521c;
+  --topo: rgba(61, 93, 64, .12);
+  --sky-haze: #e3e3d9;
+  --ridge-1: #d6d8cb;
+  --ridge-2: #c9cdbd;
+  --ridge-3: var(--bg-primary);
+  --instrument: #121a15;
+  --instrument-line: #c9c1ae;
+  --shadow-soft: 0 1px 0 rgba(255, 255, 255, .6) inset, 0 20px 50px -30px rgba(52, 44, 28, .35);
+  --shadow-lift: 0 30px 70px -40px rgba(52, 44, 28, .45);
+  --grain-opacity: .045;
+  --selection: rgba(61, 93, 64, .2);
+}
