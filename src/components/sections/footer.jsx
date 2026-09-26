@@ -22,7 +22,7 @@ function Footer() {
           </p>
 
           <div className="contact-links">
-            <a className="button" href="mailto:20378quang@gmail.com">
+            <a className="button" href="mailto:quang@quanghuynh.com">
               <FaEnvelope aria-hidden="true" /> Email me
             </a>
             <a
