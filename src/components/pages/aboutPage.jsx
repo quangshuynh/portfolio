@@ -96,7 +96,7 @@ const values = [
 ];
 
 const personalGallery = [
-  { src: quangBeachSunset, width: 927, height: 1400, alt: 'Quang standing at the shoreline at sunset', caption: 'Sunset at Charlotte Beach', shape: 'portrait' },
+  { src: quangBeachSunset, width: 927, height: 1400, alt: 'Quang standing at the shoreline at sunset', caption: 'Sunset by the water', shape: 'portrait' },
   { src: quangArtSpace, width: 927, height: 1400, alt: 'Quang seated on a large illuminated sphere in a modern interior', caption: 'Exploring Cornell architecture', shape: 'portrait' },
   { src: quangWaterfront, width: 933, height: 1400, alt: 'Quang standing beside a wide body of water at dusk', caption: 'An evening at Webster Park', shape: 'portrait' }
 ];
@@ -184,12 +184,11 @@ function AboutPage() {
             <div>
               <p className="eyebrow">A little more about me</p>
               <h1 id="about-page-title">Hi, I’m Quang.</h1>
-              <p className="about-location"><FaMapMarkerAlt aria-hidden="true" /> Rochester, New York</p>
+              <p className="about-location"><FaMapMarkerAlt aria-hidden="true" /> Rochester, New York, USA</p>
               <div className="about-prose">
                 <p>
-                  I’m a software developer and computer science student. I was born in Vietnam
-                  and moved to the United States with my family when I was young. Rochester has
-                  been home for most of my life.
+                  I’m a software developer and computer science student interested in 
+                  building dependable, useful software.
                 </p>
 
                 <p>

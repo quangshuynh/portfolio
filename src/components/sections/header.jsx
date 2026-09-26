@@ -49,7 +49,7 @@ function Header() {
             and native application work.
           </p>
           <div className="hero-meta" aria-label="Location and focus">
-            <span><FaMapMarkerAlt aria-hidden="true" /> Rochester, NY</span>
+            <span><FaMapMarkerAlt aria-hidden="true" /> Rochester, NY, USA</span>
             <span>Backend systems</span>
             <span>Developer tools</span>
             <span>Native applications</span>
