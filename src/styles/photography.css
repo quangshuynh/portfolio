@@ -1,0 +1,199 @@
+/* Photography: the photos lead. Dark = gallery wall, light = prints on a contact sheet. */
+
+.photography-page-header {
+  position: relative;
+  padding: clamp(2rem, 5vh, 3.5rem) 0 clamp(3.5rem, 7vw, 6rem);
+}
+.photography-header-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, .9fr);
+  align-items: end;
+  gap: clamp(2rem, 6vw, 6rem);
+}
+.photography-modal-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  min-height: 2.75rem;
+  margin-bottom: clamp(1.5rem, 4vw, 3rem);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.photography-modal-back-link:hover { color: var(--accent); }
+.photography-page-header h1 {
+  font-family: var(--font-display);
+  font-size: var(--step-5);
+  line-height: .9;
+  letter-spacing: -.06em;
+}
+.photography-intro {
+  max-width: 34ch;
+  margin-top: 1.5rem;
+  color: var(--text-secondary);
+  font-family: var(--font-serif);
+  font-size: var(--step-2);
+  font-style: italic;
+  line-height: 1.3;
+}
+.photography-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 2.5rem 0 0;
+  border-block: 1px solid var(--border);
+}
+.photography-stats > div { padding: .85rem 1.5rem .85rem 0; }
+.photography-stats > div + div { padding-left: 1.5rem; border-left: 1px solid var(--border); }
+.photography-stats dt { color: var(--text-tertiary); font-family: var(--font-mono); font-size: .625rem; letter-spacing: .08em; text-transform: uppercase; }
+.photography-stats dd { margin: .25rem 0 0; font-weight: 600; }
+
+.photography-cover {
+  --vf-inset: -10px;
+  display: block;
+  justify-self: end;
+  width: min(100%, 30rem);
+  color: var(--text-tertiary);
+  text-decoration: none;
+}
+.photography-cover img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  max-height: 68vh;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+.photography-cover__caption { display: block; margin-top: .9rem; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .photography-header-copy > *,
+  .photography-cover { animation: hero-rise 900ms var(--ease-out) both; }
+  .photography-header-copy > :nth-child(2) { animation-delay: 60ms; }
+  .photography-header-copy > :nth-child(3) { animation-delay: 120ms; }
+  .photography-header-copy > :nth-child(4) { animation-delay: 180ms; }
+  .photography-header-copy > :nth-child(5) { animation-delay: 240ms; }
+  .photography-cover { animation-name: photo-develop; animation-duration: 1400ms; }
+}
+@keyframes photo-develop {
+  from { opacity: 0; filter: brightness(1.6) saturate(0) blur(6px); }
+  60% { opacity: 1; }
+  to { opacity: 1; filter: none; }
+}
+
+.photography-page-gallery-section { padding: 0 0 var(--section-pad); }
+.photography-gallery-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: clamp(1.5rem, 3vw, 2.5rem);
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.photography-gallery-heading h2 { font-family: var(--font-display); font-size: var(--step-2); letter-spacing: -.03em; }
+.photography-gallery-heading label {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.photography-gallery-heading select {
+  min-height: 2.75rem;
+  padding: .4rem 2rem .4rem .8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: .9rem;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.photography-route-notice {
+  margin: 0 0 1.5rem;
+  padding: .85rem 1rem;
+  border-left: 2px solid var(--signal);
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+
+.photography-page-grid {
+  --photography-columns: 3;
+  display: grid;
+  grid-template-columns: repeat(var(--photography-columns), minmax(0, 1fr));
+  gap: clamp(1.25rem, 2.6vw, 2.5rem);
+  align-items: start;
+}
+.photography-masonry-column { display: flex; min-width: 0; flex-direction: column; gap: clamp(1.75rem, 3vw, 3rem); }
+.photography-page-grid--chronological { row-gap: clamp(1.75rem, 3vw, 3rem); }
+
+.photo-frame { display: flex; flex-direction: column; margin: 0; }
+.photo-frame a {
+  --vf-inset: -2px;
+  --vf-opacity: 0;
+  position: relative;
+  display: block;
+  background: var(--surface);
+  cursor: zoom-in;
+}
+.photo-frame a:hover,
+.photo-frame a:focus-visible { --vf-inset: -9px; --vf-opacity: 1; }
+.photo-frame img {
+  width: 100%;
+  height: auto;
+  transition: filter 500ms var(--ease-out);
+}
+.photo-frame a:hover img { filter: brightness(1.04) contrast(1.03); }
+.photo-frame__exposure {
+  position: absolute;
+  right: .6rem;
+  bottom: .6rem;
+  padding: .3rem .5rem;
+  border-radius: 2px;
+  background: rgba(8, 12, 10, .7);
+  color: #ece7da;
+  font-size: .56rem;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--dur-base) ease, transform var(--dur-base) var(--ease-out);
+  pointer-events: none;
+}
+.photo-frame a:hover .photo-frame__exposure,
+.photo-frame a:focus-visible .photo-frame__exposure { opacity: 1; transform: none; }
+.photo-frame__meta { display: grid; grid-template-columns: auto 1fr; gap: .9rem; align-items: baseline; margin-top: .8rem; }
+.photo-frame__number { color: var(--accent); white-space: nowrap; }
+.photo-frame figcaption { color: var(--text-secondary); font-size: .88rem; line-height: 1.45; }
+
+/* Light mode: prints on a contact sheet. */
+:root[data-theme='light'] .photo-frame a,
+:root[data-theme='light'] .photography-cover img {
+  padding: .5rem;
+  background: var(--surface-elevated);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .04), 0 12px 28px -18px rgba(52, 44, 28, .45);
+}
+:root[data-theme='light'] .photography-cover img { border-radius: 2px; }
+
+@media (max-width: 860px) {
+  .photography-page-grid { --photography-columns: 2; }
+  .photography-header-grid { grid-template-columns: 1fr; }
+  .photography-cover { justify-self: start; width: 100%; }
+  .photography-cover img { aspect-ratio: 16 / 11; }
+}
+@media (max-width: 620px) {
+  .photography-page-grid { gap: .9rem; }
+  .photography-masonry-column { gap: 1.5rem; }
+  .photo-frame__meta { grid-template-columns: 1fr; gap: .2rem; margin-top: .55rem; }
+  .photo-frame figcaption { font-size: .8rem; }
+  .photo-frame__exposure { display: none; }
+  :root[data-theme='light'] .photo-frame a { padding: .3rem; }
+  .photography-stats > div { padding-right: 1rem; }
+  .photography-stats > div + div { padding-left: 1rem; }
+}

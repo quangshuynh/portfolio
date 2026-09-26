@@ -31,16 +31,39 @@ export function distributePhotographs(orderedPhotographs, columnCount) {
   return columns.map(({ photographs: columnPhotographs }) => columnPhotographs);
 }
 
+export function formatExposure({ focalLength, aperture, shutterSpeed, iso }) {
+  const parts = [];
+  if (focalLength) parts.push(`${focalLength}mm`);
+  if (aperture) parts.push(`f/${aperture}`);
+  if (shutterSpeed) parts.push(shutterSpeed < 1 ? `1/${Math.round(1 / shutterSpeed)}` : `${shutterSpeed}s`);
+  if (iso) parts.push(`ISO ${iso}`);
+  return parts.join(' · ');
+}
+
 function PhotographFigure({ photograph, onOpen }) {
+  const exposure = formatExposure(photograph);
+  const frame = String(photograph.curatedOrder).padStart(2, '0');
   return (
-    <figure data-photo-slug={photograph.slug}>
-      <a href={photographyHref(photograph.slug)} onClick={(event) => onOpen(event, photograph)} aria-label={`Open photograph: ${photograph.caption}`}>
+    <figure data-photo-slug={photograph.slug} className={`photo-frame photo-frame--${photograph.shape ?? 'landscape'}`}>
+      <a className="viewfinder" href={photographyHref(photograph.slug)} onClick={(event) => onOpen(event, photograph)} aria-label={`Open photograph: ${photograph.caption}`}>
         <img src={photograph.gallerySrc} width={photograph.galleryWidth} height={photograph.galleryHeight} alt={photograph.alt} loading="lazy" decoding="async" />
+        {exposure && <span className="photo-frame__exposure mono" aria-hidden="true">{exposure}</span>}
       </a>
-      <figcaption>{photograph.caption}</figcaption>
+      <div className="photo-frame__meta">
+        <span className="photo-frame__number mono" aria-hidden="true">No. {frame}</span>
+        <figcaption>{photograph.caption}</figcaption>
+      </div>
     </figure>
   );
 }
+
+const captureYears = photographs
+  .map(({ capturedAt }) => (capturedAt ? new Date(capturedAt).getFullYear() : null))
+  .filter((year) => Number.isFinite(year));
+const yearRange = captureYears.length
+  ? `${Math.min(...captureYears)}–${Math.max(...captureYears)}`
+  : null;
+const coverPhotograph = photographs.find(({ id }) => id === 'IMGP0579') ?? photographs[0];
 
 export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = false }) {
   const [sort, setSort] = useState('default');
@@ -93,16 +116,27 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
   return (
     <div className="app-shell photography-page">
       <a className="skip-link" href={photographyHref()} onClick={(event) => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>Skip to photographs</a>
-      <SiteNav variant="photography" />
+      <SiteNav variant="photography" current="photography" />
       <main id="main-content" tabIndex="-1">
         <header className="photography-page-header">
-          <div className="section-inner">
-            <a className="photography-modal-back-link" href={appHref('/about')} onClick={backToAbout}>
-              <FaArrowLeft aria-hidden="true" /> Back to photography modal
+          <div className="section-inner photography-header-grid">
+            <div className="photography-header-copy">
+              <a className="photography-modal-back-link" href={appHref('/about')} onClick={backToAbout}>
+                <FaArrowLeft aria-hidden="true" /> Back to photography modal
+              </a>
+              <p className="eyebrow">Away from the keyboard</p>
+              <h1>Photography</h1>
+              <p className="photography-intro">A personal collection of places, light, and everyday moments I wanted to remember.</p>
+              <dl className="photography-stats">
+                <div><dt>Frames</dt><dd>{photographs.length}</dd></div>
+                {yearRange && <div><dt>Captured</dt><dd>{yearRange}</dd></div>}
+                <div><dt>Around</dt><dd>Rochester · Ithaca · Niagara</dd></div>
+              </dl>
+            </div>
+            <a className="photography-cover viewfinder" href={photographyHref(coverPhotograph.slug)} onClick={openPhotograph} aria-label={`Open photograph: ${coverPhotograph.caption}`}>
+              <img src={coverPhotograph.gallerySrc} width={coverPhotograph.galleryWidth} height={coverPhotograph.galleryHeight} alt={coverPhotograph.alt} fetchPriority="high" decoding="async" />
+              <span className="photography-cover__caption mono" aria-hidden="true">Cover — {coverPhotograph.caption}</span>
             </a>
-            <p className="eyebrow">Away from the keyboard</p>
-            <h1>Photography</h1>
-            <p>A personal collection of places, light, and everyday moments I wanted to remember.</p>
           </div>
         </header>
 
