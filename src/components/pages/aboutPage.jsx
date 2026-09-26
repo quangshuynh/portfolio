@@ -37,8 +37,6 @@ import { appHref, navigate } from '../../util/navigation';
 import SpotifyDisc from '../ui/spotifyDisc';
 import { TopoField } from '../ui/terrain';
 
-const interestTags = { Photography: 'Lens', Hiking: 'Trail', Music: 'On repeat', Cars: 'Garage', Gaming: 'Play', Technology: 'Bench' };
-
 const currently = [
   ['Studying', 'Accelerated BS/MS in Computer Science at RIT, graduating 2028'],
   ['Drawn to', 'Systems, databases, algorithms, and the decisions behind dependable software'],
@@ -197,7 +195,7 @@ function AboutPage() {
             <div className="about-hero-copy">
               <p className="eyebrow" style={{ '--i': 0 }}>A little more about me</p>
               <h1 id="about-page-title" style={{ '--i': 1 }}>Hi, I’m Quang.</h1>
-              <p className="about-location mono" style={{ '--i': 2 }}><FaMapMarkerAlt aria-hidden="true" /> Rochester, New York, USA <span aria-hidden="true">· 43.16° N 77.61° W</span></p>
+              <p className="about-location" style={{ '--i': 2 }}><FaMapMarkerAlt aria-hidden="true" /> Rochester, New York, USA</p>
               <div className="about-prose" style={{ '--i': 3 }}>
                 <p className="about-prose__lead">
                   I’m a software developer and computer science student interested in
@@ -230,7 +228,6 @@ function AboutPage() {
                   <span>View more photos</span>
                 </button>
               </div>
-              <figcaption className="mono">Fig. A — Off the clock, Rochester</figcaption>
             </figure>
           </div>
         </section>
@@ -238,7 +235,7 @@ function AboutPage() {
         <section className="page-section about-path" aria-labelledby="path-title">
           <div className="section-inner about-story">
             <div className="about-story-intro" data-reveal>
-              <p className="eyebrow"><span className="section-index">01</span> My path into software</p>
+              <p className="eyebrow">My path into software</p>
               <h2 id="path-title">From coursework to production software</h2>
 
               <figure className="kore-team-photo viewfinder">
@@ -286,13 +283,11 @@ function AboutPage() {
 
         <section id="beyond-software" className="page-section about-beyond" aria-labelledby="beyond-title">
           <div className="section-inner">
-            <div className="section-heading" data-reveal><div><p className="eyebrow"><span className="section-index">02</span> Outside the editor</p><h2 id="beyond-title">Beyond software</h2></div><p>A few of the things I make time for away from work and school.</p></div>
+            <div className="section-heading" data-reveal><div><p className="eyebrow">Outside the editor</p><h2 id="beyond-title">Beyond software</h2></div><p>A few of the things I make time for away from work and school.</p></div>
             <div className="interest-grid">
-              {interests.map(([Icon, title, copy], index) => (
+              {interests.map(([Icon, title, copy]) => (
                 <InterestCard
                   key={title}
-                  index={index}
-                  tag={interestTags[title]}
                   icon={Icon}
                   title={title}
                   copy={copy}
@@ -318,10 +313,10 @@ function AboutPage() {
 
         <section className="page-section about-values" aria-labelledby="values-title">
           <div className="section-inner">
-            <div className="section-heading" data-reveal><div><p className="eyebrow"><span className="section-index">03</span> How I like to work</p><h2 id="values-title">How I approach engineering</h2></div><p>Three principles I return to when I’m learning, building, and collaborating.</p></div>
+            <div className="section-heading" data-reveal><div><p className="eyebrow">How I like to work</p><h2 id="values-title">How I approach engineering</h2></div><p>Three principles I return to when I’m learning, building, and collaborating.</p></div>
             <ol className="values-grid">{values.map(([title, copy], index) => <li className="value-card" key={title} data-reveal style={{ '--reveal-delay': `${index * 90}ms` }}><span>0{index + 1}</span><h3>{title}</h3><p>{copy}</p></li>)}</ol>
             <div className="currently" data-reveal>
-              <p className="currently__title mono">Currently</p>
+              <p className="currently__title">Currently</p>
               <dl>
                 {currently.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
               </dl>

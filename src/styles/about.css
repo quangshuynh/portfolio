@@ -30,16 +30,16 @@
   gap: .5rem;
   margin: 1.5rem 0 2rem;
   color: var(--accent);
+  font-weight: 650;
 }
-.about-location span { color: var(--text-tertiary); }
 .about-prose { display: grid; gap: 1.1rem; }
 .about-prose p { max-width: 60ch; color: var(--text-secondary); line-height: 1.75; }
 .about-prose .about-prose__lead {
   color: var(--text-primary);
-  font-family: var(--font-serif);
-  font-size: var(--step-2);
-  font-style: italic;
-  line-height: 1.3;
+  font-size: var(--step-1);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -.015em;
 }
 .about-hero .hero-actions { margin-top: 2.25rem; }
 
@@ -73,12 +73,9 @@
   background: rgba(10, 15, 12, .72);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
-  font-family: var(--font-mono);
-  font-size: .625rem;
-  letter-spacing: .06em;
-  text-transform: uppercase;
+  font-size: .78rem;
+  font-weight: 600;
 }
-.about-portrait figcaption { margin-top: 1rem; color: var(--text-tertiary); }
 
 @media (prefers-reduced-motion: no-preference) {
   .about-hero-copy > *,
@@ -105,8 +102,6 @@
   letter-spacing: -.045em;
   text-wrap: balance;
 }
-.about-story .eyebrow .section-index,
-.about-beyond .eyebrow .section-index { color: var(--text-tertiary); margin-right: .9rem; }
 .kore-team-photo { --vf-inset: -8px; width: min(100%, 24rem); margin: 2.5rem 0 0; }
 .kore-team-photo-button,
 .interest-card-media-button {
@@ -128,76 +123,75 @@
 .kore-team-photo-button .photography-gallery-zoom-hint,
 .interest-card-media-button .photography-gallery-zoom-hint { opacity: .85; transform: none; }
 
-/* beyond software: an editorial mosaic, not six identical cards */
+/* beyond software: the original six-card grid (3 × 2), on the new tokens */
 .about-beyond { background: var(--bg-secondary); }
 .interest-grid {
+  --card-pad: clamp(1.35rem, 3vw, 2rem);
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: clamp(2.5rem, 5vw, 4.5rem) clamp(1.25rem, 3vw, 2.5rem);
-  align-items: start;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
 }
-.interest-card { position: relative; grid-column: span 4; }
-.interest-card--photography { grid-column: 1 / span 7; }
-.interest-card--hiking { grid-column: 9 / span 4; margin-top: 4rem; }
-.interest-card--music { grid-column: 1 / span 4; }
-.interest-card--cars { grid-column: 6 / span 7; }
-.interest-card--gaming { grid-column: 1 / span 6; }
-.interest-card--technology { grid-column: 8 / span 5; margin-top: -3rem; }
-
-.interest-card-figure { --vf-inset: -7px; --vf-opacity: 0; position: relative; }
-.interest-card:hover .interest-card-figure { --vf-opacity: .9; }
-.interest-card-media { overflow: hidden; border-radius: var(--radius-sm); }
-.interest-card-media img { width: 100%; height: 100%; object-fit: cover; transition: transform 900ms var(--ease-out); }
-.interest-card--photography .interest-card-media { aspect-ratio: 4 / 3; }
-.interest-card--hiking .interest-card-media { aspect-ratio: 4 / 5; }
-.interest-card--music .interest-card-media { aspect-ratio: 4 / 5; }
-.interest-card--cars .interest-card-media { aspect-ratio: 16 / 9; }
-.interest-card--gaming .interest-card-media { aspect-ratio: 16 / 9; }
-.interest-card--technology .interest-card-media { aspect-ratio: 5 / 4; }
+.interest-card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--card-pad);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  transition: border-color var(--dur-base) ease, transform var(--dur-base) var(--ease-out);
+}
+.interest-card:hover { border-color: var(--border-strong); }
+.interest-card-top {
+  position: relative;
+  margin: calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad)) 1.3rem;
+}
+.interest-card-media-button,
+.interest-card-top > .interest-card-media { border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0; }
+.interest-card-media { height: 200px; overflow: hidden; }
+.interest-card-media img { width: 100%; height: 100%; object-fit: cover; transition: transform 700ms var(--ease-out), filter var(--dur-base) ease; }
+.interest-card-media-button:hover img,
+.interest-card-media-button:focus-visible img { transform: scale(1.03); filter: brightness(.94); }
 .interest-card-media-photography img { object-position: center 67%; }
-.interest-card-media-hiking img { object-position: center 60%; }
+.interest-card-media-hiking img { object-position: center 70%; }
 .interest-card-media-music img { object-position: center 28%; }
-
-.interest-card-disc {
-  --disc-size: clamp(6.5rem, 9vw, 8rem);
-  position: absolute;
-  right: calc(var(--disc-size) * -0.3);
-  bottom: calc(var(--disc-size) * -0.3);
-  z-index: 3;
-}
-
-.interest-card-index { margin-top: 1.25rem; color: var(--text-tertiary); }
+.interest-card-media-pair { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; }
 .interest-card h3 {
   display: flex;
   align-items: center;
-  gap: .6rem;
-  margin-top: .5rem;
+  gap: .65rem;
+  margin-bottom: .55rem;
   font-family: var(--font-display);
-  font-size: var(--step-2);
-  letter-spacing: -.03em;
+  font-size: 1.25rem;
+  letter-spacing: -.02em;
 }
-.interest-card h3 svg { width: .7em; color: var(--accent); }
-.interest-card > p:not(.interest-card-index) { max-width: 48ch; margin-top: .6rem; color: var(--text-secondary); line-height: 1.65; }
+.interest-card h3 svg { flex: 0 0 auto; color: var(--accent); font-size: 1.05rem; }
+.interest-card > p { color: var(--text-secondary); line-height: 1.65; }
 .interest-card a { color: var(--text-primary); text-decoration-color: var(--accent); text-underline-offset: .2em; }
 .interest-view-more {
-  display: inline-flex;
-  align-items: center;
-  gap: .5rem;
-  min-height: 2.75rem;
-  margin-top: .5rem;
-  padding: 0;
+  align-self: flex-start;
+  margin-top: auto;
+  padding: 1.1rem 0 0;
   border: 0;
   background: transparent;
   color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: var(--step--2);
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  text-decoration: none;
   cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .3em;
 }
-.interest-view-more::after { content: '→'; transition: transform var(--dur-base) var(--ease-out); }
-.interest-view-more:hover::after { transform: translateX(4px); }
+.interest-view-more:hover { color: var(--accent-strong); }
+
+/* Spotify disc on the Music photo */
+.interest-card-disc {
+  --disc-size: 6.25rem;
+  position: absolute;
+  right: .75rem;
+  bottom: -2.25rem;
+  z-index: 3;
+}
+.interest-card:has(.interest-card-disc) h3 { padding-right: 5.5rem; }
 
 /* principles + currently */
 .values-grid {
@@ -231,8 +225,7 @@
   border-radius: var(--radius-md);
   background: var(--surface);
 }
-.currently__title { color: var(--accent); }
-.currently__title::before { content: ''; display: inline-block; width: .5rem; height: .5rem; margin-right: .6rem; border-radius: 50%; background: var(--signal); }
+.currently__title { color: var(--accent); font-size: .76rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 .currently dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; margin: 0; }
 .currently dt { color: var(--text-tertiary); font-family: var(--font-mono); font-size: .625rem; letter-spacing: .08em; text-transform: uppercase; }
 .currently dd { margin: .35rem 0 0; color: var(--text-primary); font-size: .95rem; line-height: 1.5; }
@@ -245,7 +238,6 @@
 .about-cta h2 { max-width: 16ch; }
 .about-cta .hero-actions { margin-top: 2rem; }
 
-#beyond-software { scroll-margin-top: var(--nav-height); }
 
 @media (max-width: 1080px) {
   .about-hero-grid { grid-template-columns: 1fr; }
@@ -253,25 +245,12 @@
   .about-story { grid-template-columns: 1fr; }
   .about-story-intro { position: static; }
   .interest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .interest-card,
-  .interest-card--photography,
-  .interest-card--hiking,
-  .interest-card--music,
-  .interest-card--cars,
-  .interest-card--gaming,
-  .interest-card--technology { grid-column: auto; margin-top: 0; }
-  .interest-card--photography,
-  .interest-card--cars { grid-column: 1 / -1; }
   .currently { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 760px) {
-  .about-location span { display: none; }
   .interest-grid { grid-template-columns: 1fr; }
-  .interest-card--hiking .interest-card-media,
-  .interest-card--music .interest-card-media,
-  .interest-card--technology .interest-card-media { aspect-ratio: 4 / 3; }
-  .interest-card-disc { right: .5rem; bottom: -2rem; }
+  .interest-card-media { height: 210px; }
   .values-grid { grid-template-columns: 1fr; }
   .currently dl { grid-template-columns: 1fr; gap: 1rem; }
 }

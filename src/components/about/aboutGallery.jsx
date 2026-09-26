@@ -61,7 +61,7 @@ export function ImageTrigger({ children, className, label, onOpen }) {
   );
 }
 
-export function InterestCard({ icon: Icon, title, copy, photos, gallery, galleryItems, hasNonPhotoContent = false, onOpen, onOpenImage, accessory = null, index = 0, tag = null }) {
+export function InterestCard({ icon: Icon, title, copy, photos, gallery, galleryItems, hasNonPhotoContent = false, onOpen, onOpenImage, accessory = null }) {
   const visibleSources = new Set((photos ?? []).map(({ src }) => src));
   const hasAdditionalContent = hasNonPhotoContent || Boolean(
     gallery && galleryItems?.some(({ src }) => !visibleSources.has(src))
@@ -74,14 +74,13 @@ export function InterestCard({ icon: Icon, title, copy, photos, gallery, gallery
   );
 
   return (
-    <article className={`interest-card interest-card--${title.toLowerCase()}`} data-reveal style={{ '--reveal-delay': `${(index % 3) * 80}ms` }}>
-      <div className="interest-card-figure viewfinder">
+    <article className="interest-card" data-reveal>
+      <div className="interest-card-top">
         {featuredImage
           ? <ImageTrigger className="interest-card-media-button" label={`Open featured ${title} image`} onOpen={(trigger) => onOpenImage(featuredImage, trigger)}>{media}</ImageTrigger>
           : media}
         {accessory}
       </div>
-      <p className="interest-card-index mono" aria-hidden="true">{String(index + 1).padStart(2, '0')}{tag ? ` — ${tag}` : ''}</p>
       <h3><Icon aria-hidden="true" />{title}</h3>
       <p>{copy}</p>
       {hasAdditionalContent && (
