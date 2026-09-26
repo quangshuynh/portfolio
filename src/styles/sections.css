@@ -511,9 +511,32 @@
     grid-template-areas: 'rail' 'visual' 'copy';
     gap: 1.5rem;
   }
-  .case-file__rail { position: static; display: grid; grid-template-columns: auto 1fr; gap: 1.25rem; align-items: start; }
-  .case-file__meta { margin-top: 0; grid-template-columns: 1fr 1fr; gap: .9rem 1rem; }
-  .case-file__meta .project-stack { grid-column: 1 / -1; }
+  /* Phones: title → type → screenshot → details → stack → actions. The rail, meta
+     list, and copy wrappers dissolve so their children can be reordered without
+     duplicating markup; the desktop DOM and composition are untouched. */
+  .featured-project.case-file { display: flex; flex-direction: column; gap: 0; }
+  .featured-project .case-file__rail,
+  .featured-project .case-file__meta,
+  .featured-project .project-copy { display: contents; }
+  .featured-project .case-file__index {
+    order: 1;
+    margin-bottom: .55rem;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--step--2);
+    letter-spacing: .08em;
+    line-height: 1.2;
+    -webkit-text-stroke: 0;
+  }
+  .featured-project .project-copy h3 { order: 2; overflow-wrap: anywhere; }
+  .featured-project .case-file__meta > div:first-child { order: 3; margin-top: .6rem; }
+  .featured-project .case-file__meta > div:first-child dt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .featured-project .case-file__meta > div:first-child dd { margin: 0; font-size: .95rem; }
+  .featured-project .case-file__visual { order: 4; margin-top: 1.5rem; }
+  .featured-project .project-purpose { order: 5; margin-top: 1.5rem; }
+  .featured-project .project-highlights { order: 6; }
+  .featured-project .project-stack { order: 7; margin-top: 1.75rem; }
+  .featured-project .project-actions { order: 8; }
   .detail-list li { grid-template-columns: 1fr; gap: .5rem; }
   .skill-group { grid-template-columns: 1fr; gap: .75rem; }
   .skill-group li { font-size: 1.05rem; }
@@ -526,6 +549,7 @@
   .education-meta { grid-template-columns: 1fr; }
   .education-meta > div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--border); }
   .gallery-stage { min-height: 220px; }
+  .featured-section .section-heading h2 { font-size: clamp(2.25rem, 1.6rem + 3vw, 2.75rem); text-wrap: balance; }
   .pipeline-row span { font-size: .56rem; min-height: 2.6rem; padding: .35rem; }
   .footer-inner { flex-direction: column; align-items: flex-start; }
 }

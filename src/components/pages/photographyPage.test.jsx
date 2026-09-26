@@ -153,6 +153,11 @@ test('uses deterministic responsive masonry column counts and fit geometry from 
   expect(getPhotographyColumnCount(820)).toBe(2);
   expect(getPhotographyColumnCount(800)).toBe(2);
   expect(getPhotographyColumnCount(420)).toBe(2);
+  // Narrow phones get one column instead of ~130px portrait strips.
+  expect(getPhotographyColumnCount(350)).toBe(2);
+  expect(getPhotographyColumnCount(340)).toBe(2);
+  expect(getPhotographyColumnCount(339)).toBe(1);
+  expect(getPhotographyColumnCount(280)).toBe(1);
 
   const portraitFit = calculateFittedImageDimensions(1200, 1600, 720, 820);
   expect(portraitFit.width).toBeCloseTo(615, 5);

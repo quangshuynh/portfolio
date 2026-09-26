@@ -8,8 +8,13 @@ import coverSmall from '../../assets/photography/cover/IMGP0739-cover-640.webp';
 import coverLarge from '../../assets/photography/cover/IMGP0739-cover-1100.webp';
 import Footer from '../sections/footer';
 
+// Two columns only once each column stays roughly 160px wide; narrower phones get
+// a single column rather than thin portrait strips.
+export const PHOTOGRAPHY_TWO_COLUMN_MIN_WIDTH = 340;
+
 export function getPhotographyColumnCount(contentWidth = window.innerWidth) {
-  return contentWidth > 820 ? 3 : 2;
+  if (contentWidth > 820) return 3;
+  return contentWidth >= PHOTOGRAPHY_TWO_COLUMN_MIN_WIDTH ? 2 : 1;
 }
 
 const CAPTION_LINE_HEIGHT = 20;

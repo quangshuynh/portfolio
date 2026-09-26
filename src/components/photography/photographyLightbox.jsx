@@ -129,11 +129,20 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     const stage = stageRef.current;
     const image = imageRef.current;
     if (!stage || !image) return;
+    // Measure the unconstrained stage so the fit can grow again after rotation or
+    // mobile browser chrome collapsing, not only shrink to the previous inline size.
+    const { width: fittedWidth, height: fittedHeight } = stage.style;
+    stage.style.width = '';
+    stage.style.height = '';
+    const availableWidth = stage.clientWidth;
+    const availableHeight = stage.clientHeight;
+    stage.style.width = fittedWidth;
+    stage.style.height = fittedHeight;
     const nextFit = calculateFittedImageDimensions(
       image.naturalWidth || photograph.viewerWidth || image.width || 0,
       image.naturalHeight || photograph.viewerHeight || image.height || 0,
-      stage.clientWidth,
-      stage.clientHeight,
+      availableWidth,
+      availableHeight,
     );
     setFitSize(nextFit);
   }, [photograph.viewerHeight, photograph.viewerWidth]);
