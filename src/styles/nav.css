@@ -1,0 +1,211 @@
+/* Primary navigation: translucent bar that tightens on scroll, one sliding marker. */
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  border-bottom: 1px solid transparent;
+  background: color-mix(in srgb, var(--bg-primary) 72%, transparent);
+  -webkit-backdrop-filter: saturate(1.2) blur(14px);
+  backdrop-filter: saturate(1.2) blur(14px);
+  transition: background var(--dur-base) ease, border-color var(--dur-base) ease;
+}
+.site-nav[data-scrolled] {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
+}
+
+.nav-inner {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  width: min(100% - 2 * var(--gutter), var(--page-max));
+  height: 5rem;
+  margin-inline: auto;
+  transition: height var(--dur-base) var(--ease-out);
+}
+.site-nav[data-scrolled] .nav-inner { height: var(--nav-height); }
+
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: .65rem;
+  min-height: 2.75rem;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: -.02em;
+  text-decoration: none;
+}
+.brand-cat {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  transition: transform var(--dur-base) var(--ease-out), border-color var(--dur-fast) ease;
+}
+.brand-cat img { width: 145%; max-width: none; height: auto; }
+.brand-lockup:hover .brand-cat { transform: rotate(-8deg); border-color: var(--accent); }
+.brand-name { display: inline-flex; align-items: baseline; }
+.brand-tld { color: var(--accent); }
+.photography-brand-section { margin-left: .1rem; color: var(--text-tertiary); font-family: var(--font-mono); font-size: .72em; letter-spacing: 0; }
+.photography-brand-camera { color: var(--accent); font-size: .9rem; }
+
+.nav-panel {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1.75rem;
+}
+
+.nav-links {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+}
+.nav-links a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 .7rem;
+  color: var(--text-secondary);
+  font-size: .92rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color var(--dur-fast) ease;
+}
+.nav-links a:hover,
+.nav-links a[aria-current='page'],
+.nav-links a[data-active='true'] { color: var(--text-primary); }
+.nav-marker {
+  position: absolute;
+  left: 0;
+  bottom: .35rem;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  transition: transform 420ms var(--ease-out), width 420ms var(--ease-out);
+}
+/* The marker's "trail blaze" dot at the leading edge. */
+.nav-marker::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.nav-tools { display: flex; align-items: center; gap: .5rem; }
+.nav-resume,
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  min-height: 2.5rem;
+  padding: 0 .85rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease;
+}
+.nav-resume:hover,
+.theme-toggle:hover { border-color: var(--accent); background: var(--accent-soft); }
+.nav-resume svg { color: var(--accent); }
+.theme-toggle__icon { display: grid; place-items: center; color: var(--signal); transition: transform var(--dur-slow) var(--ease-out); }
+.theme-toggle:hover .theme-toggle__icon { transform: rotate(-35deg); }
+
+.nav-menu-button { display: none; }
+
+/* ---------- compact / mobile drawer ---------- */
+@media (max-width: 1080px) {
+  .nav-inner { height: var(--nav-height); }
+  .nav-menu-button {
+    display: inline-flex;
+    align-items: center;
+    gap: .6rem;
+    min-height: 2.75rem;
+    margin-left: auto;
+    padding: 0 .9rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: var(--step--2);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .nav-menu-button__lines { display: grid; gap: 4px; width: 16px; }
+  .nav-menu-button__lines span { display: block; height: 1.5px; background: currentColor; transition: transform var(--dur-base) var(--ease-out); }
+  .site-nav[data-open] .nav-menu-button__lines span:first-child { transform: translateY(2.75px) rotate(45deg); }
+  .site-nav[data-open] .nav-menu-button__lines span:last-child { transform: translateY(-2.75px) rotate(-45deg); }
+
+  .nav-panel {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    display: grid;
+    gap: 1.5rem;
+    max-height: calc(100dvh - var(--nav-height));
+    overflow-y: auto;
+    padding: 1.25rem var(--gutter) 1.75rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-primary);
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out), visibility 0s linear var(--dur-base);
+  }
+  .site-nav[data-open] .nav-panel {
+    visibility: visible;
+    opacity: 1;
+    transform: none;
+    transition-delay: 0s;
+  }
+  .site-nav[data-open] { background: var(--bg-primary); border-color: var(--border); }
+  .nav-links { display: grid; gap: 0; }
+  .nav-links a {
+    justify-content: space-between;
+    min-height: 3.4rem;
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    letter-spacing: -.03em;
+  }
+  .nav-links a::after {
+    content: attr(data-index);
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--step--2);
+    letter-spacing: .06em;
+  }
+  .nav-links a[aria-current='page'] { color: var(--accent); }
+  .nav-marker { display: none; }
+  .nav-tools { justify-content: space-between; }
+}
+
+@media (max-width: 420px) {
+  .brand-lockup { font-size: .95rem; }
+  .photography-brand-section { display: none; }
+}

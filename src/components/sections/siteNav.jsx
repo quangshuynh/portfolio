@@ -1,114 +1,126 @@
-import React, { useLayoutEffect, useRef } from 'react';
-import { FaCamera } from 'react-icons/fa';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { FaCamera, FaFilePdf } from 'react-icons/fa';
 import chiTheCat from '../../assets/chi-the-cat.png';
+import ThemeToggle from '../ui/themeToggle';
 
 const basePath = import.meta.env.BASE_URL;
 const homeHref = (hash = '') => `${basePath}${hash}`;
 const aboutHref = `${basePath}about`;
+const photographyPageHref = `${basePath}photography/`;
+const resumeHref = `${basePath}Quang_Huynh_Resume.pdf`;
 
-const desktopNavQuery = '(min-width: 1024px)';
-const collapseDistance = 440;
+const homeLinks = [
+  { label: 'Experience', href: homeHref('#experience'), section: 'experience' },
+  { label: 'Projects', href: homeHref('#projects'), section: 'projects' },
+  { label: 'Skills', href: homeHref('#skills'), section: 'skills' },
+  { label: 'About', href: aboutHref },
+  { label: 'Photography', href: photographyPageHref },
+  { label: 'Contact', href: homeHref('#contact'), section: 'contact' },
+];
 
-const mix = (expanded, compact, progress) => expanded + (compact - expanded) * progress;
+// The Photography route keeps a deliberately quiet nav so the photos lead.
+const photographyLinks = [
+  { label: 'Portfolio', href: homeHref() },
+  { label: 'About', href: aboutHref },
+];
 
-// Match the homepage-only expanded CSS sizes; reserve room for the full hero.
-const readNavMetrics = (nav) => {
-  const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-  const footprint = nav.parentElement.getBoundingClientRect().height || 4.5 * rootFontSize;
-  return {
-    rootFontSize,
-    expandedNavHeight: footprint,
-    expandedLogoSize: Math.min(88, Math.max(54, footprint - 20)),
-    expandedBrandSize: Math.min(1.8 * rootFontSize, Math.max(1.2 * rootFontSize, window.innerWidth * 0.02)),
-  };
-};
+const routeLinks = (current) => [
+  { label: 'Portfolio', href: homeHref() },
+  { label: 'Projects', href: homeHref('#projects') },
+  { label: 'About', href: aboutHref, current: current === 'about' },
+  { label: 'Photography', href: photographyPageHref, current: current === 'photography' },
+  { label: 'Contact', href: homeHref('#contact') },
+];
 
-const writeNavProgress = (nav, progress, metrics) => {
-  const { rootFontSize, expandedNavHeight, expandedLogoSize, expandedBrandSize } = metrics;
+/** Tracks which homepage section is under the header for the nav marker. */
+function useActiveSection(enabled) {
+  const [active, setActive] = useState(null);
+  useEffect(() => {
+    if (!enabled || typeof IntersectionObserver !== 'function') return undefined;
+    const sections = homeLinks
+      .filter(({ section }) => section)
+      .map(({ section }) => document.getElementById(section))
+      .filter(Boolean);
+    const visible = new Map();
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => visible.set(entry.target.id, entry.isIntersecting));
+      const current = sections.find((section) => visible.get(section.id));
+      setActive(current?.id ?? null);
+    }, { rootMargin: '-35% 0px -60% 0px' });
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, [enabled]);
+  return active;
+}
 
-  nav.style.setProperty('--nav-progress', progress.toFixed(3));
-  nav.style.setProperty('--nav-current-height', `${mix(expandedNavHeight, 4.5 * rootFontSize, progress)}px`);
-  nav.style.setProperty('--logo-current-size', `${mix(expandedLogoSize, 54, progress)}px`);
-  nav.style.setProperty('--logo-image-current-size', `${mix(expandedLogoSize * 2, 108, progress)}px`);
-  nav.style.setProperty('--brand-current-size', `${mix(expandedBrandSize, 1.05 * rootFontSize, progress)}px`);
-  nav.style.setProperty('--brand-current-gap', `${mix(1.35, 0.75, progress)}rem`);
-  nav.style.setProperty('--nav-current-padding', `${mix(0.75, 0.5625, progress)}rem`);
-  nav.style.setProperty('--links-current-size', `${mix(1.12, 0.92, progress)}rem`);
-  nav.style.setProperty('--links-current-gap', `${mix(2.15, 1.5, progress)}rem`);
-  nav.style.setProperty('--tld-current-padding-y', `${mix(0.34, 0.2, progress)}rem`);
-  nav.style.setProperty('--tld-current-padding-x', `${mix(0.68, 0.42, progress)}rem`);
-  nav.style.setProperty('--nav-background-mix', `${mix(92, 100, progress)}%`);
-};
-
-/** Renders the shared site navigation with a narrowly scoped Photography variant. */
-function SiteNav({ collapsible = false, variant = 'default' }) {
+/** Shared site navigation; `current` marks the route, `variant` scopes Photography. */
+function SiteNav({ variant = 'default', current = 'home' }) {
   const navRef = useRef(null);
-  const initialProgress = typeof window !== 'undefined'
-    && window.location.hash
-    && window.location.hash !== '#top' ? 1 : 0;
+  const listRef = useRef(null);
+  const menuButton = useRef(null);
+  const [scrolled, setScrolled] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [marker, setMarker] = useState(null);
+  const isPhotography = variant === 'photography';
+  const isHome = current === 'home';
+  const activeSection = useActiveSection(isHome);
+  const links = isHome ? homeLinks : isPhotography ? photographyLinks : routeLinks(current);
 
+  useEffect(() => {
+    let frame;
+    const update = () => {
+      frame = undefined;
+      setScrolled(window.scrollY > 16);
+    };
+    const onScroll = () => { if (frame === undefined) frame = requestAnimationFrame(update); };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (frame !== undefined) cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  // Slide one marker under the active link instead of toggling per-link underlines.
   useLayoutEffect(() => {
-    if (!collapsible || typeof window.matchMedia !== 'function') return undefined;
+    const list = listRef.current;
+    if (!list) return undefined;
+    const place = () => {
+      const target = list.querySelector('[aria-current="page"], [data-active="true"]');
+      if (!target) { setMarker(null); return; }
+      setMarker({ left: target.offsetLeft, width: target.offsetWidth });
+    };
+    place();
+    if (typeof ResizeObserver !== 'function') return undefined;
+    const observer = new ResizeObserver(place);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [activeSection, current]);
 
-    const nav = navRef.current;
-    const desktopQuery = window.matchMedia(desktopNavQuery);
-    let animationFrame;
-    let previousProgress = -1;
-    let metrics;
+  const closeMenu = useCallback(() => setOpen(false), []);
 
-    if (!nav) return undefined;
-
-    const updateProgress = () => {
-      animationFrame = undefined;
-
-      if (!desktopQuery.matches) return;
-
-      const progress = Math.min(1, Math.max(0, window.scrollY / collapseDistance));
-
-      if (Math.abs(progress - previousProgress) >= 0.001) {
-        metrics ||= readNavMetrics(nav);
-        writeNavProgress(nav, progress, metrics);
-        previousProgress = progress;
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        menuButton.current?.focus();
       }
     };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
 
-    const requestProgressUpdate = () => {
-      if (animationFrame === undefined) animationFrame = window.requestAnimationFrame(updateProgress);
-    };
-    const requestResizedProgressUpdate = () => {
-      metrics = undefined;
-      previousProgress = -1;
-      requestProgressUpdate();
-    };
-
-    const resizeObserver = typeof ResizeObserver === 'function'
-      ? new ResizeObserver(requestResizedProgressUpdate) : null;
-    resizeObserver?.observe(nav.parentElement);
-    updateProgress();
-    window.addEventListener('scroll', requestProgressUpdate, { passive: true });
-    window.addEventListener('resize', requestResizedProgressUpdate, { passive: true });
-    desktopQuery.addEventListener?.('change', requestResizedProgressUpdate);
-
-    return () => {
-      if (animationFrame !== undefined) window.cancelAnimationFrame(animationFrame);
-      resizeObserver?.disconnect();
-      window.removeEventListener('scroll', requestProgressUpdate);
-      window.removeEventListener('resize', requestResizedProgressUpdate);
-      desktopQuery.removeEventListener?.('change', requestResizedProgressUpdate);
-    };
-  }, [collapsible]);
-
-  const isPhotography = variant === 'photography';
-
-  const navigation = (
+  return (
     <nav
       ref={navRef}
-      className={`site-nav${collapsible ? ' site-nav--collapsible' : ''}${isPhotography ? ' photography-nav' : ''}`}
-      style={collapsible ? { '--nav-progress': initialProgress } : undefined}
+      className={`site-nav${isPhotography ? ' photography-nav' : ''}`}
+      data-scrolled={scrolled || undefined}
+      data-open={open || undefined}
       aria-label="Primary navigation"
     >
       <div className="nav-inner">
-        <a className="brand brand-lockup" href={isPhotography ? `${basePath}photography/` : homeHref('#top')} aria-label={isPhotography ? 'quanghuynh.com photography — back to photography gallery' : 'quanghuynh.com — back to homepage'}>
+        <a className="brand brand-lockup" href={isPhotography ? photographyPageHref : homeHref('#top')} aria-label={isPhotography ? 'quanghuynh.com photography — back to photography gallery' : 'quanghuynh.com — back to homepage'}>
           <span className="brand-cat" aria-hidden="true">
             <img src={chiTheCat} width="1024" height="1024" alt="" decoding="async" />
           </span>
@@ -119,23 +131,46 @@ function SiteNav({ collapsible = false, variant = 'default' }) {
           </span>
           {isPhotography && <FaCamera className="photography-brand-camera" aria-hidden="true" focusable="false" />}
         </a>
-        <div className="nav-links">
-          {isPhotography ? <>
-            <a href={homeHref()}>Portfolio</a>
-            <a href={aboutHref}>About</a>
-          </> : <>
-            <a href={homeHref('#experience')}>Experience</a>
-            <a href={homeHref('#projects')}>Projects</a>
-            <a href={homeHref('#skills')}>Skills</a>
-            <a href={homeHref('#about')}>About</a>
-            <a href={homeHref('#contact')}>Contact</a>
-          </>}
+
+        <button
+          ref={menuButton}
+          className="nav-menu-button"
+          type="button"
+          aria-expanded={open}
+          aria-controls="site-nav-panel"
+          onClick={() => setOpen((value) => !value)}
+        >
+          <span className="nav-menu-button__lines" aria-hidden="true"><span /><span /></span>
+          <span className="nav-menu-button__label">{open ? 'Close' : 'Menu'}</span>
+        </button>
+
+        <div className="nav-panel" id="site-nav-panel">
+          <div className="nav-links" ref={listRef}>
+            {links.map((link, index) => (
+              <a
+                key={link.label}
+                href={link.href}
+                aria-current={link.current ? 'page' : undefined}
+                data-active={link.section && link.section === activeSection ? 'true' : undefined}
+                data-index={String(index + 1).padStart(2, '0')}
+                onClick={closeMenu}
+              >
+                {link.label}
+              </a>
+            ))}
+            {marker && <span className="nav-marker" aria-hidden="true" style={{ transform: `translateX(${marker.left}px)`, width: `${marker.width}px` }} />}
+          </div>
+          <div className="nav-tools">
+            <a className="nav-resume" href={resumeHref} target="_blank" rel="noreferrer">
+              <FaFilePdf aria-hidden="true" /> Résumé
+            </a>
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </nav>
   );
-  return collapsible ? <div className="home-nav-slot">{navigation}</div> : navigation;
 }
 
-export { aboutHref, homeHref };
+export { aboutHref, homeHref, photographyPageHref };
 export default SiteNav;

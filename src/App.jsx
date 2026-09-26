@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import './App.css';
-import { FaMoon, FaSun } from 'react-icons/fa';
 import Header from './components/sections/header';
 import Experience from './components/sections/experience';
 import FeaturedProjects from './components/sections/featuredProjects';
@@ -54,11 +53,11 @@ function App() {
   }, [isAbout, isPhotography, selectedPhotograph]);
 
   if (isAbout) {
-    return <><Suspense fallback={null}><AboutPage /><RevealAnimations /></Suspense><ThemeToggle /></>;
+    return <Suspense fallback={null}><AboutPage /><RevealAnimations /></Suspense>;
   }
 
   if (isPhotography) {
-    return <><Suspense fallback={null}><PhotographyPage selectedPhotograph={selectedPhotograph} invalidPhotoId={Boolean(photoId && !selectedPhotograph)} /></Suspense><ThemeToggle variant="photography" /></>;
+    return <Suspense fallback={null}><PhotographyPage selectedPhotograph={selectedPhotograph} invalidPhotoId={Boolean(photoId && !selectedPhotograph)} /><RevealAnimations /></Suspense>;
   }
 
   return (
@@ -66,7 +65,7 @@ function App() {
     <div className="app-shell">
       <HashScroll />
       <a className="skip-link" href="#main-content">Skip to main content</a>
-      <SiteNav collapsible />
+      <SiteNav current="home" />
       <Header />
       <main id="main-content">
         <Experience />
@@ -76,28 +75,10 @@ function App() {
         <Education />
       </main>
       <Footer />
-      <ThemeToggle />
       <RevealAnimations />
     </div>
     </HomeLightboxProvider>
   );
-}
-
-function ThemeToggle({ variant = 'default' }) {
-  const [theme, setTheme] = useState(() => localStorage.getItem('portfolio-theme') || 'dark');
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem('portfolio-theme', theme);
-    document.querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', theme === 'dark' ? '#0e1512' : '#f6f4ee');
-  }, [theme]);
-
-  const toggleTheme = () => setTheme((current) => current === 'dark' ? 'light' : 'dark');
-
-  return <button className={`theme-toggle${variant === 'photography' ? ' theme-toggle--photography' : ''}`} type="button" onClick={toggleTheme} aria-pressed={theme === 'light'} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
-    {theme === 'dark' ? <FaSun aria-hidden="true" /> : <FaMoon aria-hidden="true" />}<span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-  </button>;
 }
 
 export default App;
