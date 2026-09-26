@@ -76,3 +76,16 @@ Regenerate with:
 npm run build && npx vite preview --port 4173 &
 node scripts/capture-redesign.mjs http://127.0.0.1:4173 docs/nature-revamp/after
 ```
+
+## Reconciliation pass
+
+A second pass kept the strongest parts of the revamp and restored parts of the original portfolio (`main` @ `12f8300` was the reference implementation):
+
+- **Nav:** the original cat + `quanghuynh.com` lockup and the expanding header are back. The header starts large at the top of the page and eases into the compact bar over 440px of scroll on desktop, with a smaller range on tablet and mobile. A sticky slot reserves the expanded height, and one `--nav-progress` value drives every size in CSS.
+- **Nav links:** About goes to `/#about`. Photography left the primary nav and is linked from the footer, the About page Photography card and its gallery modal.
+- **Hero:** a full-viewport opening with the original horizontal Meet Quang card and the desk. Only "Drag to orbit" stays on the desk. Removed: the Spotify disc (it now lives on About → Music), figure labels, the legend, the stats grid and the coordinates.
+- **Metadata:** Experience and Featured Projects stacks use small rectangular outlined tags. Featured achievements use a square marker, and the decorative status field is gone.
+- **About page:** the original six-card Beyond Software grid is restored. How I approach engineering is kept.
+- **Motifs:** removed the serif italic font (Newsreader), mono eyebrows, section index numbers, "Fig." labels, "Trailhead" and the coordinates. The palette, topographic lines, ridgelines and real photography stay.
+
+Screenshots: `docs/nature-revamp/reconciled/`.

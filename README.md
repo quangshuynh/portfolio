@@ -12,7 +12,7 @@ Also deployed to [GitHub Pages](https://quangshuynh.github.io/portfolio/) and [V
 
 - React 19 and Vite
 - Plain CSS design system in `src/styles` (semantic light/dark tokens, reduced-motion support); see [docs/nature-revamp.md](docs/nature-revamp.md)
-- Self-hosted fonts via Fontsource (Schibsted Grotesk, Martian Mono, Newsreader) plus Circular
+- Self-hosted fonts via Fontsource (Schibsted Grotesk, Martian Mono) plus Circular
 - React Icons
 - GitHub Pages deployment through GitHub Actions
 - Vercel deployment from the same repository
