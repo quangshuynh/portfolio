@@ -417,10 +417,7 @@ describe('About Quang route', () => {
       screen.getByRole('link', {
         name: 'About',
       })
-    ).toHaveAttribute('href', '/about');
-    expect(
-      screen.getByRole('link', { name: 'About' })
-    ).toHaveAttribute('aria-current', 'page');
+    ).toHaveAttribute('href', '/#about');
 
     expect(
       screen.getByRole('link', {

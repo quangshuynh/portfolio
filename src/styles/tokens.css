@@ -51,7 +51,6 @@
   --gutter: clamp(1.25rem, 4.2vw, 3.75rem);
   --page-max: 1360px;
   --measure: 62ch;
-  --nav-height: 4.25rem;
   --section-pad: clamp(4.5rem, 9vw, 8rem);
   --radius-sm: 4px;
   --radius-md: 10px;

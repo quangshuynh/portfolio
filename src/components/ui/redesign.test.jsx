@@ -61,11 +61,11 @@ test('theme toggle persists the choice and updates the theme colour', () => {
   expect(document.querySelector('meta[name="theme-color"]')).toHaveAttribute('content', '#f1ede3');
 });
 
-test('route navigation marks the current page and exposes résumé and menu controls', () => {
-  render(<SiteNav current="photography" />);
+test('primary navigation points About at the homepage section and keeps Photography contextual', () => {
+  render(<SiteNav current="about" />);
   const nav = screen.getByRole('navigation', { name: 'Primary navigation' });
-  expect(within(nav).getByRole('link', { name: 'Photography' })).toHaveAttribute('aria-current', 'page');
-  expect(within(nav).getByRole('link', { name: 'About' })).not.toHaveAttribute('aria-current');
+  expect(within(nav).getByRole('link', { name: 'About' })).toHaveAttribute('href', '/#about');
+  expect(within(nav).queryByRole('link', { name: 'Photography' })).not.toBeInTheDocument();
   expect(within(nav).getByRole('link', { name: /Résumé/ })).toHaveAttribute('href', '/Quang_Huynh_Resume.pdf');
   const menu = within(nav).getByRole('button', { name: 'Menu' });
   expect(menu).toHaveAttribute('aria-expanded', 'false');
@@ -73,6 +73,20 @@ test('route navigation marks the current page and exposes résumé and menu cont
   expect(within(nav).getByRole('button', { name: 'Close' })).toHaveAttribute('aria-expanded', 'true');
   fireEvent.keyDown(document, { key: 'Escape' });
   expect(within(nav).getByRole('button', { name: 'Menu' })).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('the header expands at the top and reports compact progress as the page scrolls', () => {
+  window.scrollY = 0;
+  const { container } = render(<SiteNav current="home" />);
+  const nav = screen.getByRole('navigation', { name: 'Primary navigation' });
+  expect(container.firstChild).toHaveClass('nav-slot');
+  expect(nav).toHaveClass('site-nav--collapsible');
+  expect(nav.style.getPropertyValue('--nav-progress')).toBe('0.000');
+});
+
+test('photography keeps a compact, non-collapsing header', () => {
+  render(<SiteNav variant="photography" current="photography" />);
+  expect(screen.getByRole('navigation', { name: 'Primary navigation' })).not.toHaveClass('site-nav--collapsible');
 });
 
 test('exposure notes only include populated EXIF fields', () => {

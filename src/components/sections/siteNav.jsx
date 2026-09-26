@@ -9,28 +9,32 @@ const aboutHref = `${basePath}about`;
 const photographyPageHref = `${basePath}photography/`;
 const resumeHref = `${basePath}Quang_Huynh_Resume.pdf`;
 
+// About points at the homepage About & Education section; the dedicated
+// /about page is reached from contextual links (Meet Quang, More about me).
 const homeLinks = [
   { label: 'Experience', href: homeHref('#experience'), section: 'experience' },
   { label: 'Projects', href: homeHref('#projects'), section: 'projects' },
   { label: 'Skills', href: homeHref('#skills'), section: 'skills' },
-  { label: 'About', href: aboutHref },
-  { label: 'Photography', href: photographyPageHref },
+  { label: 'About', href: homeHref('#about'), section: 'about' },
   { label: 'Contact', href: homeHref('#contact'), section: 'contact' },
 ];
 
 // The Photography route keeps a deliberately quiet nav so the photos lead.
 const photographyLinks = [
   { label: 'Portfolio', href: homeHref() },
-  { label: 'About', href: aboutHref },
+  { label: 'About', href: homeHref('#about') },
 ];
 
-const routeLinks = (current) => [
+const routeLinks = [
   { label: 'Portfolio', href: homeHref() },
   { label: 'Projects', href: homeHref('#projects') },
-  { label: 'About', href: aboutHref, current: current === 'about' },
-  { label: 'Photography', href: photographyPageHref, current: current === 'photography' },
+  { label: 'About', href: homeHref('#about') },
   { label: 'Contact', href: homeHref('#contact') },
 ];
+
+// Scroll distance over which the expanded header settles into the compact bar
+// (the original portfolio used 440px on desktop).
+const collapseDistance = () => (window.innerWidth >= 1024 ? 440 : 180);
 
 /** Tracks which homepage section is under the header for the nav marker. */
 function useActiveSection(enabled) {
@@ -38,7 +42,6 @@ function useActiveSection(enabled) {
   useEffect(() => {
     if (!enabled || typeof IntersectionObserver !== 'function') return undefined;
     const sections = homeLinks
-      .filter(({ section }) => section)
       .map(({ section }) => document.getElementById(section))
       .filter(Boolean);
     const visible = new Map();
@@ -53,8 +56,12 @@ function useActiveSection(enabled) {
   return active;
 }
 
-/** Shared site navigation; `current` marks the route, `variant` scopes Photography. */
-function SiteNav({ variant = 'default', current = 'home' }) {
+/**
+ * Shared site navigation. On collapsible routes the header starts large at the
+ * top of the page and eases into the compact sticky bar as the page scrolls,
+ * driven by a single `--nav-progress` value (0 = expanded, 1 = compact).
+ */
+function SiteNav({ variant = 'default', current = 'home', collapsible = variant !== 'photography' }) {
   const navRef = useRef(null);
   const listRef = useRef(null);
   const menuButton = useRef(null);
@@ -64,22 +71,38 @@ function SiteNav({ variant = 'default', current = 'home' }) {
   const isPhotography = variant === 'photography';
   const isHome = current === 'home';
   const activeSection = useActiveSection(isHome);
-  const links = isHome ? homeLinks : isPhotography ? photographyLinks : routeLinks(current);
+  const links = isHome ? homeLinks : isPhotography ? photographyLinks : routeLinks;
+  // Deep links (e.g. /#about) start compact, as the original header did.
+  const initialProgress = typeof window !== 'undefined'
+    && window.location.hash
+    && window.location.hash !== '#top' ? 1 : 0;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return undefined;
     let frame;
+    let previous = -1;
     const update = () => {
       frame = undefined;
-      setScrolled(window.scrollY > 16);
+      const y = window.scrollY;
+      setScrolled(y > 8);
+      if (!collapsible) return;
+      const progress = Math.min(1, Math.max(0, y / collapseDistance()));
+      if (Math.abs(progress - previous) < 0.001) return;
+      previous = progress;
+      nav.style.setProperty('--nav-progress', progress.toFixed(3));
     };
-    const onScroll = () => { if (frame === undefined) frame = requestAnimationFrame(update); };
+    const request = () => { if (frame === undefined) frame = requestAnimationFrame(update); };
+    const resize = () => { previous = -1; request(); };
     update();
-    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('scroll', request, { passive: true });
+    window.addEventListener('resize', resize, { passive: true });
     return () => {
-      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('scroll', request);
+      window.removeEventListener('resize', resize);
       if (frame !== undefined) cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [collapsible]);
 
   // Slide one marker under the active link instead of toggling per-link underlines.
   useLayoutEffect(() => {
@@ -111,10 +134,11 @@ function SiteNav({ variant = 'default', current = 'home' }) {
     return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
-  return (
+  const navigation = (
     <nav
       ref={navRef}
-      className={`site-nav${isPhotography ? ' photography-nav' : ''}`}
+      className={`site-nav${collapsible ? ' site-nav--collapsible' : ''}${isPhotography ? ' photography-nav' : ''}`}
+      style={collapsible ? { '--nav-progress': initialProgress } : undefined}
       data-scrolled={scrolled || undefined}
       data-open={open || undefined}
       aria-label="Primary navigation"
@@ -146,13 +170,11 @@ function SiteNav({ variant = 'default', current = 'home' }) {
 
         <div className="nav-panel" id="site-nav-panel">
           <div className="nav-links" ref={listRef}>
-            {links.map((link, index) => (
+            {links.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
-                aria-current={link.current ? 'page' : undefined}
                 data-active={link.section && link.section === activeSection ? 'true' : undefined}
-                data-index={String(index + 1).padStart(2, '0')}
                 onClick={closeMenu}
               >
                 {link.label}
@@ -170,6 +192,10 @@ function SiteNav({ variant = 'default', current = 'home' }) {
       </div>
     </nav>
   );
+
+  // The slot reserves the expanded height so the page never reflows while the
+  // bar inside it shrinks (same approach as the original homepage header).
+  return collapsible ? <div className="nav-slot">{navigation}</div> : navigation;
 }
 
 export { aboutHref, homeHref, photographyPageHref };

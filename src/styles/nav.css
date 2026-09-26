@@ -1,17 +1,48 @@
-/* Primary navigation: translucent bar that tightens on scroll, one sliding marker. */
+/* Primary navigation.
+   The original portfolio's expanding header, rebuilt on the token system:
+   at the top of the page the bar and the cat + quanghuynh.com lockup are
+   large, and every size eases toward the compact bar as `--nav-progress`
+   goes 0 → 1 with scroll. Values are interpolated in CSS, so the change is
+   continuous rather than a two-state switch. */
+
+:root {
+  --nav-compact: 4.5rem;
+  --nav-expanded: clamp(5.5rem, 11svh, 6.75rem);
+  --logo-compact: 48px;
+  --logo-expanded: clamp(56px, calc(var(--nav-expanded) - 22px), 86px);
+  --brand-compact: 1.05rem;
+  --brand-expanded: clamp(1.2rem, 2vw, 1.8rem);
+  --links-compact: .92rem;
+  --links-expanded: 1.05rem;
+  /* Space the sticky header occupies; anchors land below it. */
+  --nav-footprint: var(--nav-expanded);
+  --nav-height: var(--nav-compact);
+}
+
+.nav-slot {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  height: var(--nav-expanded);
+  pointer-events: none;
+}
+.nav-slot > .site-nav { position: relative; pointer-events: auto; }
+
 .site-nav {
+  --p: 1;
   position: sticky;
   top: 0;
   z-index: 900;
   border-bottom: 1px solid transparent;
-  background: color-mix(in srgb, var(--bg-primary) 72%, transparent);
+  background: color-mix(in srgb, var(--bg-primary) 78%, transparent);
   -webkit-backdrop-filter: saturate(1.2) blur(14px);
   backdrop-filter: saturate(1.2) blur(14px);
   transition: background var(--dur-base) ease, border-color var(--dur-base) ease;
 }
+.site-nav--collapsible { --p: var(--nav-progress, 0); }
 .site-nav[data-scrolled] {
   border-color: var(--border);
-  background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
+  background: color-mix(in srgb, var(--bg-primary) 90%, transparent);
 }
 
 .nav-inner {
@@ -19,41 +50,77 @@
   align-items: center;
   gap: 1.5rem;
   width: min(100% - 2 * var(--gutter), var(--page-max));
-  height: 5rem;
+  height: calc(var(--nav-expanded) + (var(--nav-compact) - var(--nav-expanded)) * var(--p));
   margin-inline: auto;
-  transition: height var(--dur-base) var(--ease-out);
 }
-.site-nav[data-scrolled] .nav-inner { height: var(--nav-height); }
 
-.brand-lockup {
-  display: inline-flex;
-  align-items: center;
-  gap: .65rem;
-  min-height: 2.75rem;
-  color: var(--text-primary);
+/* ---------- brand: the original cat + quanghuynh.com lockup ---------- */
+.brand {
   font-family: var(--font-display);
-  font-size: 1.05rem;
+  font-size: calc(var(--brand-expanded) + (var(--brand-compact) - var(--brand-expanded)) * var(--p));
   letter-spacing: -.02em;
   text-decoration: none;
 }
-.brand-cat {
-  display: grid;
-  width: 2.35rem;
-  height: 2.35rem;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid var(--border-strong);
-  border-radius: 50%;
-  background: var(--surface);
-  transition: transform var(--dur-base) var(--ease-out), border-color var(--dur-fast) ease;
+.brand-lockup {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: calc(1.35rem + (.75rem - 1.35rem) * var(--p));
+  color: var(--text-primary);
 }
-.brand-cat img { width: 145%; max-width: none; height: auto; }
-.brand-lockup:hover .brand-cat { transform: rotate(-8deg); border-color: var(--accent); }
-.brand-name { display: inline-flex; align-items: baseline; }
-.brand-tld { color: var(--accent); }
-.photography-brand-section { margin-left: .1rem; color: var(--text-tertiary); font-family: var(--font-mono); font-size: .72em; letter-spacing: 0; }
+.brand-cat {
+  --logo: calc(var(--logo-expanded) + (var(--logo-compact) - var(--logo-expanded)) * var(--p));
+  position: relative;
+  flex: 0 0 var(--logo);
+  width: var(--logo);
+  height: var(--logo);
+  overflow: hidden;
+  border-radius: calc(1rem + (.65rem - 1rem) * var(--p));
+  transition: transform var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+.brand-cat img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--logo) * 2);
+  height: auto;
+  max-width: none;
+  transform: translate(-50%, -50%);
+}
+.brand-lockup:hover .brand-cat { transform: translateY(-2px); box-shadow: 0 0 0 3px var(--accent-soft); }
+.brand-name {
+  display: inline-flex;
+  align-items: center;
+  letter-spacing: -.015em;
+  line-height: 1.2;
+  transition: transform var(--dur-fast) ease;
+}
+.brand-domain { color: var(--text-primary); transition: color var(--dur-fast) ease; }
+.brand-tld {
+  margin-left: .16rem;
+  padding: calc(.34rem + (.2rem - .34rem) * var(--p)) calc(.68rem + (.42rem - .68rem) * var(--p));
+  border: 2px solid var(--text-primary);
+  border-radius: .5rem .5rem .5rem .18rem;
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  font-size: .8em;
+  letter-spacing: 0;
+  box-shadow: 0 2px 0 var(--accent);
+  transform: rotate(-3deg);
+  transition: transform var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+.brand-lockup:hover .brand-name { transform: translateY(-1px); }
+.brand-lockup:hover .brand-domain { color: var(--accent); }
+.brand-lockup:hover .brand-tld { box-shadow: 0 3px 0 var(--accent); transform: rotate(2deg) scale(1.06); }
+.brand-lockup:focus-visible { border-radius: .75rem; }
+
+/* Photography keeps its quieter outlined .com and section path. */
+.photography-nav .brand-tld { border-color: var(--accent); background: transparent; color: var(--accent); box-shadow: none; transform: none; }
+.photography-nav .brand-lockup:hover .brand-tld { box-shadow: none; transform: none; }
+.photography-brand-section { margin-left: .15rem; color: var(--text-tertiary); font-family: var(--font-mono); font-size: .72em; letter-spacing: 0; }
 .photography-brand-camera { color: var(--accent); font-size: .9rem; }
 
+/* ---------- links + tools ---------- */
 .nav-panel {
   display: flex;
   flex: 1;
@@ -61,7 +128,6 @@
   justify-content: flex-end;
   gap: 1.75rem;
 }
-
 .nav-links {
   position: relative;
   display: flex;
@@ -73,10 +139,10 @@
   display: inline-flex;
   align-items: center;
   min-height: 2.75rem;
-  padding: 0 .7rem;
+  padding: 0 .75rem;
   color: var(--text-secondary);
-  font-size: .92rem;
-  font-weight: 500;
+  font-size: calc(var(--links-expanded) + (var(--links-compact) - var(--links-expanded)) * var(--p));
+  font-weight: 550;
   text-decoration: none;
   transition: color var(--dur-fast) ease;
 }
@@ -93,17 +159,6 @@
   pointer-events: none;
   transition: transform 420ms var(--ease-out), width 420ms var(--ease-out);
 }
-/* The marker's "trail blaze" dot at the leading edge. */
-.nav-marker::after {
-  content: '';
-  position: absolute;
-  top: -2px;
-  right: -3px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-}
 
 .nav-tools { display: flex; align-items: center; gap: .5rem; }
 .nav-resume,
@@ -112,15 +167,13 @@
   align-items: center;
   gap: .45rem;
   min-height: 2.5rem;
-  padding: 0 .85rem;
+  padding: 0 .9rem;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   background: transparent;
   color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: var(--step--2);
-  letter-spacing: .05em;
-  text-transform: uppercase;
+  font-size: .85rem;
+  font-weight: 600;
   text-decoration: none;
   cursor: pointer;
   transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease;
@@ -135,22 +188,27 @@
 
 /* ---------- compact / mobile drawer ---------- */
 @media (max-width: 1080px) {
-  .nav-inner { height: var(--nav-height); }
+  :root {
+    --nav-compact: 4.25rem;
+    --nav-expanded: 5.25rem;
+    --logo-compact: 42px;
+    --logo-expanded: 54px;
+    --brand-compact: 1rem;
+    --brand-expanded: 1.2rem;
+  }
   .nav-menu-button {
     display: inline-flex;
     align-items: center;
     gap: .6rem;
     min-height: 2.75rem;
     margin-left: auto;
-    padding: 0 .9rem;
+    padding: 0 1rem;
     border: 1px solid var(--border-strong);
     border-radius: 999px;
     background: transparent;
     color: var(--text-primary);
-    font-family: var(--font-mono);
-    font-size: var(--step--2);
-    letter-spacing: .06em;
-    text-transform: uppercase;
+    font-size: .85rem;
+    font-weight: 600;
     cursor: pointer;
   }
   .nav-menu-button__lines { display: grid; gap: 4px; width: 16px; }
@@ -166,7 +224,7 @@
     display: grid;
     justify-content: stretch;
     gap: 1.5rem;
-    max-height: calc(100dvh - var(--nav-height));
+    max-height: calc(100dvh - var(--nav-expanded));
     overflow-y: auto;
     padding: 1.25rem var(--gutter) 1.75rem;
     border-bottom: 1px solid var(--border);
@@ -185,7 +243,6 @@
   .site-nav[data-open] { background: var(--bg-primary); border-color: var(--border); }
   .nav-links { display: grid; gap: 0; }
   .nav-links a {
-    justify-content: space-between;
     min-height: 3.4rem;
     padding: 0;
     border-bottom: 1px solid var(--border);
@@ -194,19 +251,12 @@
     font-size: 1.6rem;
     letter-spacing: -.03em;
   }
-  .nav-links a::after {
-    content: attr(data-index);
-    color: var(--text-tertiary);
-    font-family: var(--font-mono);
-    font-size: var(--step--2);
-    letter-spacing: .06em;
-  }
-  .nav-links a[aria-current='page'] { color: var(--accent); }
   .nav-marker { display: none; }
   .nav-tools { justify-content: space-between; }
 }
 
 @media (max-width: 420px) {
-  .brand-lockup { font-size: .95rem; }
+  :root { --brand-compact: .95rem; --brand-expanded: 1.08rem; --logo-expanded: 50px; }
+  .brand-lockup { gap: .6rem; }
   .photography-brand-section { display: none; }
 }

@@ -4,7 +4,8 @@
 
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: calc(var(--nav-height) + 1rem);
+  /* Anchors (e.g. /#about) land clear of the sticky header's reserved space. */
+  scroll-padding-top: calc(var(--nav-footprint, 4.5rem) + .5rem);
   -webkit-text-size-adjust: 100%;
 }
 
@@ -218,6 +219,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 700; }
 }
 
 html.overlay-open, html.layout-changing { scroll-behavior: auto; }
+html:has(.photography-nav) { --nav-footprint: var(--nav-compact); }
 
 /* ---------- reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
