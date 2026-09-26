@@ -28,12 +28,12 @@ function Education() {
         <div className="about-grid">
           <div className="about-card">
             <p>
-              I’m a software developer and computer science student based in Rochester, NY.
+              I like building practical software, but there’s more to me than what ends up in a repository.
             </p>
             <p>
-              I gravitate toward practical software: backend systems, developer tools,
-              automation, native applications, and production web systems for family-owned
-              businesses—especially where reliability and thoughtful engineering matter.
+              Outside the editor, I spend time around photography, cars, technology, gaming, music, 
+              and the occasional hike. My About page covers a little more of how I got into software, 
+              what I value when I build, and what I’m interested in beyond engineering.
             </p>
 
             <a className="text-link" href={aboutHref}>

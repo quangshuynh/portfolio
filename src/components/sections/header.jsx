@@ -29,7 +29,7 @@ function Header() {
       <section className="hero" id="top" aria-labelledby="hero-title">
         <div className="hero-inner reveal-content">
           <div className="hero-copy">
-          <p className="eyebrow">Software Engineering | Backend | Developer Tools | Native Apps</p>
+          <p className="eyebrow">Software Engineering · Backend · Developer Tools · Native Apps</p>
           <p className="hero-intro">
             Hi, I’m Quang.
             <button
@@ -43,16 +43,15 @@ function Header() {
           </p>
           <h1 id="hero-title">I build reliable backend systems, developer tools, automation, and native applications.</h1>
           <p className="hero-lede">
-            I’m a software developer with professional experience in .NET applications,
-            databases, and enterprise workflows. I also design, deploy, and maintain production
-            web applications for family-owned businesses alongside my backend, developer-tool,
-            and native application work.
+            I’m a software developer with professional experience in .NET applications, 
+            databases, and enterprise workflows. I build and maintain software across 
+            production web systems, backend infrastructure, developer tooling, and native applications.
           </p>
           <div className="hero-meta" aria-label="Location and focus">
             <span><FaMapMarkerAlt aria-hidden="true" /> Rochester, NY, USA</span>
-            <span>Backend systems</span>
-            <span>Developer tools</span>
-            <span>Native applications</span>
+            <span>RIT Computer Science · BS/MS</span>
+            <span>Software Engineering Co-op Experience</span>
+            <span>Open to Opportunities</span>
           </div>
           <div className="hero-actions">
             <PersonalityButton href="#projects" personality="rally" personalityKey="hero-view-work">View my work <FaArrowRight aria-hidden="true" /></PersonalityButton>

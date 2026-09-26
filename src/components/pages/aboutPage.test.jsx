@@ -30,7 +30,7 @@ function openSpotifyListening() {
 
 test('renders the updated biography and section headings', () => {
   renderAboutPage();
-  expect(screen.getByText(/I’m a software developer and computer science student\. I was born in Vietnam and moved to the United States with my family when I was young\. Rochester has been home for most of my life\./)).toBeInTheDocument();
+  expect(screen.getByText(/I’m a software developer and computer science student interested in building dependable, useful software\./)).toBeInTheDocument();
   expect(screen.getByText('My path into software')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'From coursework to production software' })).toBeInTheDocument();
   expect(screen.getByText('How I like to work')).toBeInTheDocument();
