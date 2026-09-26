@@ -172,33 +172,51 @@ function ProjectVisual({ type }) {
   return <GitProfileLensVisual />;
 }
 
+const statusFor = (project) => {
+  if (project.visual === 'dashcam') return 'In production';
+  if (project.live && project.github) return 'Live demo · open source';
+  if (project.documentation) return 'Open source · documented';
+  return 'Open source';
+};
+
 /**
  * renders the featured project collection
  * :returns: featured projects section markup
  */
 function FeaturedProjects() {
   return (
-    <section className="featured-section" id="projects" aria-labelledby="projects-title">
-      <div className="featured-list">
-        {projects.map((project, index) => (
-          <div className={`featured-stage snap-stage scroll-enter${index === 0 ? ' featured-stage-first' : ''}`} key={project.name}>
-            <div className="section-inner reveal-content" style={{ '--settle-rotate': index % 2 === 0 ? '-.35deg' : '.35deg' }}>
-              {index === 0 && (
-                <div className="section-heading">
-                  <div><p className="eyebrow">Selected work</p><h2 id="projects-title">Featured projects</h2></div>
-                  <p>Selected projects highlighting engineering decisions, reliability, system design, and practical problem solving.</p>
-                </div>
-              )}
-              <article className={`featured-project${index === 0 ? ' flagship-project' : ''}${project.name === 'GitProfileLens' ? ' gitprofilelens-project' : ''}`}>
-              <ProjectVisual type={project.visual} />
-              <div className="project-copy">
-                <span className="project-number">{String(index + 1).padStart(2, '0')} · {project.label}</span>
+    <section className="page-section featured-section" id="projects" aria-labelledby="projects-title">
+      <div className="section-inner">
+        <div className="section-heading" data-reveal>
+          <div><p className="eyebrow"><span className="section-index">02</span> Selected work</p><h2 id="projects-title">Featured projects</h2></div>
+          <p>Selected projects highlighting engineering decisions, reliability, system design, and practical problem solving.</p>
+        </div>
+        <svg className="trail-line" viewBox="0 0 20 1000" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+          <path d="M10 0 C 2 120, 18 240, 10 360 S 2 600, 10 720 S 18 900, 10 1000" pathLength="1" />
+        </svg>
+        <div className="featured-list">
+          {projects.map((project, index) => (
+            <article
+              key={project.name}
+              className={`featured-project case-file${index === 0 ? ' flagship-project case-file--wide' : ''}${index % 2 === 0 ? '' : ' case-file--flip'}${project.name === 'GitProfileLens' ? ' gitprofilelens-project' : ''}`}
+            >
+              <div className="case-file__rail" data-reveal>
+                <span className="case-file__index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+                <dl className="case-file__meta">
+                  <div><dt>Type</dt><dd className="project-number">{project.label}</dd></div>
+                  <div><dt>Status</dt><dd><span className="status-dot" aria-hidden="true" />{statusFor(project)}</dd></div>
+                  <div className="project-stack"><dt>Stack</dt><dd>{project.stack.split(' · ').map((item) => <span key={item}>{item}</span>)}</dd></div>
+                </dl>
+              </div>
+              <div className="case-file__visual viewfinder" data-reveal style={{ '--reveal-delay': '80ms' }}>
+                <ProjectVisual type={project.visual} />
+              </div>
+              <div className="project-copy" data-reveal style={{ '--reveal-delay': '140ms' }}>
                 <h3>{project.name}</h3>
                 <p className="project-purpose">{project.purpose}</p>
                 <ul className="project-highlights" aria-label={`${project.name} engineering highlights`}>
                   {project.highlights.map((item) => <li key={item}>{item}</li>)}
                 </ul>
-                <p className="project-stack"><strong>Stack</strong> {project.stack}</p>
                 <div className="project-actions">
                   {project.live && !project.github && <PersonalityButton href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live site`}>Live Site <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
                   {project.github && <PersonalityButton href={project.github} target="_blank" rel="noreferrer" aria-label={`View ${project.name} code`}>View code <FaGithub aria-hidden="true" /></PersonalityButton>}
@@ -207,10 +225,9 @@ function FeaturedProjects() {
                   {project.documentation && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-documentation`} href={project.documentation} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} documentation`}>Documentation <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
                 </div>
               </div>
-              </article>
-            </div>
-          </div>
-        ))}
+            </article>
+          ))}
+        </div>
       </div>
     </section>
   );
