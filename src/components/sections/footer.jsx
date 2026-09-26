@@ -1,6 +1,7 @@
 import React from 'react';
 import { FaEnvelope, FaGithub, FaLinkedin } from 'react-icons/fa';
 import { Ridgeline, TopoField } from '../ui/terrain';
+import { aboutHref, photographyPageHref } from './siteNav';
 
 /**
  * renders contact links and site attribution
@@ -12,7 +13,7 @@ function Footer() {
       <section className="contact-section" id="contact" aria-labelledby="contact-title">
         <TopoField variant="quiet" className="contact-topo" />
         <div className="section-inner contact-inner">
-          <p className="eyebrow" data-reveal>Contact · Trailhead</p>
+          <p className="eyebrow" data-reveal>Contact</p>
           <h2 id="contact-title" data-reveal>Let’s talk about building useful software.</h2>
           <p className="contact-lede" data-reveal>
             I’m open to software engineering opportunities and always glad to connect
@@ -36,7 +37,11 @@ function Footer() {
       <footer className="site-footer">
         <div className="footer-inner section-inner">
           <p>© {new Date().getFullYear()} Quang Huynh</p>
-          <p className="mono footer-coords" aria-hidden="true">43.16° N · 77.61° W · Rochester, NY</p>
+          <nav className="footer-links" aria-label="More">
+            <a href={aboutHref}>About Quang</a>
+            <a href={photographyPageHref}>Photography</a>
+            <a href={`${import.meta.env.BASE_URL}Quang_Huynh_Resume.pdf`} target="_blank" rel="noreferrer">Résumé</a>
+          </nav>
           <p>Designed and built with React.</p>
         </div>
       </footer>

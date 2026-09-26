@@ -172,13 +172,6 @@ function ProjectVisual({ type }) {
   return <GitProfileLensVisual />;
 }
 
-const statusFor = (project) => {
-  if (project.visual === 'dashcam') return 'In production';
-  if (project.live && project.github) return 'Live demo · open source';
-  if (project.documentation) return 'Open source · documented';
-  return 'Open source';
-};
-
 /**
  * renders the featured project collection
  * :returns: featured projects section markup
@@ -188,7 +181,7 @@ function FeaturedProjects() {
     <section className="page-section featured-section" id="projects" aria-labelledby="projects-title">
       <div className="section-inner">
         <div className="section-heading" data-reveal>
-          <div><p className="eyebrow"><span className="section-index">02</span> Selected work</p><h2 id="projects-title">Featured projects</h2></div>
+          <div><p className="eyebrow">Selected work</p><h2 id="projects-title">Featured projects</h2></div>
           <p>Selected projects highlighting engineering decisions, reliability, system design, and practical problem solving.</p>
         </div>
         <svg className="trail-line" viewBox="0 0 20 1000" preserveAspectRatio="none" aria-hidden="true" focusable="false">
@@ -204,8 +197,14 @@ function FeaturedProjects() {
                 <span className="case-file__index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
                 <dl className="case-file__meta">
                   <div><dt>Type</dt><dd className="project-number">{project.label}</dd></div>
-                  <div><dt>Status</dt><dd><span className="status-dot" aria-hidden="true" />{statusFor(project)}</dd></div>
-                  <div className="project-stack"><dt>Stack</dt><dd>{project.stack.split(' · ').map((item) => <span key={item}>{item}</span>)}</dd></div>
+                  <div className="project-stack">
+                    <dt>Stack</dt>
+                    <dd>
+                      <ul className="tech-tags" aria-label={`${project.name} technologies`}>
+                        {project.stack.split(' · ').map((item) => <li key={item}>{item}</li>)}
+                      </ul>
+                    </dd>
+                  </div>
                 </dl>
               </div>
               <div className="case-file__visual viewfinder" data-reveal style={{ '--reveal-delay': '80ms' }}>

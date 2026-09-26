@@ -26,7 +26,7 @@ function Experience() {
       <div className="section-inner">
         <div className="section-heading" data-reveal>
           <div>
-            <p className="eyebrow"><span className="section-index">01</span> Professional work</p>
+            <p className="eyebrow">Professional work</p>
             <h2 id="experience-title">Experience</h2>
           </div>
           <p>
@@ -47,10 +47,11 @@ function Experience() {
             </a>
             <h3>KORE Wireless</h3>
             <p className="experience-role">IoT Software Engineering Co-op</p>
-            <p className="experience-location mono">Rochester, NY</p>
-            <ul className="experience-tech" aria-label="Technologies used">
+            <p className="experience-location">Rochester, NY</p>
+            <ul className="experience-tech tech-tags" aria-label="Technologies used">
               <li>C#</li>
-              <li>.NET / WPF</li>
+              <li>.NET</li>
+              <li>WPF</li>
               <li>SQL Server</li>
               <li>Boomi</li>
               <li>NetSuite</li>

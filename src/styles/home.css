@@ -1,60 +1,60 @@
-/* Homepage hero: editorial split, workbench viewfinder, legend, ridgeline. */
+/* Homepage hero: full-screen opening, headline + restored Meet Quang card, framed 3D desk. */
 
 /* ============ HERO ============ */
+/* A deliberate full-screen opening: the hero fills the first viewport below
+   the expanded header, with content sitting a little below centre. */
 .hero {
   position: relative;
   isolation: isolate;
   display: grid;
-  align-content: start;
-  min-height: calc(100svh - 5rem);
-  padding-top: clamp(1.5rem, 4.5vh, 4rem);
-  padding-bottom: calc(clamp(90px, 14vw, 220px) - 1rem);
+  align-content: center;
+  min-height: calc(100svh - var(--nav-footprint));
+  padding-top: clamp(1.5rem, 5vh, 4rem);
+  padding-bottom: clamp(3.5rem, 9vh, 6.5rem);
   overflow: hidden;
-  background: linear-gradient(to bottom, var(--bg-primary) 0%, var(--bg-primary) 35%, var(--sky-haze) 100%);
+  background: linear-gradient(to bottom, var(--bg-primary) 0%, var(--bg-primary) 40%, var(--sky-haze) 100%);
 }
 .hero-topo {
   z-index: -1;
-  -webkit-mask-image: radial-gradient(ellipse 60% 70% at 78% 32%, #000 0%, rgba(0, 0, 0, .55) 45%, transparent 78%);
-  mask-image: radial-gradient(ellipse 60% 70% at 78% 32%, #000 0%, rgba(0, 0, 0, .55) 45%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse 60% 70% at 78% 40%, #000 0%, rgba(0, 0, 0, .55) 45%, transparent 78%);
+  mask-image: radial-gradient(ellipse 60% 70% at 78% 40%, #000 0%, rgba(0, 0, 0, .55) 45%, transparent 78%);
 }
-.hero-ridge { z-index: -1; }
+.hero-ridge { z-index: -1; height: clamp(60px, 8vw, 130px); }
 
 .hero-inner {
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   align-items: center;
   gap: clamp(2.5rem, 5vw, 5.5rem);
 }
 
 .hero-copy { min-width: 0; }
-.hero-eyebrow { color: var(--accent); }
 .hero-intro {
   display: flex;
   align-items: center;
-  gap: .35rem;
-  margin-bottom: .6rem;
+  gap: .35em;
+  margin-bottom: .75rem;
   color: var(--text-secondary);
-  font-family: var(--font-serif);
-  font-size: var(--step-2);
-  font-style: italic;
-  font-weight: 400;
+  font-size: clamp(1.1rem, 1rem + .5vw, 1.35rem);
+  font-weight: 650;
   letter-spacing: -.01em;
 }
 .wave-trigger {
   display: inline-grid;
   place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.5rem;
+  height: 2.5rem;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
-  font-size: 1.6rem;
-  font-style: normal;
+  font-size: 1.25em;
 }
 .wave-trigger:hover { background: var(--accent-soft); }
 .wave { display: inline-block; transform-origin: 70% 70%; }
+.wave-trigger:hover .wave,
+.wave-trigger:focus-visible .wave,
 .wave.is-waving { animation: wave-animation 2.1s ease-in-out; }
 @keyframes wave-animation {
   0% { transform: rotate(0deg); }
@@ -69,50 +69,58 @@
 .hero h1 {
   max-width: 17ch;
   font-family: var(--font-display);
-  font-size: clamp(2.35rem, 1.3rem + 2.75vw, 3.85rem);
+  font-size: clamp(2.35rem, 1.3rem + 2.8vw, 3.95rem);
   line-height: 1.02;
   letter-spacing: -.042em;
   text-wrap: balance;
 }
 .hero-lede {
   max-width: 54ch;
-  margin-top: 1.25rem;
+  margin-top: 1.4rem;
   color: var(--text-secondary);
   font-size: var(--step-0);
   line-height: 1.65;
 }
 .hero-actions { margin-top: 2rem; }
 
-.hero-log {
+/* Meet Quang: the original horizontal card, on the new tokens. */
+.meet-quang-card {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0;
-  max-width: 40rem;
-  margin: 2rem 0 0;
-  border-top: 1px solid var(--border);
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .9rem;
+  width: min(100%, 22rem);
+  min-height: 4.75rem;
+  margin-top: 1.75rem;
+  padding: .55rem 1rem .55rem .6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  text-decoration: none;
+  box-shadow: var(--shadow-soft);
+  transition: transform var(--dur-fast) ease, border-color var(--dur-fast) ease, background var(--dur-fast) ease;
 }
-.hero-log > div {
-  padding: .6rem 1rem .6rem 0;
-  border-bottom: 1px solid var(--border);
+.meet-quang-card:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--surface) 82%, var(--accent-soft));
+  transform: translateY(-2px);
 }
-.hero-log > div:nth-child(odd) { border-right: 1px solid var(--border); }
-.hero-log > div:nth-child(even) { padding-left: 1rem; }
-.hero-log dt {
-  color: var(--text-tertiary);
-  font-family: var(--font-mono);
-  font-size: var(--step--2);
-  letter-spacing: .06em;
-  text-transform: uppercase;
+.meet-quang-card__photo {
+  width: 3.5rem;
+  height: 3.5rem;
+  object-fit: cover;
+  border: 2px solid var(--accent);
+  border-radius: .65rem;
 }
-.hero-log dd { margin: .2rem 0 0; font-size: .92rem; font-weight: 550; }
-.hero-log__coords { display: block; color: var(--text-tertiary); font-family: var(--font-mono); font-size: var(--step--2); font-weight: 400; }
+.meet-quang-card__copy { display: grid; min-width: 0; gap: .15rem; }
+.meet-quang-card__copy strong { font-family: var(--font-display); font-size: 1rem; line-height: 1.1; }
+.meet-quang-card__copy > span { overflow: hidden; color: var(--text-secondary); font-size: .82rem; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.meet-quang-card__arrow { color: var(--accent); font-size: .85rem; transition: transform var(--dur-fast) ease; }
+.meet-quang-card:hover .meet-quang-card__arrow { transform: translateX(3px); }
 
-/* The workbench: the desk scene framed as a camera viewfinder plate. */
-.hero-bench {
-  position: relative;
-  margin: 0;
-  padding: 0 0 2.5rem;
-}
+/* The desk, framed; only the interaction hint remains. */
+.hero-bench { position: relative; margin: 0; }
 .hero-bench__frame {
   --vf-inset: -9px;
   position: relative;
@@ -123,111 +131,27 @@
     linear-gradient(to bottom, var(--surface), var(--bg-secondary));
   box-shadow: var(--shadow-lift);
 }
-.hero-bench__hud {
+.hero-bench .hero-desk { padding: 1.75rem .5rem 2.5rem; }
+.hero-bench__hint {
   position: absolute;
-  top: .8rem;
   right: 1rem;
-  left: 1rem;
+  bottom: .85rem;
   z-index: 2;
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
   color: var(--text-tertiary);
-  font-family: var(--font-mono);
-  font-size: .625rem;
-  letter-spacing: .08em;
-  text-transform: uppercase;
+  font-size: .78rem;
+  font-weight: 550;
+  letter-spacing: .02em;
   pointer-events: none;
 }
-.hero-bench__hud--bottom { top: auto; bottom: .8rem; }
-.hero-bench__rec::before {
-  content: '';
-  display: inline-block;
-  width: .45rem;
-  height: .45rem;
-  margin-right: .45rem;
-  border-radius: 50%;
-  background: var(--signal);
-  vertical-align: .05em;
-}
-.hero-bench .hero-desk { padding: 2.2rem .5rem; }
-
-.hero-bench__disc {
-  --disc-size: clamp(8rem, 10.5vw, 10rem);
-  position: absolute;
-  top: calc(var(--disc-size) * -0.5);
-  right: calc(var(--disc-size) * -0.3);
-  z-index: 4;
-}
-
-.meet-quang-card {
-  position: absolute;
-  bottom: 0;
-  left: clamp(1rem, 3vw, 2rem);
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  gap: .8rem;
-  min-height: 3.5rem;
-  padding: .45rem 1rem .45rem .45rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  color: var(--text-primary);
-  text-decoration: none;
-  box-shadow: var(--shadow-soft);
-  transition: transform var(--dur-base) var(--ease-out), border-color var(--dur-fast) ease;
-}
-.meet-quang-card:hover { transform: translateY(-3px); border-color: var(--accent); }
-.meet-quang-card__photo { width: 2.6rem; height: 2.6rem; border-radius: 50%; object-fit: cover; }
-.meet-quang-card__copy { display: grid; line-height: 1.2; }
-.meet-quang-card__copy strong { font-family: var(--font-display); font-size: .95rem; }
-.meet-quang-card__copy span { color: var(--text-tertiary); font-size: .78rem; }
-.meet-quang-card__arrow { width: .8rem; color: var(--accent); transition: transform var(--dur-base) var(--ease-out); }
-.meet-quang-card:hover .meet-quang-card__arrow { transform: translateX(3px); }
-
-/* Legend: the four interests, like a map key along the hero's foot. */
-.hero-legend {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 1.5rem;
-  margin-top: clamp(2.5rem, 6vh, 4.5rem);
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-}
-.hero-legend__title { color: var(--text-tertiary); }
-.hero-legend ul {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.hero-legend a {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  align-items: center;
-  column-gap: .6rem;
-  min-height: 2.75rem;
-  color: var(--text-primary);
-  text-decoration: none;
-}
-.hero-legend__index { color: var(--text-tertiary); }
-.hero-legend a svg { color: var(--accent); transition: transform var(--dur-base) var(--ease-out); }
-.hero-legend__label { font-weight: 600; }
-.hero-legend__note { grid-column: 3; color: var(--text-tertiary); font-size: .8rem; }
-.hero-legend a:hover svg { transform: translateY(-2px); }
-.hero-legend a:hover .hero-legend__label { color: var(--accent); }
+.hero-bench__hint svg { color: var(--accent); }
 
 /* Entrance choreography: copy rises in sequence, bench settles after. */
 @media (prefers-reduced-motion: no-preference) {
   .hero-copy > *,
-  .hero-bench,
-  .hero-legend li {
+  .hero-bench {
     animation: hero-rise 900ms var(--ease-out) both;
     animation-delay: calc(var(--i, 0) * 85ms + 80ms);
   }
@@ -249,30 +173,19 @@
 
 /* ============ responsive ============ */
 @media (max-width: 1080px) {
-  .hero { min-height: 0; }
+  .hero { min-height: 0; align-content: start; padding-top: 2.5rem; }
   .hero-inner { grid-template-columns: 1fr; }
   .hero h1 { max-width: 20ch; }
-  .hero-bench { max-width: 44rem; width: 100%; margin-inline: auto; }
-  .hero-legend ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-@media (max-width: 760px) {
-  .hero-legend { grid-template-columns: 1fr; gap: .75rem; }
-  .hero-legend__title { display: none; }
+  .hero-bench { max-width: 44rem; width: 100%; }
 }
 
 @media (max-width: 620px) {
-  .hero { padding-top: 2rem; }
-  .hero-intro { font-size: var(--step-1); }
-  .hero-log { grid-template-columns: 1fr; }
-  .hero-log > div:nth-child(odd) { border-right: 0; }
-  .hero-log > div:nth-child(even) { padding-left: 0; }
-  .hero-bench { padding-bottom: 3rem; }
-  .hero-bench__disc { --disc-size: 6.25rem; top: calc(var(--disc-size) * -0.5); right: -.25rem; }
-  .hero-bench .hero-desk { padding: 2rem .25rem 1.75rem; }
-  .hero-bench__hud { font-size: .56rem; }
-  .meet-quang-card { left: .75rem; }
-  .hero-legend ul { grid-template-columns: 1fr; gap: 0; }
-  .hero-legend li + li { border-top: 1px solid var(--border); }
+  .hero { padding-top: 1.75rem; padding-bottom: 4rem; }
+  .hero h1 { font-size: clamp(2.15rem, 10.5vw, 3rem); }
+  .hero-intro { font-size: 1.1rem; }
+  .hero-actions .button,
+  .hero-actions .personality-button { flex: 1 1 auto; }
+  .meet-quang-card { width: 100%; }
+  .hero-inner { gap: 2rem; }
+  .hero-bench .hero-desk { padding: 1rem .25rem 2.25rem; }
 }
-

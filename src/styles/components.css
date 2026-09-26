@@ -1,4 +1,4 @@
-/* Shared decorative components: terrain, ridgelines, Spotify disc, status dot. */
+/* Shared decorative components: terrain, ridgelines, Spotify disc, technology tags. */
 
 .topo-field {
   position: absolute;
@@ -47,30 +47,6 @@
 @keyframes ridge-parallax {
   from { transform: translateY(0); }
   to { transform: translateY(var(--ridge-shift, 0px)); }
-}
-
-.status-dot {
-  display: inline-block;
-  width: .5rem;
-  height: .5rem;
-  margin-right: .5rem;
-  border-radius: 50%;
-  background: var(--accent);
-  vertical-align: .05em;
-}
-/* Only the hero's availability dot breathes (opacity/transform only); the rest stay still. */
-.hero-log .status-dot { position: relative; }
-.hero-log .status-dot::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: status-pulse 3.2s ease-out infinite;
-}
-@keyframes status-pulse {
-  0% { opacity: .5; transform: scale(1); }
-  70%, 100% { opacity: 0; transform: scale(2.6); }
 }
 
 /* ---------- Spotify disc: Circular type set around a turning record ---------- */
@@ -133,6 +109,27 @@
   .hero-topo,
   .contact-topo,
   .spotify-disc__ring,
-  .spotify-disc__record,
-  .hero-log .status-dot::after { animation: none !important; }
+  .spotify-disc__record { animation: none !important; }
+}
+
+/* ---------- technology tags: small outlined metadata, not buttons ---------- */
+.tech-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tech-tags li {
+  padding: .28rem .5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: .66rem;
+  letter-spacing: .02em;
+  line-height: 1.35;
+  white-space: nowrap;
 }
