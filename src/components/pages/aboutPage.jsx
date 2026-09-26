@@ -34,6 +34,14 @@ import { ImageTrigger, InterestCard, InterestGalleryModal } from '../about/about
 import PhotoLightbox from '../ui/photoLightbox';
 import { photographs } from '../../data/photographs';
 import { appHref, navigate } from '../../util/navigation';
+import SpotifyDisc from '../ui/spotifyDisc';
+import { TopoField } from '../ui/terrain';
+
+const currently = [
+  ['Studying', 'Accelerated BS/MS in Computer Science at RIT, graduating 2028'],
+  ['Drawn to', 'Systems, databases, algorithms, and the decisions behind dependable software'],
+  ['Building', 'Production web apps for Rochester businesses, native Apple tools, and open-source backend work'],
+];
 
 const interests = [
   [
@@ -136,9 +144,11 @@ const galleries = { personal: personalGallery, photography: photographyGallery, 
 const interestGalleryKeys = { Photography: 'photography', Hiking: 'hiking', Music: 'music', Cars: 'cars', Gaming: 'gaming', Technology: 'technology' };
 
 function AboutPage() {
-  const [activeGallery, setActiveGallery] = useState(() => (
-    !window.history.state?.restorePhotographyModal && window.location.hash === '#photography' ? 'photography' : null
-  ));
+  const [activeGallery, setActiveGallery] = useState(() => {
+    if (window.history.state?.restorePhotographyModal) return null;
+    if (window.location.hash === '#photography') return 'photography';
+    return window.location.hash === '#music' ? 'music' : null;
+  });
   const [directLightbox, setDirectLightbox] = useState(null);
   const galleryTrigger = useRef(null);
   const lightboxTrigger = useRef(null);
@@ -160,7 +170,7 @@ function AboutPage() {
 
   const closeGallery = useCallback(() => {
     setActiveGallery(null);
-    if (window.location.hash === '#photography') navigate(appHref('/about'), { replace: true });
+    if (window.location.hash === '#photography' || window.location.hash === '#music') navigate(appHref('/about'), { replace: true });
     requestAnimationFrame(() => galleryTrigger.current?.focus());
   }, []);
 
@@ -177,17 +187,18 @@ function AboutPage() {
   return (
     <div className="app-shell about-page">
       <a className="skip-link" href="#main-content">Skip to main content</a>
-      <SiteNav collapsible />
+      <SiteNav current="about" />
       <main id="main-content">
-        <section className="about-hero snap-stage scroll-enter" aria-labelledby="about-page-title">
-          <div className="section-inner about-hero-grid reveal-content">
-            <div>
-              <p className="eyebrow">A little more about me</p>
-              <h1 id="about-page-title">Hi, I’m Quang.</h1>
-              <p className="about-location"><FaMapMarkerAlt aria-hidden="true" /> Rochester, New York, USA</p>
-              <div className="about-prose">
-                <p>
-                  I’m a software developer and computer science student interested in 
+        <section className="about-hero" aria-labelledby="about-page-title">
+          <TopoField variant="quiet" className="about-hero-topo" />
+          <div className="section-inner about-hero-grid">
+            <div className="about-hero-copy">
+              <p className="eyebrow" style={{ '--i': 0 }}>A little more about me</p>
+              <h1 id="about-page-title" style={{ '--i': 1 }}>Hi, I’m Quang.</h1>
+              <p className="about-location" style={{ '--i': 2 }}><FaMapMarkerAlt aria-hidden="true" /> Rochester, New York, USA</p>
+              <div className="about-prose" style={{ '--i': 3 }}>
+                <p className="about-prose__lead">
+                  I’m a software developer and computer science student interested in
                   building dependable, useful software.
                 </p>
 
@@ -205,27 +216,29 @@ function AboutPage() {
                   fail, data gets messy, or software has to keep working over time.
                 </p>
               </div>
-              <div className="hero-actions">
+              <div className="hero-actions" style={{ '--i': 4 }}>
                 <PersonalityButton href={homeHref('#projects')} personality="hardware" personalityKey="about-view-work">View my work <FaArrowRight aria-hidden="true" /></PersonalityButton>
                 <PersonalityButton secondary href={homeHref('#contact')} personality="auto" personalityKey="about-contact">Get in touch</PersonalityButton>
               </div>
             </div>
-            <figure className="about-portrait">
-              <button className="about-portrait-button" type="button" aria-label="View more photos of Quang" aria-haspopup="dialog" onClick={(event) => openGallery('personal', event.currentTarget)}>
-                <img src={quangPhoto} width="1000" height="1000" alt="Quang seated on a bench outdoors" />
-                <span>View photos</span>
-              </button>
+            <figure className="about-portrait" style={{ '--i': 2 }}>
+              <div className="viewfinder about-portrait-frame">
+                <button className="about-portrait-button" type="button" aria-label="View more photos of Quang" aria-haspopup="dialog" onClick={(event) => openGallery('personal', event.currentTarget)}>
+                  <img src={quangPhoto} width="1000" height="1000" alt="Quang seated on a bench outdoors" />
+                  <span>View more photos</span>
+                </button>
+              </div>
             </figure>
           </div>
         </section>
 
-        <section className="page-section about-path snap-stage scroll-enter" aria-labelledby="path-title">
-          <div className="section-inner about-story reveal-content">
-            <div className="about-story-intro">
+        <section className="page-section about-path" aria-labelledby="path-title">
+          <div className="section-inner about-story">
+            <div className="about-story-intro" data-reveal>
               <p className="eyebrow">My path into software</p>
               <h2 id="path-title">From coursework to production software</h2>
 
-              <figure className="kore-team-photo">
+              <figure className="kore-team-photo viewfinder">
                 <ImageTrigger className="kore-team-photo-button" label="Open KORE Wireless team lunch photo" onOpen={(trigger) => openDirectLightbox({ src: koreTeamLunch, alt: 'Quang seated at lunch with members of the KORE Wireless engineering team', caption: 'Team lunch near the end of my software engineering co-op at KORE Wireless' }, trigger)}>
                   <img src={koreTeamLunch} alt="Quang seated at lunch with members of the KORE Wireless engineering team" loading="lazy" />
                 </ImageTrigger>
@@ -234,7 +247,7 @@ function AboutPage() {
                 </figcaption>
               </figure>
             </div>
-            <div className="about-prose">
+            <div className="about-prose" data-reveal style={{ '--reveal-delay': '100ms' }}>
               <p>
                 My first professional software engineering role was at KORE Wireless through
                 RIT’s co-op program. It was my first opportunity to move beyond coursework and
@@ -242,13 +255,13 @@ function AboutPage() {
               </p>
 
               <p>
-                During the co-op, I learned an unfamiliar enterprise codebase and integration 
-                environment while contributing across application code, SQL, integrations, testing, 
+                During the co-op, I learned an unfamiliar enterprise codebase and integration
+                environment while contributing across application code, SQL, integrations, testing,
                 and production issue investigation.
               </p>
 
               <p>
-                That experience changed how I approach my own projects. I became much more interested in 
+                That experience changed how I approach my own projects. I became much more interested in
                 reliability, failure handling, data correctness, and what happens outside the happy path.
               </p>
 
@@ -268,9 +281,9 @@ function AboutPage() {
           </div>
         </section>
 
-        <section id="beyond-software" className="page-section about-beyond snap-stage scroll-enter" aria-labelledby="beyond-title">
-          <div className="section-inner reveal-content">
-            <div className="section-heading"><div><p className="eyebrow">Outside the editor</p><h2 id="beyond-title">Beyond software</h2></div><p>A few of the things I make time for away from work and school.</p></div>
+        <section id="beyond-software" className="page-section about-beyond" aria-labelledby="beyond-title">
+          <div className="section-inner">
+            <div className="section-heading" data-reveal><div><p className="eyebrow">Outside the editor</p><h2 id="beyond-title">Beyond software</h2></div><p>A few of the things I make time for away from work and school.</p></div>
             <div className="interest-grid">
               {interests.map(([Icon, title, copy]) => (
                 <InterestCard
@@ -284,6 +297,7 @@ function AboutPage() {
                   hasNonPhotoContent={interestGalleryKeys[title] === 'music'}
                   onOpen={openGallery}
                   onOpenImage={(image, trigger) => openDirectLightbox({ src: image.src, alt: image.alt, caption: image.caption ?? title }, trigger)}
+                  accessory={title === 'Music' ? <SpotifyDisc className="interest-card-disc" onClick={(event) => openGallery('music', event.currentTarget)} /> : null}
                 />
               ))}
             </div>
@@ -297,20 +311,21 @@ function AboutPage() {
           </div>
         </section>
 
-        <section className="page-section about-values snap-stage scroll-enter" aria-labelledby="values-title">
-          <div className="section-inner reveal-content">
-            <div className="section-heading"><div><p className="eyebrow">How I like to work</p><h2 id="values-title">How I approach engineering</h2></div><p>Three principles I return to when I’m learning, building, and collaborating.</p></div>
-            <div className="values-grid">{values.map(([title, copy], index) => <article className="value-card" key={title}><span>0{index + 1}</span><h3>{title}</h3><p>{copy}</p></article>)}</div>
-            <p className="education-note">
-              I’m currently pursuing an accelerated BS/MS in Computer Science at RIT,
-              with particular interest in systems, databases, algorithms, and the
-              engineering decisions behind dependable software.
-            </p>
+        <section className="page-section about-values" aria-labelledby="values-title">
+          <div className="section-inner">
+            <div className="section-heading" data-reveal><div><p className="eyebrow">How I like to work</p><h2 id="values-title">How I approach engineering</h2></div><p>Three principles I return to when I’m learning, building, and collaborating.</p></div>
+            <ol className="values-grid">{values.map(([title, copy], index) => <li className="value-card" key={title} data-reveal style={{ '--reveal-delay': `${index * 90}ms` }}><span>0{index + 1}</span><h3>{title}</h3><p>{copy}</p></li>)}</ol>
+            <div className="currently" data-reveal>
+              <p className="currently__title">Currently</p>
+              <dl>
+                {currently.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+              </dl>
+            </div>
           </div>
         </section>
 
-        <section className="about-cta snap-stage scroll-enter" aria-labelledby="about-cta-title">
-          <div className="section-inner reveal-content">
+        <section className="about-cta" aria-labelledby="about-cta-title">
+          <div className="section-inner" data-reveal>
             <p className="eyebrow">Selected work</p>
             <h2 id="about-cta-title">Want to see what I’ve been building?</h2>
             <div className="hero-actions">

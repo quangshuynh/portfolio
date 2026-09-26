@@ -1,0 +1,256 @@
+/* About: personal, image-led, more field journal than résumé. */
+
+.about-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(3rem, 8vh, 6rem) 0 clamp(4rem, 9vw, 7rem);
+}
+.about-hero-topo {
+  z-index: -1;
+  -webkit-mask-image: radial-gradient(ellipse 55% 70% at 80% 40%, #000, transparent 75%);
+  mask-image: radial-gradient(ellipse 55% 70% at 80% 40%, #000, transparent 75%);
+}
+.about-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, .85fr);
+  align-items: center;
+  gap: clamp(2.5rem, 7vw, 7rem);
+}
+.about-hero h1 {
+  font-family: var(--font-display);
+  font-size: var(--step-5);
+  line-height: .92;
+  letter-spacing: -.055em;
+}
+.about-location {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  margin: 1.5rem 0 2rem;
+  color: var(--accent);
+  font-weight: 650;
+}
+.about-prose { display: grid; gap: 1.1rem; }
+.about-prose p { max-width: 60ch; color: var(--text-secondary); line-height: 1.75; }
+.about-prose .about-prose__lead {
+  color: var(--text-primary);
+  font-size: var(--step-1);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -.015em;
+}
+.about-hero .hero-actions { margin-top: 2.25rem; }
+
+.about-portrait { margin: 0; justify-self: end; width: min(100%, 26rem); }
+.about-portrait-frame { --vf-inset: -10px; }
+.about-portrait-button {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: #f3efe4;
+  cursor: zoom-in;
+}
+.about-portrait-button img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  transition: transform 900ms var(--ease-out);
+}
+.about-portrait-button:hover img { transform: scale(1.03); }
+.about-portrait-button span {
+  position: absolute;
+  right: .75rem;
+  bottom: .75rem;
+  padding: .45rem .75rem;
+  border-radius: 999px;
+  background: rgba(10, 15, 12, .72);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  font-size: .78rem;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .about-hero-copy > *,
+  .about-portrait {
+    animation: hero-rise 900ms var(--ease-out) both;
+    animation-delay: calc(var(--i, 0) * 90ms + 60ms);
+  }
+}
+
+/* path into software */
+.about-path { border-top: 1px solid var(--border); }
+.about-story {
+  display: grid;
+  grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
+  gap: clamp(2.5rem, 8vw, 8rem);
+  align-items: start;
+}
+.about-story-intro { position: sticky; top: calc(var(--nav-height) + 2rem); }
+.about-story h2,
+.about-cta h2 {
+  font-family: var(--font-display);
+  font-size: var(--step-4);
+  line-height: .98;
+  letter-spacing: -.045em;
+  text-wrap: balance;
+}
+.kore-team-photo { --vf-inset: -8px; width: min(100%, 24rem); margin: 2.5rem 0 0; }
+.kore-team-photo-button,
+.interest-card-media-button {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: zoom-in;
+  text-align: inherit;
+}
+.kore-team-photo img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; object-position: center 78%; transition: transform 900ms var(--ease-out); }
+.kore-team-photo-button:hover img,
+.interest-card-media-button:hover img { transform: scale(1.03); }
+.kore-team-photo figcaption { margin-top: .8rem; color: var(--text-tertiary); font-size: .85rem; line-height: 1.5; }
+.kore-team-photo-button .photography-gallery-zoom-hint,
+.interest-card-media-button .photography-gallery-zoom-hint { opacity: .85; transform: none; }
+
+/* beyond software: the original six-card grid (3 × 2), on the new tokens */
+.about-beyond { background: var(--bg-secondary); }
+.interest-grid {
+  --card-pad: clamp(1.35rem, 3vw, 2rem);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.interest-card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--card-pad);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  transition: border-color var(--dur-base) ease, transform var(--dur-base) var(--ease-out);
+}
+.interest-card:hover { border-color: var(--border-strong); }
+.interest-card-top {
+  position: relative;
+  margin: calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad)) 1.3rem;
+}
+.interest-card-media-button,
+.interest-card-top > .interest-card-media { border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0; }
+.interest-card-media { height: 200px; overflow: hidden; }
+.interest-card-media img { width: 100%; height: 100%; object-fit: cover; transition: transform 700ms var(--ease-out), filter var(--dur-base) ease; }
+.interest-card-media-button:hover img,
+.interest-card-media-button:focus-visible img { transform: scale(1.03); filter: brightness(.94); }
+.interest-card-media-photography img { object-position: center 67%; }
+.interest-card-media-hiking img { object-position: center 70%; }
+.interest-card-media-music img { object-position: center 28%; }
+.interest-card-media-pair { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; }
+.interest-card h3 {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  margin-bottom: .55rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  letter-spacing: -.02em;
+}
+.interest-card h3 svg { flex: 0 0 auto; color: var(--accent); font-size: 1.05rem; }
+.interest-card > p { color: var(--text-secondary); line-height: 1.65; }
+.interest-card a { color: var(--text-primary); text-decoration-color: var(--accent); text-underline-offset: .2em; }
+.interest-view-more {
+  align-self: flex-start;
+  margin-top: auto;
+  padding: 1.1rem 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .3em;
+}
+.interest-view-more:hover { color: var(--accent-strong); }
+
+/* Spotify disc on the Music photo */
+.interest-card-disc {
+  --disc-size: 6.25rem;
+  position: absolute;
+  right: .75rem;
+  bottom: -2.25rem;
+  z-index: 3;
+}
+.interest-card:has(.interest-card-disc) h3 { padding-right: 5.5rem; }
+
+/* principles + currently */
+.values-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.value-card { padding-top: 1.25rem; border-top: 1px solid var(--border-strong); }
+.value-card > span {
+  display: block;
+  color: transparent;
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 5vw, 4.5rem);
+  line-height: .9;
+  letter-spacing: -.04em;
+  -webkit-text-stroke: 1px var(--accent);
+}
+.value-card h3 { margin-top: 1.25rem; font-family: var(--font-display); font-size: var(--step-1); letter-spacing: -.02em; }
+.value-card p { margin-top: .6rem; color: var(--text-secondary); line-height: 1.65; }
+
+.currently {
+  display: grid;
+  grid-template-columns: 10rem minmax(0, 1fr);
+  gap: 1.5rem;
+  margin-top: clamp(3.5rem, 7vw, 5.5rem);
+  padding: 1.5rem clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.currently__title { color: var(--accent); font-size: .76rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.currently dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; margin: 0; }
+.currently dt { color: var(--text-tertiary); font-family: var(--font-mono); font-size: .625rem; letter-spacing: .08em; text-transform: uppercase; }
+.currently dd { margin: .35rem 0 0; color: var(--text-primary); font-size: .95rem; line-height: 1.5; }
+
+.about-cta {
+  position: relative;
+  padding: var(--section-pad) 0;
+  border-top: 1px solid var(--border);
+}
+.about-cta h2 { max-width: 16ch; }
+.about-cta .hero-actions { margin-top: 2rem; }
+
+
+@media (max-width: 1080px) {
+  .about-hero-grid { grid-template-columns: 1fr; }
+  .about-portrait { justify-self: start; width: min(100%, 22rem); }
+  .about-story { grid-template-columns: 1fr; }
+  .about-story-intro { position: static; }
+  .interest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .currently { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px) {
+  .interest-grid { grid-template-columns: 1fr; }
+  .interest-card-media { height: 210px; }
+  .values-grid { grid-template-columns: 1fr; }
+  .currently dl { grid-template-columns: 1fr; gap: 1rem; }
+}

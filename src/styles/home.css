@@ -1,0 +1,191 @@
+/* Homepage hero: full-screen opening, headline + restored Meet Quang card, framed 3D desk. */
+
+/* ============ HERO ============ */
+/* A deliberate full-screen opening: the hero fills the first viewport below
+   the expanded header, with content sitting a little below centre. */
+.hero {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  align-content: center;
+  min-height: calc(100svh - var(--nav-footprint));
+  padding-top: clamp(1.5rem, 5vh, 4rem);
+  padding-bottom: clamp(3.5rem, 9vh, 6.5rem);
+  overflow: hidden;
+  background: linear-gradient(to bottom, var(--bg-primary) 0%, var(--bg-primary) 40%, var(--sky-haze) 100%);
+}
+.hero-topo {
+  z-index: -1;
+  -webkit-mask-image: radial-gradient(ellipse 60% 70% at 78% 40%, #000 0%, rgba(0, 0, 0, .55) 45%, transparent 78%);
+  mask-image: radial-gradient(ellipse 60% 70% at 78% 40%, #000 0%, rgba(0, 0, 0, .55) 45%, transparent 78%);
+}
+.hero-ridge { z-index: -1; height: clamp(60px, 8vw, 130px); }
+
+.hero-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(2.5rem, 5vw, 5.5rem);
+}
+
+.hero-copy { min-width: 0; }
+.hero-intro {
+  display: flex;
+  align-items: center;
+  gap: .35em;
+  margin-bottom: .75rem;
+  color: var(--text-secondary);
+  font-size: clamp(1.1rem, 1rem + .5vw, 1.35rem);
+  font-weight: 650;
+  letter-spacing: -.01em;
+}
+.wave-trigger {
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.25em;
+}
+.wave-trigger:hover { background: var(--accent-soft); }
+.wave { display: inline-block; transform-origin: 70% 70%; }
+.wave-trigger:hover .wave,
+.wave-trigger:focus-visible .wave,
+.wave.is-waving { animation: wave-animation 2.1s ease-in-out; }
+@keyframes wave-animation {
+  0% { transform: rotate(0deg); }
+  10% { transform: rotate(14deg); }
+  20% { transform: rotate(-8deg); }
+  30% { transform: rotate(14deg); }
+  40% { transform: rotate(-4deg); }
+  50% { transform: rotate(10deg); }
+  60%, 100% { transform: rotate(0deg); }
+}
+
+.hero h1 {
+  max-width: 17ch;
+  font-family: var(--font-display);
+  font-size: clamp(2.35rem, 1.3rem + 2.8vw, 3.95rem);
+  line-height: 1.02;
+  letter-spacing: -.042em;
+  text-wrap: balance;
+}
+.hero-lede {
+  max-width: 54ch;
+  margin-top: 1.4rem;
+  color: var(--text-secondary);
+  font-size: var(--step-0);
+  line-height: 1.65;
+}
+.hero-actions { margin-top: 2rem; }
+
+/* Meet Quang: the original horizontal card, on the new tokens. */
+.meet-quang-card {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .9rem;
+  width: min(100%, 22rem);
+  min-height: 4.75rem;
+  margin-top: 1.75rem;
+  padding: .55rem 1rem .55rem .6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  text-decoration: none;
+  box-shadow: var(--shadow-soft);
+  transition: transform var(--dur-fast) ease, border-color var(--dur-fast) ease, background var(--dur-fast) ease;
+}
+.meet-quang-card:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--surface) 82%, var(--accent-soft));
+  transform: translateY(-2px);
+}
+.meet-quang-card__photo {
+  width: 3.5rem;
+  height: 3.5rem;
+  object-fit: cover;
+  border: 2px solid var(--accent);
+  border-radius: .65rem;
+}
+.meet-quang-card__copy { display: grid; min-width: 0; gap: .15rem; }
+.meet-quang-card__copy strong { font-family: var(--font-display); font-size: 1rem; line-height: 1.1; }
+.meet-quang-card__copy > span { overflow: hidden; color: var(--text-secondary); font-size: .82rem; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.meet-quang-card__arrow { color: var(--accent); font-size: .85rem; transition: transform var(--dur-fast) ease; }
+.meet-quang-card:hover .meet-quang-card__arrow { transform: translateX(3px); }
+
+/* The desk, framed; only the interaction hint remains. */
+.hero-bench { position: relative; margin: 0; }
+.hero-bench__frame {
+  --vf-inset: -9px;
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 55%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%),
+    linear-gradient(to bottom, var(--surface), var(--bg-secondary));
+  box-shadow: var(--shadow-lift);
+}
+.hero-bench .hero-desk { padding: 1.75rem .5rem 2.5rem; }
+.hero-bench__hint {
+  position: absolute;
+  right: 1rem;
+  bottom: .85rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  color: var(--text-tertiary);
+  font-size: .78rem;
+  font-weight: 550;
+  letter-spacing: .02em;
+  pointer-events: none;
+}
+.hero-bench__hint svg { color: var(--accent); }
+
+/* Entrance choreography: copy rises in sequence, bench settles after. */
+@media (prefers-reduced-motion: no-preference) {
+  .hero-copy > *,
+  .hero-bench {
+    animation: hero-rise 900ms var(--ease-out) both;
+    animation-delay: calc(var(--i, 0) * 85ms + 80ms);
+  }
+  .hero-bench { animation-name: hero-settle; animation-duration: 1200ms; }
+  .hero h1 { animation-name: hero-mask; animation-duration: 1100ms; }
+}
+@keyframes hero-rise {
+  from { opacity: 0; transform: translate3d(0, 18px, 0); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes hero-mask {
+  from { transform: translate3d(0, 22px, 0); }
+  to { transform: none; }
+}
+@keyframes hero-settle {
+  from { opacity: 0; transform: translate3d(0, 28px, 0) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ============ responsive ============ */
+@media (max-width: 1080px) {
+  .hero { min-height: 0; align-content: start; padding-top: 2.5rem; }
+  .hero-inner { grid-template-columns: 1fr; }
+  .hero h1 { max-width: 20ch; }
+  .hero-bench { max-width: 44rem; width: 100%; }
+}
+
+@media (max-width: 620px) {
+  .hero { padding-top: 1.75rem; padding-bottom: 4rem; }
+  .hero h1 { font-size: clamp(2.15rem, 10.5vw, 3rem); }
+  .hero-intro { font-size: 1.1rem; }
+  .hero-actions .button,
+  .hero-actions .personality-button { flex: 1 1 auto; }
+  .meet-quang-card { width: 100%; }
+  .hero-inner { gap: 2rem; }
+  .hero-bench .hero-desk { padding: 1rem .25rem 2.25rem; }
+}

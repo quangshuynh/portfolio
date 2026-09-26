@@ -4,44 +4,10 @@ import { FaSearchPlus, FaTimes } from 'react-icons/fa';
 import useOverlayLock from '../utilities/overlayLock';
 import PhotoLightbox from '../ui/photoLightbox';
 import { navigate, photographyHref } from '../../util/navigation';
-
-const SPOTIFY_ENDPOINT = 'https://spotify-portfolio-api.quangs.workers.dev/recent';
-const SPOTIFY_PROFILE = 'https://open.spotify.com/user/foahrtqqvuuvt7wscxub4uerd';
-const SPOTIFY_CACHE_TTL = 5 * 60 * 1000;
-let spotifyTracksCache = null;
-let spotifyTracksCachedAt = null;
-let spotifyRequest = null;
-
-function getFreshSpotifyTracksCache() {
-  if (spotifyTracksCache === null || spotifyTracksCachedAt === null) return null;
-  return Date.now() - spotifyTracksCachedAt < SPOTIFY_CACHE_TTL
-    ? spotifyTracksCache
-    : null;
-}
-
-function getSpotifyTracks() {
-  const cachedTracks = getFreshSpotifyTracksCache();
-  if (cachedTracks) return Promise.resolve(cachedTracks);
-  if (!spotifyRequest) {
-    spotifyRequest = fetch(SPOTIFY_ENDPOINT)
-      .then((response) => {
-        if (!response.ok) throw new Error('Spotify request failed');
-        return response.json();
-      })
-      .then((data) => {
-        spotifyTracksCache = data.tracks ?? [];
-        spotifyTracksCachedAt = Date.now();
-        return spotifyTracksCache;
-      })
-      .finally(() => { spotifyRequest = null; });
-  }
-  return spotifyRequest;
-}
+import { clearSpotifyCache, getFreshSpotifyTracksCache, getSpotifyTracks, SPOTIFY_PROFILE } from '../../util/spotify';
 
 export function resetSpotifyCacheForTests() {
-  spotifyTracksCache = null;
-  spotifyTracksCachedAt = null;
-  spotifyRequest = null;
+  clearSpotifyCache();
 }
 
 const galleryMetadata = {
@@ -95,7 +61,7 @@ export function ImageTrigger({ children, className, label, onOpen }) {
   );
 }
 
-export function InterestCard({ icon: Icon, title, copy, photos, gallery, galleryItems, hasNonPhotoContent = false, onOpen, onOpenImage }) {
+export function InterestCard({ icon: Icon, title, copy, photos, gallery, galleryItems, hasNonPhotoContent = false, onOpen, onOpenImage, accessory = null }) {
   const visibleSources = new Set((photos ?? []).map(({ src }) => src));
   const hasAdditionalContent = hasNonPhotoContent || Boolean(
     gallery && galleryItems?.some(({ src }) => !visibleSources.has(src))
@@ -108,10 +74,13 @@ export function InterestCard({ icon: Icon, title, copy, photos, gallery, gallery
   );
 
   return (
-    <article className="interest-card">
-      {featuredImage
-        ? <ImageTrigger className="interest-card-media-button" label={`Open featured ${title} image`} onOpen={(trigger) => onOpenImage(featuredImage, trigger)}>{media}</ImageTrigger>
-        : media}
+    <article className="interest-card" data-reveal>
+      <div className="interest-card-top">
+        {featuredImage
+          ? <ImageTrigger className="interest-card-media-button" label={`Open featured ${title} image`} onOpen={(trigger) => onOpenImage(featuredImage, trigger)}>{media}</ImageTrigger>
+          : media}
+        {accessory}
+      </div>
       <h3><Icon aria-hidden="true" />{title}</h3>
       <p>{copy}</p>
       {hasAdditionalContent && (
@@ -195,9 +164,7 @@ export function SpotifyListening() {
   }, [requestAttempt]);
 
   const retry = () => {
-    spotifyTracksCache = null;
-    spotifyTracksCachedAt = null;
-    spotifyRequest = null;
+    clearSpotifyCache();
 
     setStatus('loading');
     setRequestAttempt((attempt) => attempt + 1);

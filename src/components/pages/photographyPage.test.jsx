@@ -75,7 +75,7 @@ test('renders every curated photograph exactly once with its caption and target'
   expect(nav.querySelector('.brand-cat img')).toBeInTheDocument();
   expect(nav.querySelector('.photography-brand-camera')).toHaveAttribute('aria-hidden', 'true');
   expect(within(nav).getByRole('link', { name: 'Portfolio' })).toHaveAttribute('href', '/');
-  expect(within(nav).getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about');
+  expect(within(nav).getByRole('link', { name: 'About' })).toHaveAttribute('href', '/#about');
   expect(within(nav).queryByRole('link', { name: 'Projects' })).not.toBeInTheDocument();
   expect(within(nav).queryByRole('link', { name: 'Contact' })).not.toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'More about me' })).not.toBeInTheDocument();

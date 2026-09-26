@@ -1,10 +1,13 @@
 import React from 'react';
 
+// Regrouped from the existing toolkit by discipline; no new skills are claimed.
 const groups = [
-  ['Languages', 'Python · Swift · TypeScript · JavaScript · C# · Java · SQL · C'],
-  ['Frameworks & platforms', 'FastAPI · SwiftUI · React · Next.js · .NET/WPF · SQLAlchemy · pandas'],
-  ['Data', 'PostgreSQL · SQL Server · SwiftData · Firebase'],
-  ['Tools & practices', 'Git · Docker · GitHub Actions · pytest · Ruff · Linux · REST APIs · Boomi'],
+  { title: 'Backend', note: 'APIs, services, persistence', items: ['FastAPI', 'SQLAlchemy', 'REST APIs'] },
+  { title: 'Native', note: 'Apple platforms & desktop', items: ['SwiftUI', 'SwiftData', '.NET / WPF'] },
+  { title: 'Frontend', note: 'Web delivery', items: ['React', 'Next.js'] },
+  { title: 'Data', note: 'Storage & analysis', items: ['PostgreSQL', 'SQL Server', 'Firebase', 'pandas'] },
+  { title: 'Infrastructure & tooling', note: 'Shipping and keeping it working', items: ['Git', 'Docker', 'GitHub Actions', 'Linux', 'pytest', 'Ruff', 'Boomi'] },
+  { title: 'Languages', note: 'Day to day', items: ['Python', 'Swift', 'TypeScript', 'JavaScript', 'C#', 'Java', 'SQL', 'C'] },
 ];
 
 /**
@@ -13,18 +16,31 @@ const groups = [
  */
 function TechStack() {
   return (
-    <section className="page-section snap-stage scroll-enter" id="skills" aria-labelledby="skills-title">
-      <div className="section-inner reveal-content">
-        <div className="section-heading">
+    <section className="page-section section-skills" id="skills" aria-labelledby="skills-title">
+      <div className="section-inner">
+        <div className="section-heading" data-reveal>
           <div><p className="eyebrow">Engineering toolkit</p><h2 id="skills-title">Skills</h2></div>
           <p>
             A focused toolkit spanning backend systems, developer tools, data workflows,
             native applications, automation, and frontend delivery.
           </p>
         </div>
-        <div className="skills-grid">
-          {groups.map(([title, items]) => <div className="skill-group" key={title}><h3>{title}</h3><p>{items}</p></div>)}
-        </div>
+        <dl className="skills-grid spec-sheet">
+          {groups.map(({ title, note, items }, index) => (
+            <div className="skill-group" key={title} data-reveal style={{ '--reveal-delay': `${(index % 3) * 60}ms` }}>
+              <dt>
+                <span className="skill-group__index mono" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+                <span className="skill-group__title">{title}</span>
+                <span className="skill-group__note">{note}</span>
+              </dt>
+              <dd>
+                <ul aria-label={`${title} skills`}>
+                  {items.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </dd>
+            </div>
+          ))}
+        </dl>
       </div>
     </section>
   );

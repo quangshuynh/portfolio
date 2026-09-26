@@ -1,28 +1,50 @@
 import { useEffect } from 'react';
 
+const SELECTOR = '[data-reveal]';
+
+/**
+ * Reveals `[data-reveal]` elements once as they enter the viewport. Content is
+ * visible by default; hiding only starts once this effect runs, and elements
+ * added later (expanded project lists, lazy routes) are observed too.
+ */
 export default function RevealAnimations() {
   useEffect(() => {
-    const stops = Array.from(document.querySelectorAll('.scroll-enter'));
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-
     if (reducedMotion || !('IntersectionObserver' in window)) {
-      stops.forEach((stop) => stop.classList.add('is-visible'));
+      document.querySelectorAll(SELECTOR).forEach((element) => element.classList.add('is-visible'));
       return undefined;
     }
 
-    document.documentElement.classList.add('reveal-ready');
+    const root = document.documentElement;
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (!entry.isIntersecting) return;
         entry.target.classList.add('is-visible');
         observer.unobserve(entry.target);
       });
-    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+    }, { threshold: 0.08, rootMargin: '0px 0px -6% 0px' });
 
-    stops.forEach((stop) => observer.observe(stop));
+    const observeAll = (scope) => {
+      if (scope.matches?.(SELECTOR) && !scope.classList.contains('is-visible')) observer.observe(scope);
+      scope.querySelectorAll?.(SELECTOR).forEach((element) => {
+        if (!element.classList.contains('is-visible')) observer.observe(element);
+      });
+    };
+
+    observeAll(document.body);
+    root.classList.add('reveal-ready');
+
+    const mutations = typeof MutationObserver === 'function'
+      ? new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach((node) => {
+        if (node.nodeType === 1) observeAll(node);
+      })))
+      : null;
+    mutations?.observe(document.body, { childList: true, subtree: true });
+
     return () => {
       observer.disconnect();
-      document.documentElement.classList.remove('reveal-ready');
+      mutations?.disconnect();
+      root.classList.remove('reveal-ready');
     };
   }, []);
 

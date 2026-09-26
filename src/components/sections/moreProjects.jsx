@@ -166,36 +166,41 @@ function MoreProjects() {
   };
 
   return (
-    <section className="page-section snap-stage scroll-enter" id="more-projects" aria-labelledby="more-projects-title">
-      <div className="section-inner reveal-content">
-        <div className="section-heading">
+    <section className="page-section section-ledger" id="more-projects" aria-labelledby="more-projects-title">
+      <div className="section-inner">
+        <div className="section-heading" data-reveal>
           <div><p className="eyebrow">Additional work</p><h2 id="more-projects-title">More projects</h2></div>
           <p>Additional projects spanning system design, developer tooling, automation, native applications, and product engineering.</p>
         </div>
-        <div className="more-grid" id="more-projects-grid">
-          {visibleProjects.map((project) => (
-            <article className={`more-card${project.logo ? ' has-logo' : ''}`} key={project.name}>
-              {project.logo && (
-                <img
-                  className={`more-card-logo ${
-                    project.name === 'Repo Radar' ? 'repo-radar-logo' : ''
-                  }`}
-                  src={project.logo}
-                  alt={`${project.name} project logo`}
-                  loading="lazy"
-                  decoding="async"
-                />
-              )}
-              <h3>{project.name}</h3>
-              <p>{project.description}</p>
-              {project.image && <HomeImageTrigger src={project.image} imageClassName="more-card-preview" alt={project.imageAlt} caption={`${project.name} project preview`} />}
-              <p className="more-highlight">{project.highlight}</p>
-              <ul className="tag-list" aria-label={`${project.name} technologies`}>
-                {project.technologies.map((item) => <li key={item}>{item}</li>)}
-              </ul>
-              <div className="more-links">
-                {project.github && <a className="text-link" href={project.github} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} repository`}>Repository <FaGithub aria-hidden="true" /></a>}
-                {project.live && <a className="text-link" href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} ${project.liveLabel ? project.liveLabel.toLowerCase() : 'live demo'}`}>{project.liveLabel || 'Live demo'} <FaExternalLinkAlt aria-hidden="true" /></a>}
+        <div className="more-grid ledger" id="more-projects-grid">
+          {visibleProjects.map((project, index) => (
+            <article className={`more-card ledger-row${project.logo ? ' has-logo' : ''}`} key={project.name} data-reveal style={{ '--reveal-delay': `${(index % 3) * 70}ms` }}>
+              <div className="ledger-row__id">
+                <span className="ledger-row__index mono" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+                {project.logo && (
+                  <img
+                    className={`more-card-logo${project.name === 'Repo Radar' ? ' repo-radar-logo' : ''}`}
+                    src={project.logo}
+                    alt={`${project.name} project logo`}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )}
+              </div>
+              <div className="ledger-row__main">
+                <h3>{project.name}</h3>
+                <p>{project.description}</p>
+                <p className="more-highlight">{project.highlight}</p>
+              </div>
+              <div className="ledger-row__side">
+                {project.image && <HomeImageTrigger src={project.image} imageClassName="more-card-preview" alt={project.imageAlt} caption={`${project.name} project preview`} />}
+                <ul className="tag-list" aria-label={`${project.name} technologies`}>
+                  {project.technologies.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+                <div className="more-links">
+                  {project.github && <a className="text-link" href={project.github} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} repository`}>Repository <FaGithub aria-hidden="true" /></a>}
+                  {project.live && <a className="text-link" href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} ${project.liveLabel ? project.liveLabel.toLowerCase() : 'live demo'}`}>{project.liveLabel || 'Live demo'} <FaExternalLinkAlt aria-hidden="true" /></a>}
+                </div>
               </div>
             </article>
           ))}

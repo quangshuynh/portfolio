@@ -12,8 +12,17 @@
         }
       }());
     </script>
+    <script>
+      // Apply the saved theme before first paint to avoid a light/dark flash.
+      (function () {
+        var theme = 'dark';
+        try { theme = localStorage.getItem('portfolio-theme') || 'dark'; } catch (error) {}
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.backgroundColor = theme === 'light' ? '#f1ede3' : '#101913';
+      }());
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0e1512" />
+    <meta name="theme-color" content="#101913" />
     <meta name="description" content="Software developer building production web applications, backend systems, developer tools, automation, and native applications." />
     <meta name="author" content="Quang Huynh" />
     <link rel="icon" href="%BASE_URL%favicon.ico" />
