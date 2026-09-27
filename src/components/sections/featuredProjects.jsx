@@ -186,14 +186,14 @@ function ScribeKitGallery() {
             />
           )}
 
-          {slide === 'mic' && (
+          {slide === 'audio' && (
             <HomeImageTrigger
               src={scribeKitAudioCapture}
               imageClassName="project-result-image vertical-project-shot"
               alt="ScribeKit audio capture page"
               caption="ScribeKit audio capture"
               gallery={scribeKitGallery}
-              galleryIndex={1}
+              galleryIndex={2}
             />
           )}
 
@@ -204,7 +204,7 @@ function ScribeKitGallery() {
               alt="ScribeKit history and find features"
               caption="ScribeKit history and find"
               gallery={scribeKitGallery}
-              galleryIndex={2}
+              galleryIndex={3}
             />
           )}
 
@@ -215,14 +215,14 @@ function ScribeKitGallery() {
               alt="ScribeKit review features"
               caption="ScribeKit review"
               gallery={scribeKitGallery}
-              galleryIndex={3}
+              galleryIndex={4}
             />
           )}
         </div>
       <div className="gallery-controls" aria-label="ScribeKit gallery">
         <button type="button" aria-pressed={slide === 'logo'} onClick={() => setSlide('logo')}>Logo</button>
         <button type="button" aria-pressed={slide === 'app'} onClick={() => setSlide('app')}>App</button>
-        <button type="button" aria-pressed={slide === 'mic'} onClick={() => setSlide('mic')}>Audio</button>
+        <button type="button" aria-pressed={slide === 'audio'} onClick={() => setSlide('audio')}>Audio</button>
         <button type="button" aria-pressed={slide === 'find'} onClick={() => setSlide('find')}>Find</button>
         <button type="button" aria-pressed={slide === 'review'} onClick={() => setSlide('review')}>Review</button>
       </div>
