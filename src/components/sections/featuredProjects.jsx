@@ -34,7 +34,7 @@ const projects = [
     highlights: [
       'Fails fast on structural dataset errors while quarantining invalid rows with explainable validation_errors',
       'Calculates payments, refunds, and signed adjustments with Decimal-based cent precision',
-      'Uses transactional PostgreSQL primary-key upserts, rollback handling, and FastAPI reporting endpoints',
+      'Persists validated records with transactional PostgreSQL upserts and rollback handling, while exposing reconciliation results through FastAPI',
       'Covers validation, reconciliation, database, API, and end-to-end behavior with 52 pytest tests',
     ],
     stack: 'Python · FastAPI · PostgreSQL · SQLAlchemy · pandas · Docker · pytest · GitHub Actions',
@@ -44,12 +44,14 @@ const projects = [
   {
     name: 'GitProfileLens',
     label: 'Developer tooling · GitHub APIs & authenticated data',
-    purpose: 'Audits GitHub profiles and repositories using explainable scoring to identify presentation and discoverability improvements without claiming to measure developer ability.',
+    purpose:
+      'Audits GitHub profiles and repositories with transparent, deterministic rules to improve portfolio presentation, discoverability, and project selection without claiming to measure developer ability.',
+
     highlights: [
-      'Analyzes public repository metadata with GitHub REST/GraphQL APIs and deterministic category scoring',
-      'Supports authorized private repositories through a read-only GitHub App with encrypted session material and isolated caching',
-      'Separates private data from public/shareable audit output while handling repository pagination, filtering, and authenticated metadata',
-      'Validates scoring and recommendations against an evaluation corpus of 13 representative profiles and 185 repositories, with regression baselines designed to expose unintended behavior changes',
+      'Analyzes public repository metadata with GitHub REST/GraphQL APIs using deterministic presentation scoring, portfolio candidacy, and pinned-repository recommendations',
+      'Supports authorized private repositories through a read-only GitHub App with encrypted session material and strict public/private output boundaries',
+      'Adds contribution discovery and follower/following analysis while withholding conclusions when GitHub data is incomplete or ambiguous',
+      'Validates scoring and recommendations against a representative evaluation corpus with regression baselines designed to expose unintended behavior changes',
     ],
     stack: 'JavaScript · Node.js · GitHub REST/GraphQL APIs · Vercel · Playwright',
     github: 'https://github.com/quangshuynh/gitprofilelens',
@@ -59,12 +61,14 @@ const projects = [
   {
     name: 'ScribeKit',
     label: 'Native macOS · Audio, transcription & reliability',
-    purpose: 'Native macOS meeting transcription that captures audio from selected applications, transcribes it on-device with Apple speech frameworks, and durably writes timestamped Markdown.',
+    purpose:
+      'Native macOS meeting transcription that captures selected application audio or a chosen microphone, transcribes it on-device with Apple speech frameworks, and durably writes timestamped Markdown.',
+
     highlights: [
-      'Captures only user-selected application audio through ScreenCaptureKit rather than recording all system audio or the microphone',
+      'Captures either user-selected application audio through ScreenCaptureKit or a chosen microphone, with one source per meeting and optional local audio retention',
       'Uses Apple’s on-device SpeechAnalyzer and SpeechTranscriber stack with no network fallback',
-      'Preserves finalized speech during recording with pause/resume, background operation, interruption handling, and crash recovery',
-      'Validated with 703 automated tests, fault injection, a real 60-minute capture soak, and manual keyboard and VoiceOver release testing',
+      'Preserves finalized speech with pause/resume, background operation, interruption handling, crash recovery, history search, and uncertainty review',
+      'Validated with extensive automated testing, fault injection, long-duration capture testing, and manual keyboard and VoiceOver release checks',
     ],
     stack: 'Swift · SwiftUI · ScreenCaptureKit · Speech · AVFoundation · macOS · Swift Testing',
     github: 'https://github.com/quangshuynh/scribekit',

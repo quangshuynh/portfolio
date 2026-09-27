@@ -39,7 +39,7 @@ const projects = [
   {
     name: 'Repo Radar',
     description:
-      'Personalized GitHub discovery tool that recommends relevant repositories and open-source contribution opportunities using preference signals, feedback, and discovery history.',
+      'Personalized GitHub discovery tool for finding relevant repositories and open-source contribution opportunities from developer interests, feedback, and discovery history.',
     highlight:
       'Uses deterministic, explainable ranking to balance relevance, quality, activity, novelty, and diversity, with bounded GitHub issue discovery and reproducible offline evaluation.',
     technologies: ['Python', 'FastAPI', 'GitHub API', 'Recommendation Systems'],
@@ -52,7 +52,7 @@ const projects = [
     description:
       'Chess game review app that analyzes PGNs with Stockfish and explains move quality through engine-backed classifications and evaluations.',
     highlight:
-      'Runs Stockfish in a Web Worker with cancellable MultiPV analysis, mover-relative evaluation, deterministic move classification, and calibration/regression testing across curated chess positions.',
+      'Runs Stockfish in a Web Worker with cancellable MultiPV analysis, mover-relative evaluation, explainable move classifications, and regression testing across curated chess positions.',
     technologies: ['Next.js', 'TypeScript', 'Stockfish', 'Web Workers'],
     github: 'https://github.com/quangshuynh/chessed',
     logo: chessedLogo,
@@ -60,9 +60,9 @@ const projects = [
   {
     name: 'DashPilot',
     description:
-      'Local-first iOS companion for delivery drivers that records mileage, delivery activity, pickup waits, earnings, and shift performance.',
+      'Local-first iOS companion for delivery drivers that records shifts, deliveries, routes, earnings, expenses, and performance without relying on delivery-platform integrations.',
     highlight:
-      'Built with background Core Location capture, SwiftData migrations, pause-aware mileage and working-time metrics, stacked delivery lifecycles, App Intents, and a Live Activity with Lock Screen and Dynamic Island controls.',
+        'Models pause-aware shifts, stacked delivery lifecycles, route gaps, recorded mileage, corrections, profitability, Live Activities, App Intents, and local exports while keeping recorded facts separate from estimates.',
     technologies: ['Swift', 'SwiftUI', 'SwiftData', 'Core Location', 'ActivityKit'],
     github: 'https://github.com/quangshuynh/dashpilot',
     logo: dashPilotLogo,
