@@ -305,13 +305,19 @@ expect(
 
     fireEvent.click(
       scribeKitGallery.getByRole('button', {
-        name: 'Transcript',
+        name: 'Mic',
       })
     );
 
     expect(
+      scribeKitGallery.getByRole('button', {
+        name: 'Mic',
+      })
+    ).toHaveAttribute('aria-pressed', 'true');
+
+    expect(
       screen.getByRole('img', {
-        name: 'ScribeKit timestamped Markdown transcript output',
+        name: 'ScribeKit microphone selection and audio capture features',
       })
     ).toBeInTheDocument();
   });
