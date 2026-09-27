@@ -4,8 +4,10 @@ import dashboardImage from '../../assets/business-data-dashboard.png';
 import gitProfileLensLogo from '../../assets/logos/gitprofilelens-logo.png';
 import gitProfileLensResults from '../../assets/gitprofilelens-results-vert.png';
 import scribeKitLogo from '../../assets/logos/scribekit-logo.png';
-import scribeKitApp from '../../assets/scribekit-app.png';
-import scribeKitTranscript from '../../assets/scribekit-md.png';
+import scribeKitApp from '../../assets/scribekit-app2.png';
+import scribeKitHistoryFind from '../../assets/scribekit-historyfind.png';
+import scribeKitHistoryReview from '../../assets/scribekit-historyreview.png';
+import scribeKitMic from '../../assets/scribekit-mic.png';
 import dashcamStorefront from '../../assets/585dashcam585-storefront.png';
 import PersonalityButton from '../ui/personalityButton';
 import { HomeImageTrigger } from '../utilities/homeLightbox';
@@ -129,20 +131,96 @@ function GitProfileLensVisual() {
  * renders the ScribeKit image gallery
  * :returns: ScribeKit gallery markup
  */
+const scribeKitGallery = [
+  {
+    src: scribeKitApp,
+    alt: 'ScribeKit macOS meeting window showing selected application audio, on-device transcription status, and a live transcript',
+    caption: 'ScribeKit macOS meeting window',
+  },
+  {
+    src: scribeKitMic,
+    alt: 'ScribeKit microphone selection and audio capture features',
+    caption: 'ScribeKit microphone selection and audio capture',
+  },
+  {
+    src: scribeKitHistoryFind,
+    alt: 'ScribeKit history and find features',
+    caption: 'ScribeKit history and find',
+  },
+  {
+    src: scribeKitHistoryReview,
+    alt: 'ScribeKit review features',
+    caption: 'ScribeKit review',
+  },
+];
+
 function ScribeKitGallery() {
   const [slide, setSlide] = useState('logo');
 
   return (
     <div className="project-visual gallery">
       <div className="gallery-stage">
-        {slide === 'logo' && <img src={scribeKitLogo} width="788" height="737" alt="ScribeKit app logo" loading="lazy" decoding="async" />}
-        {slide === 'app' && <HomeImageTrigger src={scribeKitApp} imageClassName="project-result-image vertical-project-shot" alt="ScribeKit macOS meeting window showing selected application audio, on-device transcription status, and a live transcript" caption="ScribeKit macOS meeting window" />}
-        {slide === 'transcript' && <HomeImageTrigger src={scribeKitTranscript} imageClassName="project-result-image vertical-project-shot" alt="ScribeKit timestamped Markdown transcript output" caption="ScribeKit timestamped Markdown transcript" />}
-      </div>
+          {slide === 'logo' && (
+            <img
+              src={scribeKitLogo}
+              width="788"
+              height="737"
+              alt="ScribeKit app logo"
+              loading="lazy"
+              decoding="async"
+            />
+          )}
+
+          {slide === 'app' && (
+            <HomeImageTrigger
+              src={scribeKitApp}
+              imageClassName="project-result-image vertical-project-shot"
+              alt="ScribeKit macOS meeting window showing selected application audio, on-device transcription status, and a live transcript"
+              caption="ScribeKit macOS meeting window"
+              gallery={scribeKitGallery}
+              galleryIndex={0}
+            />
+          )}
+
+          {slide === 'mic' && (
+            <HomeImageTrigger
+              src={scribeKitMic}
+              imageClassName="project-result-image vertical-project-shot"
+              alt="ScribeKit microphone selection and audio capture features"
+              caption="ScribeKit microphone selection and audio capture"
+              gallery={scribeKitGallery}
+              galleryIndex={1}
+            />
+          )}
+
+          {slide === 'find' && (
+            <HomeImageTrigger
+              src={scribeKitHistoryFind}
+              imageClassName="project-result-image vertical-project-shot"
+              alt="ScribeKit history and find features"
+              caption="ScribeKit history and find"
+              gallery={scribeKitGallery}
+              galleryIndex={2}
+            />
+          )}
+
+          {slide === 'review' && (
+            <HomeImageTrigger
+              src={scribeKitHistoryReview}
+              imageClassName="project-result-image vertical-project-shot"
+              alt="ScribeKit review features"
+              caption="ScribeKit review"
+              gallery={scribeKitGallery}
+              galleryIndex={3}
+            />
+          )}
+        </div>
       <div className="gallery-controls" aria-label="ScribeKit gallery">
         <button type="button" aria-pressed={slide === 'logo'} onClick={() => setSlide('logo')}>Logo</button>
         <button type="button" aria-pressed={slide === 'app'} onClick={() => setSlide('app')}>App</button>
-        <button type="button" aria-pressed={slide === 'transcript'} onClick={() => setSlide('transcript')}>Transcript</button>
+        <button type="button" aria-pressed={slide === 'mic'} onClick={() => setSlide('mic')}>Mic</button>
+        <button type="button" aria-pressed={slide === 'find'} onClick={() => setSlide('find')}>Find</button>
+        <button type="button" aria-pressed={slide === 'review'} onClick={() => setSlide('review')}>Review</button>
       </div>
     </div>
   );

@@ -457,6 +457,72 @@
   pointer-events: none;
 }
 
+.photo-lightbox-nav {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+
+  padding: 0;
+
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 50%;
+
+  background: rgba(18, 24, 21, .82);
+  color: #f5f7f6;
+
+  cursor: pointer;
+
+  font: inherit;
+  font-size: 2rem;
+  line-height: 1;
+
+  transform: translateY(-50%);
+
+  backdrop-filter: blur(10px);
+
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.photo-lightbox-nav:hover {
+  border-color: rgba(255, 255, 255, .35);
+  background: rgba(255, 255, 255, .16);
+}
+
+.photo-lightbox-nav:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.photo-lightbox-nav--previous {
+  left: .75rem;
+}
+
+.photo-lightbox-nav--next {
+  right: .75rem;
+}
+
+.photo-lightbox-counter {
+  margin: 0 auto;
+
+  color: #9ba8a1;
+
+  text-align: center;
+
+  font-size: .72rem;
+  font-weight: 700;
+  line-height: 1.4;
+
+  font-variant-numeric: tabular-nums;
+}
+
 .photo-lightbox-caption {
   margin: 0 auto;
 
@@ -482,7 +548,19 @@
   line-height: 1.4;
 }
 
+.photo-lightbox-help--mobile {
+  display: none;
+}
 
+@media (hover: none) and (pointer: coarse) {
+  .photo-lightbox-help--desktop {
+    display: none;
+  }
+
+  .photo-lightbox-help--mobile {
+    display: inline;
+  }
+}
 /* Phones and short landscape screens: contain the photo inside the stage row (the
    fixed 82dvh cap could exceed it and clip) and keep controls clear of safe areas. */
 @media (max-width: 820px), (max-height: 500px) and (orientation: landscape) {
@@ -490,6 +568,9 @@
   .photo-lightbox-stage { grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
   .photo-lightbox-stage img { max-width: 100%; max-height: 100%; }
   .photo-lightbox-caption { font-size: .85rem; }
+  .photo-lightbox-nav { width: 2.75rem; height: 2.75rem; font-size: 1.75rem; }
+  .photo-lightbox-nav--previous { left: .4rem; }
+  .photo-lightbox-nav--next { right: .4rem; }
 }
 
 /* Photography viewer stays dark in both themes: photos read best on near-black. */

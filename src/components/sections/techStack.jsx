@@ -6,7 +6,7 @@ const groups = [
   { title: 'Native', note: 'Apple platforms & desktop', items: ['SwiftUI', 'SwiftData', '.NET / WPF'] },
   { title: 'Frontend', note: 'Web delivery', items: ['React', 'Next.js'] },
   { title: 'Data', note: 'Storage & analysis', items: ['PostgreSQL', 'SQL Server', 'Firebase', 'pandas'] },
-  { title: 'Infrastructure & tooling', note: 'Shipping and keeping it working', items: ['Git', 'Docker', 'GitHub Actions', 'Linux', 'pytest', 'Ruff', 'Boomi'] },
+  { title: 'Infrastructure & tooling', note: 'Delivery, automation & reliability', items: ['Git', 'Docker', 'GitHub Actions', 'GitLab', 'Linux', 'pytest', 'Ruff', 'Boomi'] },
   { title: 'Languages', note: 'Day to day', items: ['Python', 'Swift', 'TypeScript', 'JavaScript', 'C#', 'Java', 'SQL', 'C'] },
 ];
 
