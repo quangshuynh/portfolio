@@ -7,7 +7,7 @@ import scribeKitLogo from '../../assets/logos/scribekit-logo.png';
 import scribeKitApp from '../../assets/scribekit-app2.png';
 import scribeKitHistoryFind from '../../assets/scribekit-historyfind.png';
 import scribeKitHistoryReview from '../../assets/scribekit-historyreview.png';
-import scribeKitMic from '../../assets/scribekit-mic.png';
+import scribeKitAudioCapture from '../../assets/scribekit-audiocapture.png';
 import dashcamStorefront from '../../assets/585dashcam585-storefront.png';
 import PersonalityButton from '../ui/personalityButton';
 import { HomeImageTrigger } from '../utilities/homeLightbox';
@@ -142,9 +142,9 @@ const scribeKitGallery = [
     caption: 'ScribeKit macOS meeting window',
   },
   {
-    src: scribeKitMic,
-    alt: 'ScribeKit microphone selection and audio capture features',
-    caption: 'ScribeKit microphone selection and audio capture',
+    src: scribeKitAudioCapture,
+    alt: 'ScribeKit audio capture page',
+    caption: 'ScribeKit audio capture',
   },
   {
     src: scribeKitHistoryFind,
@@ -188,10 +188,10 @@ function ScribeKitGallery() {
 
           {slide === 'mic' && (
             <HomeImageTrigger
-              src={scribeKitMic}
+              src={scribeKitAudioCapture}
               imageClassName="project-result-image vertical-project-shot"
-              alt="ScribeKit microphone selection and audio capture features"
-              caption="ScribeKit microphone selection and audio capture"
+              alt="ScribeKit audio capture page"
+              caption="ScribeKit audio capture"
               gallery={scribeKitGallery}
               galleryIndex={1}
             />
@@ -222,7 +222,7 @@ function ScribeKitGallery() {
       <div className="gallery-controls" aria-label="ScribeKit gallery">
         <button type="button" aria-pressed={slide === 'logo'} onClick={() => setSlide('logo')}>Logo</button>
         <button type="button" aria-pressed={slide === 'app'} onClick={() => setSlide('app')}>App</button>
-        <button type="button" aria-pressed={slide === 'mic'} onClick={() => setSlide('mic')}>Mic</button>
+        <button type="button" aria-pressed={slide === 'mic'} onClick={() => setSlide('mic')}>Audio</button>
         <button type="button" aria-pressed={slide === 'find'} onClick={() => setSlide('find')}>Find</button>
         <button type="button" aria-pressed={slide === 'review'} onClick={() => setSlide('review')}>Review</button>
       </div>
