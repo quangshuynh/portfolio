@@ -24,7 +24,7 @@ describe('portfolio homepage', () => {
     ).toBeInTheDocument();
 
     expect(
-      screen.getByRole('heading', { name: 'Business Data Automation' })
+      screen.getByRole('heading', { name: 'Flipper' })
     ).toBeInTheDocument();
 
     expect(
@@ -61,19 +61,19 @@ describe('portfolio homepage', () => {
 ).toBeInTheDocument();
 
 expect(
-  screen.getByRole('heading', { name: 'Flipper' })
+  screen.getByRole('heading', { name: 'DashPilot' })
 ).toBeInTheDocument();
 
 expect(
-  screen.getByRole('heading', { name: 'Repo Radar' })
+  screen.getByRole('heading', { name: 'Business Data Automation' })
 ).toBeInTheDocument();
 
 expect(
-  screen.queryByRole('heading', { name: 'Chessed' })
+  screen.queryByRole('heading', { name: 'Repo Radar' })
 ).not.toBeInTheDocument();
 
 expect(
-  screen.queryByRole('heading', { name: 'DashPilot' })
+  screen.queryByRole('heading', { name: 'Chessed' })
 ).not.toBeInTheDocument();
 
 expect(
@@ -231,33 +231,33 @@ expect(
   test('project galleries switch between their available views', () => {
     render(<App />);
 
-    const businessGallery = within(
-      screen.getByLabelText('Business Data Automation gallery')
-    );
+  const flipperGallery = within(
+    screen.getByLabelText('Flipper gallery')
+  );
 
-    expect(
-      businessGallery.getByRole('button', {
-        name: 'Architecture',
-      })
-    ).toHaveAttribute('aria-pressed', 'true');
+  expect(
+    flipperGallery.getByRole('button', {
+      name: 'Logo',
+    })
+  ).toHaveAttribute('aria-pressed', 'true');
 
-    fireEvent.click(
-      businessGallery.getByRole('button', {
-        name: 'Dashboard',
-      })
-    );
+  fireEvent.click(
+    flipperGallery.getByRole('button', {
+      name: 'Dashboard',
+    })
+  );
 
-    expect(
-      businessGallery.getByRole('button', {
-        name: 'Dashboard',
-      })
-    ).toHaveAttribute('aria-pressed', 'true');
+  expect(
+    flipperGallery.getByRole('button', {
+      name: 'Dashboard',
+    })
+  ).toHaveAttribute('aria-pressed', 'true');
 
-    expect(
-      screen.getByRole('img', {
-        name: /Business Data Automation reconciliation dashboard/i,
-      })
-    ).toBeInTheDocument();
+  expect(
+    screen.getByRole('img', {
+      name: /Flipper dashboard/i,
+    })
+  ).toBeInTheDocument();
 
     const gitProfileLensGallery = within(
       screen.getByLabelText('GitProfileLens gallery')
