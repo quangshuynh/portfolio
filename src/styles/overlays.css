@@ -242,6 +242,21 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+
+/* A two-column track grid leaves almost no room for metadata on phones once the
+   cover, gap, and card padding are accounted for. Use a denser single-column
+   list and let the copy take the remaining width. */
+@media (max-width: 620px) {
+  .spotify-listening { margin-top: 1.1rem; }
+  .spotify-track-list { grid-template-columns: 1fr; gap: .65rem; }
+  .spotify-track { grid-template-columns: 58px minmax(0, 1fr); gap: .75rem; padding: .65rem; }
+  .spotify-track img { width: 58px; height: 58px; border-radius: .45rem; }
+  .spotify-track strong { font-size: .95rem; }
+  .spotify-track span { font-size: .82rem; }
+  .spotify-track small { font-size: .72rem; }
+  .spotify-track .spotify-track-time { margin-top: .25rem; }
+  .spotify-profile-link { margin-top: 1.1rem; }
+}
 .photography-gallery-image-button {
   position: relative;
   display: block;
