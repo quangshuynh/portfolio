@@ -105,7 +105,7 @@ test('the new interest galleries expose curated images and captions', () => {
 
   const gamingCard = screen.getByRole('heading', { name: 'Gaming' }).closest('article');
   fireEvent.click(within(gamingCard).getByRole('button', { name: 'View more' }));
-  expect(screen.getByText('Sim racing, 2026')).toBeInTheDocument();
+  expect(screen.getByText('Sim racing, 2024')).toBeInTheDocument();
   expect(screen.getByAltText('Steering wheel, shifter, pedals, and curved monitor arranged for sim racing')).toBeInTheDocument();
   expect(screen.getByText('Fortnite, 2023')).toBeInTheDocument();
   expect(screen.getByText('Marvel Rivals 67 KOs, 2025')).toBeInTheDocument();
