@@ -12,17 +12,21 @@ import fortniteLifetimeStats from '../../assets/about/gaming/fortnite-lifetime-s
 import marvelRivalsMvpStats from '../../assets/about/gaming/marvel-rivals-mvp-stats.png';
 import minecraftCherryHouse from '../../assets/about/gaming/minecraft-cherry-house.jpg';
 import simRacingSetup from '../../assets/about/gaming/sim-racing-setup-2024.jpg';
-import carsPhoto from '../../assets/about/cars-tech/quang-cars-web.jpg';
-import techPhoto from '../../assets/about/cars-tech/quang-tech-web.jpg';
-import carShowPorsche from '../../assets/about/cars-tech/car-show-porsche-web.jpg';
-import carShowSubaruEngine from '../../assets/about/cars-tech/car-show-subaru-engine-web.jpg';
-import customPcGreen from '../../assets/about/cars-tech/custom-pc-green-web.jpg';
-import graphicsCard from '../../assets/about/cars-tech/graphics-card-rtx-3080-ti-web.jpg';
-import subaruWaterfront from '../../assets/about/cars-tech/subaru-25rs-waterfront.jpg';
-import subaruEngineBay from '../../assets/about/cars-tech/subaru-25rs-engine-bay.jpg';
-import technologyWorkstation from '../../assets/about/cars-tech/technology-workstation.jpg';
-import motherboardUpgrade from '../../assets/about/cars-tech/motherboard-upgrade-2024.jpg';
-import roomSetup2025 from '../../assets/about/cars-tech/room-setup-2025.jpg';
+import carsPhoto from '../../assets/about/cars/quang-cars-web.jpg';
+import techPhoto from '../../assets/about/tech/quang-tech-web.jpg';
+import carShowPorsche from '../../assets/about/cars/car-show-porsche-web.jpg';
+import carShowSubaruEngine from '../../assets/about/cars/car-show-subaru-engine-web.jpg';
+import carShowCrowd from '../../assets/about/cars/car-show-crowd-web.jpg';
+import nobleM12 from '../../assets/about/cars/noble-m12-web.jpg';
+import audiR8 from '../../assets/about/cars/audi-r8-web.jpg';
+import toyotaSupraMk3 from '../../assets/about/cars/toyota-supra-mk3-web.jpg';
+import customPcGreen from '../../assets/about/tech/custom-pc-green-web.jpg';
+import graphicsCard from '../../assets/about/tech/graphics-card-rtx-3080-ti-web.jpg';
+import subaru25rs from '../../assets/about/cars/subaru-25rs.jpg';
+import subaruEngineBay from '../../assets/about/cars/subaru-25rs-engine-bay.jpg';
+import technologyWorkstation from '../../assets/about/tech/technology-workstation.jpg';
+import motherboardUpgrade from '../../assets/about/tech/motherboard-upgrade-2024.jpg';
+import roomSetup2025 from '../../assets/about/tech/room-setup-2025.jpg';
 import quangBeachSunset from '../../assets/about/quang/quang-beach-sunset-web.jpg';
 import quangArtSpace from '../../assets/about/quang/quang-art-space-web.jpg';
 import quangWaterfront from '../../assets/about/quang/quang-waterfront-web.jpg';
@@ -115,10 +119,14 @@ const hikingGallery = [
 ];
 
 const carsGallery = [
-  { src: subaruWaterfront, width: 1500, height: 2000, alt: 'Blue Subaru Impreza 2.5RS parked beside the waterfront', caption: 'My Subaru Impreza 2.5RS. One of the reasons cars became more than transportation to me', shape: 'portrait' },
-  { src: subaruEngineBay, width: 2000, height: 1500, alt: 'Engine bay of a blue Subaru Impreza 2.5RS during maintenance', caption: 'I enjoy the mechanical side just as much as the photography, learning what is under the hood and keeping an older car going', shape: 'landscape' },
-  { src: carShowPorsche, width: 1400, height: 984, alt: 'A black Singer Porsche 930 displayed at Little Speed Shop Cars & Coffee', caption: 'A Singer Porsche 930 at The Little Speed Shop Cars & Coffee', shape: 'landscape' },
-  { src: carShowSubaruEngine, width: 1400, height: 889, alt: 'Modified blue Blobeye STI with its engine bay open at a car show', caption: 'Taking a closer look under the hood of this Blobeye STI', shape: 'landscape' }
+  { src: subaru25rs, width: 1500, height: 2000, alt: 'Blue Subaru Impreza 2.5RS parked beside the waterfront', caption: 'My Subaru Impreza 2.5RS', shape: 'portrait' },
+  { src: subaruEngineBay, width: 2000, height: 1500, alt: 'Engine bay of a blue Subaru Impreza 2.5RS during maintenance', caption: 'Learning my way around the EJ25 engine', shape: 'landscape' },
+  { src: carShowPorsche, width: 1400, height: 984, alt: 'A black Singer Porsche 930 displayed at Little Speed Shop Cars & Coffee', caption: 'Singer Porsche 930 at Cars & Coffee', shape: 'landscape' },
+  { src: carShowSubaruEngine, width: 1400, height: 889, alt: 'Modified blue Blobeye STI with its engine bay open at a car show', caption: 'A closer look at this Blobeye STI', shape: 'landscape' },
+  { src: carShowCrowd, width: 2048, height: 1536, alt: 'Crowded Cars & Coffee meet with sports cars on display', caption: 'Cars & Coffee in full swing', shape: 'landscape' },
+  { src: nobleM12, width: 1536, height: 2048, alt: 'Gray Noble M12 displayed at Cars & Coffee', caption: 'Noble M12 at Cars & Coffee', shape: 'portrait' },
+  { src: audiR8, width: 1536, height: 2048, alt: 'Black Audi R8 displayed at Cars & Coffee', caption: 'Audi R8 at Cars & Coffee', shape: 'portrait' },
+  { src: toyotaSupraMk3, width: 1536, height: 2048, alt: 'Black Mk3 Toyota Supra displayed at Cars & Coffee', caption: 'Mk3 Toyota Supra at Cars & Coffee', shape: 'portrait' }
 ];
 
 const technologyGallery = [
