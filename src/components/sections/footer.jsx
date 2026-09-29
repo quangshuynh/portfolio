@@ -21,7 +21,7 @@ function Footer() {
           </p>
 
           <div className="contact-links" data-reveal>
-            <a className="button" href="mailto:quang@quanghuynh.com">
+            <a className="button" href="mailto:quang@quanghuynh.com?subject=Let%27s%20Connect!&body=Hi%20Quang%2C%0A%0AI%20came%20across%20your%20portfolio%20and%20wanted%20to%20reach%20out.%20I%27d%20love%20to%20connect%20and%20chat%20about..." target="_blank" rel="noreferrer">
               <FaEnvelope aria-hidden="true" /> Email me
             </a>
             <a className="button button-secondary" href="https://github.com/quangshuynh" target="_blank" rel="noreferrer">
