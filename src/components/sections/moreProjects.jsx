@@ -12,6 +12,7 @@ import photoPortfolio from '../../assets/585photo585-portfolio.png';
 import flipperLogo from '../../assets/logos/flipper-logo.png';
 import chessedLogo from '../../assets/logos/chessed-logo.png';
 import photo585Logo from '../../assets/logos/585photo585-logo.png';
+import bdaLogo from '../../assets/logos/business-data-automation-logo.png';
 import PersonalityButton from '../ui/personalityButton';
 import { HomeImageTrigger } from '../utilities/homeLightbox';
 
@@ -27,14 +28,24 @@ const projects = [
     logo: hymicalFormsLogo,
   },
   {
-    name: 'Flipper',
+    name: 'DashPilot',
     description:
-      'Local-first reseller toolkit for researching deals, modeling sourcing economics, managing inventory, and reconciling marketplace sales.',
+      'Local-first iOS companion for delivery drivers that records shifts, deliveries, routes, earnings, expenses, and performance without relying on delivery-platform integrations.',
     highlight:
-      'Separates research estimates from accounting facts with immutable snapshots, exact money semantics, explicit acquisition workflows, travel-cost modeling, and decision-versus-outcome tracking.',
-    technologies: ['Python', 'FastAPI', 'SQLite', 'eBay API'],
-    github: 'https://github.com/quangshuynh/flipper',
-    logo: flipperLogo,
+        'Models pause-aware shifts, stacked delivery lifecycles, pickup/place identity, pickup wait time, route gaps, mileage, profitability, Live Activities, and local exports while keeping recorded facts separate from estimates.',
+    technologies: ['Swift', 'SwiftUI', 'SwiftData', 'Core Location', 'ActivityKit'],
+    github: 'https://github.com/quangshuynh/dashpilot',
+    logo: dashPilotLogo,
+  },
+  {
+    name: 'Business Data Automation',
+    description:
+      'Backend data pipeline for validating related business records, reconciling financial transactions, and exposing trustworthy results through an API and dashboard.',
+    highlight:
+      'Quarantines invalid records without blocking valid processing, uses Decimal-based financial calculations, transactional PostgreSQL upserts, and automated coverage across validation, reconciliation, database, API, and end-to-end behavior.',
+    technologies: ['Python', 'FastAPI', 'PostgreSQL', 'SQLAlchemy', 'pandas'],
+    github: 'https://github.com/quangshuynh/business-data-automation',
+    logo: bdaLogo,
   },
   {
     name: 'Repo Radar',
@@ -56,16 +67,6 @@ const projects = [
     technologies: ['Next.js', 'TypeScript', 'Stockfish', 'Web Workers'],
     github: 'https://github.com/quangshuynh/chessed',
     logo: chessedLogo,
-  },
-  {
-    name: 'DashPilot',
-    description:
-      'Local-first iOS companion for delivery drivers that records shifts, deliveries, routes, earnings, expenses, and performance without relying on delivery-platform integrations.',
-    highlight:
-        'Models pause-aware shifts, stacked delivery lifecycles, route gaps, recorded mileage, corrections, profitability, Live Activities, App Intents, and local exports while keeping recorded facts separate from estimates.',
-    technologies: ['Swift', 'SwiftUI', 'SwiftData', 'Core Location', 'ActivityKit'],
-    github: 'https://github.com/quangshuynh/dashpilot',
-    logo: dashPilotLogo,
   },
   {
     name: 'CaseNotes',

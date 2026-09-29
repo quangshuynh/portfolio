@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
-import dashboardImage from '../../assets/business-data-dashboard.png';
+import flipperLogo from '../../assets/logos/flipper-logo.png';
+import flipperDashboard from '../../assets/flipper-dashboard.png';
+import flipperResearch from '../../assets/flipper-research.png';
+import flipperInventory from '../../assets/flipper-inventory.png';
+import flipperSale from '../../assets/flipper-sale.png';
 import gitProfileLensLogo from '../../assets/logos/gitprofilelens-logo.png';
 import gitProfileLensResults from '../../assets/gitprofilelens-results-vert.png';
 import scribeKitLogo from '../../assets/logos/scribekit-logo.png';
@@ -28,18 +32,21 @@ const projects = [
     visual: 'dashcam',
   },
   {
-    name: 'Business Data Automation',
-    label: 'Backend & data engineering',
-    purpose: 'Validates related business records and reconciles financial transactions without allowing isolated bad records to halt valid processing.',
+    name: 'Flipper',
+    label: 'Backend · Reselling & marketplace tooling',
+    purpose:
+      'Local-first reseller toolkit for researching deals, modeling sourcing economics, managing inventory, and reconciling marketplace sales from discovery through outcome.',
+
     highlights: [
-      'Fails fast on structural dataset errors while quarantining invalid rows with explainable validation_errors',
-      'Calculates payments, refunds, and signed adjustments with Decimal-based cent precision',
-      'Persists validated records with transactional PostgreSQL upserts and rollback handling, while exposing reconciliation results through FastAPI',
-      'Covers validation, reconciliation, database, API, and end-to-end behavior with 52 pytest tests',
+      'Separates research estimates from authoritative accounting facts with immutable research snapshots, explicit acquisition state, and exact Decimal-based money semantics',
+      'Researches marketplace opportunities with active and sold comparables, provenance-aware evidence, travel economics, and deterministic deal scoring',
+      'Tracks inventory through acquisition and sale, including completed-order imports, buyer-paid shipping, marketplace fees, collect-and-remit taxes, and provisional economics when acquisition facts are incomplete',
+      'Compares frozen pre-purchase expectations against authoritative sale outcomes while keeping external marketplace failures isolated from local records',
     ],
-    stack: 'Python · FastAPI · PostgreSQL · SQLAlchemy · pandas · Docker · pytest · GitHub Actions',
-    github: 'https://github.com/quangshuynh/business-data-automation',
-    visual: 'dashboard',
+
+    stack: 'Python · FastAPI · SQLite · Jinja · eBay APIs · pytest',
+    github: 'https://github.com/quangshuynh/flipper',
+    visual: 'flipper',
   },
   {
     name: 'GitProfileLens',
@@ -193,7 +200,7 @@ function ScribeKitGallery() {
               alt="ScribeKit audio capture page"
               caption="ScribeKit audio capture"
               gallery={scribeKitGallery}
-              galleryIndex={2}
+              galleryIndex={1}
             />
           )}
 
@@ -204,7 +211,7 @@ function ScribeKitGallery() {
               alt="ScribeKit history and find features"
               caption="ScribeKit history and find"
               gallery={scribeKitGallery}
-              galleryIndex={3}
+              galleryIndex={2}
             />
           )}
 
@@ -215,7 +222,7 @@ function ScribeKitGallery() {
               alt="ScribeKit review features"
               caption="ScribeKit review"
               gallery={scribeKitGallery}
-              galleryIndex={4}
+              galleryIndex={3}
             />
           )}
         </div>
@@ -230,6 +237,120 @@ function ScribeKitGallery() {
   );
 }
 
+
+/** 
+ * renders the Flipper project visual
+ * :returns: Flipper visual markup
+*/
+const flipperGallery = [
+  {
+    src: flipperDashboard,
+    alt: 'Flipper dashboard showing inventory, workflow state, attention items, and sales economics',
+    caption: 'Flipper operational dashboard',
+  },
+  {
+    src: flipperResearch,
+    alt: 'Flipper Deals workspace showing live eBay opportunities, research modes, and comparison candidates',
+    caption: 'Flipper marketplace research workspace',
+  },
+  {
+    src: flipperInventory,
+    alt: 'Flipper inventory showing Q-number records, lifecycle status, marketplace linkage, and sale references',
+    caption: 'Flipper inventory workflow',
+  },
+  {
+    src: flipperSale,
+    alt: 'Flipper sale detail showing seller revenue, fees, reconciliation state, and provisional realized economics',
+    caption: 'Flipper sale reconciliation',
+  },
+];
+
+function FlipperVisual() {
+  const [slide, setSlide] = useState('logo');
+
+  const screenshots = {
+    dashboard: {
+      ...flipperGallery[0],
+      galleryIndex: 0,
+    },
+    research: {
+      ...flipperGallery[1],
+      galleryIndex: 1,
+    },
+    inventory: {
+      ...flipperGallery[2],
+      galleryIndex: 2,
+    },
+    sale: {
+      ...flipperGallery[3],
+      galleryIndex: 3,
+    },
+  };
+
+  return (
+    <div className="project-visual gallery">
+      <div className="gallery-stage">
+        {slide === 'logo' ? (
+          <img
+            className="flipper-logo"
+            src={flipperLogo}
+            alt="Flipper project logo"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          <HomeImageTrigger
+            src={screenshots[slide].src}
+            imageClassName="project-result-image"
+            alt={screenshots[slide].alt}
+            caption={screenshots[slide].caption}
+            gallery={flipperGallery}
+            galleryIndex={screenshots[slide].galleryIndex}
+          />
+        )}
+      </div>
+
+      <div className="gallery-controls" aria-label="Flipper gallery">
+        <button
+          type="button"
+          aria-pressed={slide === 'logo'}
+          onClick={() => setSlide('logo')}
+        >
+          Logo
+        </button>
+        <button
+          type="button"
+          aria-pressed={slide === 'dashboard'}
+          onClick={() => setSlide('dashboard')}
+        >
+          Dashboard
+        </button>
+        <button
+          type="button"
+          aria-pressed={slide === 'research'}
+          onClick={() => setSlide('research')}
+        >
+          Research
+        </button>
+        <button
+          type="button"
+          aria-pressed={slide === 'inventory'}
+          onClick={() => setSlide('inventory')}
+        >
+          Inventory
+        </button>
+        <button
+          type="button"
+          aria-pressed={slide === 'sale'}
+          onClick={() => setSlide('sale')}
+        >
+          Sale
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /**
  * selects and renders a project visual
  * :param type: project visual type
@@ -239,18 +360,23 @@ function ProjectVisual({ type }) {
   if (type === 'dashcam') {
     return (
       <div className="project-visual production-site-visual">
-        <HomeImageTrigger src={dashcamStorefront} alt="585Dashcam585 storefront showing dashcam products and local installation options" caption="585Dashcam585 storefront" />
+        <HomeImageTrigger
+          src={dashcamStorefront}
+          alt="585Dashcam585 storefront showing dashcam products and local installation options"
+          caption="585Dashcam585 storefront"
+        />
       </div>
     );
   }
-  if (type === 'dashboard') {
-    return (
-      <BusinessGallery />
-    );
+
+  if (type === 'flipper') {
+    return <FlipperVisual />;
   }
+
   if (type === 'scribekit') {
     return <ScribeKitGallery />;
   }
+
   return <GitProfileLensVisual />;
 }
 
@@ -301,7 +427,6 @@ function FeaturedProjects() {
                 <div className="project-actions">
                   {project.live && !project.github && <PersonalityButton href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live site`}>Live Site <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
                   {project.github && <PersonalityButton href={project.github} target="_blank" rel="noreferrer" aria-label={`View ${project.name} code`}>View code <FaGithub aria-hidden="true" /></PersonalityButton>}
-                  {project.name === 'Business Data Automation' && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-architecture`} href={`${project.github}#architecture`} target="_blank" rel="noreferrer" aria-label="Read Business Data Automation architecture">Read architecture <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
                   {project.live && project.github && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-live`} href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live demo`}>Live demo <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
                   {project.documentation && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-documentation`} href={project.documentation} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} documentation`}>Documentation <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
                 </div>
