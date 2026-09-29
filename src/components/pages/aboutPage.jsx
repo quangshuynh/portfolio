@@ -138,9 +138,9 @@ const technologyGallery = [
 ];
 
 const gamingGallery = [
-  { src: simRacingSetup, width: 1500, height: 2000, alt: 'Steering wheel, shifter, pedals, and curved monitor arranged for sim racing', caption: 'Sim racing, 2026', shape: 'portrait' },
   { src: minecraftCherryHouse, width: 2000, height: 1084, alt: 'Minecraft house built among cherry trees with a mountain backdrop', caption: 'Cozy Minecraft cabin, 2026', shape: 'landscape' },
   { src: marvelRivalsMvpStats, width: 2000, height: 887, alt: 'Marvel Rivals victory scoreboard showing an MVP performance with 67 KOs', caption: 'Marvel Rivals 67 KOs, 2025', shape: 'landscape' },
+  { src: simRacingSetup, width: 1500, height: 2000, alt: 'Steering wheel, shifter, pedals, and curved monitor arranged for sim racing', caption: 'Sim racing, 2024', shape: 'portrait' },
   { src: fortniteLifetimeStats, width: 1196, height: 969, alt: 'Fortnite lifetime statistics profile showing wins, matches and eliminations', caption: 'Fortnite, 2023', shape: 'landscape' },
   { src: csgoScreenshot, width: 1152, height: 864, alt: 'Counter-Strike: Global Offensive menu screenshot', caption: 'CS:GO, 2022', shape: 'landscape' }
 ];
