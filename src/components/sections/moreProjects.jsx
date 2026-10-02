@@ -30,9 +30,9 @@ const projects = [
   {
     name: 'DashPilot',
     description:
-      'Local-first iOS companion for delivery drivers that records shifts, deliveries, routes, earnings, expenses, and performance without relying on delivery-platform integrations.',
+      'Local-first iOS companion for delivery drivers that tracks shifts, deliveries, routes, earnings, expenses, and performance without relying on delivery-platform integrations.',
     highlight:
-        'Models pause-aware shifts, stacked delivery lifecycles, pickup/place identity, pickup wait time, route gaps, mileage, profitability, Live Activities, and local exports while keeping recorded facts separate from estimates.',
+        'Tracks stacked delivery lifecycles, Park & Resume workflows, mileage, pickup waits, vehicle and fuel costs, weekly performance, corrections, Live Activities, App Intents, and local exports while keeping recorded facts separate from estimates.',
     technologies: ['Swift', 'SwiftUI', 'SwiftData', 'Core Location', 'ActivityKit'],
     github: 'https://github.com/quangshuynh/dashpilot',
     logo: dashPilotLogo,
