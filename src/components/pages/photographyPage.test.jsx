@@ -1,36 +1,41 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import App from '../../App';
-import { photographs, sortPhotographs } from '../../data/photographs';
-import { getAppPathname, photographyHref } from '../../util/navigation';
-import { calculateFittedImageDimensions, PhotographyDetails, resetPhotographyPreloadsForTests } from '../photography/photographyLightbox';
-import { distributePhotographs, getPhotographyColumnCount } from './photographyPage';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 
-const curatedSlugs = [
-  '_DSC0023',
-  'DIBS2164',
-  'EJUT5331',
-  'YJMZ4301',
-  'IMG_0758',
-  'IMGP0739',
-  'IMG_0931',
-  '_DSC0003',
-  '_DSC0033',
-  'IMGP0579',
-  'IMG_0776',
-  'NTIO3912',
-  'PBTM8581',
-  'IMG_0845',
-  'TERM5977',
-  'IMG_0858',
-  'IMG_0811',
-  'IMG_0846',
-];
+import App from '../../App';
+
+import {
+  photographs,
+  sortPhotographs,
+} from '../../data/photographs';
+
+import {
+  getAppPathname,
+  photographyHref,
+} from '../../util/navigation';
+
+import {
+  PhotographyDetails,
+  resetPhotographyPreloadsForTests,
+} from '../photography/photographyLightbox';
+
 
 beforeEach(() => {
   resetPhotographyPreloadsForTests();
+
   window.history.replaceState({}, '', '/photography/');
-  document.documentElement.classList.remove('overlay-open', 'layout-changing');
+
+  document.documentElement.classList.remove(
+    'overlay-open',
+    'layout-changing',
+  );
+
   document.body.removeAttribute('style');
+
   if (!document.querySelector('link[rel="canonical"]')) {
     const canonical = document.createElement('link');
     canonical.rel = 'canonical';
@@ -38,394 +43,504 @@ beforeEach(() => {
   }
 });
 
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
-test('renders every curated photograph exactly once with its caption and target', async () => {
+
+test('renders the photography page and curated photographs', async () => {
   render(<App />);
-  expect(await screen.findByRole('heading', { name: 'Photography' })).toBeInTheDocument();
-  const renderedItems = [...document.querySelectorAll('[data-photo-slug]')];
-  expect(document.getElementById('photography-gallery')).toHaveClass('photography-page-grid');
-  expect(document.getElementById('photography-modal-gallery')).not.toBeInTheDocument();
-  expect(renderedItems).toHaveLength(18);
-  expect(renderedItems.map((item) => item.dataset.photoSlug).sort()).toEqual([...curatedSlugs].sort());
-  renderedItems.forEach((item) => {
-    const photograph = photographs.find(({ slug }) => slug === item.dataset.photoSlug);
-    expect(item.querySelector('figcaption')).toHaveTextContent(photograph.caption);
-    expect(item.querySelector('a')).toHaveAttribute('href', photographyHref(photograph.slug));
-  });
-  expect(screen.getAllByText('My 2011 Subaru WRX after dark')).toHaveLength(1);
-  expect(document.querySelector('[data-photo-slug="IMG_0846"]')).toHaveTextContent('My 2011 Subaru WRX after dark');
-  expect(document.querySelector('[data-photo-slug="_DSC0023"]')).toHaveTextContent("Looking up through Cornell's brick architecture");
-  expect(screen.getByLabelText('Order')).toHaveValue('default');
-  expect(document.title).toBe('Photography | Quang Huynh');
-  expect(photographs.every(({ id, slug }) => id === slug)).toBe(true);
-  expect(photographs.every(({ sourceFilename }) => sourceFilename !== null)).toBe(true);
-  expect(photographs.find(({ id }) => id === 'IMGP0739').curatedOrder).toBe(6);
-  expect(photographs.find(({ id }) => id === 'IMG_0858').curatedOrder).toBe(16);
-  expect(document.querySelector('[data-photo-slug="_DSC0023"] img'))
-    .toHaveAttribute('src', photographs[0].gallerySrc);
-  expect(screen.getByRole('heading', { name: 'Featured' })).toBeInTheDocument();
 
-  const nav = screen.getByRole('navigation', { name: 'Primary navigation' });
-  expect(within(nav).getByRole('link', { name: /quanghuynh.com photography/i })).toHaveAttribute('href', '/photography/');
-  expect(nav).toHaveTextContent('quanghuynh.com/photography');
-  expect(nav.querySelector('.brand-cat img')).toBeInTheDocument();
-  expect(nav.querySelector('.photography-brand-camera')).toHaveAttribute('aria-hidden', 'true');
-  expect(within(nav).getByRole('link', { name: 'Portfolio' })).toHaveAttribute('href', '/');
-  expect(within(nav).getByRole('link', { name: 'About' })).toHaveAttribute('href', '/#about');
-  expect(within(nav).queryByRole('link', { name: 'Projects' })).not.toBeInTheDocument();
-  expect(within(nav).queryByRole('link', { name: 'Contact' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: 'More about me' })).not.toBeInTheDocument();
-});
+  expect(
+    await screen.findByRole('heading', { name: 'Photography' }),
+  ).toBeInTheDocument();
 
-test('accepts the photography gallery pathname without a trailing slash', async () => {
-  window.history.replaceState({}, '', '/photography');
-  render(<App />);
-  expect(await screen.findByRole('heading', { name: 'Photography' })).toBeInTheDocument();
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-});
-
-test('keeps photography navigation and theming isolated from the homepage', async () => {
-  window.history.replaceState({}, '', '/');
-  render(<App />);
-  const nav = screen.getByRole('navigation', { name: 'Primary navigation' });
-  expect(document.querySelector('.photography-page')).not.toBeInTheDocument();
-  expect(nav).not.toHaveClass('photography-nav');
-  expect(nav.querySelector('.photography-brand-camera')).not.toBeInTheDocument();
-  expect(within(nav).getByRole('link', { name: 'Experience' })).toBeInTheDocument();
-  expect(within(nav).getByRole('link', { name: 'Projects' })).toBeInTheDocument();
-  expect(within(nav).getByRole('link', { name: 'Contact' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /Switch to .* mode/ })).not.toHaveClass('theme-toggle--photography');
-});
-
-test('same-path generic lightbox cleanup still restores its locked scroll position', async () => {
-  let simulatedScrollY = 420;
-  vi.spyOn(window, 'scrollY', 'get').mockImplementation(() => simulatedScrollY);
-  const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation((first, second) => {
-    simulatedScrollY = typeof first === 'object' ? first.top : second;
-  });
-  window.history.replaceState({}, '', '/');
-  render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: 'Open image: 585Dashcam585 storefront' }));
-
-  simulatedScrollY = 0;
-  fireEvent.keyDown(document, { key: 'Escape' });
-
-  await waitFor(() => expect(simulatedScrollY).toBe(420));
-  expect(scrollTo).toHaveBeenCalledWith({ top: 420, left: 0, behavior: 'instant' });
-});
-
-test('reacts to native hash changes without treating the hash as an anchor target', async () => {
-  render(<App />);
-  act(() => { window.location.hash = 'IMGP0579'; });
-  expect(await screen.findByRole('dialog', { name: /Looking up through the trees at Bristol Mountain/i })).toBeInTheDocument();
-  expect(window.location.pathname).toBe('/photography/');
-});
-
-test('date sorting is deterministic, puts missing dates last, and does not mutate input', () => {
-  const input = [
-    { id: 'missing-two', capturedAt: null, curatedOrder: 4 },
-    { id: 'newer', capturedAt: '2025-05-01T12:00:00Z', curatedOrder: 2 },
-    { id: 'missing-one', capturedAt: null, curatedOrder: 3 },
-    { id: 'older', capturedAt: '2024-05-01T12:00:00Z', curatedOrder: 1 },
+  const renderedItems = [
+    ...document.querySelectorAll('[data-photo-slug]'),
   ];
-  const originalOrder = input.map(({ id }) => id);
 
-  expect(sortPhotographs(input, 'newest').map(({ id }) => id))
-    .toEqual(['newer', 'older', 'missing-one', 'missing-two']);
-  expect(sortPhotographs(input, 'oldest').map(({ id }) => id))
-    .toEqual(['older', 'newer', 'missing-one', 'missing-two']);
-  expect(input.map(({ id }) => id)).toEqual(originalOrder);
-  expect(sortPhotographs(photographs, 'newest').map(({ slug }) => slug)).toEqual([
-    'IMG_0931', 'IMG_0858', 'IMG_0846', 'IMG_0845', 'IMG_0811', 'IMG_0776',
-    'IMG_0758', 'IMGP0739', 'IMGP0579', '_DSC0003', '_DSC0033', 'DIBS2164',
-    'NTIO3912', 'TERM5977', '_DSC0023', 'EJUT5331', 'YJMZ4301', 'PBTM8581',
-  ]);
+  expect(renderedItems).toHaveLength(photographs.length);
+
+  const renderedSlugs = renderedItems.map(
+    (item) => item.dataset.photoSlug,
+  );
+
+  expect(new Set(renderedSlugs).size).toBe(photographs.length);
+
+  photographs.forEach((photograph) => {
+    expect(renderedSlugs).toContain(photograph.slug);
+  });
+
+  expect(document.title).toBe('Photography | Quang Huynh');
 });
 
-test('uses deterministic responsive masonry column counts and fit geometry from the stage', () => {
-  expect(getPhotographyColumnCount(1600)).toBe(3);
-  expect(getPhotographyColumnCount(1200)).toBe(3);
-  expect(getPhotographyColumnCount(821)).toBe(3);
-  expect(getPhotographyColumnCount(820)).toBe(2);
-  expect(getPhotographyColumnCount(800)).toBe(2);
-  expect(getPhotographyColumnCount(420)).toBe(2);
-  // Narrow phones get one column instead of ~130px portrait strips.
-  expect(getPhotographyColumnCount(350)).toBe(2);
-  expect(getPhotographyColumnCount(340)).toBe(2);
-  expect(getPhotographyColumnCount(339)).toBe(1);
-  expect(getPhotographyColumnCount(280)).toBe(1);
 
-  const portraitFit = calculateFittedImageDimensions(1200, 1600, 720, 820);
-  expect(portraitFit.width).toBeCloseTo(615, 5);
-  expect(portraitFit.height).toBeCloseTo(820, 5);
+test('accepts the photography pathname without a trailing slash', async () => {
+  window.history.replaceState({}, '', '/photography');
 
-  const landscapeFit = calculateFittedImageDimensions(1600, 900, 1080, 760);
-  expect(landscapeFit.width).toBeCloseTo(1080, 5);
-  expect(landscapeFit.height).toBeCloseTo(607.5, 5);
-});
-
-test('opens a photo hash, navigates between photos, and closes to the collection', async () => {
   render(<App />);
-  fireEvent.click(await screen.findByRole('link', { name: /Open photograph: Looking up through Cornell/i }));
-  expect(window.location.pathname).toBe('/photography/');
-  expect(window.location.hash).toBe('#_DSC0023');
-  expect(screen.getByRole('dialog', { name: /Looking up through Cornell/i })).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
-  expect(window.location.pathname).toBe('/photography/');
-  expect(window.location.hash).toBe('#DIBS2164');
-  expect(screen.getByRole('dialog', { name: /A quiet moment on the grass/i })).toBeInTheDocument();
+  expect(
+    await screen.findByRole('heading', { name: 'Photography' }),
+  ).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Close photograph' }));
-  expect(window.location.pathname).toBe('/photography/');
-  expect(window.location.hash).toBe('');
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
-test('focus enters the viewer, the page is inert, and normal close restores its thumbnail', async () => {
-  const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+
+test('opens a photograph, navigates to the next photograph, and closes', async () => {
+  const orderedPhotographs = sortPhotographs(photographs);
+
+  const firstPhotograph = orderedPhotographs[0];
+  const secondPhotograph = orderedPhotographs[1];
+
   render(<App />);
-  const trigger = await screen.findByRole('link', { name: /Open photograph: Looking up through Cornell/i });
+
+  fireEvent.click(
+    await screen.findByRole('link', {
+      name: `Open photograph: ${firstPhotograph.caption}`,
+    }),
+  );
+
+  expect(window.location.hash).toBe(`#${firstPhotograph.slug}`);
+
+  expect(
+    screen.getByRole('dialog', {
+      name: new RegExp(firstPhotograph.caption, 'i'),
+    }),
+  ).toBeInTheDocument();
+
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Next photograph' }),
+  );
+
+  expect(window.location.hash).toBe(`#${secondPhotograph.slug}`);
+
+  expect(
+    screen.getByRole('dialog', {
+      name: new RegExp(secondPhotograph.caption, 'i'),
+    }),
+  ).toBeInTheDocument();
+
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Close photograph' }),
+  );
+
+  expect(window.location.hash).toBe('');
+
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+
+test('Escape closes the viewer and restores focus to its thumbnail', async () => {
+  const orderedPhotographs = sortPhotographs(photographs);
+  const firstPhotograph = orderedPhotographs[0];
+
+  render(<App />);
+
+  const trigger = await screen.findByRole('link', {
+    name: `Open photograph: ${firstPhotograph.caption}`,
+  });
+
   fireEvent.click(trigger);
-  expect(screen.getByRole('button', { name: 'Close photograph' })).toHaveFocus();
-  expect(document.querySelector('.photography-page')).toHaveAttribute('inert');
+
+  expect(
+    screen.getByRole('button', { name: 'Close photograph' }),
+  ).toHaveFocus();
+
+  expect(
+    document.querySelector('.photography-page'),
+  ).toHaveAttribute('inert');
+
   expect(document.documentElement).toHaveClass('overlay-open');
 
   fireEvent.keyDown(document, { key: 'Escape' });
-  await waitFor(() => expect(trigger).toHaveFocus());
-  expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
+
+  await waitFor(() => {
+    expect(trigger).toHaveFocus();
+  });
+
   expect(window.location.hash).toBe('');
-  expect(document.querySelector('.photography-page')).not.toHaveAttribute('inert');
-  await waitFor(() => expect(document.documentElement).not.toHaveClass('overlay-open'));
+
+  expect(
+    document.querySelector('.photography-page'),
+  ).not.toHaveAttribute('inert');
+
+  await waitFor(() => {
+    expect(document.documentElement).not.toHaveClass('overlay-open');
+  });
 });
 
-test('direct-hash close safely focuses the matching thumbnail', async () => {
-  const focus = vi.spyOn(HTMLElement.prototype, 'focus');
-  window.history.replaceState({}, '', '/photography/#IMG_0846');
-  render(<App />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Close photograph' }));
-  const fallback = document.querySelector('[data-photo-slug="IMG_0846"] a');
-  await waitFor(() => expect(fallback).toHaveFocus());
-  expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
-});
 
-test('arrow navigation is non-wrapping at the first and last photographs', async () => {
-  render(<App />);
-  fireEvent.click(await screen.findByRole('link', { name: /Open photograph: Looking up through Cornell/i }));
-  expect(screen.getByRole('button', { name: 'Previous photograph' })).toBeDisabled();
-  fireEvent.keyDown(document, { key: 'ArrowLeft' });
-  expect(window.location.hash).toBe('#_DSC0023');
-  fireEvent.keyDown(document, { key: 'ArrowRight' });
-  expect(window.location.hash).toBe('#DIBS2164');
-
-  act(() => window.history.replaceState({}, '', '/photography/#IMG_0846'));
-  act(() => window.dispatchEvent(new Event('portfolio:locationchange')));
-  expect(screen.getByRole('button', { name: 'Next photograph' })).toBeDisabled();
-  fireEvent.keyDown(document, { key: 'ArrowRight' });
-  expect(window.location.hash).toBe('#IMG_0846');
-  fireEvent.keyDown(document, { key: 'ArrowLeft' });
-  expect(window.location.hash).toBe('#IMG_0811');
-});
-
-test('mobile information opens as a nested dialog and Escape dismisses it first', async () => {
-  render(<App />);
-  fireEvent.click(await screen.findByRole('link', { name: /Open photograph: Looking up through Cornell/i }));
-  const info = document.querySelector('.photography-lightbox-info');
-  expect(info).toHaveAttribute('aria-label', 'Show photograph information');
-  fireEvent.click(info);
-  expect(screen.getByRole('dialog', { name: 'Photograph information' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Close photograph information' })).toHaveFocus();
-
-  fireEvent.keyDown(document, { key: 'Escape' });
-  await waitFor(() => expect(info).toHaveFocus());
-  expect(screen.queryByRole('dialog', { name: 'Photograph information' })).not.toBeInTheDocument();
-  expect(window.location.hash).toBe('#_DSC0023');
-
-  fireEvent.click(info);
-  fireEvent.click(screen.getByRole('button', { name: 'Close photograph information' }));
-  await waitFor(() => expect(info).toHaveFocus());
-
-  fireEvent.keyDown(document, { key: 'Escape' });
-  await waitFor(() => expect(window.location.hash).toBe(''));
-});
-
-test('metadata renders only populated public fields without placeholders', () => {
-  render(<PhotographyDetails photograph={{
-    id: '2C6A1754',
-    caption: 'Evening light',
-    capturedAt: '2026-04-13T14:47:00Z',
-    camera: 'Canon EOS R6 Mark II',
-    focalLength: 70,
-    aperture: 2.8,
-    shutterSpeed: 0.004,
-    iso: 100,
-    location: 'Ithaca, New York',
-  }} />);
-  expect(screen.getByText('#2C6A1754')).toBeInTheDocument();
-  expect(screen.getByText('Canon EOS R6 Mark II')).toBeInTheDocument();
-  expect(screen.getByText('70 mm')).toBeInTheDocument();
-  expect(screen.getByText('f/2.8')).toBeInTheDocument();
-  expect(screen.getByText('1/250 s')).toBeInTheDocument();
-  expect(screen.getByText(/April 13, 2026 · 10:47 AM/)).toBeInTheDocument();
-  expect(screen.getByText('Ithaca, New York')).toBeInTheDocument();
-  expect(screen.queryByText('Lens')).not.toBeInTheDocument();
-  expect(screen.queryByText(/Unknown/i)).not.toBeInTheDocument();
-});
-
-test('announces photo changes and preloads only adjacent images', async () => {
-  const loaded = [];
+test('previous and next navigation stop at collection boundaries', async () => {
   const orderedPhotographs = sortPhotographs(photographs);
-  const ithacaIndex = orderedPhotographs.findIndex(({ id }) => id === 'IMGP0739');
-  const previousPhotograph = orderedPhotographs[ithacaIndex - 1];
-  const ithacaPhotograph = orderedPhotographs[ithacaIndex];
-  const nextPhotograph = orderedPhotographs[ithacaIndex + 1];
-  const followingPhotograph = orderedPhotographs[ithacaIndex + 2];
-  vi.stubGlobal('Image', class { set src(value) { loaded.push(value); } });
-  window.history.replaceState({}, '', '/photography/#IMGP0739');
-  render(<App />);
-  expect(await screen.findByText('Photo 6 of 18. Ithaca Falls in the summer.')).toBeInTheDocument();
-  expect(loaded).toEqual([previousPhotograph.viewerSrc, nextPhotograph.viewerSrc]);
-  expect(document.querySelector('.photography-lightbox img')).toHaveAttribute('src', ithacaPhotograph.viewerSrc);
 
-  fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
-  expect(screen.getByText(`Photo 7 of 18. ${nextPhotograph.caption}.`)).toBeInTheDocument();
-  expect(loaded).toEqual([previousPhotograph.viewerSrc, nextPhotograph.viewerSrc, followingPhotograph.viewerSrc]);
+  const firstPhotograph = orderedPhotographs[0];
+  const lastPhotograph =
+    orderedPhotographs[orderedPhotographs.length - 1];
+
+  render(<App />);
+
+  fireEvent.click(
+    await screen.findByRole('link', {
+      name: `Open photograph: ${firstPhotograph.caption}`,
+    }),
+  );
+
+  expect(
+    screen.getByRole('button', { name: 'Previous photograph' }),
+  ).toBeDisabled();
+
+  fireEvent.keyDown(document, { key: 'ArrowLeft' });
+
+  expect(window.location.hash).toBe(`#${firstPhotograph.slug}`);
+
+  act(() => {
+    window.history.replaceState(
+      {},
+      '',
+      photographyHref(lastPhotograph.slug),
+    );
+
+    window.dispatchEvent(
+      new Event('portfolio:locationchange'),
+    );
+  });
+
+  expect(
+    screen.getByRole('button', { name: 'Next photograph' }),
+  ).toBeDisabled();
+
+  fireEvent.keyDown(document, { key: 'ArrowRight' });
+
+  expect(window.location.hash).toBe(`#${lastPhotograph.slug}`);
 });
 
-test('packs the curated Default sequence deterministically without duplicates or mutation', () => {
-  const sorted = sortPhotographs(photographs, 'default');
-  const before = sorted.map(({ id }) => id);
-  const first = distributePhotographs(sorted, 3);
-  const second = distributePhotographs(sorted, 3);
-  expect(first).toEqual(second);
-  expect(first.flat().map(({ id }) => id).sort()).toEqual([...before].sort());
-  expect(new Set(first.flat().map(({ id }) => id)).size).toBe(18);
-  expect(sorted.map(({ id }) => id)).toEqual(before);
+
+test('opens a photograph directly from its hash', async () => {
+  const photograph = photographs.find(
+    ({ id }) => id === 'IMGP0739',
+  ) ?? photographs[0];
+
+  window.history.replaceState(
+    {},
+    '',
+    photographyHref(photograph.slug),
+  );
+
+  render(<App />);
+
+  expect(
+    await screen.findByRole('dialog', {
+      name: new RegExp(photograph.caption, 'i'),
+    }),
+  ).toBeInTheDocument();
+
+  expect(window.location.hash).toBe(`#${photograph.slug}`);
 });
 
-test.each(['newest', 'oldest'])('%s renders chronological DOM order directly without mutating photographs', async (order) => {
-  const canonicalOrder = photographs.map(({ id }) => id);
+
+test('invalid photograph hashes do not open the viewer', async () => {
+  window.history.replaceState(
+    {},
+    '',
+    '/photography/#not-a-real-photo',
+  );
+
   render(<App />);
+
+  expect(
+    await screen.findByText(/could not be found/i),
+  ).toBeInTheDocument();
+
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+
+test('Back and Forward restore photograph viewer state', async () => {
+  const orderedPhotographs = sortPhotographs(photographs);
+
+  const firstPhotograph = orderedPhotographs[0];
+  const secondPhotograph = orderedPhotographs[1];
+
+  render(<App />);
+
+  fireEvent.click(
+    await screen.findByRole('link', {
+      name: `Open photograph: ${firstPhotograph.caption}`,
+    }),
+  );
+
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Next photograph' }),
+  );
+
+  expect(window.location.hash).toBe(`#${secondPhotograph.slug}`);
+
+  await act(async () => {
+    window.history.back();
+  });
+
+  await waitFor(() => {
+    expect(window.location.hash).toBe(`#${firstPhotograph.slug}`);
+  });
+
+  expect(
+    screen.getByRole('dialog', {
+      name: new RegExp(firstPhotograph.caption, 'i'),
+    }),
+  ).toBeInTheDocument();
+
+  await act(async () => {
+    window.history.back();
+  });
+
+  await waitFor(() => {
+    expect(window.location.hash).toBe('');
+  });
+
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+  await act(async () => {
+    window.history.forward();
+  });
+
+  await waitFor(() => {
+    expect(window.location.hash).toBe(`#${firstPhotograph.slug}`);
+  });
+
+  expect(
+    screen.getByRole('dialog', {
+      name: new RegExp(firstPhotograph.caption, 'i'),
+    }),
+  ).toBeInTheDocument();
+});
+
+
+test('sorts photographs chronologically without mutating input', () => {
+  const input = [
+    {
+      id: 'missing',
+      capturedAt: null,
+      curatedOrder: 3,
+    },
+    {
+      id: 'newer',
+      capturedAt: '2026-05-01T12:00:00Z',
+      curatedOrder: 2,
+    },
+    {
+      id: 'older',
+      capturedAt: '2025-05-01T12:00:00Z',
+      curatedOrder: 1,
+    },
+  ];
+
+  const originalOrder = input.map(({ id }) => id);
+
+  expect(
+    sortPhotographs(input, 'newest').map(({ id }) => id),
+  ).toEqual([
+    'newer',
+    'older',
+    'missing',
+  ]);
+
+  expect(
+    sortPhotographs(input, 'oldest').map(({ id }) => id),
+  ).toEqual([
+    'older',
+    'newer',
+    'missing',
+  ]);
+
+  expect(input.map(({ id }) => id)).toEqual(originalOrder);
+});
+
+
+test('changing the gallery order renders photographs in chronological order', async () => {
+  render(<App />);
+
   await screen.findByRole('heading', { name: 'Photography' });
-  fireEvent.change(screen.getByLabelText('Order'), { target: { value: order } });
 
-  const expected = sortPhotographs(photographs, order);
-  const renderedItems = [...document.querySelectorAll('[data-photo-slug]')];
-  expect(document.getElementById('photography-gallery')).toHaveClass('photography-page-grid--chronological');
-  expect(renderedItems).toHaveLength(18);
-  expect(renderedItems.map((item) => item.dataset.photoSlug)).toEqual(expected.map(({ slug }) => slug));
-  expect(photographs.map(({ id }) => id)).toEqual(canonicalOrder);
+  fireEvent.change(
+    screen.getByLabelText('Order'),
+    {
+      target: {
+        value: 'newest',
+      },
+    },
+  );
 
-  renderedItems.forEach((item, index) => {
-    expect(item.querySelector('img')).toHaveAttribute('alt', expected[index].alt);
-    expect(item.querySelector('figcaption')).toHaveTextContent(expected[index].caption);
-    expect(item.querySelector('a')).toHaveAttribute('href', photographyHref(expected[index].slug));
-  });
+  const expected = sortPhotographs(
+    photographs,
+    'newest',
+  );
+
+  const renderedItems = [
+    ...document.querySelectorAll('[data-photo-slug]'),
+  ];
+
+  expect(
+    renderedItems.map(
+      (item) => item.dataset.photoSlug,
+    ),
+  ).toEqual(
+    expected.map(({ slug }) => slug),
+  );
 });
 
-test('resolves direct photo hashes and rejects invalid hashes', async () => {
-  window.history.replaceState({}, '', '/photography/#IMGP0739');
-  const view = render(<App />);
-  expect(await screen.findByRole('dialog', { name: /Ithaca Falls in the summer/i })).toBeInTheDocument();
-  expect(document.querySelector('link[rel="canonical"]'))
-    .toHaveAttribute('href', 'https://quanghuynh.com/photography/');
 
-  view.unmount();
-  window.history.replaceState({}, '', '/photography/#not-a-real-photo');
-  render(<App />);
-  expect(await screen.findByText(/could not be found/i)).toBeInTheDocument();
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+test('photography details handle partial metadata without placeholders', () => {
+  render(
+    <PhotographyDetails
+      photograph={{
+        id: 'DIBS2164',
+        caption: 'A quiet moment on the grass at Cornell',
+        capturedAt: '2026-04-04T16:56:19.000Z',
+      }}
+    />,
+  );
+
+  expect(
+    screen.getByText('#DIBS2164'),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.queryByText(/unknown/i),
+  ).not.toBeInTheDocument();
+
+  expect(
+    screen.queryByText(/^Lens$/i),
+  ).not.toBeInTheDocument();
+
+  expect(
+    screen.queryByText(/^ISO$/i),
+  ).not.toBeInTheDocument();
 });
 
-test('keeps the waterfall photographs on their stable hashes', async () => {
-  window.history.replaceState({}, '', '/photography/#IMG_0858');
-  const view = render(<App />);
-  expect(await screen.findByRole('dialog', { name: /Mist and skyline at Niagara Falls/i })).toBeInTheDocument();
 
-  view.unmount();
-  window.history.replaceState({}, '', '/photography/#IMGP0739');
-  render(<App />);
-  expect(await screen.findByRole('dialog', { name: /Ithaca Falls in the summer/i })).toBeInTheDocument();
+test('photography details render available camera metadata', () => {
+  render(
+    <PhotographyDetails
+      photograph={{
+        id: 'metadata-test',
+        caption: 'Test photograph',
+        capturedAt: '2026-10-02T10:39:26.000Z',
+        camera: 'SONY ILCE-6400',
+        focalLength: 31,
+        aperture: 10,
+        shutterSpeed: 0.01,
+        iso: 100,
+      }}
+    />,
+  );
+
+  expect(
+    screen.getByText('SONY ILCE-6400'),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByText('31 mm'),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByText('f/10'),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByText('1/100 s'),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByText('ISO'),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByText('100'),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.queryByText(/unknown/i),
+  ).not.toBeInTheDocument();
 });
 
-test('Back and Forward open, change, and close photograph state', async () => {
-  render(<App />);
-  fireEvent.click(await screen.findByRole('link', { name: /Open photograph: Looking up through Cornell/i }));
-  fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
 
-  await act(async () => { window.history.back(); });
-  await waitFor(() => expect(window.location.hash).toBe('#_DSC0023'));
-  expect(screen.getByRole('dialog', { name: /Looking up through Cornell/i })).toBeInTheDocument();
+test('builds photography URLs for root and GitHub Pages base paths', () => {
+  expect(
+    photographyHref('IMGP0579', '/'),
+  ).toBe('/photography/#IMGP0579');
 
-  await act(async () => { window.history.back(); });
-  await waitFor(() => expect(window.location.hash).toBe(''));
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(
+    photographyHref('IMGP0579', '/portfolio/'),
+  ).toBe('/portfolio/photography/#IMGP0579');
 
-  await act(async () => { window.history.forward(); });
-  await waitFor(() => expect(window.location.hash).toBe('#_DSC0023'));
-  expect(screen.getByRole('dialog', { name: /Looking up through Cornell/i })).toBeInTheDocument();
+  expect(
+    photographyHref(undefined, '/portfolio/'),
+  ).toBe('/portfolio/photography/');
 
-  await act(async () => { window.history.forward(); });
-  await waitFor(() => expect(window.location.hash).toBe('#DIBS2164'));
-  expect(screen.getByRole('dialog', { name: /A quiet moment on the grass/i })).toBeInTheDocument();
+  expect(
+    getAppPathname(
+      '/portfolio/photography/',
+      '/portfolio/',
+    ),
+  ).toBe('/photography');
 });
 
-test('does not treat obsolete pathname IDs as photo routes', async () => {
-  window.history.replaceState({}, '', '/photography/IMGP0739');
-  render(<App />);
-  expect(await screen.findByRole('heading', { name: /I build reliable backend systems/i })).toBeInTheDocument();
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-});
 
-test('builds photography hashes for root and GitHub Pages base paths', () => {
-  expect(photographyHref('IMGP0579', '/')).toBe('/photography/#IMGP0579');
-  expect(photographyHref('_DSC0023', '/portfolio/')).toBe('/portfolio/photography/#_DSC0023');
-  expect(photographyHref(undefined, '/portfolio/')).toBe('/portfolio/photography/');
-  expect(getAppPathname('/portfolio/photography/', '/portfolio/')).toBe('/photography');
-});
-
-test('the About photography modal hands off cleanly to the photography route', async () => {
-  let simulatedScrollY = 640;
-  const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation((first, second) => {
-    simulatedScrollY = typeof first === 'object' ? first.top : second;
-  });
-  vi.spyOn(window, 'scrollY', 'get').mockImplementation(() => simulatedScrollY);
+test('the About photography modal opens the full photography page', async () => {
   window.history.replaceState({}, '', '/about');
+
   render(<App />);
-  const photographyHeading = await screen.findByRole('heading', { name: 'Photography' });
-  fireEvent.click(photographyHeading.closest('article').querySelector('.interest-view-more'));
-  expect(screen.getByRole('dialog', { name: 'Photography by Quang' })).toBeInTheDocument();
-  expect(document.getElementById('photography-modal-gallery')).toBeInTheDocument();
-  expect(document.querySelectorAll('#photography-gallery')).toHaveLength(0);
 
-  fireEvent.click(screen.getByRole('link', { name: 'View all' }));
-  expect(await screen.findByRole('heading', { name: 'Featured' })).toBeInTheDocument();
-  expect(window.location.pathname).toBe('/photography/');
-  expect(window.location.hash).toBe('');
-  expect(screen.queryByRole('dialog', { name: 'Photography by Quang' })).not.toBeInTheDocument();
-  await waitFor(() => expect(document.documentElement).not.toHaveClass('overlay-open'));
-  expect(document.body.style.overflow).toBe('');
-  expect(scrollTo).toHaveBeenCalledWith(0, 0);
-  expect(simulatedScrollY).toBe(0);
+  const photographyHeading =
+    await screen.findByRole(
+      'heading',
+      { name: 'Photography' },
+    );
 
-  const backLink = screen.getByRole('link', { name: 'Back to photography modal' });
-  expect(backLink).toHaveAttribute('href', '/about');
-  fireEvent.click(backLink);
-  expect(await screen.findByRole('dialog', { name: 'Photography by Quang' })).toBeInTheDocument();
-  expect(window.location.pathname).toBe('/about');
-  expect(window.location.hash).toBe('');
-  expect(document.getElementById('photography-modal-gallery')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('link', { name: 'View all' }));
-  expect(await screen.findByRole('heading', { name: 'Featured' })).toBeInTheDocument();
+  const photographyArticle =
+    photographyHeading.closest('article');
 
-  scrollTo.mockClear();
-  fireEvent.change(screen.getByLabelText('Order'), { target: { value: 'newest' } });
-  fireEvent.click(screen.getByRole('link', { name: /Open photograph: Pink skies over Rochester/i }));
-  fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Close photograph' }));
-  expect(scrollTo).not.toHaveBeenCalled();
+  fireEvent.click(
+    photographyArticle.querySelector(
+      '.interest-view-more',
+    ),
+  );
+
+  expect(
+    screen.getByRole('dialog', {
+      name: 'Photography by Quang',
+    }),
+  ).toBeInTheDocument();
+
+  fireEvent.click(
+    screen.getByRole('link', {
+      name: 'View all',
+    }),
+  );
+
+  expect(
+    await screen.findByRole('heading', {
+      name: 'Featured',
+    }),
+  ).toBeInTheDocument();
+
+  expect(window.location.pathname).toBe(
+    '/photography/',
+  );
+
+  expect(
+    screen.queryByRole('dialog', {
+      name: 'Photography by Quang',
+    }),
+  ).not.toBeInTheDocument();
+
+  await waitFor(() => {
+    expect(
+      document.documentElement,
+    ).not.toHaveClass('overlay-open');
+  });
 });

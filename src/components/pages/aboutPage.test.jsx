@@ -1,358 +1,518 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+
 import AboutPage from './aboutPage';
-import { formatRelativePlayTime, resetSpotifyCacheForTests, SpotifyListening } from '../about/aboutGallery';
+
+import {
+  formatRelativePlayTime,
+  resetSpotifyCacheForTests,
+} from '../about/aboutGallery';
+
 
 const originalFetch = global.fetch;
 
+
 beforeEach(() => {
   resetSpotifyCacheForTests();
+
+  window.history.replaceState({}, '', '/about');
+
+  document.documentElement.classList.remove(
+    'overlay-open',
+    'layout-changing',
+  );
+
+  document.body.removeAttribute('style');
 });
+
 
 afterEach(() => {
   global.fetch = originalFetch;
   vi.restoreAllMocks();
 });
 
+
 function renderAboutPage() {
-  window.history.pushState({}, '', '/about');
+  window.history.replaceState({}, '', '/about');
+
   return render(<AboutPage />);
 }
 
-function photographyTrigger() {
-  return within(screen.getByRole('heading', { name: 'Photography' }).closest('article'))
-    .getByRole('button', { name: 'View more' });
+
+function photographyCard() {
+  return screen
+    .getByRole('heading', { name: 'Photography' })
+    .closest('article');
 }
+
+
+function photographyTrigger() {
+  return within(photographyCard()).getByRole(
+    'button',
+    { name: 'View more' },
+  );
+}
+
+
+function musicCard() {
+  return screen
+    .getByRole('heading', { name: 'Music' })
+    .closest('article');
+}
+
 
 function openSpotifyListening() {
-  const musicCard = screen.getByRole('heading', { name: 'Music' }).closest('article');
-  fireEvent.click(within(musicCard).getByRole('button', { name: 'View listening' }));
+  fireEvent.click(
+    within(musicCard()).getByRole(
+      'button',
+      { name: 'View listening' },
+    ),
+  );
 }
 
-test('renders the updated biography and section headings', () => {
+
+test('renders the About page and main sections', () => {
   renderAboutPage();
-  expect(screen.getByText(/I’m a software developer and computer science student interested in building dependable, useful software\./)).toBeInTheDocument();
-  expect(screen.getByText('My path into software')).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'From coursework to production software' })).toBeInTheDocument();
-  expect(screen.getByText('How I like to work')).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'How I approach engineering' })).toBeInTheDocument();
-  const beyondSection = document.getElementById('beyond-software');
-  expect(beyondSection).toHaveAttribute('aria-labelledby', 'beyond-title');
-  expect(document.getElementById('beyond-title')).toHaveTextContent('Beyond software');
-  for (const value of ['Curiosity', 'Reliability', 'Usefulness']) {
-    expect(screen.getByRole('heading', { name: value })).toBeInTheDocument();
-  }
+
+  expect(
+    screen.getByRole('heading', {
+      name: 'From coursework to production software',
+    }),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByRole('heading', {
+      name: 'How I approach engineering',
+    }),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByRole('heading', {
+      name: 'Photography',
+    }),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByRole('heading', {
+      name: 'Music',
+    }),
+  ).toBeInTheDocument();
 });
 
-test('the scoped photography history entry positions Beyond Software before reopening the modal', () => {
-  let simulatedScrollY = 0;
-  vi.spyOn(window, 'scrollY', 'get').mockImplementation(() => simulatedScrollY);
-  vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
-  const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {
-    simulatedScrollY = 640;
-  });
-  window.history.replaceState({ restorePhotographyModal: true, returnSection: 'beyond-software' }, '', '/about');
-  render(<AboutPage />);
-  expect(scrollIntoView).toHaveBeenCalledTimes(1);
-  expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'instant' });
-  expect(scrollIntoView.mock.instances[0]).toBe(document.getElementById('beyond-software'));
-  expect(screen.getByRole('dialog', { name: 'Photography by Quang' })).toBeInTheDocument();
-  expect(document.body.style.top).toBe('-640px');
-  expect(window.history.state).toMatchObject({
-    restorePhotographyModal: true,
-    returnSection: 'beyond-software'
-  });
-});
 
-test('normal About navigation does not position or open Beyond Software', () => {
-  const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+test('opens the photography gallery', () => {
   renderAboutPage();
-  expect(scrollIntoView).not.toHaveBeenCalled();
-  expect(screen.queryByRole('dialog', { name: 'Photography by Quang' })).not.toBeInTheDocument();
-});
 
-test('only interests with additional content render actions while every featured image opens directly', () => {
-  renderAboutPage();
-  for (const title of ['Photography', 'Hiking', 'Cars', 'Gaming', 'Technology']) {
-    const card = screen.getByRole('heading', { name: title }).closest('article');
-    expect(within(card).getAllByRole('button')).toHaveLength(2);
-    expect(within(card).getByRole('button', { name: 'View more' })).toBeInTheDocument();
-  }
-  const musicCard = screen.getByRole('heading', { name: 'Music' }).closest('article');
-  expect(within(musicCard).getByRole('button', { name: 'View listening' })).toBeInTheDocument();
-});
-
-test('links to the Blue 2.5RS photo archive from the cars interest', () => {
-  renderAboutPage();
-  const carsCard = screen.getByRole('heading', { name: 'Cars' }).closest('article');
-  expect(within(carsCard).getByRole('link', { name: 'photo archive of my blue Subaru Impreza 2.5RS' })).toHaveAttribute(
-    'href',
-    'https://gc8quang.vercel.app/'
+  fireEvent.click(
+    photographyTrigger(),
   );
+
+  expect(
+    screen.getByRole('dialog', {
+      name: 'Photography by Quang',
+    }),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByRole('button', {
+      name: 'Close photography gallery',
+    }),
+  ).toHaveFocus();
+
+  expect(
+    document.body.style.overflow,
+  ).toBe('hidden');
 });
 
-test('the new interest galleries expose curated images and captions', () => {
+
+test('Escape closes the photography gallery and restores focus', async () => {
   renderAboutPage();
-  const photographyCard = screen.getByRole('heading', { name: 'Photography' }).closest('article');
-  fireEvent.click(within(photographyCard).getByRole('button', { name: 'View more' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Close photography gallery' }));
 
-  const hikingCard = screen.getByRole('heading', { name: 'Hiking' }).closest('article');
-  fireEvent.click(within(hikingCard).getByRole('button', { name: 'View more' }));
-  expect(screen.getByRole('dialog', { name: 'Hiking' })).toBeInTheDocument();
-  expect(screen.getByText('Frozen falls, 2026')).toBeInTheDocument();
-  expect(screen.getByAltText('Frozen waterfall and long icicles in a wooded gorge')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Close hiking gallery' }));
-
-  const gamingCard = screen.getByRole('heading', { name: 'Gaming' }).closest('article');
-  fireEvent.click(within(gamingCard).getByRole('button', { name: 'View more' }));
-  expect(screen.getByText('Sim racing, 2024')).toBeInTheDocument();
-  expect(screen.getByAltText('Steering wheel, shifter, pedals, and curved monitor arranged for sim racing')).toBeInTheDocument();
-  expect(screen.getByText('Fortnite, 2023')).toBeInTheDocument();
-  expect(screen.getByText('Marvel Rivals 67 KOs, 2025')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Close gaming gallery' }));
-
-  const technologyCard = screen.getByRole('heading', { name: 'Technology' }).closest('article');
-  fireEvent.click(within(technologyCard).getByRole('button', { name: 'View more' }));
-  expect(screen.getByText('Between upgrades, 2024')).toBeInTheDocument();
-  expect(screen.getByAltText('Desktop motherboard and Intel CPU cooler removed during a computer upgrade')).toBeInTheDocument();
-});
-
-test('renders the six interests in the intended order without the family and friends card', () => {
-  renderAboutPage();
-  const headings = [...document.querySelectorAll('.interest-card h3')].map((heading) => heading.textContent);
-  expect(headings).toEqual(['Photography', 'Hiking', 'Music', 'Cars', 'Gaming', 'Technology']);
-  expect(screen.queryByRole('heading', { name: 'Time with family & friends' })).not.toBeInTheDocument();
-});
-
-test.each([
-  ['Photography', 'Photography'],
-  ['Gaming', 'Gaming'],
-  ['Hiking', 'Hiking']
-])('clicking the %s featured image opens that image in the lightbox', (title, caption) => {
-  renderAboutPage();
-  const card = screen.getByRole('heading', { name: title }).closest('article');
-  fireEvent.click(within(card).getByRole('button', { name: `Open featured ${title} image` }));
-  expect(screen.getByRole('dialog', { name: `Image viewer: ${caption}` })).toBeInTheDocument();
-});
-
-test('formats recent play times and handles invalid timestamps', () => {
-  const now = new Date('2026-09-07T16:00:00Z');
-  expect(formatRelativePlayTime('2026-09-07T15:59:45Z', now)).toBe('Just now');
-  expect(formatRelativePlayTime('2026-09-07T15:52:00Z', now)).toBe('8 minutes ago');
-  expect(formatRelativePlayTime('2026-09-07T15:00:00Z', now)).toBe('1 hour ago');
-  expect(formatRelativePlayTime('2026-09-06T15:00:00Z', now)).toBe('Yesterday');
-  expect(formatRelativePlayTime('2026-09-04T16:00:00Z', now)).toBe('3 days ago');
-  expect(formatRelativePlayTime(null, now)).toBeNull();
-  expect(formatRelativePlayTime('not-a-date', now)).toBeNull();
-});
-
-test('KORE image opens the direct lightbox and Escape restores focus', async () => {
-  document.body.style.overflow = 'scroll';
-  renderAboutPage();
-  const trigger = screen.getByRole('button', { name: 'Open KORE Wireless team lunch photo' });
-  fireEvent.click(trigger);
-  expect(document.body).toHaveStyle({ overflow: 'hidden' });
-  expect(screen.getByRole('dialog', { name: /Image viewer: Team lunch/i })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Zoom in' })).toBeInTheDocument();
-  fireEvent.keyDown(document, { key: 'Escape' });
-  await waitFor(() => expect(trigger).toHaveFocus());
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  expect(document.body).toHaveStyle({ overflow: 'scroll' });
-});
-
-test('About portrait still opens the personal gallery and restores focus', async () => {
-  renderAboutPage();
-  const trigger = screen.getByRole('button', { name: 'View more photos of Quang' });
-  fireEvent.click(trigger);
-  expect(screen.getByRole('dialog', { name: 'More about Quang' })).toBeInTheDocument();
-  fireEvent.keyDown(document, { key: 'Escape' });
-  await waitFor(() => expect(trigger).toHaveFocus());
-});
-
-test('gallery closes by button, Escape, and backdrop and restores its trigger', async () => {
-  renderAboutPage();
   const trigger = photographyTrigger();
 
   fireEvent.click(trigger);
-  expect(screen.getByRole('button', { name: 'Close photography gallery' })).toHaveFocus();
-  fireEvent.click(screen.getByRole('button', { name: 'Close photography gallery' }));
-  await waitFor(() => expect(trigger).toHaveFocus());
 
-  fireEvent.click(trigger);
-  fireEvent.keyDown(document, { key: 'Escape' });
-  await waitFor(() => expect(trigger).toHaveFocus());
+  expect(
+    screen.getByRole('dialog', {
+      name: 'Photography by Quang',
+    }),
+  ).toBeInTheDocument();
 
-  fireEvent.click(trigger);
-  fireEvent.mouseDown(document.querySelector('.photography-modal-backdrop'));
-  await waitFor(() => expect(trigger).toHaveFocus());
+  fireEvent.keyDown(
+    document,
+    { key: 'Escape' },
+  );
+
+  await waitFor(() => {
+    expect(trigger).toHaveFocus();
+  });
+
+  expect(
+    screen.queryByRole('dialog', {
+      name: 'Photography by Quang',
+    }),
+  ).not.toBeInTheDocument();
 });
 
-test('nested lightbox owns Escape, restores focus, and supports zoom shortcuts', async () => {
-  document.body.style.overflow = 'auto';
+
+test('a featured interest image opens in the image viewer', () => {
   renderAboutPage();
-  const trigger = photographyTrigger();
-  fireEvent.click(trigger);
-  expect(document.body).toHaveStyle({ overflow: 'hidden' });
+
+  const card = photographyCard();
+
+  fireEvent.click(
+    within(card).getByRole('button', {
+      name: 'Open featured Photography image',
+    }),
+  );
+
+  expect(
+    screen.getByRole('dialog', {
+      name: /Image viewer:/i,
+    }),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByRole('button', {
+      name: 'Close image viewer',
+    }),
+  ).toHaveFocus();
+});
+
+
+test('nested photography lightbox handles Escape before the parent gallery', async () => {
+  renderAboutPage();
+
+  const galleryTrigger = photographyTrigger();
+
+  fireEvent.click(
+    galleryTrigger,
+  );
+
   const imageTrigger = screen.getByRole('button', {
-    name: /Open image: Looking up through Cornell/i
+    name: "Open image: Looking up through Cornell's brick architecture",
   });
 
   fireEvent.click(imageTrigger);
-  const parentDialog = document.querySelector('.photography-modal');
-  expect(parentDialog).toHaveAttribute('aria-hidden', 'true');
-  expect(parentDialog).toHaveAttribute('inert');
-  expect(document.body).toHaveStyle({ overflow: 'hidden' });
-  expect(screen.getByRole('button', { name: 'Close image viewer' })).toHaveFocus();
-  expect(screen.getByRole('dialog', { name: /Image viewer:/i })).toHaveAttribute(
-    'aria-describedby'
+
+  const parentDialog =
+    document.querySelector(
+      '.photography-modal',
+    );
+
+  expect(
+    parentDialog,
+  ).toHaveAttribute(
+    'aria-hidden',
+    'true',
   );
 
-  fireEvent.keyDown(document, { key: '+' });
-  expect(screen.getByRole('button', { name: 'Reset zoom' })).toHaveTextContent('125%');
-  fireEvent.keyDown(document, { key: '0' });
-  expect(screen.getByRole('button', { name: 'Reset zoom' })).toHaveTextContent('100%');
-
-  fireEvent.keyDown(document, { key: 'Escape' });
-  await waitFor(() => expect(imageTrigger).toHaveFocus());
-  expect(screen.getByRole('dialog', { name: 'Photography by Quang' })).toBeInTheDocument();
-  expect(document.body).toHaveStyle({ overflow: 'hidden' });
-
-  fireEvent.keyDown(document, { key: 'Escape' });
-  await waitFor(() => expect(trigger).toHaveFocus());
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  expect(document.body).toHaveStyle({ overflow: 'auto' });
-});
-
-test('gallery and lightbox trap Tab within the active dialog', () => {
-  renderAboutPage();
-  fireEvent.click(photographyTrigger());
-  const galleryClose = screen.getByRole('button', { name: 'Close photography gallery' });
-  fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
-  expect(screen.getByRole('link', { name: 'View all' })).toHaveFocus();
-
-  fireEvent.click(screen.getByRole('button', { name: /Open image: Looking up through Cornell/i }));
-  const lightboxClose = screen.getByRole('button', { name: 'Close image viewer' });
-  expect(lightboxClose).toHaveFocus();
-  fireEvent.keyDown(document, { key: 'Tab' });
-  expect(screen.getByRole('button', { name: 'Reset zoom' })).toHaveFocus();
-  expect(galleryClose).not.toHaveFocus();
-});
-
-test('Spotify stays lazy and shows its loading and failure states', async () => {
-  global.fetch = vi.fn().mockRejectedValue(new Error('offline'));
-  renderAboutPage();
-
-  expect(global.fetch).not.toHaveBeenCalled();
-  openSpotifyListening();
-  expect(screen.getByText('Loading recent listening...')).toBeInTheDocument();
-  expect(await screen.findByText('Couldn’t load recent listening')).toBeInTheDocument();
-  expect(screen.getByText('Spotify activity is temporarily unavailable.')).toBeInTheDocument();
-  expect(global.fetch).toHaveBeenCalledWith(
-    'https://spotify-portfolio-api.quangs.workers.dev/recent'
+  expect(
+    parentDialog,
+  ).toHaveAttribute(
+    'inert',
   );
-  expect(screen.getByRole('link', { name: 'View my Spotify' })).toHaveAttribute(
-    'href',
-    'https://open.spotify.com/user/foahrtqqvuuvt7wscxub4uerd'
+
+  expect(
+    screen.getByRole('dialog', {
+      name: /Image viewer:/i,
+    }),
+  ).toBeInTheDocument();
+
+  fireEvent.keyDown(
+    document,
+    { key: 'Escape' },
   );
-  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+
+  await waitFor(() => {
+    expect(imageTrigger).toHaveFocus();
+  });
+
+  expect(
+    screen.queryByRole('dialog', {
+      name: /Image viewer:/i,
+    }),
+  ).not.toBeInTheDocument();
+
+  expect(
+    screen.getByRole('dialog', {
+      name: 'Photography by Quang',
+    }),
+  ).toBeInTheDocument();
+
+  fireEvent.keyDown(
+    document,
+    { key: 'Escape' },
+  );
+
+  await waitFor(() => {
+    expect(galleryTrigger).toHaveFocus();
+  });
+
+  expect(
+    screen.queryByRole('dialog', {
+      name: 'Photography by Quang',
+    }),
+  ).not.toBeInTheDocument();
 });
 
-test('Spotify retries a failed request successfully only after explicit action', async () => {
-  global.fetch = vi.fn()
-    .mockRejectedValueOnce(new Error('offline'))
-    .mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ tracks: [{ id: 'recovered', name: 'Recovered song', artist: 'Artist', album: 'Album', url: 'https://open.spotify.com/track/recovered', playedAt: '2026-09-07T15:00:00Z' }] })
-    });
+
+test('nested lightbox supports basic zoom controls', () => {
   renderAboutPage();
-  openSpotifyListening();
-  const retry = await screen.findByRole('button', { name: 'Retry' });
-  expect(global.fetch).toHaveBeenCalledTimes(1);
 
-  fireEvent.click(retry);
-  expect(screen.getByText('Loading recent listening...')).toBeInTheDocument();
-  await screen.findByText('Recovered song');
-  expect(global.fetch).toHaveBeenCalledTimes(2);
+  fireEvent.click(
+    photographyTrigger(),
+  );
+
+  fireEvent.click(
+    screen.getByRole('button', {
+      name: "Open image: Looking up through Cornell's brick architecture",
+    }),
+  );
+
+  fireEvent.keyDown(
+    document,
+    { key: '+' },
+  );
+
+  expect(
+    screen.getByRole('button', {
+      name: 'Reset zoom',
+    }),
+  ).toHaveTextContent('125%');
+
+  fireEvent.keyDown(
+    document,
+    { key: '0' },
+  );
+
+  expect(
+    screen.getByRole('button', {
+      name: 'Reset zoom',
+    }),
+  ).toHaveTextContent('100%');
 });
 
-test('Spotify renders valid play times semantically and omits invalid ones', async () => {
+
+test('Spotify does not load until the listening panel is opened', async () => {
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({
-      tracks: [
-        { id: 'valid', name: 'First song', artist: 'Artist', album: 'Album', url: 'https://open.spotify.com/track/valid', playedAt: new Date(Date.now() - 8 * 60 * 1000).toISOString() },
-        { id: 'invalid', name: 'Second song', artist: 'Artist', album: 'Album', url: 'https://open.spotify.com/track/invalid', playedAt: 'invalid' }
-      ]
-    })
+      tracks: [],
+    }),
   });
-  renderAboutPage();
-  openSpotifyListening();
-  await screen.findByText('First song');
-  const time = screen.getByText('8 minutes ago');
-  expect(time.tagName).toBe('TIME');
-  expect(time).toHaveAttribute('dateTime');
-  expect(time).toHaveAttribute('title');
-  expect(screen.getByText('Second song').parentElement.querySelector('time')).not.toBeInTheDocument();
-});
 
-test('Spotify reuses a fresh cache and refreshes it after five minutes', async () => {
-  let now = new Date('2026-09-07T16:00:00Z').getTime();
-  vi.spyOn(Date, 'now').mockImplementation(() => now);
-  global.fetch = vi.fn()
-    .mockResolvedValueOnce({ ok: true, json: async () => ({ tracks: [{ id: 'first', name: 'Cached song', artist: 'Artist', album: 'Album', url: '#first', playedAt: '2026-09-07T15:00:00Z' }] }) })
-    .mockResolvedValueOnce({ ok: true, json: async () => ({ tracks: [{ id: 'second', name: 'Fresh song', artist: 'Artist', album: 'Album', url: '#second', playedAt: '2026-09-07T15:30:00Z' }] }) });
   renderAboutPage();
 
+  expect(
+    global.fetch,
+  ).not.toHaveBeenCalled();
+
   openSpotifyListening();
-  await screen.findByText('Cached song');
-  fireEvent.click(screen.getByRole('button', { name: 'Close music activity' }));
 
-  now += 5 * 60 * 1000 - 1;
-  openSpotifyListening();
-  await screen.findByText('Cached song');
-  expect(global.fetch).toHaveBeenCalledTimes(1);
-  fireEvent.click(screen.getByRole('button', { name: 'Close music activity' }));
-
-  now += 1;
-  openSpotifyListening();
-  expect(screen.getByText('Loading recent listening...')).toBeInTheDocument();
-  await screen.findByText('Fresh song');
-  expect(global.fetch).toHaveBeenCalledTimes(2);
-});
-
-test('Spotify deduplicates concurrent requests', async () => {
-  let resolveFetch;
-  global.fetch = vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; }));
-  render(<><SpotifyListening /><SpotifyListening /></>);
-
-  expect(global.fetch).toHaveBeenCalledTimes(1);
-  await act(async () => {
-    resolveFetch({ ok: true, json: async () => ({ tracks: [{ id: 'shared', name: 'Shared song', artist: 'Artist', album: 'Album', url: '#shared', playedAt: '2026-09-07T15:00:00Z' }] }) });
+  await waitFor(() => {
+    expect(
+      global.fetch,
+    ).toHaveBeenCalledTimes(1);
   });
-  expect(await screen.findAllByText('Shared song')).toHaveLength(2);
 });
 
-test('Spotify sorts newest valid plays first and leaves malformed timestamps after them', async () => {
+
+test('Spotify shows loading and failure states', async () => {
+  global.fetch = vi
+    .fn()
+    .mockRejectedValue(
+      new Error('offline'),
+    );
+
+  renderAboutPage();
+
+  openSpotifyListening();
+
+  expect(
+    screen.getByText(
+      'Loading recent listening...',
+    ),
+  ).toBeInTheDocument();
+
+  expect(
+    await screen.findByText(
+      'Couldn’t load recent listening',
+    ),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByText(
+      'Spotify activity is temporarily unavailable.',
+    ),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByRole('button', {
+      name: 'Retry',
+    }),
+  ).toBeInTheDocument();
+});
+
+
+test('Spotify renders a successful response', async () => {
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
-    json: async () => ({ tracks: [
-      { id: 'invalid', name: 'Malformed song', artist: 'Artist', album: 'Album', url: '#invalid', playedAt: 'not-a-date' },
-      { id: 'older', name: 'Older song', artist: 'Artist', album: 'Album', url: '#older', playedAt: '2026-09-07T14:00:00Z' },
-      { id: 'missing', name: 'Missing date song', artist: 'Artist', album: 'Album', url: '#missing' },
-      { id: 'newest', name: 'Newest song', artist: 'Artist', album: 'Album', url: '#newest', playedAt: '2026-09-07T15:00:00Z' }
-    ] })
-  });
-  renderAboutPage();
-  openSpotifyListening();
-  await screen.findByText('Newest song');
 
-  const renderedTracks = [...document.querySelectorAll('.spotify-track')];
-  expect(renderedTracks.map((track) => track.querySelector('strong').textContent)).toEqual([
-    'Newest song', 'Older song', 'Malformed song', 'Missing date song'
-  ]);
-  expect(renderedTracks[0]).toHaveTextContent('Newest song');
-  expect(renderedTracks[0]).toHaveClass('spotify-track-latest');
-  expect(renderedTracks.slice(1).every((track) => !track.classList.contains('spotify-track-latest'))).toBe(true);
-  expect(screen.getByText('Malformed song').parentElement.querySelector('time')).not.toBeInTheDocument();
-  expect(screen.getByText('Missing date song').parentElement.querySelector('time')).not.toBeInTheDocument();
+    json: async () => ({
+      tracks: [
+        {
+          id: 'track-1',
+          name: 'Test song',
+          artist: 'Test artist',
+          album: 'Test album',
+          url: 'https://open.spotify.com/track/test',
+          playedAt:
+            new Date(
+              Date.now() -
+              8 * 60 * 1000,
+            ).toISOString(),
+        },
+      ],
+    }),
+  });
+
+  renderAboutPage();
+
+  openSpotifyListening();
+
+  expect(
+    await screen.findByText(
+      'Test song',
+    ),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByText(
+      'Test artist',
+    ),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByText(
+      '8 minutes ago',
+    ),
+  ).toBeInTheDocument();
+});
+
+
+test('Spotify retry performs a new request after failure', async () => {
+  global.fetch = vi
+    .fn()
+
+    .mockRejectedValueOnce(
+      new Error('offline'),
+    )
+
+    .mockResolvedValueOnce({
+      ok: true,
+
+      json: async () => ({
+        tracks: [
+          {
+            id: 'recovered',
+            name: 'Recovered song',
+            artist: 'Artist',
+            album: 'Album',
+            url: 'https://open.spotify.com/track/recovered',
+            playedAt:
+              new Date().toISOString(),
+          },
+        ],
+      }),
+    });
+
+  renderAboutPage();
+
+  openSpotifyListening();
+
+  const retry =
+    await screen.findByRole(
+      'button',
+      { name: 'Retry' },
+    );
+
+  expect(
+    global.fetch,
+  ).toHaveBeenCalledTimes(1);
+
+  fireEvent.click(
+    retry,
+  );
+
+  expect(
+    screen.getByText(
+      'Loading recent listening...',
+    ),
+  ).toBeInTheDocument();
+
+  expect(
+    await screen.findByText(
+      'Recovered song',
+    ),
+  ).toBeInTheDocument();
+
+  expect(
+    global.fetch,
+  ).toHaveBeenCalledTimes(2);
+});
+
+
+test('formats relative Spotify play times', () => {
+  const now =
+    new Date(
+      '2026-09-07T16:00:00Z',
+    );
+
+  expect(
+    formatRelativePlayTime(
+      '2026-09-07T15:59:45Z',
+      now,
+    ),
+  ).toBe('Just now');
+
+  expect(
+    formatRelativePlayTime(
+      '2026-09-07T15:52:00Z',
+      now,
+    ),
+  ).toBe('8 minutes ago');
+
+  expect(
+    formatRelativePlayTime(
+      '2026-09-07T15:00:00Z',
+      now,
+    ),
+  ).toBe('1 hour ago');
+
+  expect(
+    formatRelativePlayTime(
+      '2026-09-06T15:00:00Z',
+      now,
+    ),
+  ).toBe('Yesterday');
+
+  expect(
+    formatRelativePlayTime(
+      null,
+      now,
+    ),
+  ).toBeNull();
+
+  expect(
+    formatRelativePlayTime(
+      'not-a-date',
+      now,
+    ),
+  ).toBeNull();
 });

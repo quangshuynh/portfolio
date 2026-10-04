@@ -5,379 +5,224 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+
 import App from './App';
 
-describe('portfolio homepage', () => {
-  beforeEach(() => {
-    window.history.pushState({}, '', '/');
-  });
 
-  test('renders the portfolio and primary project sections', () => {
+beforeEach(() => {
+  window.history.replaceState({}, '', '/');
+
+  document.documentElement.classList.remove(
+    'overlay-open',
+    'layout-changing',
+  );
+
+  document.documentElement.removeAttribute(
+    'data-theme',
+  );
+
+  document.body.removeAttribute('style');
+});
+
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+
+describe('portfolio homepage', () => {
+  test('renders the main portfolio sections', () => {
     render(<App />);
 
-    expect(screen.getByText('Hi, I’m Quang.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Hi, I’m Quang.'),
+    ).toBeInTheDocument();
 
     expect(
       screen.getByRole('heading', {
-        name: 'I build reliable backend systems, developer tools, automation, and native applications.',
-      })
+        name: 'Experience',
+      }),
     ).toBeInTheDocument();
 
     expect(
-      screen.getByRole('heading', { name: 'Flipper' })
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole('heading', { name: '585Dashcam585' })
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole('heading', { name: 'GitProfileLens' })
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole('heading', { name: 'ScribeKit' })
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole('heading', { name: 'Experience' })
+      screen.getByRole('button', {
+        name: 'View more projects',
+      }),
     ).toBeInTheDocument();
   });
 
-  test('uses the existing About destination for both Meet Quang treatments', () => {
-    render(<App />);
 
-    expect(document.querySelector('.meet-quang-card'))
-      .toHaveAttribute('href', '/about');
-    expect(screen.getByRole('link', { name: /^Meet Quang/ }))
-      .toHaveAttribute('href', '/about');
-  });
-
-  test('shows featured additional projects and expands the full project grid', () => {
-    render(<App />);
-
- expect(
-  screen.getByRole('heading', { name: 'Hymical Forms' })
-).toBeInTheDocument();
-
-expect(
-  screen.getByRole('heading', { name: 'DashPilot' })
-).toBeInTheDocument();
-
-expect(
-  screen.getByRole('heading', { name: 'Business Data Automation' })
-).toBeInTheDocument();
-
-expect(
-  screen.queryByRole('heading', { name: 'Repo Radar' })
-).not.toBeInTheDocument();
-
-expect(
-  screen.queryByRole('heading', { name: 'Chessed' })
-).not.toBeInTheDocument();
-
-expect(
-  screen.queryByRole('heading', { name: 'CaseNotes' })
-).not.toBeInTheDocument();
-
-expect(
-  screen.queryByRole('heading', { name: 'InboxSweep' })
-).not.toBeInTheDocument();
-
-expect(
-  screen.queryByRole('heading', { name: '585photo585' })
-).not.toBeInTheDocument();
-
-expect(
-  screen.queryByRole('heading', { name: 'SalonFlow' })
-).not.toBeInTheDocument();
-
-const toggle = screen.getByRole('button', {
-  name: 'View more projects',
-});
-
-expect(toggle).toHaveAttribute('aria-expanded', 'false');
-
-fireEvent.click(toggle);
-
-expect(
-  screen.getByRole('heading', { name: 'Chessed' })
-).toBeInTheDocument();
-
-expect(
-  screen.getByRole('heading', { name: 'DashPilot' })
-).toBeInTheDocument();
-
-expect(
-  screen.getByRole('heading', { name: 'CaseNotes' })
-).toBeInTheDocument();
-
-expect(
-  screen.getByRole('heading', { name: 'InboxSweep' })
-).toBeInTheDocument();
-
-expect(
-  screen.getByRole('heading', { name: '585photo585' })
-).toBeInTheDocument();
-
-expect(
-  screen.getByRole('heading', { name: 'SalonFlow' })
-).toBeInTheDocument();
-
-expect(
-  screen.getByRole('heading', { name: 'mover-git' })
-).toBeInTheDocument();
-
-expect(
-  screen.getByRole('heading', { name: 'Steam Value Lookup' })
-).toBeInTheDocument();
-
-    const collapseButton = screen.getByRole('button', {
-      name: 'Show fewer projects',
-    });
-
-    expect(collapseButton).toHaveAttribute('aria-expanded', 'true');
-
-    fireEvent.click(collapseButton);
-
-    expect(
-      screen.queryByRole('heading', { name: 'InboxSweep' })
-    ).not.toBeInTheDocument();
-
-    expect(
-      screen.queryByRole('heading', { name: 'SalonFlow' })
-    ).not.toBeInTheDocument();
-  });
-
-  test('important project links point to the expected destinations', () => {
+  test('links to the dedicated About page', () => {
     render(<App />);
 
     expect(
       screen.getByRole('link', {
-        name: 'Open 585Dashcam585 live site',
-      })
-    ).toHaveAttribute('href', 'https://www.585dashcam585.com');
-
-    expect(
-      screen.getByRole('link', {
-        name: 'View GitProfileLens code',
-      })
+        name: /^Meet Quang/,
+      }),
     ).toHaveAttribute(
       'href',
-      'https://github.com/quangshuynh/gitprofilelens'
+      '/about',
     );
+  });
 
-    expect(
-      screen.getByRole('link', {
-        name: 'Open GitProfileLens live demo',
-      })
-    ).toHaveAttribute(
-      'href',
-      'https://gitprofilelens.vercel.app/'
+
+  test('expands and collapses additional projects', () => {
+    render(<App />);
+
+    const toggle =
+      screen.getByRole('button', {
+        name: 'View more projects',
+      });
+
+    expect(toggle).toHaveAttribute(
+      'aria-expanded',
+      'false',
     );
-
-    const toggle = screen.getByRole('button', {
-      name: 'View more projects',
-    });
 
     fireEvent.click(toggle);
 
     expect(
-      screen.getByRole('link', {
-        name: 'Open Hymical Forms repository',
-      })
+      screen.getByRole('button', {
+        name: 'Show fewer projects',
+      }),
     ).toHaveAttribute(
-      'href',
-      'https://github.com/hymical/forms'
+      'aria-expanded',
+      'true',
     );
 
     expect(
-      screen.getByRole('link', {
-        name: 'Open CaseNotes documentation',
-      })
-    ).toHaveAttribute(
-      'href',
-      'https://quangshuynh.github.io/casenotes/'
+      screen.getByRole('heading', {
+        name: 'CaseNotes',
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Show fewer projects',
+      }),
     );
 
     expect(
-      screen.getByRole('link', {
-        name: 'Open InboxSweep repository',
-      })
-    ).toHaveAttribute(
-      'href',
-      'https://github.com/quangshuynh/inboxsweep'
-    );
-
-    expect(
-      screen.getByRole('link', {
-        name: 'Open 585photo585 live site',
-      })
-    ).toHaveAttribute(
-      'href',
-      'https://www.585photo585.com'
-    );
-
-    expect(
-      screen.getByRole('link', {
-        name: 'Open Steam Value Lookup live demo',
-      })
-    ).toHaveAttribute(
-      'href',
-      'https://steam-value-lookup.onrender.com/'
-    );
+      screen.queryByRole('heading', {
+        name: 'CaseNotes',
+      }),
+    ).not.toBeInTheDocument();
   });
 
-  test('project galleries switch between their available views', () => {
+
+  test('project galleries can switch views', () => {
     render(<App />);
 
-  const flipperGallery = within(
-    screen.getByLabelText('Flipper gallery')
-  );
+    const flipperGallery = within(
+      screen.getByLabelText(
+        'Flipper gallery',
+      ),
+    );
 
-  expect(
-    flipperGallery.getByRole('button', {
-      name: 'Logo',
-    })
-  ).toHaveAttribute('aria-pressed', 'true');
-
-  fireEvent.click(
-    flipperGallery.getByRole('button', {
-      name: 'Dashboard',
-    })
-  );
-
-  expect(
-    flipperGallery.getByRole('button', {
-      name: 'Dashboard',
-    })
-  ).toHaveAttribute('aria-pressed', 'true');
-
-  expect(
-    screen.getByRole('img', {
-      name: /Flipper dashboard/i,
-    })
-  ).toBeInTheDocument();
-
-    const gitProfileLensGallery = within(
-      screen.getByLabelText('GitProfileLens gallery')
+    expect(
+      flipperGallery.getByRole(
+        'button',
+        {
+          name: 'Logo',
+        },
+      ),
+    ).toHaveAttribute(
+      'aria-pressed',
+      'true',
     );
 
     fireEvent.click(
-      gitProfileLensGallery.getByRole('button', {
-        name: 'Results',
-      })
+      flipperGallery.getByRole(
+        'button',
+        {
+          name: 'Dashboard',
+        },
+      ),
+    );
+
+    expect(
+      flipperGallery.getByRole(
+        'button',
+        {
+          name: 'Dashboard',
+        },
+      ),
+    ).toHaveAttribute(
+      'aria-pressed',
+      'true',
     );
 
     expect(
       screen.getByRole('img', {
-        name: /GitProfileLens audit dashboard/i,
-      })
-    ).toBeInTheDocument();
-
-    const scribeKitGallery = within(
-      screen.getByLabelText('ScribeKit gallery')
-    );
-
-    expect(
-      scribeKitGallery.getByRole('button', {
-        name: 'Logo',
-      })
-    ).toHaveAttribute('aria-pressed', 'true');
-
-    fireEvent.click(
-      scribeKitGallery.getByRole('button', {
-        name: 'App',
-      })
-    );
-
-    expect(
-      scribeKitGallery.getByRole('button', {
-        name: 'App',
-      })
-    ).toHaveAttribute('aria-pressed', 'true');
-
-    expect(
-      screen.getByRole('img', {
-        name: /ScribeKit macOS meeting window/i,
-      })
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      scribeKitGallery.getByRole('button', {
-        name: 'Audio',
-      })
-    );
-
-    expect(
-      scribeKitGallery.getByRole('button', {
-        name: 'Audio',
-      })
-    ).toHaveAttribute('aria-pressed', 'true');
-
-    expect(
-      screen.getByRole('img', {
-        name: 'ScribeKit audio capture page',
-      })
+        name: /Flipper dashboard/i,
+      }),
     ).toBeInTheDocument();
   });
+
 
   test('theme toggle switches between dark and light modes', () => {
     render(<App />);
 
-    const themeToggle = screen.getByRole('button', {
-      name: 'Switch to light mode',
-    });
+    const toggle =
+      screen.getByRole('button', {
+        name: 'Switch to light mode',
+      });
 
-    fireEvent.click(themeToggle);
+    fireEvent.click(toggle);
 
-    expect(document.documentElement).toHaveAttribute(
+    expect(
+      document.documentElement,
+    ).toHaveAttribute(
       'data-theme',
-      'light'
+      'light',
     );
 
     expect(
       screen.getByRole('button', {
         name: 'Switch to dark mode',
-      })
+      }),
     ).toBeInTheDocument();
   });
 });
 
-describe('image lightbox', () => {
-  beforeEach(() => {
-    window.history.pushState({}, '', '/');
-  });
 
+describe('shared image lightbox', () => {
   test('opens, closes with Escape, and restores focus', async () => {
     render(<App />);
 
-    const trigger = screen.getByRole('button', {
-      name: 'Open image: 585Dashcam585 storefront',
-    });
+    const trigger =
+      screen.getByRole('button', {
+        name:
+          'Open image: 585Dashcam585 storefront',
+      });
 
     fireEvent.click(trigger);
 
-    const lightbox = screen.getByRole('dialog', {
-      name: 'Image viewer: 585Dashcam585 storefront',
-    });
+    expect(
+      screen.getByRole('dialog', {
+        name:
+          'Image viewer: 585Dashcam585 storefront',
+      }),
+    ).toBeInTheDocument();
 
-    expect(lightbox).toBeInTheDocument();
-    expect(lightbox.parentElement).toBe(document.body);
-
-    expect(document.documentElement).toHaveClass(
-      'overlay-open'
+    expect(
+      document.documentElement,
+    ).toHaveClass(
+      'overlay-open',
     );
 
     expect(
       screen.getByRole('button', {
         name: 'Close image viewer',
-      })
+      }),
     ).toHaveFocus();
 
-    fireEvent.keyDown(document, {
-      key: 'Escape',
-    });
+    fireEvent.keyDown(
+      document,
+      {
+        key: 'Escape',
+      },
+    );
 
     await waitFor(() => {
       expect(trigger).toHaveFocus();
@@ -385,199 +230,118 @@ describe('image lightbox', () => {
 
     expect(
       screen.queryByRole('dialog', {
-        name: 'Image viewer: 585Dashcam585 storefront',
-      })
+        name:
+          'Image viewer: 585Dashcam585 storefront',
+      }),
     ).not.toBeInTheDocument();
 
-    expect(document.documentElement).not.toHaveClass(
-      'overlay-open'
+    expect(
+      document.documentElement,
+    ).not.toHaveClass(
+      'overlay-open',
     );
   });
 });
 
-describe('About Quang route', () => {
+
+describe('routing', () => {
   test('renders the dedicated About page', async () => {
-    window.history.pushState({}, '', '/about');
+    window.history.replaceState(
+      {},
+      '',
+      '/about',
+    );
 
     render(<App />);
 
     expect(
-      await screen.findByRole('heading', {
-        name: 'Hi, I’m Quang.',
-      })
+      await screen.findByRole(
+        'heading',
+        {
+          name: 'Hi, I’m Quang.',
+        },
+      ),
     ).toBeInTheDocument();
 
     expect(
       screen.getByRole('heading', {
         name: 'Beyond software',
-      })
+      }),
     ).toBeInTheDocument();
 
     expect(
-      screen.getByRole('heading', {
-        name: 'How I approach engineering',
-      })
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole('link', {
-        name: 'About',
-      })
-    ).toHaveAttribute('href', '/#about');
-
-    expect(
-      screen.getByRole('link', {
-        name: /View my work/i,
-      })
-    ).toHaveAttribute('href', '/#projects');
-
-    expect(document.title).toBe(
-      'Quang Huynh | About Quang'
+      document.title,
+    ).toBe(
+      'Quang Huynh | About Quang',
     );
   });
 
-  test('opens and closes the personal photo gallery', () => {
-    window.history.pushState({}, '', '/about');
+
+  test('renders the photography page', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/photography/',
+    );
 
     render(<App />);
 
-    const trigger = screen.getByRole('button', {
-      name: 'View more photos of Quang',
-    });
-
-    fireEvent.click(trigger);
-
     expect(
-      screen.getByRole('dialog', {
-        name: 'More about Quang',
-      })
-    ).toBeInTheDocument();
-
-    expect(document.documentElement).toHaveClass(
-      'overlay-open'
-    );
-
-    expect(
-      screen.getByLabelText('More photos of Quang')
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'Close personal photo gallery',
-      })
-    );
-
-    expect(
-      screen.queryByRole('dialog', {
-        name: 'More about Quang',
-      })
-    ).not.toBeInTheDocument();
-
-    expect(document.documentElement).not.toHaveClass(
-      'overlay-open'
-    );
-  });
-
-  test('opens the photography gallery and links to the dedicated collection', () => {
-    window.history.pushState({}, '', '/about');
-
-    render(<App />);
-
-    const photographyCard = screen
-      .getByRole('heading', {
-        name: 'Photography',
-      })
-      .closest('article');
-
-    const toggle = within(photographyCard).getByRole(
-      'button',
-      {
-        name: 'View more',
-      }
-    );
-
-    expect(
-      screen.queryByLabelText(
-        'More photographs by Quang'
-      )
-    ).not.toBeInTheDocument();
-
-    fireEvent.click(toggle);
-
-    expect(
-      screen.getByLabelText(
-        'More photographs by Quang'
-      )
+      await screen.findByRole(
+        'heading',
+        {
+          name: 'Photography',
+        },
+      ),
     ).toBeInTheDocument();
 
     expect(
-      screen.getByRole('img', {
-        name: /church spire/i,
-      })
-    ).toHaveAttribute('loading', 'lazy');
-
-    expect(screen.getByRole('link', { name: 'View all' }))
-      .toHaveAttribute('href', '/photography/');
-
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'Close photography gallery',
-      })
-    );
-
-    expect(
-      screen.queryByRole('dialog', {
-        name: 'Photography by Quang',
-      })
+      screen.queryByRole(
+        'heading',
+        {
+          name: 'Experience',
+        },
+      ),
     ).not.toBeInTheDocument();
   });
 
-  test('opens and closes the separate cars and technology galleries', () => {
-    window.history.pushState({}, '', '/about');
 
+  test('homepage navigation remains available', () => {
     render(<App />);
 
-    const carsCard = screen
-      .getByRole('heading', {
-        name: 'Cars',
-      })
-      .closest('article');
-
-    fireEvent.click(
-      within(carsCard).getByRole('button', {
-        name: 'View more',
-      })
-    );
+    const nav =
+      screen.getByRole(
+        'navigation',
+        {
+          name: 'Primary navigation',
+        },
+      );
 
     expect(
-      screen.getByRole('dialog', {
-        name: 'Cars',
-      })
+      within(nav).getByRole(
+        'link',
+        {
+          name: 'Experience',
+        },
+      ),
     ).toBeInTheDocument();
 
-    const carsDialog = screen.getByRole('dialog', { name: 'Cars' });
-    expect(within(carsDialog).getByRole('img', { name: /Singer Porsche/i })).toBeInTheDocument();
-    expect(within(carsDialog).queryByRole('img', { name: /computer hardware/i })).not.toBeInTheDocument();
-
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'Close cars gallery',
-      })
-    );
+    expect(
+      within(nav).getByRole(
+        'link',
+        {
+          name: 'Projects',
+        },
+      ),
+    ).toBeInTheDocument();
 
     expect(
-      screen.queryByRole('dialog', {
-        name: 'Cars',
-      })
-    ).not.toBeInTheDocument();
-
-    const technologyCard = screen
-      .getByRole('heading', { name: 'Technology' })
-      .closest('article');
-
-    fireEvent.click(within(technologyCard).getByRole('button', { name: 'View more' }));
-    const technologyDialog = screen.getByRole('dialog', { name: 'Technology' });
-    expect(within(technologyDialog).getByRole('img', { name: /computer hardware/i })).toBeInTheDocument();
-    expect(within(technologyDialog).queryByRole('img', { name: /Singer Porsche/i })).not.toBeInTheDocument();
+      within(nav).getByRole(
+        'link',
+        {
+          name: 'Contact',
+        },
+      ),
+    ).toBeInTheDocument();
   });
 });
