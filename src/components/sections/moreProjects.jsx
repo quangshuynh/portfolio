@@ -2,14 +2,10 @@ import React, { useLayoutEffect, useRef, useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
 import hymicalFormsLogo from '../../assets/logos/hymical-forms-logo.png';
 import repoRadarLogo from '../../assets/logos/repo-radar-logo.png';
-import moverGitLogo from '../../assets/logos/git-mover-logo.png';
 import salonFlowLogo from '../../assets/logos/salonflow-logo.png';
 import caseNotesLogo from '../../assets/logos/casenotes-logo.png';
-import steamLogo from '../../assets/logos/Steam-icon-logo.svg';
-import dashPilotLogo from '../../assets/logos/dashpilot-logo.png';
 import inboxSweepLogo from '../../assets/logos/inboxsweep-logo.png';
 import photoPortfolio from '../../assets/585photo585-portfolio.png';
-import flipperLogo from '../../assets/logos/flipper-logo.png';
 import chessedLogo from '../../assets/logos/chessed-logo.png';
 import photo585Logo from '../../assets/logos/585photo585-logo.png';
 import bdaLogo from '../../assets/logos/business-data-automation-logo.png';
@@ -26,16 +22,6 @@ const projects = [
     technologies: ['Python', 'FastAPI', 'PostgreSQL', 'SQLAlchemy'],
     github: 'https://github.com/hymical/forms',
     logo: hymicalFormsLogo,
-  },
-  {
-    name: 'DashPilot',
-    description:
-      'Local-first iOS companion for delivery drivers that tracks shifts, deliveries, routes, earnings, expenses, and performance without relying on delivery-platform integrations.',
-    highlight:
-        'Tracks stacked delivery lifecycles, Park & Resume workflows, mileage, pickup waits, vehicle and fuel costs, weekly performance, corrections, Live Activities, App Intents, and local exports while keeping recorded facts separate from estimates.',
-    technologies: ['Swift', 'SwiftUI', 'SwiftData', 'Core Location', 'ActivityKit'],
-    github: 'https://github.com/quangshuynh/dashpilot',
-    logo: dashPilotLogo,
   },
   {
     name: 'Business Data Automation',
@@ -112,27 +98,6 @@ const projects = [
     technologies: ['Next.js', 'TypeScript', 'Supabase', 'PostgreSQL'],
     github: 'https://github.com/quangshuynh/salonflow',
     logo: salonFlowLogo,
-  },
-  {
-    name: 'mover-git',
-    description: 
-      'Python desktop utility for safely previewing, organizing, and moving files into Git repositories with automated batch commits and pushes.',
-    highlight: 
-      'Blocks moves when the destination repository has pending changes, stages with explicit pathspecs instead of blanket adds, and splits work into batches that respect GitHub file-size limits.',
-    technologies: ['Python', 'Tkinter', 'Git', 'pytest'],
-    github: 'https://github.com/quangshuynh/mover-git',
-    logo: moverGitLogo,
-  },
-  {
-    name: 'Steam Value Lookup',
-    description:
-      'Aggregates public Steam profile, library, pricing, achievement, and supported inventory data into a single valuation dashboard.',
-    highlight:
-      'Coordinates multiple Steam APIs, parallelizes Store pricing lookups, handles private or incomplete account data, and covers API, pricing, database, route, and failure behavior with automated tests.',
-    technologies: ['Python', 'Flask', 'SQLAlchemy', 'Steam Web API'],
-    github: 'https://github.com/quangshuynh/steam-value-lookup',
-    live: 'https://steam-value-lookup.onrender.com/',
-    logo: steamLogo,
   },
 ];
 
