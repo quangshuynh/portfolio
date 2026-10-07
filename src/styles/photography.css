@@ -95,38 +95,60 @@
 
 /* ---------- featured sequence ---------- */
 .photography-featured { padding-bottom: var(--section-pad); }
-.featured-sequence { display: grid; gap: clamp(3.5rem, 8vw, 7.5rem); }
+.featured-sequence {
+  display: grid;
+  gap: clamp(3rem, 6vw, 5.5rem);
+}
 .featured-row {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  column-gap: var(--photo-row-gap);
+  gap: var(--photo-row-gap);
   align-items: end;
 }
-.featured-row > .featured-frame { grid-column: 1 / -1; }
-.featured-row--single-offset > .featured-frame { grid-column: 4 / -1; }
-.featured-row--pair-portrait-first > :first-child { grid-column: 1 / 6; }
-.featured-row--pair-portrait-first > :last-child { grid-column: 7 / -1; }
-.featured-row--pair-landscape-first > :first-child { grid-column: 1 / 8; }
-.featured-row--pair-landscape-first > :last-child { grid-column: 9 / -1; }
-.featured-row--pair--low { align-items: start; }
-.featured-row--pair--low > :first-child { grid-column: 2 / 6; }
-.featured-row--pair--low > :last-child { margin-top: clamp(4rem, 14vw, 13rem); }
+
+/* Default featured row: full-width statement image */
+.featured-row > .featured-frame {
+  grid-column: 1 / -1;
+}
+
+/* Portrait-led pair */
+.featured-row--pair-portrait-first > :first-child {
+  grid-column: 1 / 6;
+}
+
+.featured-row--pair-portrait-first > :last-child {
+  grid-column: 7 / -1;
+}
+
+/* Landscape-led pair */
+.featured-row--pair-landscape-first > :first-child {
+  grid-column: 1 / 8;
+}
+
+.featured-row--pair-landscape-first > :last-child {
+  grid-column: 9 / -1;
+}
+
+/* Optional restrained offset for a single image */
+.featured-row--single-offset > .featured-frame {
+  grid-column: 2 / 12;
+}
 
 .featured-frame, .photo-frame { margin: 0; min-width: 0; }
 .featured-frame a, .photo-frame a { position: relative; display: block; background: var(--surface); cursor: zoom-in; }
 .featured-frame img, .photo-frame img { width: 100%; height: auto; transition: filter 500ms var(--ease-out); }
 .featured-frame a:hover img, .photo-frame a:hover img { filter: brightness(1.05); }
-/* The opener fits the viewport at its natural ratio; on wide screens its caption
-   moves into the margin beside it instead of leaving a dead strip. */
+/* Give the opening photograph a strong but restrained width and keep
+   exceptionally tall images within the initial viewport. */
 @media (min-width: 761px) {
-  .featured-row--lead .featured-frame {
-    display: grid;
-    grid-template-columns: minmax(0, auto) minmax(9rem, 1fr);
-    align-items: end;
-    column-gap: var(--photo-row-gap);
+  .featured-row--lead > .featured-frame {
+    grid-column: 1 / 11;
   }
-  .featured-row--lead img { width: auto; max-width: 100%; max-height: 82vh; }
-  .featured-row--lead figcaption { flex-direction: column; gap: .4rem; margin: 0; }
+
+  .featured-row--lead img {
+    width: 100%;
+    max-height: 82vh;
+  }
 }
 
 .featured-frame figcaption, .photo-frame figcaption {
@@ -217,17 +239,18 @@
 
 /* ---------- tablet ---------- */
 @media (max-width: 1024px) {
-  .featured-row--single-offset > .featured-frame { grid-column: 2 / -1; }
-  .featured-row--pair--low > :first-child { grid-column: 1 / 6; }
+  .featured-row--single-offset > .featured-frame {
+    grid-column: 1 / -1;
+  }
 }
 
 /* ---------- phones: one column, art-directed widths ---------- */
 @media (max-width: 760px) {
   .featured-sequence { gap: 3.25rem; }
   .featured-row { grid-template-columns: 1fr; row-gap: 3.25rem; }
-  .featured-row > .featured-frame,
-  .featured-row--pair--low > :first-child { grid-column: 1 / -1; }
-  .featured-row--pair--low > :last-child { margin-top: 0; }
+  .featured-row > .featured-frame {
+    grid-column: 1;
+  }
   /* Landscape frames run edge to edge; portraits sit narrower and alternate sides. */
   .featured-frame--landscape { margin-inline: calc(-1 * var(--gutter)); }
   .featured-frame--landscape figcaption { padding-inline: var(--gutter); }
