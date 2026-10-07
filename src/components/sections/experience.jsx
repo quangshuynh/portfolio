@@ -55,6 +55,7 @@ function Experience() {
               <li>SQL Server</li>
               <li>Boomi</li>
               <li>NetSuite</li>
+              <li>GitLab</li>
             </ul>
           </div>
 
