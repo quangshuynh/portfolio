@@ -1,0 +1,25 @@
+// Build-only: where originals that came from the camera library live, relative to
+// --library-dir. The library is read-only; derivatives are written into the repo.
+export const photographLibraryPaths = {
+  'fog-parking-lot': 'nikon-d3100/2026-03-20/_DSC0009.JPG',
+  'bridge-lattice': 'nikon-d3100/2026-04-13/_DSC0019.JPG',
+  'suzuki-bandit': 'sony-a6400/2026-10-04/DSC00358.JPG',
+  'letchworth-gorge': 'nikon-d3100/2026-04-13/_DSC0051.JPG',
+  'neon-window-blue-hour': 'sony-a6400/2026-09-30/DSC00153.JPG',
+  'red-sun': 'nikon-d3100/2026-04-22/_DSC0012--3e197f2d.JPG',
+  'waves-on-rocks': 'sony-a6400/2026-10-02/DSC00240.JPG',
+  'orange-domes-close': 'pentax-k50/2026-07-25/IMGP0717.JPG',
+  'shoreline-gold-dusk': 'sony-a7iii/2026-10-05/_DSC9077.JPG',
+  'bird-in-flight': 'nikon-d3100/2026-04-05/_DSC0041.JPG',
+  'high-falls-mist': 'sony-a7iii/2026-10-06/DSC09184.JPG',
+  'impreza-fence': 'nikon-d3100/_DSC0120.JPG',
+  'downtown-rochester-dusk': 'nikon-d3100/2026-04-22/_DSC0032--c0c129d8.JPG',
+  'sundown-streaked-clouds': 'pentax-k50/2026-07-19/IMGP0594.JPG',
+  'shore-curve': 'sony-a7iii/2026-10-06/DSC09234.JPG',
+  'beach-cloud-bank': 'sony-a7iii/2026-10-05/_DSC9015.JPG',
+  'harbor-golden-hour': 'sony-a7iii/2026-10-06/DSC09202.JPG',
+  'afterglow-road': 'sony-a6400/2026-10-02/DSC00292.JPG',
+  'streaked-sky': 'sony-a6400/2026-10-02/DSC00280.JPG',
+  'aero-wheel': 'sony-a6400/2026-09-30/DSC00131.JPG',
+  'impreza-grass': 'sony-a6400/2026-09-30/DSC00125.JPG',
+};

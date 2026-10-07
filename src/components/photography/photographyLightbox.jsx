@@ -54,8 +54,22 @@ function formatCapturedAt(value) {
   return `${datePart} · ${timePart}`;
 }
 
+// Visitor-facing names for raw EXIF make/model strings; unknown models pass through.
+const CAMERA_DISPLAY_NAMES = {
+  'SONY ILCE-6400': 'Sony A6400',
+  'SONY ILCE-7M3': 'Sony A7 III',
+  'SONY ILCE-6700': 'Sony A6700',
+  'NIKON D3100': 'Nikon D3100',
+  'PENTAX K-50': 'Pentax K-50',
+};
+
+export function formatCameraName(camera) {
+  return CAMERA_DISPLAY_NAMES[camera] ?? camera;
+}
+
 function formatMetadataValue(field, value) {
   if (field === 'capturedAt') return formatCapturedAt(value);
+  if (field === 'camera') return formatCameraName(value);
   if (field === 'focalLength') return `${value} mm`;
   if (field === 'aperture') return `f/${value}`;
   if (field === 'shutterSpeed') {
@@ -73,8 +87,9 @@ export function PhotographyDetails({ photograph }) {
 
   return (
     <div className="photography-lightbox-details-content">
-      <p className="photography-lightbox-id">#{photograph.id}</p>
+      {photograph.curatedOrder && <p className="photography-lightbox-id">No. {String(photograph.curatedOrder).padStart(2, '0')}</p>}
       <p className="photography-lightbox-caption">{photograph.caption}</p>
+      {photograph.category && <p className="photography-lightbox-tags">{[photograph.category, ...(photograph.tags ?? [])].join(' · ')}</p>}
       {rows.length > 0 && (
         <dl className="photography-lightbox-metadata">
           {rows.map(([label, value]) => <React.Fragment key={label}><dt>{label}</dt><dd>{value}</dd></React.Fragment>)}

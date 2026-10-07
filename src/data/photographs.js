@@ -1,5 +1,5 @@
 import generatedRecords from './photographs.generated.json';
-import { EXIF_CAPTURE_TIMEZONE, photographOverrides } from './photographs.overrides.mjs';
+import { EXIF_CAPTURE_TIMEZONE, PHOTOGRAPHY_CATEGORIES, photographOverrides } from './photographs.overrides.mjs';
 import { mergePhotographyMetadata } from '../../scripts/photography-utils.mjs';
 
 const derivativeAssets = import.meta.glob('../assets/photography/generated/*.jpg', {
@@ -22,6 +22,7 @@ const records = photographOverrides.map((override) => {
   if (!generated) throw new Error(`Generated photography metadata not found for ${override.id}.`);
   if (generated.sourceFilename !== override.sourceFilename) throw new Error(`Source filename mismatch for ${override.id}.`);
   const merged = mergePhotographyMetadata(generated, override);
+  if (!PHOTOGRAPHY_CATEGORIES.includes(merged.category)) throw new Error(`Unknown photography category for ${override.id}.`);
   return {
     ...merged,
     gallerySrc: resolveDerivative(generated.galleryFilename),
@@ -31,8 +32,17 @@ const records = photographOverrides.map((override) => {
 
 if (records.length !== generatedRecords.length) throw new Error('Generated photography metadata contains undeclared records.');
 
-export { EXIF_CAPTURE_TIMEZONE };
+export { EXIF_CAPTURE_TIMEZONE, PHOTOGRAPHY_CATEGORIES };
 export const photographs = Object.freeze(records.map((record) => Object.freeze(record)));
+
+// The editorial selection shown first; every photograph also stays in the full collection.
+export const featuredPhotographs = Object.freeze(
+  photographs.filter(({ featured }) => featured).sort((a, b) => a.featured - b.featured),
+);
+
+export function filterPhotographs(items, category = 'All') {
+  return category === 'All' ? [...items] : items.filter((photograph) => photograph.category === category);
+}
 
 export function findPhotograph(slug) {
   return photographs.find((photograph) => photograph.slug === slug) ?? null;

@@ -1,34 +1,61 @@
-import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import exifr from 'exifr';
 import sharp from 'sharp';
-import { EXIF_CAPTURE_TIMEZONE, photographOverrides } from '../src/data/photographs.overrides.mjs';
+import { EXIF_CAPTURE_TIMEZONE, photographOverrides as publicOverrides } from '../src/data/photographs.overrides.mjs';
+import { photographLibraryPaths } from './photography-sources.mjs';
 import { derivativeFilenames, normalizeCamera, parseExifTimestamp } from './photography-utils.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const publicSourcePath = path.join(projectRoot, 'src', 'assets', 'about', 'photography');
 const outputDirectory = path.join(projectRoot, 'src', 'assets', 'photography', 'generated');
 const manifestPath = path.join(projectRoot, 'src', 'data', 'photographs.generated.json');
+const photographOverrides = publicOverrides.map((record) => (
+  photographLibraryPaths[record.id] ? { ...record, libraryPath: photographLibraryPaths[record.id] } : record
+));
 
+function readOption(args, name, envName) {
+  const index = args.indexOf(name);
+  if (index >= 0 && !args[index + 1]) throw new Error(`${name} requires a value.`);
+  return index >= 0 ? args[index + 1] : envName && process.env[envName];
+}
+
+// --source-dir is the flat originals folder; --library-dir is the read-only camera library
+// that records with a `libraryPath` are read from. --only regenerates a subset and leaves
+// every other derivative and manifest entry untouched.
 function readArguments() {
   const args = process.argv.slice(2);
-  const sourceIndex = args.indexOf('--source-dir');
-  const sourceValue = sourceIndex >= 0 ? args[sourceIndex + 1] : process.env.PHOTOGRAPHY_ORIGINALS_DIR;
-  if (!sourceValue) throw new Error('Provide --source-dir <path> or set PHOTOGRAPHY_ORIGINALS_DIR.');
-  if (sourceIndex >= 0 && !sourceValue) throw new Error('--source-dir requires a path.');
-  return { sourceDirectory: path.resolve(sourceValue), allowPublicSource: args.includes('--allow-public-source') };
+  const sourceValue = readOption(args, '--source-dir', 'PHOTOGRAPHY_ORIGINALS_DIR');
+  const libraryValue = readOption(args, '--library-dir', 'PHOTOGRAPHY_LIBRARY_DIR');
+  const onlyValue = readOption(args, '--only');
+  return {
+    sourceDirectory: sourceValue ? path.resolve(sourceValue) : null,
+    libraryDirectory: libraryValue ? path.resolve(libraryValue) : null,
+    only: onlyValue ? new Set(onlyValue.split(',').map((id) => id.trim()).filter(Boolean)) : null,
+    allowPublicSource: args.includes('--allow-public-source'),
+  };
+}
+
+function sourceKey(record) {
+  return (record.libraryPath ?? record.sourceFilename).split(path.sep).join('/').toLowerCase();
 }
 
 function validateDeclarations() {
   const ids = new Set();
-  const filenames = new Set();
+  const sources = new Set();
+  for (const id of Object.keys(photographLibraryPaths)) {
+    if (!publicOverrides.some((record) => record.id === id)) throw new Error(`Library path declared for unknown photograph: ${id}`);
+  }
   for (const record of photographOverrides) {
-    const normalizedFilename = record.sourceFilename.toLowerCase();
+    const key = sourceKey(record);
     if (ids.has(record.id)) throw new Error(`Duplicate photography ID: ${record.id}`);
-    if (filenames.has(normalizedFilename)) throw new Error(`Duplicate source filename: ${record.sourceFilename}`);
+    if (sources.has(key)) throw new Error(`Duplicate source: ${record.libraryPath ?? record.sourceFilename}`);
+    if (record.libraryPath && path.posix.basename(record.libraryPath) !== record.sourceFilename) {
+      throw new Error(`libraryPath and sourceFilename disagree for ${record.id}.`);
+    }
     ids.add(record.id);
-    filenames.add(normalizedFilename);
+    sources.add(key);
     derivativeFilenames(record.id);
   }
 }
@@ -87,28 +114,67 @@ async function createDerivative(sourcePath, destination, dimensions, quality) {
   return { width: metadata.width, height: metadata.height, bytes: (await stat(destination)).size };
 }
 
+async function resolveSources(records, { sourceDirectory, libraryDirectory }) {
+  let flatFiles = null;
+  if (records.some((record) => !record.libraryPath)) {
+    if (!sourceDirectory) throw new Error('Provide --source-dir <path> or set PHOTOGRAPHY_ORIGINALS_DIR.');
+    flatFiles = await readdir(sourceDirectory);
+    const caseInsensitiveFiles = new Set();
+    for (const filename of flatFiles) {
+      const key = filename.toLowerCase();
+      if (caseInsensitiveFiles.has(key)) throw new Error(`Duplicate source filenames differ only by case: ${filename}`);
+      caseInsensitiveFiles.add(key);
+    }
+  }
+  if (records.some((record) => record.libraryPath) && !libraryDirectory) {
+    throw new Error('Provide --library-dir <path> or set PHOTOGRAPHY_LIBRARY_DIR.');
+  }
+
+  const resolved = new Map();
+  for (const record of records) {
+    if (record.libraryPath) {
+      const sourcePath = path.resolve(libraryDirectory, record.libraryPath);
+      if (!sourcePath.startsWith(`${libraryDirectory}${path.sep}`)) throw new Error(`libraryPath escapes the library: ${record.id}`);
+      try {
+        await access(sourcePath);
+      } catch {
+        throw new Error(`Declared library original not found: ${record.libraryPath}`);
+      }
+      resolved.set(record.id, sourcePath);
+    } else {
+      if (!flatFiles.includes(record.sourceFilename)) throw new Error(`Declared source original not found: ${record.sourceFilename}`);
+      resolved.set(record.id, path.join(sourceDirectory, record.sourceFilename));
+    }
+  }
+  return resolved;
+}
+
+async function readExistingManifest() {
+  try {
+    return JSON.parse(await readFile(manifestPath, 'utf8'));
+  } catch (error) {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
 async function main() {
-  const { sourceDirectory, allowPublicSource } = readArguments();
-  if (sourceDirectory === publicSourcePath && !allowPublicSource) {
+  const options = readArguments();
+  if (options.sourceDirectory === publicSourcePath && !options.allowPublicSource) {
     throw new Error('The production asset directory cannot be used as an originals source without --allow-public-source.');
   }
   validateDeclarations();
-  const availableFiles = await readdir(sourceDirectory);
-  const caseInsensitiveFiles = new Map();
-  for (const filename of availableFiles) {
-    const key = filename.toLowerCase();
-    if (caseInsensitiveFiles.has(key)) throw new Error(`Duplicate source filenames differ only by case: ${filename}`);
-    caseInsensitiveFiles.set(key, filename);
+  for (const id of options.only ?? []) {
+    if (!photographOverrides.some((record) => record.id === id)) throw new Error(`--only names an undeclared photograph: ${id}`);
   }
-  for (const { sourceFilename } of photographOverrides) {
-    if (!availableFiles.includes(sourceFilename)) throw new Error(`Declared source original not found: ${sourceFilename}`);
-  }
+  const selected = photographOverrides.filter(({ id }) => !options.only || options.only.has(id));
+  const sources = await resolveSources(selected, options);
 
   await mkdir(outputDirectory, { recursive: true });
-  const generated = [];
+  const generatedById = new Map((await readExistingManifest()).map((record) => [record.id, record]));
   const audit = [];
-  for (const override of photographOverrides) {
-    const sourcePath = path.join(sourceDirectory, override.sourceFilename);
+  for (const override of selected) {
+    const sourcePath = sources.get(override.id);
     const sourceMetadata = await sharp(sourcePath).metadata();
     const exif = await extractExif(sourcePath);
     const gpsPresent = await hasGps(sourcePath);
@@ -116,7 +182,7 @@ async function main() {
     const gallery = await createDerivative(sourcePath, path.join(outputDirectory, galleryFilename), { width: 900, height: 1200 }, 82);
     const viewer = await createDerivative(sourcePath, path.join(outputDirectory, viewerFilename), { width: 2200, height: 1800 }, 88);
     const publicMetadata = normalizeExif(exif);
-    generated.push({
+    generatedById.set(override.id, {
       id: override.id,
       sourceFilename: override.sourceFilename,
       galleryFilename,
@@ -140,6 +206,9 @@ async function main() {
     });
   }
 
+  const missing = photographOverrides.filter(({ id }) => !generatedById.has(id));
+  if (missing.length) throw new Error(`No generated metadata for: ${missing.map(({ id }) => id).join(', ')}`);
+  const generated = photographOverrides.map(({ id }) => generatedById.get(id));
   const serialized = `${JSON.stringify(generated, null, 2)}\n`;
   if (/latitude|longitude|coordinates/i.test(serialized)) throw new Error('Coordinate-like fields cannot be written to public metadata.');
   await writeFile(manifestPath, serialized, 'utf8');

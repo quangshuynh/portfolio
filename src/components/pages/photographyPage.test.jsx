@@ -4,11 +4,13 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 
 import App from '../../App';
 
 import {
+  featuredPhotographs,
   photographs,
   sortPhotographs,
 } from '../../data/photographs';
@@ -20,6 +22,7 @@ import {
 
 import {
   PhotographyDetails,
+  formatCameraName,
   resetPhotographyPreloadsForTests,
 } from '../photography/photographyLightbox';
 
@@ -398,6 +401,7 @@ test('photography details handle partial metadata without placeholders', () => {
     <PhotographyDetails
       photograph={{
         id: 'DIBS2164',
+        curatedOrder: 3,
         caption: 'A quiet moment on the grass at Cornell',
         capturedAt: '2026-04-04T16:56:19.000Z',
       }}
@@ -405,7 +409,7 @@ test('photography details handle partial metadata without placeholders', () => {
   );
 
   expect(
-    screen.getByText('#DIBS2164'),
+    screen.getByText('No. 03'),
   ).toBeInTheDocument();
 
   expect(
@@ -439,7 +443,7 @@ test('photography details render available camera metadata', () => {
   );
 
   expect(
-    screen.getByText('SONY ILCE-6400'),
+    screen.getByText('Sony A6400'),
   ).toBeInTheDocument();
 
   expect(
@@ -543,4 +547,66 @@ test('the About photography modal opens the full photography page', async () => 
       document.documentElement,
     ).not.toHaveClass('overlay-open');
   });
+});
+
+test('featured is a restrained selection and every photograph stays in the collection', async () => {
+  render(<App />);
+
+  await screen.findByRole('heading', { name: 'Featured' });
+
+  const featuredSlugs = [...document.querySelectorAll('[data-featured-slug]')].map((item) => item.dataset.featuredSlug);
+  expect(featuredSlugs).toEqual(featuredPhotographs.map(({ slug }) => slug));
+  expect(featuredSlugs.length).toBeGreaterThan(0);
+  expect(featuredSlugs.length).toBeLessThan(photographs.length / 2);
+
+  const collectionSlugs = new Set([...document.querySelectorAll('[data-photo-slug]')].map((item) => item.dataset.photoSlug));
+  featuredSlugs.forEach((slug) => expect(collectionSlugs).toContain(slug));
+});
+
+
+test('category filters narrow the collection and All restores it', async () => {
+  render(<App />);
+
+  await screen.findByRole('heading', { name: 'All photographs' });
+
+  const filters = screen.getByRole('group', { name: 'Filter photographs by category' });
+  fireEvent.click(within(filters).getByRole('button', { name: /^Automotive/ }));
+
+  const automotive = photographs.filter(({ category }) => category === 'Automotive');
+  const shown = [...document.querySelectorAll('[data-photo-slug]')].map((item) => item.dataset.photoSlug);
+  expect(shown.sort()).toEqual(automotive.map(({ slug }) => slug).sort());
+  expect(within(filters).getByRole('button', { name: /^Automotive/ })).toHaveAttribute('aria-pressed', 'true');
+
+  fireEvent.click(within(filters).getByRole('button', { name: /^All/ }));
+  expect(document.querySelectorAll('[data-photo-slug]')).toHaveLength(photographs.length);
+});
+
+
+test('a photograph opened from Featured steps through the featured sequence', async () => {
+  const [first, second] = featuredPhotographs;
+
+  render(<App />);
+
+  fireEvent.click(
+    await screen.findByRole('link', { name: `View photograph: ${first.caption}` }),
+  );
+
+  expect(window.location.hash).toBe(`#${first.slug}`);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
+
+  expect(window.location.hash).toBe(`#${second.slug}`);
+});
+
+
+test('camera names are shown in readable form, never as raw EXIF model codes', () => {
+  expect(formatCameraName('SONY ILCE-6400')).toBe('Sony A6400');
+  expect(formatCameraName('SONY ILCE-7M3')).toBe('Sony A7 III');
+  expect(formatCameraName('SONY ILCE-6700')).toBe('Sony A6700');
+
+  photographs
+    .filter(({ camera }) => camera)
+    .forEach(({ camera }) => {
+      expect(formatCameraName(camera)).not.toMatch(/ILCE|^[A-Z]{3,} /);
+    });
 });

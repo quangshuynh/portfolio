@@ -8,6 +8,8 @@ import {
 
 import AboutPage from './aboutPage';
 
+import { photographs } from '../../data/photographs';
+
 import {
   formatRelativePlayTime,
   resetSpotifyCacheForTests,
@@ -195,7 +197,7 @@ test('nested photography lightbox handles Escape before the parent gallery', asy
   );
 
   const imageTrigger = screen.getByRole('button', {
-    name: "Open image: Looking up through Cornell's brick architecture",
+    name: `Open image: ${photographs[0].caption}`,
   });
 
   fireEvent.click(imageTrigger);
@@ -271,7 +273,7 @@ test('nested lightbox supports basic zoom controls', () => {
 
   fireEvent.click(
     screen.getByRole('button', {
-      name: "Open image: Looking up through Cornell's brick architecture",
+      name: `Open image: ${photographs[0].caption}`,
     }),
   );
 
