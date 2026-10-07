@@ -7,7 +7,18 @@
     "galleryWidth": 900,
     "galleryHeight": 600,
     "viewerWidth": 2200,
-    "viewerHeight": 1467
+    "viewerHeight": 1467,
+    "capturedAt": "2026-03-11T22:13:09.000Z",
+    "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
+    "focalLength": 55,
+    "focalLength35mm": 82,
+    "aperture": 4,
+    "shutterSpeed": 0.01666667,
+    "iso": 900,
+    "exposureCompensation": 0,
+    "flash": "On",
+    "whiteBalance": "Auto"
   },
   {
     "id": "IMGP0739",
@@ -20,10 +31,15 @@
     "viewerHeight": 1800,
     "capturedAt": "2026-07-25T22:47:32.000Z",
     "camera": "PENTAX K-50",
+    "lens": "smc PENTAX-DA L 18-55mm F3.5-5.6 AL WR",
     "focalLength": 24.38,
+    "focalLength35mm": 36,
     "aperture": 7.1,
     "shutterSpeed": 0.003125,
-    "iso": 100
+    "iso": 100,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "fog-parking-lot",
@@ -36,10 +52,15 @@
     "viewerHeight": 1467,
     "capturedAt": "2026-03-21T01:03:52.000Z",
     "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
     "focalLength": 55,
+    "focalLength35mm": 82,
     "aperture": 4,
     "shutterSpeed": 0.0125,
-    "iso": 1600
+    "iso": 1600,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "bridge-lattice",
@@ -52,10 +73,15 @@
     "viewerHeight": 1800,
     "capturedAt": "2026-04-13T18:21:03.000Z",
     "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
     "focalLength": 62,
+    "focalLength35mm": 93,
     "aperture": 4.5,
     "shutterSpeed": 0.003125,
-    "iso": 400
+    "iso": 400,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "shore-curve",
@@ -70,9 +96,13 @@
     "camera": "SONY ILCE-7M3",
     "lens": "FE 28-70mm F3.5-5.6 OSS",
     "focalLength": 32,
+    "focalLength35mm": 32,
     "aperture": 10,
     "shutterSpeed": 0.004,
-    "iso": 1600
+    "iso": 1600,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "suzuki-bandit",
@@ -87,9 +117,13 @@
     "camera": "SONY ILCE-6400",
     "lens": "E PZ 16-50mm F3.5-5.6 OSS",
     "focalLength": 50,
+    "focalLength35mm": 75,
     "aperture": 5.6,
     "shutterSpeed": 0.004,
-    "iso": 800
+    "iso": 800,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "letchworth-gorge",
@@ -102,10 +136,15 @@
     "viewerHeight": 1800,
     "capturedAt": "2026-04-13T18:51:20.000Z",
     "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
     "focalLength": 70,
+    "focalLength35mm": 105,
     "aperture": 5.6,
     "shutterSpeed": 0.002,
-    "iso": 250
+    "iso": 250,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "aero-wheel",
@@ -120,9 +159,13 @@
     "camera": "SONY ILCE-6400",
     "lens": "E PZ 16-50mm F3.5-5.6 OSS",
     "focalLength": 16,
+    "focalLength35mm": 24,
     "aperture": 3.5,
     "shutterSpeed": 0.0125,
-    "iso": 100
+    "iso": 100,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "_DSC0023",
@@ -135,10 +178,15 @@
     "viewerHeight": 1800,
     "capturedAt": "2026-04-04T14:19:57.000Z",
     "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
     "focalLength": 55,
+    "focalLength35mm": 82,
     "aperture": 8,
     "shutterSpeed": 0.004,
-    "iso": 100
+    "iso": 100,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "neon-window-blue-hour",
@@ -153,9 +201,13 @@
     "camera": "SONY ILCE-6400",
     "lens": "E PZ 16-50mm F3.5-5.6 OSS",
     "focalLength": 16,
+    "focalLength35mm": 24,
     "aperture": 3.5,
     "shutterSpeed": 0.01666667,
-    "iso": 2500
+    "iso": 2500,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "red-sun",
@@ -168,10 +220,15 @@
     "viewerHeight": 1467,
     "capturedAt": "2026-04-22T23:57:34.000Z",
     "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
     "focalLength": 155,
+    "focalLength35mm": 232,
     "aperture": 5.3,
     "shutterSpeed": 0.00125,
-    "iso": 400
+    "iso": 400,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "DIBS2164",
@@ -182,23 +239,38 @@
     "galleryHeight": 1200,
     "viewerWidth": 1200,
     "viewerHeight": 1800,
-    "capturedAt": "2026-04-04T16:56:19.000Z"
+    "capturedAt": "2026-04-04T14:40:12.000Z",
+    "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
+    "focalLength": 200,
+    "focalLength35mm": 300,
+    "aperture": 5.6,
+    "shutterSpeed": 0.002,
+    "iso": 400,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "_DSC0003",
     "sourceFilename": "_DSC0003.JPG",
     "galleryFilename": "_DSC0003-gallery.jpg",
     "viewerFilename": "_DSC0003-viewer.jpg",
-    "galleryWidth": 900,
-    "galleryHeight": 600,
-    "viewerWidth": 2200,
-    "viewerHeight": 1467,
+    "galleryWidth": 800,
+    "galleryHeight": 1200,
+    "viewerWidth": 1200,
+    "viewerHeight": 1800,
     "capturedAt": "2026-04-22T04:14:28.000Z",
     "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
     "focalLength": 55,
+    "focalLength35mm": 82,
     "aperture": 4,
     "shutterSpeed": 0.01666667,
-    "iso": 3200
+    "iso": 3200,
+    "exposureCompensation": 0,
+    "flash": "On",
+    "whiteBalance": "Auto"
   },
   {
     "id": "afterglow-road",
@@ -213,9 +285,13 @@
     "camera": "SONY ILCE-6400",
     "lens": "E PZ 16-50mm F3.5-5.6 OSS",
     "focalLength": 50,
+    "focalLength35mm": 75,
     "aperture": 5.6,
     "shutterSpeed": 0.02,
-    "iso": 125
+    "iso": 125,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "waves-on-rocks",
@@ -230,9 +306,13 @@
     "camera": "SONY ILCE-6400",
     "lens": "E PZ 16-50mm F3.5-5.6 OSS",
     "focalLength": 38,
+    "focalLength35mm": 57,
     "aperture": 5.6,
     "shutterSpeed": 0.025,
-    "iso": 100
+    "iso": 100,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "IMG_0758",
@@ -245,10 +325,15 @@
     "viewerHeight": 1800,
     "capturedAt": "2026-08-02T21:06:35.000Z",
     "camera": "Canon PowerShot G11",
+    "lens": "6.1-30.5mm",
     "focalLength": 6.1,
+    "focalLength35mm": 28.5,
     "aperture": 4,
     "shutterSpeed": 0.002,
-    "iso": 400
+    "iso": 400,
+    "exposureCompensation": -1,
+    "flash": "On",
+    "whiteBalance": "Daylight Fluorescent"
   },
   {
     "id": "orange-domes-close",
@@ -261,10 +346,15 @@
     "viewerHeight": 1800,
     "capturedAt": "2026-07-25T21:30:32.000Z",
     "camera": "PENTAX K-50",
+    "lens": "smc PENTAX-DA L 18-55mm F3.5-5.6 AL WR",
     "focalLength": 24.38,
+    "focalLength35mm": 36,
     "aperture": 4,
     "shutterSpeed": 0.02,
-    "iso": 320
+    "iso": 320,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "beach-cloud-bank",
@@ -279,9 +369,13 @@
     "camera": "SONY ILCE-7M3",
     "lens": "FE 28-70mm F3.5-5.6 OSS",
     "focalLength": 30,
+    "focalLength35mm": 30,
     "aperture": 3.5,
     "shutterSpeed": 0.03333333,
-    "iso": 100
+    "iso": 100,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "shoreline-gold-dusk",
@@ -296,9 +390,13 @@
     "camera": "SONY ILCE-7M3",
     "lens": "FE 28-70mm F3.5-5.6 OSS",
     "focalLength": 70,
+    "focalLength35mm": 70,
     "aperture": 5.6,
     "shutterSpeed": 0.04,
-    "iso": 100
+    "iso": 100,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "bird-in-flight",
@@ -311,10 +409,15 @@
     "viewerHeight": 1800,
     "capturedAt": "2026-04-05T21:54:50.000Z",
     "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
     "focalLength": 200,
+    "focalLength35mm": 300,
     "aperture": 5.6,
     "shutterSpeed": 0.002,
-    "iso": 500
+    "iso": 500,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "YJMZ4301",
@@ -324,7 +427,18 @@
     "galleryWidth": 900,
     "galleryHeight": 600,
     "viewerWidth": 2200,
-    "viewerHeight": 1467
+    "viewerHeight": 1467,
+    "capturedAt": "2026-03-11T21:23:42.000Z",
+    "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
+    "focalLength": 60,
+    "focalLength35mm": 90,
+    "aperture": 5.6,
+    "shutterSpeed": 0.002,
+    "iso": 180,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "impreza-grass",
@@ -339,9 +453,13 @@
     "camera": "SONY ILCE-6400",
     "lens": "E PZ 16-50mm F3.5-5.6 OSS",
     "focalLength": 16,
+    "focalLength35mm": 24,
     "aperture": 3.5,
     "shutterSpeed": 0.0125,
-    "iso": 100
+    "iso": 100,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "high-falls-mist",
@@ -356,9 +474,13 @@
     "camera": "SONY ILCE-7M3",
     "lens": "FE 28-70mm F3.5-5.6 OSS",
     "focalLength": 49,
+    "focalLength35mm": 49,
     "aperture": 4.5,
     "shutterSpeed": 0.004,
-    "iso": 100
+    "iso": 100,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "impreza-fence",
@@ -371,10 +493,15 @@
     "viewerHeight": 1467,
     "capturedAt": "2026-03-09T18:33:06.000Z",
     "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
     "focalLength": 55,
+    "focalLength35mm": 82,
     "aperture": 9,
     "shutterSpeed": 0.008,
-    "iso": 400
+    "iso": 400,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "IMG_0931",
@@ -387,10 +514,15 @@
     "viewerHeight": 1650,
     "capturedAt": "2026-09-10T23:43:52.000Z",
     "camera": "Canon PowerShot G11",
+    "lens": "6.1-30.5mm",
     "focalLength": 12.074,
+    "focalLength35mm": 56.3,
     "aperture": 3.5,
     "shutterSpeed": 0.02,
-    "iso": 800
+    "iso": 800,
+    "exposureCompensation": -0.66666667,
+    "flash": "Off",
+    "whiteBalance": "Daylight Fluorescent"
   },
   {
     "id": "_DSC0033",
