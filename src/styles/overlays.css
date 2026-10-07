@@ -92,6 +92,7 @@
   #photography-modal-gallery > figure:nth-child(n) {
     grid-column: auto;
     grid-row: auto;
+    aspect-ratio: 1 / 1;
   }
 }
 /* Spotify listening activity */
