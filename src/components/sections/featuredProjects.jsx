@@ -1,20 +1,36 @@
 import React, { useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
-import flipperLogo from '../../assets/logos/flipper-logo.png';
-import flipperDashboard from '../../assets/flipper-dashboard.png';
-import flipperResearch from '../../assets/flipper-research.png';
-import flipperInventory from '../../assets/flipper-inventory.png';
-import flipperSale from '../../assets/flipper-sale.png';
-import gitProfileLensLogo from '../../assets/logos/gitprofilelens-logo.png';
-import gitProfileLensResults from '../../assets/gitprofilelens-results-vert.png';
-import scribeKitLogo from '../../assets/logos/scribekit-logo.png';
-import scribeKitApp from '../../assets/scribekit-app2.png';
-import scribeKitHistoryFind from '../../assets/scribekit-historyfind.png';
-import scribeKitHistoryReview from '../../assets/scribekit-historyreview.png';
-import scribeKitAudioCapture from '../../assets/scribekit-audiocapture.png';
-import dashcamStorefront from '../../assets/585dashcam585-storefront.png';
-import PersonalityButton from '../ui/personalityButton';
 import { HomeImageTrigger } from '../utilities/homeLightbox';
+
+//flipper
+import flipperLogo from '../../assets/logos/flipper-logo.png';
+import flipperDashboard from '../../assets/flipper/flipper-dashboard.png';
+import flipperResearch from '../../assets/flipper/flipper-research.png';
+import flipperInventory from '../../assets/flipper/flipper-inventory.png';
+import flipperSale from '../../assets/flipper/flipper-sale.png';
+
+//gitprofilelens
+import gitProfileLensLogo from '../../assets/logos/gitprofilelens-logo.png';
+import gitProfileLensResults from '../../assets/gitprofilelens/gitprofilelens-results-vert.png';
+
+//scribekit
+import scribeKitLogo from '../../assets/logos/scribekit-logo.png';
+import scribeKitApp from '../../assets/scribekit/scribekit-app2.png';
+import scribeKitHistoryFind from '../../assets/scribekit/scribekit-historyfind.png';
+import scribeKitHistoryReview from '../../assets/scribekit/scribekit-historyreview.png';
+import scribeKitAudioCapture from '../../assets/scribekit/scribekit-audiocapture.png';
+
+//585dashcam585
+import dashcamStorefront from '../../assets/585dashcam585/585dashcam585-storefront.png';
+import PersonalityButton from '../ui/personalityButton';
+
+//dashpilot
+import dashPilotLogo from '../../assets/logos/dashpilot-logo.png';
+import dashPilotStacked from '../../assets/dashpilot/home-stacked-deliveries.png';
+import dashPilotOffer from '../../assets/dashpilot/offer-sheet-three-shared.png';
+import dashPilotHistory from '../../assets/dashpilot/history-current-week.png';
+import dashPilotPeriodSummary from '../../assets/dashpilot/period-summary.png';
+
 
 const projects = [
   {
@@ -82,33 +98,138 @@ const projects = [
     documentation: 'https://quangshuynh.github.io/scribekit/',
     visual: 'scribekit',
   },
+  {
+    name: 'DashPilot',
+    label: 'Native iOS · Delivery workflow & local-first data',
+    purpose:
+      'Local-first iOS companion for delivery drivers that tracks shifts, stacked deliveries, journeys, earnings, mileage, expenses, and performance without relying on delivery-platform integrations.',
+
+    highlights: [
+      'Models stacked delivery lifecycles, pickup waits, corrections, Park & Resume workflows, and historical journeys while preserving recorded delivery facts',
+      'Tracks mileage, earnings, vehicle and fuel costs, and weekly performance while keeping authoritative records separate from estimates and derived metrics',
+      'Integrates Live Activities and App Intents for glanceable delivery status and faster interaction during active shifts',
+      'Persists driver data locally with SwiftData and supports corrections and exports without requiring an external account or delivery-platform connection',
+    ],
+
+    stack:
+      'Swift · SwiftUI · SwiftData · Core Location · ActivityKit · App Intents · Swift Testing',
+
+    github: 'https://github.com/quangshuynh/dashpilot',
+    visual: 'dashpilot',
+  },
 ];
 
 /**
- * renders the business data automation image gallery
- * :returns: business data automation gallery markup
+ * renders the DashPilot image gallery
+ * :returns: DashPilot gallery markup
  */
-function BusinessGallery() {
-  const [slide, setSlide] = useState('architecture');
+const dashPilotGallery = [
+  {
+    src: dashPilotStacked,
+    alt: 'DashPilot home screen during an active shift with stacked deliveries',
+    caption: 'Stacked delivery workflow',
+  },
+  {
+    src: dashPilotOffer,
+    alt: 'DashPilot offer sheet showing a multi-delivery offer',
+    caption: 'Multi-delivery offer',
+  },
+  {
+    src: dashPilotHistory,
+    alt: 'DashPilot history showing delivery activity for the current week',
+    caption: 'Weekly delivery history',
+  },
+  {
+    src: dashPilotPeriodSummary,
+    alt: 'DashPilot period summary showing delivery performance and earnings metrics',
+    caption: 'Performance summary',
+  },
+];
+
+function DashPilotGallery() {
+  const [slide, setSlide] = useState('logo');
+
+  const screenshots = {
+    today: {
+      ...dashPilotGallery[0],
+      galleryIndex: 0,
+    },
+    delivery: {
+      ...dashPilotGallery[1],
+      galleryIndex: 1,
+    },
+    history: {
+      ...dashPilotGallery[2],
+      galleryIndex: 2,
+    },
+    performance: {
+      ...dashPilotGallery[3],
+      galleryIndex: 3,
+    },
+  };
 
   return (
-    <div className="project-visual dashboard gallery">
+    <div className="project-visual gallery">
       <div className="gallery-stage">
-        {slide === 'architecture' ? (
-          <div className="pipeline" role="img" aria-label="Business data pipeline from CSV inputs through validation and reconciliation to reports, PostgreSQL, FastAPI, and a dashboard">
-            <div className="pipeline-row"><span>Customer CSV</span><span>Order CSV</span><span>Payment CSV</span></div>
-            <div className="pipeline-arrow" aria-hidden="true">↓</div>
-            <div className="pipeline-row"><span>Validate</span><span>Quarantine</span><span>Reconcile</span></div>
-            <div className="pipeline-arrow" aria-hidden="true">↓</div>
-            <div className="pipeline-row"><span>CSV Reports</span><span>PostgreSQL</span><span>API + Dashboard</span></div>
-          </div>
+        {slide === 'logo' ? (
+          <img
+            src={dashPilotLogo}
+            alt="DashPilot app logo"
+            loading="lazy"
+            decoding="async"
+          />
         ) : (
-          <HomeImageTrigger src={dashboardImage} imageClassName="project-result-image" alt="Business Data Automation reconciliation dashboard showing financial totals, payment statuses, and flagged discrepancies" caption="Business Data Automation reconciliation dashboard" />
+          <HomeImageTrigger
+            src={screenshots[slide].src}
+            imageClassName="project-result-image vertical-project-shot"
+            alt={screenshots[slide].alt}
+            caption={screenshots[slide].caption}
+            gallery={dashPilotGallery}
+            galleryIndex={screenshots[slide].galleryIndex}
+          />
         )}
       </div>
-      <div className="gallery-controls" aria-label="Business Data Automation gallery">
-        <button type="button" aria-pressed={slide === 'architecture'} onClick={() => setSlide('architecture')}>Architecture</button>
-        <button type="button" aria-pressed={slide === 'dashboard'} onClick={() => setSlide('dashboard')}>Dashboard</button>
+
+      <div className="gallery-controls" aria-label="DashPilot gallery">
+        <button
+          type="button"
+          aria-pressed={slide === 'logo'}
+          onClick={() => setSlide('logo')}
+        >
+          Logo
+        </button>
+
+        <button
+          type="button"
+          aria-pressed={slide === 'today'}
+          onClick={() => setSlide('today')}
+        >
+          Shift
+        </button>
+
+        <button
+          type="button"
+          aria-pressed={slide === 'delivery'}
+          onClick={() => setSlide('delivery')}
+        >
+          Delivery
+        </button>
+
+        <button
+          type="button"
+          aria-pressed={slide === 'history'}
+          onClick={() => setSlide('history')}
+        >
+          History
+        </button>
+
+        <button
+          type="button"
+          aria-pressed={slide === 'performance'}
+          onClick={() => setSlide('performance')}
+        >
+          Performance
+        </button>
       </div>
     </div>
   );
@@ -375,6 +496,10 @@ function ProjectVisual({ type }) {
 
   if (type === 'scribekit') {
     return <ScribeKitGallery />;
+  }
+
+  if (type === 'dashpilot') {
+    return <DashPilotGallery />;
   }
 
   return <GitProfileLensVisual />;
