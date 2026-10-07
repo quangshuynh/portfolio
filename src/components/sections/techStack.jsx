@@ -3,10 +3,10 @@ import React from 'react';
 // Regrouped from the existing toolkit by discipline; no new skills are claimed.
 const groups = [
   { title: 'Backend', note: 'APIs, services, persistence', items: ['FastAPI', 'SQLAlchemy', 'REST APIs'] },
-  { title: 'Native', note: 'Apple platforms & desktop', items: ['SwiftUI', 'SwiftData', '.NET / WPF'] },
+  { title: 'Native', note: 'Apple platforms & desktop', items: ['SwiftUI', 'SwiftData', 'AppKit', '.NET / WPF'] },
   { title: 'Frontend', note: 'Web delivery', items: ['React', 'Next.js'] },
   { title: 'Data', note: 'Storage & analysis', items: ['PostgreSQL', 'SQL Server', 'SQLite', 'pandas'] },
-  { title: 'Infrastructure & tooling', note: 'Delivery, automation & reliability', items: ['Git', 'Docker', 'GitHub Actions', 'GitLab', 'Linux', 'pytest', 'Ruff', 'Boomi'] },
+  { title: 'Infrastructure & tooling', note: 'Delivery, automation & reliability', items: ['Git', 'Docker', 'GitHub Actions', 'GitLab', 'Linux', 'Cloudflare Workers', 'pytest', 'Ruff', 'Boomi'] },
   { title: 'Languages', note: 'Day to day', items: ['Python', 'Swift', 'TypeScript', 'JavaScript', 'C#', 'Java', 'SQL', 'C'] },
 ];
 

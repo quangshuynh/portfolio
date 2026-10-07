@@ -24,7 +24,7 @@ function flexOrder(block, selector) {
 test('every featured project exposes the parts the phone layout reorders', () => {
   render(<FeaturedProjects />);
   const articles = document.querySelectorAll('.featured-project');
-  expect(articles).toHaveLength(4);
+  expect(articles).toHaveLength(5);
   articles.forEach((article) => {
     ['.case-file__index', 'h3', '.case-file__meta > div:first-child .project-number', '.case-file__visual', '.project-purpose', '.project-highlights', '.case-file__meta .project-stack', '.project-actions']
       .forEach((selector) => expect(article.querySelector(selector), selector).not.toBeNull());
