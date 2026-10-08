@@ -535,10 +535,15 @@
     "viewerHeight": 1800,
     "capturedAt": "2026-04-13T18:35:00.000Z",
     "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
     "focalLength": 185,
+    "focalLength35mm": 277,
     "aperture": 5.6,
     "shutterSpeed": 0.001,
-    "iso": 400
+    "iso": 400,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "downtown-rochester-dusk",
@@ -551,10 +556,15 @@
     "viewerHeight": 1800,
     "capturedAt": "2026-04-23T00:00:28.000Z",
     "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
     "focalLength": 145,
+    "focalLength35mm": 217,
     "aperture": 5,
     "shutterSpeed": 0.002,
-    "iso": 1250
+    "iso": 1250,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "streaked-sky",
@@ -569,9 +579,13 @@
     "camera": "SONY ILCE-6400",
     "lens": "E PZ 16-50mm F3.5-5.6 OSS",
     "focalLength": 30,
+    "focalLength35mm": 45,
     "aperture": 8,
     "shutterSpeed": 0.01,
-    "iso": 100
+    "iso": 100,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "IMGP0579",
@@ -584,10 +598,15 @@
     "viewerHeight": 1800,
     "capturedAt": "2026-07-11T18:54:16.000Z",
     "camera": "PENTAX K-50",
+    "lens": "smc PENTAX-DA L 18-55mm F3.5-5.6 AL WR",
     "focalLength": 30.63,
+    "focalLength35mm": 46,
     "aperture": 4.5,
     "shutterSpeed": 0.01666667,
-    "iso": 100
+    "iso": 100,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "DSC00266",
@@ -618,7 +637,18 @@
     "galleryWidth": 900,
     "galleryHeight": 600,
     "viewerWidth": 2200,
-    "viewerHeight": 1467
+    "viewerHeight": 1467,
+    "capturedAt": "2026-03-11T21:08:38.000Z",
+    "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
+    "focalLength": 60,
+    "focalLength35mm": 90,
+    "aperture": 5.6,
+    "shutterSpeed": 0.002,
+    "iso": 200,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "NTIO3912",
@@ -629,7 +659,17 @@
     "galleryHeight": 1200,
     "viewerWidth": 1200,
     "viewerHeight": 1800,
-    "capturedAt": "2026-04-04T16:56:02.000Z"
+    "capturedAt": "2026-04-04T14:22:36.000Z",
+    "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
+    "focalLength": 55,
+    "focalLength35mm": 82,
+    "aperture": 7.1,
+    "shutterSpeed": 0.005,
+    "iso": 100,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "sundown-streaked-clouds",
@@ -640,12 +680,17 @@
     "galleryHeight": 1200,
     "viewerWidth": 1192,
     "viewerHeight": 1800,
-    "capturedAt": "2026-07-20T00:43:42.000Z",
+    "capturedAt": "2026-07-20T00:43:30.000Z",
     "camera": "PENTAX K-50",
-    "focalLength": 50,
-    "aperture": 7.1,
+    "lens": "smc PENTAX-DA L 18-55mm F3.5-5.6 AL WR",
+    "focalLength": 42.5,
+    "focalLength35mm": 64,
+    "aperture": 8,
     "shutterSpeed": 0.0125,
-    "iso": 100
+    "iso": 100,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "TERM5977",
@@ -656,7 +701,17 @@
     "galleryHeight": 1200,
     "viewerWidth": 1200,
     "viewerHeight": 1800,
-    "capturedAt": "2026-04-04T16:55:21.000Z"
+    "capturedAt": "2026-04-04T14:48:00.000Z",
+    "camera": "NIKON D3100",
+    "lens": "AF-S DX Zoom-Nikkor 55-200mm f/4-5.6G ED",
+    "focalLength": 78,
+    "focalLength35mm": 117,
+    "aperture": 5.6,
+    "shutterSpeed": 0.002,
+    "iso": 160,
+    "exposureCompensation": 0,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "harbor-golden-hour",
@@ -671,9 +726,13 @@
     "camera": "SONY ILCE-7M3",
     "lens": "FE 28-70mm F3.5-5.6 OSS",
     "focalLength": 70,
+    "focalLength35mm": 70,
     "aperture": 8,
     "shutterSpeed": 0.004,
-    "iso": 200
+    "iso": 200,
+    "exposureCompensation": 0.3,
+    "flash": "Off",
+    "whiteBalance": "Auto"
   },
   {
     "id": "IMG_0776",
@@ -686,10 +745,15 @@
     "viewerHeight": 1800,
     "capturedAt": "2026-08-04T00:26:53.000Z",
     "camera": "Canon PowerShot G11",
+    "lens": "6.1-30.5mm",
     "focalLength": 9.784,
+    "focalLength35mm": 45.7,
     "aperture": 4,
     "shutterSpeed": 0.002,
-    "iso": 100
+    "iso": 100,
+    "exposureCompensation": -1,
+    "flash": "On",
+    "whiteBalance": "Daylight Fluorescent"
   },
   {
     "id": "IMG_0858",
@@ -702,10 +766,15 @@
     "viewerHeight": 1800,
     "capturedAt": "2026-08-24T19:39:36.000Z",
     "camera": "Canon PowerShot G11",
+    "lens": "6.1-30.5mm",
     "focalLength": 6.1,
+    "focalLength35mm": 28.5,
     "aperture": 4,
     "shutterSpeed": 0.0015625,
-    "iso": 80
+    "iso": 80,
+    "exposureCompensation": -0.33333333,
+    "flash": "Off",
+    "whiteBalance": "Daylight Fluorescent"
   },
   {
     "id": "IMG_0845",
@@ -718,10 +787,15 @@
     "viewerHeight": 1650,
     "capturedAt": "2026-08-20T00:16:12.000Z",
     "camera": "Canon PowerShot G11",
+    "lens": "6.1-30.5mm",
     "focalLength": 6.1,
+    "focalLength35mm": 28.5,
     "aperture": 2.8,
     "shutterSpeed": 0.0125,
-    "iso": 320
+    "iso": 320,
+    "exposureCompensation": -0.33333333,
+    "flash": "On",
+    "whiteBalance": "Daylight Fluorescent"
   },
   {
     "id": "IMG_0811",
@@ -734,10 +808,15 @@
     "viewerHeight": 1650,
     "capturedAt": "2026-08-05T21:21:31.000Z",
     "camera": "Canon PowerShot G11",
+    "lens": "6.1-30.5mm",
     "focalLength": 6.1,
+    "focalLength35mm": 28.5,
     "aperture": 4,
     "shutterSpeed": 0.0008,
-    "iso": 80
+    "iso": 80,
+    "exposureCompensation": -1,
+    "flash": "Off",
+    "whiteBalance": "Daylight Fluorescent"
   },
   {
     "id": "IMG_0846",
@@ -750,9 +829,14 @@
     "viewerHeight": 1650,
     "capturedAt": "2026-08-22T01:37:39.000Z",
     "camera": "Canon PowerShot G11",
+    "lens": "6.1-30.5mm",
     "focalLength": 6.1,
+    "focalLength35mm": 28.5,
     "aperture": 2.8,
     "shutterSpeed": 0.01666667,
-    "iso": 500
+    "iso": 500,
+    "exposureCompensation": -0.33333333,
+    "flash": "On",
+    "whiteBalance": "Daylight Fluorescent"
   }
 ]
