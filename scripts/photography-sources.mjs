@@ -21,8 +21,10 @@ export const photographLibraryPaths = {
   'afterglow-road': 'sony-a6400/2026-10-02/DSC00292.JPG',
   'streaked-sky': 'sony-a6400/2026-10-02/DSC00280.JPG',
   'aero-wheel': 'sony-a6400/2026-09-30/DSC00131.JPG',
-  'impreza-grass': 'sony-a6400/2026-09-30/DSC00125.JPG',
   'sun-between-trunks': 'sony-a6400/2026-10-02/DSC00260.JPG',
   'mill-wheel': 'sony-a7iii/2026-10-06/DSC09155.JPG',
   'taughannock-falls': 'pentax-k50/2026-07-25/IMGP0731.JPG',
+  'lamp-and-tower': 'sony-a7iii/2026-10-09/DSC09311.JPG',
+  'colonnade-steps': 'sony-a7iii/2026-10-09/DSC09308.JPG',
+  'nissan-350z': 'sony-a7iii/2026-10-09/DSC09322.JPG',
 };

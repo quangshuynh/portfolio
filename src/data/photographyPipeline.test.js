@@ -127,7 +127,7 @@ const PUBLISHED_PHOTOGRAPH_IDS = [
   'letchworth-gorge', 'aero-wheel', '_DSC0023', 'neon-window-blue-hour', 'red-sun', 'DIBS2164',
   '_DSC0003', 'afterglow-road', 'waves-on-rocks', 'IMG_0758', 'orange-domes-close',
   'shoreline-gold-dusk', 'bird-in-flight', 'YJMZ4301', 'high-falls-mist', 'impreza-fence',
-  'IMG_0931', '_DSC0033', 'downtown-rochester-dusk', 'streaked-sky', 'IMGP0579', 'impreza-grass',
+  'IMG_0931', '_DSC0033', 'downtown-rochester-dusk', 'streaked-sky', 'IMGP0579',
   'DSC00266', 'PBTM8581', 'NTIO3912', 'sundown-streaked-clouds', 'TERM5977', 'harbor-golden-hour',
   'IMG_0776', 'IMG_0858', 'beach-cloud-bank', 'IMG_0845', 'IMG_0811', 'IMG_0846',
   'sun-between-trunks', 'mill-wheel', 'taughannock-falls',
