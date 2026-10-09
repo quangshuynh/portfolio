@@ -109,6 +109,8 @@ function MoreProjects() {
   const [showAllProjects, setShowAllProjects] = useState(false);
   const collapsedScrollY = useRef(null);
   const pendingScrollY = useRef(null);
+  const toggleButton = useRef(null);
+  const grid = useRef(null);
   const visibleProjects = showAllProjects ? projects : projects.slice(0, 3);
 
   useLayoutEffect(() => {
@@ -118,6 +120,13 @@ function MoreProjects() {
     if (window.scrollY !== scrollY) {
       window.scrollTo({ top: scrollY, left: 0, behavior: 'auto' });
     }
+    // Focus moves only after the scroll is restored, with preventScroll, so it
+    // never drags the page. Expanding lands on the first newly shown project;
+    // collapsing returns to the toggle (otherwise focus would fall to <body>).
+    const target = showAllProjects
+      ? grid.current?.querySelector('article:nth-child(4) h3')
+      : toggleButton.current;
+    target?.focus({ preventScroll: true });
   }, [showAllProjects]);
 
   const toggleProjects = (event) => {
@@ -138,7 +147,7 @@ function MoreProjects() {
           <div><p className="eyebrow">Additional work</p><h2 id="more-projects-title">More projects</h2></div>
           <p>Additional projects spanning system design, developer tooling, automation, native applications, and product engineering.</p>
         </div>
-        <div className="more-grid ledger" id="more-projects-grid">
+        <div className="more-grid ledger" id="more-projects-grid" ref={grid}>
           {visibleProjects.map((project, index) => (
             <article className={`more-card ledger-row${project.logo ? ' has-logo' : ''}`} key={project.name} data-reveal style={{ '--reveal-delay': `${(index % 3) * 70}ms` }}>
               <div className="ledger-row__id">
@@ -154,7 +163,7 @@ function MoreProjects() {
                 )}
               </div>
               <div className="ledger-row__main">
-                <h3>{project.name}</h3>
+                <h3 tabIndex={-1}>{project.name}</h3>
                 <p>{project.description}</p>
                 <p className="more-highlight">{project.highlight}</p>
               </div>
@@ -177,6 +186,7 @@ function MoreProjects() {
               secondary
               personality="auto"
               personalityKey="more-projects-toggle"
+              ref={toggleButton}
               type="button"
               aria-expanded={showAllProjects}
               aria-controls="more-projects-grid"
