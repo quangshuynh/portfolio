@@ -185,6 +185,43 @@
   font-size: var(--step-1);
   line-height: 1.45;
 }
+/* The one-line engineering takeaway: scannable between purpose and the detail list. */
+.project-takeaway {
+  max-width: 52ch;
+  margin-top: 1rem;
+  padding-left: .85rem;
+  border-left: 2px solid var(--accent);
+  color: var(--text-primary);
+  font-size: .98rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.project-takeaway__label {
+  display: block;
+  margin-bottom: .15rem;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: .625rem;
+  font-weight: 400;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+/* Shareable per-project anchor: the title links to itself; a quiet '#' appears
+   on hover/focus. The '/ ""' alt text keeps it out of the heading's name. */
+.project-permalink { color: inherit; text-decoration: none; }
+.project-permalink::after {
+  content: '#';
+  content: '#' / '';
+  margin-left: .3em;
+  color: var(--text-tertiary);
+  font-size: .5em;
+  vertical-align: middle;
+  opacity: 0;
+  transition: opacity var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.featured-project:hover .project-permalink::after,
+.project-permalink:focus-visible::after { opacity: 1; }
+.project-permalink:hover::after { color: var(--accent); }
 .project-highlights {
   display: grid;
   gap: .75rem;
@@ -217,8 +254,9 @@
   margin-top: .5rem;
 }
 .case-file--wide .project-copy h3,
-.case-file--wide .project-purpose { grid-column: 1; }
-.case-file--wide .project-highlights { grid-column: 2; grid-row: 1 / span 3; margin-top: 0; }
+.case-file--wide .project-purpose,
+.case-file--wide .project-takeaway { grid-column: 1; }
+.case-file--wide .project-highlights { grid-column: 2; grid-row: 1 / span 4; margin-top: 0; }
 .case-file--wide .project-actions { grid-column: 1; }
 .project-actions { margin-top: 2rem; }
 
@@ -535,9 +573,10 @@
   .featured-project .case-file__meta > div:first-child dd { margin: 0; font-size: .95rem; }
   .featured-project .case-file__visual { order: 4; margin-top: 1.5rem; }
   .featured-project .project-purpose { order: 5; margin-top: 1.5rem; }
-  .featured-project .project-highlights { order: 6; }
-  .featured-project .project-stack { order: 7; margin-top: 1.75rem; }
-  .featured-project .project-actions { order: 8; }
+  .featured-project .project-takeaway { order: 6; }
+  .featured-project .project-highlights { order: 7; }
+  .featured-project .project-stack { order: 8; margin-top: 1.75rem; }
+  .featured-project .project-actions { order: 9; }
   .detail-list li { grid-template-columns: 1fr; gap: .5rem; }
   .skill-group { grid-template-columns: 1fr; gap: .75rem; }
   .skill-group li { font-size: 1.05rem; }

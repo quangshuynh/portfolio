@@ -35,6 +35,8 @@ import dashPilotPeriodSummary from '../../assets/dashpilot/period-summary.png';
 const projects = [
   {
     name: '585Dashcam585',
+    slug: '585dashcam585',
+    takeaway: 'Production checkout and order processing with reliable payment finalization.',
     label: 'Production commerce platform',
     purpose: 'Built and deployed a full-stack commerce platform for a family-owned Rochester automotive services business, replacing its hosted website with a custom production application.',
     highlights: [
@@ -49,6 +51,8 @@ const projects = [
   },
   {
     name: 'Flipper',
+    slug: 'flipper',
+    takeaway: 'Exact financial accounting from deal research through realized profit.',
     label: 'Backend · Reselling & marketplace tooling',
     purpose:
       'Local-first reseller toolkit for researching deals, modeling sourcing economics, managing inventory, and reconciling marketplace sales from discovery through outcome.',
@@ -66,6 +70,8 @@ const projects = [
   },
   {
     name: 'GitProfileLens',
+    slug: 'gitprofilelens',
+    takeaway: 'Explainable GitHub portfolio analysis with strict privacy boundaries.',
     label: 'Developer tooling · GitHub APIs & authenticated data',
     purpose:
       'Audits GitHub profiles and repositories with transparent, deterministic rules to improve portfolio presentation, discoverability, and project selection without claiming to measure developer ability.',
@@ -83,6 +89,8 @@ const projects = [
   },
   {
     name: 'ScribeKit',
+    slug: 'scribekit',
+    takeaway: 'On-device transcription designed to preserve work through interruptions.',
     label: 'Native macOS · Audio, transcription & reliability',
     purpose:
       'Native macOS meeting transcription that captures selected application audio or a chosen microphone, transcribes it on-device with Apple speech frameworks, and durably writes timestamped Markdown.',
@@ -100,6 +108,8 @@ const projects = [
   },
   {
     name: 'DashPilot',
+    slug: 'dashpilot',
+    takeaway: 'Reliable shift and delivery tracking without cloud accounts or platform integrations.',
     label: 'Native iOS · Delivery workflow & local-first data',
     purpose:
       'Local-first iOS companion for delivery drivers that tracks shifts, stacked deliveries, journeys, earnings, mileage, expenses, and performance without relying on delivery-platform integrations.',
@@ -524,6 +534,8 @@ function FeaturedProjects() {
           {projects.map((project, index) => (
             <article
               key={project.name}
+              id={`project-${project.slug}`}
+              aria-labelledby={`project-${project.slug}-title`}
               className={`featured-project case-file${index === 0 ? ' flagship-project case-file--wide' : ''}${index % 2 === 0 ? '' : ' case-file--flip'}${project.name === 'GitProfileLens' ? ' gitprofilelens-project' : ''}`}
             >
               <div className="case-file__rail" data-reveal>
@@ -544,8 +556,12 @@ function FeaturedProjects() {
                 <ProjectVisual type={project.visual} />
               </div>
               <div className="project-copy" data-reveal style={{ '--reveal-delay': '140ms' }}>
-                <h3>{project.name}</h3>
+                {/* Self-linking title: gives each project a shareable /#project-… URL. */}
+                <h3 id={`project-${project.slug}-title`}>
+                  <a className="project-permalink" href={`#project-${project.slug}`}>{project.name}</a>
+                </h3>
                 <p className="project-purpose">{project.purpose}</p>
+                <p className="project-takeaway"><span className="project-takeaway__label">Takeaway</span> {project.takeaway}</p>
                 <ul className="project-highlights" aria-label={`${project.name} engineering highlights`}>
                   {project.highlights.map((item) => <li key={item}>{item}</li>)}
                 </ul>
