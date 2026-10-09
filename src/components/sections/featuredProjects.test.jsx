@@ -57,3 +57,22 @@ test('phone modal galleries use two columns of 3:4 portrait and 4:3 landscape ce
   expect(phone).toMatch(/\.photography-gallery-portrait \{ grid-row: auto; aspect-ratio: 3 \/ 4; \}/);
   expect(phone).toMatch(/\.photography-gallery figcaption \{[^}]*-webkit-line-clamp: 2;/);
 });
+
+test('featured cards cannot be widened past the column by their gallery tabs', () => {
+  // An implicit `auto` track let five gallery tabs stretch every card to ~460px on a 375px phone.
+  expect(sectionsCss).toMatch(/\.featured-list \{[^}]*grid-template-columns: minmax\(0, 1fr\);/);
+  const phone = mediaBlock(sectionsCss, '(max-width: 620px)');
+  expect(phone).toMatch(/\.gallery-controls \{[^}]*flex-wrap: wrap;/);
+});
+
+test('gallery tab sets are named groups of toggle buttons', () => {
+  const { getAllByRole } = render(<FeaturedProjects />);
+  const groups = getAllByRole('group', { name: /gallery$/ });
+  expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
+    'Flipper gallery', 'GitProfileLens gallery', 'ScribeKit gallery', 'DashPilot gallery',
+  ]);
+  groups.forEach((group) => {
+    const pressed = [...group.querySelectorAll('button')].filter((button) => button.getAttribute('aria-pressed') === 'true');
+    expect(pressed).toHaveLength(1);
+  });
+});

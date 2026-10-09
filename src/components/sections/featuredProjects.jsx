@@ -190,7 +190,7 @@ function DashPilotGallery() {
         )}
       </div>
 
-      <div className="gallery-controls" aria-label="DashPilot gallery">
+      <div className="gallery-controls" role="group" aria-label="DashPilot gallery">
         <button
           type="button"
           aria-pressed={slide === 'logo'}
@@ -251,7 +251,7 @@ function GitProfileLensVisual() {
           <HomeImageTrigger src={gitProfileLensResults} imageClassName="project-result-image" alt="GitProfileLens audit dashboard showing presentation and discoverability scores with prioritized recommendations" caption="GitProfileLens audit results" />
         )}
       </div>
-      <div className="gallery-controls" aria-label="GitProfileLens gallery">
+      <div className="gallery-controls" role="group" aria-label="GitProfileLens gallery">
         <button type="button" aria-pressed={slide === 'logo'} onClick={() => setSlide('logo')}>Logo</button>
         <button type="button" aria-pressed={slide === 'results'} onClick={() => setSlide('results')}>Results</button>
       </div>
@@ -347,7 +347,7 @@ function ScribeKitGallery() {
             />
           )}
         </div>
-      <div className="gallery-controls" aria-label="ScribeKit gallery">
+      <div className="gallery-controls" role="group" aria-label="ScribeKit gallery">
         <button type="button" aria-pressed={slide === 'logo'} onClick={() => setSlide('logo')}>Logo</button>
         <button type="button" aria-pressed={slide === 'app'} onClick={() => setSlide('app')}>App</button>
         <button type="button" aria-pressed={slide === 'audio'} onClick={() => setSlide('audio')}>Audio</button>
@@ -431,7 +431,7 @@ function FlipperVisual() {
         )}
       </div>
 
-      <div className="gallery-controls" aria-label="Flipper gallery">
+      <div className="gallery-controls" role="group" aria-label="Flipper gallery">
         <button
           type="button"
           aria-pressed={slide === 'logo'}
