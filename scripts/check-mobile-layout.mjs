@@ -61,7 +61,7 @@ async function viewport(width, height, mobile = true) {
 const ratioError = `(image) => { const box = image.getBoundingClientRect(); return Math.abs(box.width / box.height - image.naturalWidth / image.naturalHeight); }`;
 
 const phones = [[320, 740], [360, 800], [375, 812], [390, 844], [393, 852], [430, 932]];
-const phoneOrder = ['title', 'type', 'visual', 'purpose', 'stack', 'actions'];
+const phoneOrder = ['title', 'type', 'visual', 'purpose', 'takeaway', 'stack', 'actions'];
 
 try {
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
@@ -136,7 +136,7 @@ try {
     const projects = await evaluate(`(() => { const heading = document.querySelector('#projects-title'); const range = document.createRange(); range.selectNodeContents(heading);
       return { headingFits: [...range.getClientRects()].every(rect => rect.right <= innerWidth - 8), pageOverflow: document.documentElement.scrollWidth > innerWidth,
         articles: [...document.querySelectorAll('#projects .featured-project')].map(article => { const top = selector => article.querySelector(selector).getBoundingClientRect().top;
-          const parts = { title: top('h3'), type: top('.project-number'), visual: top('.case-file__visual'), purpose: top('.project-purpose'), stack: top('.project-stack'), actions: top('.project-actions') };
+          const parts = { title: top('h3'), type: top('.project-number'), visual: top('.case-file__visual'), purpose: top('.project-purpose'), takeaway: top('.project-takeaway'), stack: top('.project-stack'), actions: top('.project-actions') };
           const index = article.querySelector('.case-file__index'); const title = article.querySelector('h3');
           return { order: Object.keys(parts).sort((first, second) => parts[first] - parts[second]), indexDemoted: parseFloat(getComputedStyle(index).fontSize) < parseFloat(getComputedStyle(title).fontSize) / 2 }; }) }; })()`);
     assert.ok(projects.headingFits, `${label}: Featured projects heading fits`);
