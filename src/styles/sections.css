@@ -295,7 +295,9 @@
   margin-inline: auto;
   object-fit: contain;
 }
-.gallery-stage > img { max-height: 260px; }
+/* Explicit height (logos are always 260px tall once loaded) reserves the space
+   before lazy loading, so deep links to later projects don't drift on phones. */
+.gallery-stage > img { height: 260px; max-height: 260px; }
 .gallery-stage .home-image-trigger { width: auto; border-radius: var(--radius-sm); }
 .vertical-project-shot { max-height: 420px !important; }
 .gallery-controls {

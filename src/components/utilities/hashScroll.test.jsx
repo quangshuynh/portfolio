@@ -57,3 +57,63 @@ test('a nonexistent homepage hash is ignored without errors', () => {
   expect(() => render(<App />)).not.toThrow();
   expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
 });
+
+describe('settling after the initial jump', () => {
+  let observers;
+  const originalResizeObserver = global.ResizeObserver;
+
+  beforeEach(() => {
+    observers = [];
+    global.ResizeObserver = class {
+      constructor(callback) { this.callback = callback; this.disconnected = false; observers.push(this); }
+      observe() {}
+      disconnect() { this.disconnected = true; }
+    };
+  });
+
+  afterEach(() => {
+    global.ResizeObserver = originalResizeObserver;
+    vi.useRealTimers();
+  });
+
+  const resize = () => observers.forEach((observer) => !observer.disconnected && observer.callback([]));
+
+  test('re-aligns a project deep link when content above it changes size', () => {
+    window.history.replaceState({}, '', '/#project-flipper');
+    render(<App />);
+    resize();
+    const calls = Element.prototype.scrollIntoView.mock;
+    expect(calls.instances.map((element) => element.id)).toEqual(['project-flipper', 'project-flipper']);
+    expect(calls.calls[1][0]).toEqual({ behavior: 'instant' });
+  });
+
+  test('stops re-aligning once the visitor scrolls', () => {
+    window.history.replaceState({}, '', '/#project-flipper');
+    render(<App />);
+    fireEvent.wheel(window);
+    resize();
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  test('stops re-aligning after the hash changes or the settle window ends', () => {
+    vi.useFakeTimers();
+    window.history.replaceState({}, '', '/#project-flipper');
+    render(<App />);
+    window.history.replaceState({}, '', '/#project-dashpilot');
+    resize();
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
+    window.history.replaceState({}, '', '/#project-flipper');
+    vi.advanceTimersByTime(5000);
+    resize();
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  test('a StrictMode re-mount jumps once but keeps settling', async () => {
+    const { StrictMode } = await import('react');
+    window.history.replaceState({}, '', '/#project-scribekit');
+    render(<StrictMode><App /></StrictMode>);
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
+    resize();
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(2);
+  });
+});
