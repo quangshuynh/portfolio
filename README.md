@@ -45,6 +45,16 @@ Portfolio content is maintained locally in `src/components`, keeping featured pr
 
 The public routes and their titles, descriptions, canonical URLs, and JSON-LD live in `src/seo/site.mjs`. At build time `scripts/seo-plugin.mjs` writes a static HTML page per route (`index.html`, `about/index.html`, `photography/index.html`) with that route's head tags, plus `404.html` (noindex) and `sitemap.xml` (pages plus every photograph). The page body is still rendered client-side. Add a new page to `ROUTES` and it will get its own HTML, sitemap entry, and tests. `vite preview` does not apply `vercel.json`, so check redirects and 404s against a Vercel deployment.
 
+## Homepage images
+
+Logos and the 585Dashcam585 screenshot are served as WebP derivatives sized to roughly 3x their largest on-page display size. Sources stay in `src/assets`; after replacing one, regenerate the derivatives in `src/assets/optimized`:
+
+```bash
+npm run prepare:images
+```
+
+The image list, target sizes, and lossless/lossy choice live in `scripts/prepare-site-images.mjs`.
+
 ## Photography preparation
 
 Retained originals live outside this public repository. Generate public gallery and viewer derivatives by passing their directory explicitly:

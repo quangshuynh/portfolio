@@ -260,3 +260,10 @@
   .brand-lockup { gap: .6rem; }
   .photography-brand-section { display: none; }
 }
+
+/* Smallest phones / 320px reflow: brand + labelled pill no longer fit, so the
+   menu button becomes a 44px icon button. The label stays as its accessible name. */
+@media (max-width: 360px) {
+  .nav-menu-button { position: relative; justify-content: center; width: 2.75rem; padding: 0; }
+  .nav-menu-button__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}

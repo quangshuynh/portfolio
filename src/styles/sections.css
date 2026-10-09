@@ -90,7 +90,7 @@
 /* ============ FEATURED PROJECTS: case files ============ */
 .featured-section { background: var(--bg-secondary); }
 .featured-section .section-inner { position: relative; }
-.featured-list { display: grid; gap: 0; }
+.featured-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
 
 .trail-line {
   position: absolute;
@@ -185,6 +185,43 @@
   font-size: var(--step-1);
   line-height: 1.45;
 }
+/* The one-line engineering takeaway: scannable between purpose and the detail list. */
+.project-takeaway {
+  max-width: 52ch;
+  margin-top: 1rem;
+  padding-left: .85rem;
+  border-left: 2px solid var(--accent);
+  color: var(--text-primary);
+  font-size: .98rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.project-takeaway__label {
+  display: block;
+  margin-bottom: .15rem;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: .625rem;
+  font-weight: 400;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+/* Shareable per-project anchor: the title links to itself; a quiet '#' appears
+   on hover/focus. The '/ ""' alt text keeps it out of the heading's name. */
+.project-permalink { color: inherit; text-decoration: none; }
+.project-permalink::after {
+  content: '#';
+  content: '#' / '';
+  margin-left: .3em;
+  color: var(--text-tertiary);
+  font-size: .5em;
+  vertical-align: middle;
+  opacity: 0;
+  transition: opacity var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.featured-project:hover .project-permalink::after,
+.project-permalink:focus-visible::after { opacity: 1; }
+.project-permalink:hover::after { color: var(--accent); }
 .project-highlights {
   display: grid;
   gap: .75rem;
@@ -217,8 +254,9 @@
   margin-top: .5rem;
 }
 .case-file--wide .project-copy h3,
-.case-file--wide .project-purpose { grid-column: 1; }
-.case-file--wide .project-highlights { grid-column: 2; grid-row: 1 / span 3; margin-top: 0; }
+.case-file--wide .project-purpose,
+.case-file--wide .project-takeaway { grid-column: 1; }
+.case-file--wide .project-highlights { grid-column: 2; grid-row: 1 / span 4; margin-top: 0; }
 .case-file--wide .project-actions { grid-column: 1; }
 .project-actions { margin-top: 2rem; }
 
@@ -257,7 +295,9 @@
   margin-inline: auto;
   object-fit: contain;
 }
-.gallery-stage > img { max-height: 260px; }
+/* Explicit height (logos are always 260px tall once loaded) reserves the space
+   before lazy loading, so deep links to later projects don't drift on phones. */
+.gallery-stage > img { height: 260px; max-height: 260px; }
 .gallery-stage .home-image-trigger { width: auto; border-radius: var(--radius-sm); }
 .vertical-project-shot { max-height: 420px !important; }
 .gallery-controls {
@@ -272,7 +312,8 @@
   border: 0;
   border-right: 1px solid var(--border);
   background: transparent;
-  color: var(--text-tertiary);
+  /* Secondary, not tertiary: tertiary falls under 4.5:1 on the sunken light surface. */
+  color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: var(--step--2);
   letter-spacing: .06em;
@@ -392,7 +433,7 @@
 .about-card { display: grid; gap: 1.25rem; }
 .about-card > p { max-width: 52ch; color: var(--text-secondary); line-height: 1.7; }
 .about-card .about-card__lead { max-width: 30ch; color: var(--text-primary); font-size: var(--step-2); font-weight: 600; line-height: 1.3; letter-spacing: -.02em; }
-.about-card .text-link { justify-self: start; margin-top: .5rem; }
+.about-card .text-link { justify-self: start; min-height: 2.75rem; margin-top: .5rem; }
 
 .education-card {
   padding: clamp(1.5rem, 3vw, 2.25rem);
@@ -534,9 +575,10 @@
   .featured-project .case-file__meta > div:first-child dd { margin: 0; font-size: .95rem; }
   .featured-project .case-file__visual { order: 4; margin-top: 1.5rem; }
   .featured-project .project-purpose { order: 5; margin-top: 1.5rem; }
-  .featured-project .project-highlights { order: 6; }
-  .featured-project .project-stack { order: 7; margin-top: 1.75rem; }
-  .featured-project .project-actions { order: 8; }
+  .featured-project .project-takeaway { order: 6; }
+  .featured-project .project-highlights { order: 7; }
+  .featured-project .project-stack { order: 8; margin-top: 1.75rem; }
+  .featured-project .project-actions { order: 9; }
   .detail-list li { grid-template-columns: 1fr; gap: .5rem; }
   .skill-group { grid-template-columns: 1fr; gap: .75rem; }
   .skill-group li { font-size: 1.05rem; }
@@ -549,6 +591,11 @@
   .education-meta { grid-template-columns: 1fr; }
   .education-meta > div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--border); }
   .gallery-stage { min-height: 220px; }
+  /* Five tabs no longer fit one row at phone width: wrap into full-width rows
+     (3 + 2) instead of widening the card. Negative margins tuck each tab's
+     right/bottom divider under the clipped edge so only inner rules show. */
+  .gallery-controls { flex-wrap: wrap; overflow: hidden; }
+  .gallery-controls button { flex: 1 0 auto; min-width: 30%; margin: 0 -1px -1px 0; padding: 0 .5rem; border-bottom: 1px solid var(--border); }
   .featured-section .section-heading h2 { font-size: clamp(2.25rem, 1.6rem + 3vw, 2.75rem); text-wrap: balance; }
   .pipeline-row span { font-size: .56rem; min-height: 2.6rem; padding: .35rem; }
   .footer-inner { flex-direction: column; align-items: flex-start; }

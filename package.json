@@ -17,6 +17,7 @@
     "test": "vitest run",
     "prepare:photography": "node scripts/prepare-photography.mjs",
     "prepare:hero": "node scripts/render-hero-fallbacks.mjs",
+    "prepare:images": "node scripts/prepare-site-images.mjs",
     "test:hero:browser": "node scripts/check-hero-browser.mjs",
     "measure:hero": "node scripts/measure-hero-bundles.mjs"
   },

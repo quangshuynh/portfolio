@@ -1,5 +1,5 @@
 import React from 'react';
-import ritLogo from '../../assets/logos/rit-logo.png';
+import ritLogo from '../../assets/optimized/rit-logo.webp';
 import { aboutHref } from './siteNav';
 const honors = [
   { name: 'Farash Foundation First in Family Scholar' },
@@ -41,7 +41,7 @@ function Education() {
           <article className="education-card" data-reveal style={{ '--reveal-delay': '120ms' }}>
             <div className="education-title">
               <a href="https://www.rit.edu/" target="_blank" rel="noopener noreferrer">
-                <img className="institution-logo" src={ritLogo} width="860" height="860" alt="Rochester Institute of Technology" loading="lazy" decoding="async" />
+                <img className="institution-logo" src={ritLogo} width="192" height="192" alt="Rochester Institute of Technology" loading="lazy" decoding="async" />
               </a>
               <div><h3>Rochester Institute of Technology</h3><p className="degree">BS/MS Computer Science – Accelerated Program</p></div>
             </div>

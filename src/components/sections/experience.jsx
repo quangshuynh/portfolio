@@ -1,17 +1,17 @@
 import React from 'react';
-import koreLogo from '../../assets/logos/kore-logo.png';
+import koreLogo from '../../assets/optimized/kore-logo.webp';
 
 const work = [
   {
-    area: 'Applications',
+    area: '.NET desktop apps',
     detail: 'Developed C#/.NET WPF features for internal business applications using XAML and MVVM, including a configurable XML-generation workflow for Excel imports and a partial-match search interface for maintenance tooling.',
   },
   {
-    area: 'Data & automation',
+    area: 'SQL Server automation',
     detail: 'Built and modified SQL Server queries and stored procedures for order automation, validation, reporting, and data-quality workflows, including logic that automatically updated shipping methods, order comments, and processing status based on business rules.',
   },
   {
-    area: 'Integrations',
+    area: 'Boomi/NetSuite integrations',
     detail: 'Improved Boomi/NetSuite integration reliability and supportability by extending centralized error tracking and manual resolution workflows, building reusable transaction test harnesses, and reproducing production integration failures in QA.',
   },
 ];
@@ -43,7 +43,7 @@ function Experience() {
               <time dateTime="2025-05">May 2025</time>
             </p>
             <a className="company-logo-link" href="https://www.korewireless.com/about-us" target="_blank" rel="noopener noreferrer">
-              <img className="company-logo" src={koreLogo} width="3000" height="2000" alt="KORE Wireless" loading="lazy" decoding="async" />
+              <img className="company-logo" src={koreLogo} width="336" height="224" alt="KORE Wireless" loading="lazy" decoding="async" />
             </a>
             <h3>KORE Wireless</h3>
             <p className="experience-role">IoT Software Engineering Co-op</p>
