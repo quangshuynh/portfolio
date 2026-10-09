@@ -65,6 +65,18 @@ function finiteNumber(value, precision = 6) {
   return Number.isFinite(number) ? Number(number.toFixed(precision)) : null;
 }
 
+// EXIF LightSource names, used when white balance was set manually rather than Auto.
+const LIGHT_SOURCES = {
+  1: 'Daylight', 2: 'Fluorescent', 3: 'Tungsten', 4: 'Flash', 9: 'Fine Weather', 10: 'Cloudy', 11: 'Shade',
+  12: 'Daylight Fluorescent', 13: 'Day White Fluorescent', 14: 'Cool White Fluorescent', 15: 'White Fluorescent',
+};
+
+function whiteBalanceName(whiteBalance, lightSource) {
+  if (whiteBalance === 0) return 'Auto';
+  if (whiteBalance === 1) return LIGHT_SOURCES[lightSource] ?? 'Manual';
+  return null;
+}
+
 function normalizeExif(exif) {
   const capturedAt = parseExifTimestamp(
     exif?.DateTimeOriginal ?? exif?.CreateDate,
@@ -76,9 +88,13 @@ function normalizeExif(exif) {
     camera: normalizeCamera(exif?.Make, exif?.Model),
     lens: exif?.LensModel ? String(exif.LensModel).trim() : null,
     focalLength: finiteNumber(exif?.FocalLength, 3),
+    focalLength35mm: finiteNumber(exif?.FocalLengthIn35mmFormat, 1),
     aperture: finiteNumber(exif?.FNumber, 2),
     shutterSpeed: finiteNumber(exif?.ExposureTime, 8),
     iso: finiteNumber(exif?.ISO, 0),
+    exposureCompensation: finiteNumber(exif?.ExposureCompensation, 8),
+    flash: Number.isInteger(exif?.Flash) ? (exif.Flash & 1 ? 'On' : 'Off') : null,
+    whiteBalance: whiteBalanceName(exif?.WhiteBalance, exif?.LightSource),
   };
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== null && value !== ''));
 }
@@ -86,8 +102,10 @@ function normalizeExif(exif) {
 async function extractExif(sourcePath) {
   try {
     return await exifr.parse(sourcePath, {
-      pick: ['DateTimeOriginal', 'CreateDate', 'OffsetTimeOriginal', 'OffsetTime', 'Make', 'Model', 'LensModel', 'FocalLength', 'FNumber', 'ExposureTime', 'ISO', 'Orientation'],
+      pick: ['DateTimeOriginal', 'CreateDate', 'OffsetTimeOriginal', 'OffsetTime', 'Make', 'Model', 'LensModel', 'FocalLength', 'FNumber', 'ExposureTime', 'ISO', 'Orientation',
+        'FocalLengthIn35mmFormat', 'ExposureCompensation', 'Flash', 'WhiteBalance', 'LightSource'],
       reviveValues: false,
+      translateValues: false,
     }) ?? {};
   } catch (error) {
     throw new Error(`EXIF parsing failed for ${path.basename(sourcePath)}: ${error.message}`);

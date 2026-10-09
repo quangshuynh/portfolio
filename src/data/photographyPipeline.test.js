@@ -120,3 +120,24 @@ test('generated records match declared sources without exposing coordinates', ()
     /latitude|longitude|coordinates/i,
   );
 });
+
+// Published photographs keep their IDs (and lightbox links) for good; additions are fine.
+const PUBLISHED_PHOTOGRAPH_IDS = [
+  'EJUT5331', 'IMGP0739', 'fog-parking-lot', 'bridge-lattice', 'shore-curve', 'suzuki-bandit',
+  'letchworth-gorge', 'aero-wheel', '_DSC0023', 'neon-window-blue-hour', 'red-sun', 'DIBS2164',
+  '_DSC0003', 'afterglow-road', 'waves-on-rocks', 'IMG_0758', 'orange-domes-close',
+  'shoreline-gold-dusk', 'bird-in-flight', 'YJMZ4301', 'high-falls-mist', 'impreza-fence',
+  'IMG_0931', '_DSC0033', 'downtown-rochester-dusk', 'streaked-sky', 'IMGP0579', 'impreza-grass',
+  'DSC00266', 'PBTM8581', 'NTIO3912', 'sundown-streaked-clouds', 'TERM5977', 'harbor-golden-hour',
+  'IMG_0776', 'IMG_0858', 'beach-cloud-bank', 'IMG_0845', 'IMG_0811', 'IMG_0846',
+  'sun-between-trunks', 'mill-wheel', 'taughannock-falls',
+];
+
+
+test('every published photograph is still declared exactly once', () => {
+  const ids = photographOverrides.map(({ id }) => id);
+
+  for (const id of PUBLISHED_PHOTOGRAPH_IDS) {
+    expect(ids.filter((declared) => declared === id)).toHaveLength(1);
+  }
+});
