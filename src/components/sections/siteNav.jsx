@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FaCamera, FaFilePdf } from 'react-icons/fa';
-import chiTheCat from '../../assets/chi-the-cat.png';
+import chiTheCat from '../../assets/optimized/chi-the-cat.webp';
 import ThemeToggle from '../ui/themeToggle';
 
 const basePath = import.meta.env.BASE_URL;
@@ -146,7 +146,7 @@ function SiteNav({ variant = 'default', current = 'home', collapsible = variant 
       <div className="nav-inner">
         <a className="brand brand-lockup" href={isPhotography ? photographyPageHref : homeHref('#top')} aria-label={isPhotography ? 'quanghuynh.com photography — back to photography gallery' : 'quanghuynh.com — back to homepage'}>
           <span className="brand-cat" aria-hidden="true">
-            <img src={chiTheCat} width="1024" height="1024" alt="" decoding="async" />
+            <img src={chiTheCat} width="400" height="400" alt="" decoding="async" />
           </span>
           <span className="brand-name">
             <span className="brand-domain">quanghuynh</span>

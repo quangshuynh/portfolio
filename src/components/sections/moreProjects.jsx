@@ -1,14 +1,14 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
-import hymicalFormsLogo from '../../assets/logos/hymical-forms-logo.png';
-import repoRadarLogo from '../../assets/logos/repo-radar-logo.png';
-import salonFlowLogo from '../../assets/logos/salonflow-logo.png';
-import caseNotesLogo from '../../assets/logos/casenotes-logo.png';
-import inboxSweepLogo from '../../assets/logos/inboxsweep-logo.png';
+import hymicalFormsLogo from '../../assets/optimized/hymical-forms-logo.webp';
+import repoRadarLogo from '../../assets/optimized/repo-radar-logo.webp';
+import salonFlowLogo from '../../assets/optimized/salonflow-logo.webp';
+import caseNotesLogo from '../../assets/optimized/casenotes-logo.webp';
+import inboxSweepLogo from '../../assets/optimized/inboxsweep-logo.webp';
 import photoPortfolio from '../../assets/585photo585-portfolio.png';
-import chessedLogo from '../../assets/logos/chessed-logo.png';
-import photo585Logo from '../../assets/logos/585photo585-logo.png';
-import bdaLogo from '../../assets/logos/business-data-automation-logo.png';
+import chessedLogo from '../../assets/optimized/chessed-logo.webp';
+import photo585Logo from '../../assets/optimized/585photo585-logo.webp';
+import bdaLogo from '../../assets/optimized/business-data-automation-logo.webp';
 import PersonalityButton from '../ui/personalityButton';
 import { HomeImageTrigger } from '../utilities/homeLightbox';
 

@@ -3,29 +3,29 @@ import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
 import { HomeImageTrigger } from '../utilities/homeLightbox';
 
 //flipper
-import flipperLogo from '../../assets/logos/flipper-logo.png';
+import flipperLogo from '../../assets/optimized/flipper-logo.webp';
 import flipperDashboard from '../../assets/flipper/flipper-dashboard.png';
 import flipperResearch from '../../assets/flipper/flipper-research.png';
 import flipperInventory from '../../assets/flipper/flipper-inventory.png';
 import flipperSale from '../../assets/flipper/flipper-sale.png';
 
 //gitprofilelens
-import gitProfileLensLogo from '../../assets/logos/gitprofilelens-logo.png';
+import gitProfileLensLogo from '../../assets/optimized/gitprofilelens-logo.webp';
 import gitProfileLensResults from '../../assets/gitprofilelens/gitprofilelens-results-vert.png';
 
 //scribekit
-import scribeKitLogo from '../../assets/logos/scribekit-logo.png';
+import scribeKitLogo from '../../assets/optimized/scribekit-logo.webp';
 import scribeKitApp from '../../assets/scribekit/scribekit-app2.png';
 import scribeKitHistoryFind from '../../assets/scribekit/scribekit-historyfind.png';
 import scribeKitHistoryReview from '../../assets/scribekit/scribekit-historyreview.png';
 import scribeKitAudioCapture from '../../assets/scribekit/scribekit-audiocapture.png';
 
 //585dashcam585
-import dashcamStorefront from '../../assets/585dashcam585/585dashcam585-storefront.png';
+import dashcamStorefront from '../../assets/optimized/585dashcam585-storefront.webp';
 import PersonalityButton from '../ui/personalityButton';
 
 //dashpilot
-import dashPilotLogo from '../../assets/logos/dashpilot-logo.png';
+import dashPilotLogo from '../../assets/optimized/dashpilot-logo.webp';
 import dashPilotStacked from '../../assets/dashpilot/home-stacked-deliveries.png';
 import dashPilotOffer from '../../assets/dashpilot/offer-sheet-three-shared.png';
 import dashPilotHistory from '../../assets/dashpilot/history-current-week.png';
@@ -184,6 +184,8 @@ function DashPilotGallery() {
         {slide === 'logo' ? (
           <img
             src={dashPilotLogo}
+            width="780"
+            height="771"
             alt="DashPilot app logo"
             loading="lazy"
             decoding="async"
@@ -256,7 +258,7 @@ function GitProfileLensVisual() {
     <div className="project-visual gallery">
       <div className="gallery-stage">
         {slide === 'logo' ? (
-          <img className="gitprofilelens-logo" src={gitProfileLensLogo} width="788" height="737" alt="GitProfileLens project logo" loading="lazy" decoding="async" />
+          <img className="gitprofilelens-logo" src={gitProfileLensLogo} width="780" height="780" alt="GitProfileLens project logo" loading="lazy" decoding="async" />
         ) : (
           <HomeImageTrigger src={gitProfileLensResults} imageClassName="project-result-image" alt="GitProfileLens audit dashboard showing presentation and discoverability scores with prioritized recommendations" caption="GitProfileLens audit results" />
         )}
@@ -305,8 +307,8 @@ function ScribeKitGallery() {
           {slide === 'logo' && (
             <img
               src={scribeKitLogo}
-              width="788"
-              height="737"
+              width="780"
+              height="730"
               alt="ScribeKit app logo"
               loading="lazy"
               decoding="async"
@@ -425,6 +427,8 @@ function FlipperVisual() {
           <img
             className="flipper-logo"
             src={flipperLogo}
+            width="780"
+            height="780"
             alt="Flipper project logo"
             loading="lazy"
             decoding="async"

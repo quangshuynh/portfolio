@@ -1,5 +1,5 @@
 import React from 'react';
-import koreLogo from '../../assets/logos/kore-logo.png';
+import koreLogo from '../../assets/optimized/kore-logo.webp';
 
 const work = [
   {
@@ -43,7 +43,7 @@ function Experience() {
               <time dateTime="2025-05">May 2025</time>
             </p>
             <a className="company-logo-link" href="https://www.korewireless.com/about-us" target="_blank" rel="noopener noreferrer">
-              <img className="company-logo" src={koreLogo} width="3000" height="2000" alt="KORE Wireless" loading="lazy" decoding="async" />
+              <img className="company-logo" src={koreLogo} width="336" height="224" alt="KORE Wireless" loading="lazy" decoding="async" />
             </a>
             <h3>KORE Wireless</h3>
             <p className="experience-role">IoT Software Engineering Co-op</p>
