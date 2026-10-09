@@ -610,3 +610,40 @@ test('camera names are shown in readable form, never as raw EXIF model codes', (
       expect(formatCameraName(camera)).not.toMatch(/ILCE|^[A-Z]{3,} /);
     });
 });
+
+test('collections index lists each category with its real count and opens it in the archive', async () => {
+  render(<App />);
+
+  await screen.findByRole('heading', { name: 'Collections' });
+
+  const automotive = photographs.filter(({ category }) => category === 'Automotive');
+  const card = screen.getByRole('button', { name: `Automotive, ${automotive.length} photographs. Show in all photographs` });
+  const cover = card.querySelector('img');
+  expect(automotive.map(({ gallerySrc }) => gallerySrc)).toContain(cover.getAttribute('src'));
+
+  fireEvent.click(card);
+
+  const filters = screen.getByRole('group', { name: 'Filter photographs by category' });
+  expect(within(filters).getByRole('button', { name: /^Automotive/ })).toHaveAttribute('aria-pressed', 'true');
+  const shown = [...document.querySelectorAll('[data-photo-slug]')].map((item) => item.dataset.photoSlug);
+  expect(shown.sort()).toEqual(automotive.map(({ slug }) => slug).sort());
+  expect(screen.getByRole('heading', { name: 'All photographs' })).toHaveFocus();
+});
+
+test('the opening photograph is an existing photograph and opens in the existing viewer', async () => {
+  render(<App />);
+
+  await screen.findByRole('heading', { level: 1, name: 'Photography' });
+
+  const hero = document.querySelector('[data-hero-slug]');
+  const photograph = photographs.find(({ slug }) => slug === hero.dataset.heroSlug);
+  expect(photograph).toBeDefined();
+  expect(hero.querySelector('img')).toHaveAttribute('alt', photograph.alt);
+  expect(document.querySelectorAll('[data-featured-slug]')).toHaveLength(featuredPhotographs.length);
+  expect(document.querySelectorAll('[data-photo-slug]')).toHaveLength(photographs.length);
+
+  fireEvent.click(within(hero).getByRole('link', { name: `View photograph: ${photograph.caption}` }));
+
+  expect(window.location.hash).toBe(`#${photograph.slug}`);
+  expect(screen.getByRole('dialog', { name: new RegExp(photograph.caption, 'i') })).toBeInTheDocument();
+});

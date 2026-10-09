@@ -4,6 +4,7 @@ import {
   PHOTOGRAPHY_CATEGORIES,
   featuredPhotographs,
   filterPhotographs,
+  findPhotograph,
   photographs,
   sortPhotographs,
 } from '../../data/photographs';
@@ -103,6 +104,35 @@ function FeaturedFigure({ photograph, sizes, onOpen, priority }) {
   );
 }
 
+// Viewfinder corners frame the opening photograph and close in on hover, like focusing.
+function HeroFigure({ photograph, onOpen }) {
+  const exposure = formatExposure(photograph);
+  return (
+    <figure className="photography-hero" data-hero-slug={photograph.slug}>
+      <a href={photographyHref(photograph.slug)} onClick={(event) => onOpen(event, 'featured')} aria-label={`View photograph: ${photograph.caption}`}>
+        <span className="photography-hero__frame">
+          <img
+            src={photograph.viewerSrc}
+            srcSet={srcSet(photograph)}
+            sizes="(max-width: 899px) 100vw, 60vw"
+            alt={photograph.alt}
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+          />
+          {exposure && <span className="photography-hero__exposure mono" aria-hidden="true">{exposure}</span>}
+        </span>
+        <span className="photography-hero__corners" aria-hidden="true"><i /><i /><i /><i /></span>
+      </a>
+      <figcaption>
+        <span className="mono" aria-hidden="true">No. {padNumber(photograph.curatedOrder)}</span>
+        <span className="photography-hero__caption">{photograph.caption}</span>
+        <span className="photography-hero__cue mono" aria-hidden="true">View ↗</span>
+      </figcaption>
+    </figure>
+  );
+}
+
 function PhotographFigure({ photograph, onOpen }) {
   const exposure = formatExposure(photograph);
   return (
@@ -133,12 +163,36 @@ const categoryCounts = Object.fromEntries(
 );
 const filters = [['All', photographs.length], ...PHOTOGRAPHY_CATEGORIES.map((category) => [category, categoryCounts[category]])];
 
+// Each collection is fronted by its first frame in curated order that isn't already in
+// Featured, so the index shows more of the work rather than repeating the sequence above.
+export const photographyCollections = PHOTOGRAPHY_CATEGORIES.map((category) => {
+  const members = sortPhotographs(filterPhotographs(photographs, category));
+  const cover = members.find(({ featured }) => !featured) ?? members[0];
+  return { category, count: members.length, cover };
+}).filter(({ count }) => count > 0);
+// The opening frame is chosen for how it carries the title (the lit arch bridge's curves and
+// dark sky), not its place in the sequence; Featured and the archive keep their own order.
+const heroPhotograph = findPhotograph('_DSC0003') ?? featuredPhotographs[0];
+const cameraCount = new Set(photographs.map(({ camera }) => camera).filter(Boolean)).size;
+
+function SectionLabel({ index, id, title, headingRef, children }) {
+  return (
+    <div className="photography-section-label">
+      <span className="photography-section-index mono" aria-hidden="true">{index}</span>
+      <h2 id={id} ref={headingRef} tabIndex={headingRef ? '-1' : undefined}>{title}</h2>
+      {children}
+    </div>
+  );
+}
+
 export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = false }) {
   const [sort, setSort] = useState('default');
   const [category, setCategory] = useState('All');
   const [viewerContext, setViewerContext] = useState('collection');
   const [columnCount, setColumnCount] = useState(() => getPhotographyColumnCount());
   const galleryRef = useRef(null);
+  const featuredRef = useRef(null);
+  const collectionsRef = useRef(null);
   const collectionRef = useRef(null);
   const viewerTrigger = useRef(null);
   const collectionPhotographs = useMemo(
@@ -208,6 +262,11 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
     target.focus({ preventScroll: true });
   }, []);
 
+  const showCollection = useCallback((name) => {
+    setCategory(name);
+    jumpTo(collectionRef);
+  }, [jumpTo]);
+
   return (
     <div className="app-shell photography-page">
       <a className="skip-link" href={photographyHref()} onClick={(event) => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>Skip to photographs</a>
@@ -218,13 +277,23 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
             <FaArrowLeft aria-hidden="true" /> Back to photography modal
           </a>
           <div className="photography-intro__grid">
-            <h1>Photography</h1>
-            <div className="photography-intro__aside">
-              <p>Cars, places, and whatever catches my eye.</p>
-              <button type="button" className="photography-jump" onClick={() => jumpTo(collectionRef)}>
-                All {photographs.length} photographs <span aria-hidden="true">↓</span>
-              </button>
+            <div className="photography-intro__text">
+              {/* Stacked into two lines on wide screens; announced as one word. */}
+              <h1>
+                <span className="visually-hidden">Photography</span>
+                <span className="photography-intro__title" aria-hidden="true"><span>Photo</span><span>graphy</span></span>
+              </h1>
+              <p className="photography-intro__tagline">Cars, places, and whatever catches my eye.</p>
+              <p className="photography-intro__facts mono">
+                <span>{photographs.length} photographs</span> · <span>{photographyCollections.length} collections</span> · <span>{cameraCount} cameras</span>
+              </p>
+              <nav className="photography-index" aria-label="Photography sections">
+                <button type="button" onClick={() => jumpTo(featuredRef)}><span className="mono" aria-hidden="true">01</span> Featured</button>
+                <button type="button" onClick={() => jumpTo(collectionsRef)}><span className="mono" aria-hidden="true">02</span> Collections</button>
+                <button type="button" onClick={() => jumpTo(collectionRef)}><span className="mono" aria-hidden="true">03</span> All {photographs.length} photographs</button>
+              </nav>
             </div>
+            {heroPhotograph && <HeroFigure photograph={heroPhotograph} onOpen={openPhotograph} />}
           </div>
         </header>
 
@@ -232,15 +301,14 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
 
         <section className="photography-featured" aria-labelledby="photography-featured-title">
           <div className="section-inner">
-            <div className="photography-section-label">
-              <h2 id="photography-featured-title">Featured</h2>
-              <span className="mono">{padNumber(featuredPhotographs.length)} selected</span>
-            </div>
+            <SectionLabel index="01" id="photography-featured-title" title="Featured" headingRef={featuredRef}>
+              <span className="photography-section-meta mono">{padNumber(featuredPhotographs.length)} selected</span>
+            </SectionLabel>
             <div className="featured-sequence">
               {featuredRows.map((row, rowIndex) => (
                 <div className={`featured-row ${row.layout.split(' ').map((name) => `featured-row--${name}`).join(' ')}`} key={rowIndex}>
                   {row.photographs.map((photograph) => (
-                    <FeaturedFigure photograph={photograph} sizes={row.sizes} onOpen={openPhotograph} priority={rowIndex === 0} key={photograph.id} />
+                    <FeaturedFigure photograph={photograph} sizes={row.sizes} onOpen={openPhotograph} key={photograph.id} />
                   ))}
                 </div>
               ))}
@@ -248,27 +316,59 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
           </div>
         </section>
 
+        <section className="photography-collections" aria-labelledby="photography-collections-title">
+          <div className="section-inner">
+            <SectionLabel index="02" id="photography-collections-title" title="Collections" headingRef={collectionsRef}>
+              <span className="photography-section-meta mono">{padNumber(photographyCollections.length)} collections</span>
+            </SectionLabel>
+            <ul className="photography-collections__list">
+              {photographyCollections.map(({ category: name, count, cover }) => (
+                <li key={name}>
+                  <button type="button" className="collection-card" onClick={() => showCollection(name)} aria-label={`${name}, ${count} photographs. Show in all photographs`}>
+                    <span className="collection-card__media">
+                      <img
+                        src={cover.gallerySrc}
+                        sizes="(max-width: 760px) 46vw, 24vw"
+                        srcSet={srcSet(cover)}
+                        width={cover.galleryWidth}
+                        height={cover.galleryHeight}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </span>
+                    <span className="collection-card__label">
+                      <span className="collection-card__name">{name}</span>
+                      <span className="mono">{padNumber(count)}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
         <section className="photography-collection" aria-labelledby="photography-collection-title">
           <div className="section-inner">
-            <div className="photography-section-label photography-collection__header">
-              <h2 id="photography-collection-title" ref={collectionRef} tabIndex="-1">All photographs</h2>
-              <div className="photography-collection__controls">
-                <div className="photography-filters" role="group" aria-label="Filter photographs by category">
-                  {filters.map(([name, count]) => (
-                    <button type="button" key={name} aria-pressed={category === name} onClick={() => setCategory(name)}>
-                      {name} <span className="mono" aria-hidden="true">{count}</span>
-                      <span className="visually-hidden">, {count} photographs</span>
-                    </button>
-                  ))}
-                </div>
-                <label>Order
-                  <select value={sort} onChange={(event) => setSort(event.target.value)}>
-                    <option value="default">Curated</option>
-                    <option value="newest">Newest</option>
-                    <option value="oldest">Oldest</option>
-                  </select>
-                </label>
+            <SectionLabel index="03" id="photography-collection-title" title="All photographs" headingRef={collectionRef}>
+              <span className="photography-section-meta mono">{category === 'All' ? `${padNumber(photographs.length)} photographs` : `${padNumber(collectionPhotographs.length)} of ${padNumber(photographs.length)}`}</span>
+            </SectionLabel>
+            <div className="photography-collection__controls">
+              <div className="photography-filters" role="group" aria-label="Filter photographs by category">
+                {filters.map(([name, count]) => (
+                  <button type="button" key={name} aria-pressed={category === name} onClick={() => setCategory(name)}>
+                    {name} <span className="mono" aria-hidden="true">{count}</span>
+                    <span className="visually-hidden">, {count} photographs</span>
+                  </button>
+                ))}
               </div>
+              <label>Order
+                <select value={sort} onChange={(event) => setSort(event.target.value)}>
+                  <option value="default">Curated</option>
+                  <option value="newest">Newest</option>
+                  <option value="oldest">Oldest</option>
+                </select>
+              </label>
             </div>
             <p className="visually-hidden" role="status">
               {category === 'All' ? `Showing all ${collectionPhotographs.length} photographs` : `Showing ${collectionPhotographs.length} ${category} photographs`}
