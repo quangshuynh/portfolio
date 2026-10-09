@@ -184,7 +184,7 @@ function SiteNav({ variant = 'default', current = 'home', collapsible = variant 
           </div>
           <div className="nav-tools">
             <a className="nav-resume" href={resumeHref} target="_blank" rel="noreferrer">
-              <FaFilePdf aria-hidden="true" /> Résumé
+              <FaFilePdf aria-hidden="true" /> Résumé{' '}<span className="visually-hidden">(PDF, opens in a new tab)</span>
             </a>
             <ThemeToggle />
           </div>

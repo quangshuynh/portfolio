@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaEnvelope, FaGithub, FaLinkedin } from 'react-icons/fa';
+import { FaEnvelope, FaFilePdf, FaGithub, FaLinkedin } from 'react-icons/fa';
 import { Ridgeline, TopoField } from '../ui/terrain';
 import { aboutHref, photographyPageHref } from './siteNav';
 
@@ -16,8 +16,9 @@ function Footer() {
           <p className="eyebrow" data-reveal>Contact</p>
           <h2 id="contact-title" data-reveal>Let’s talk about building useful software.</h2>
           <p className="contact-lede" data-reveal>
-            I’m open to software engineering opportunities and always glad to connect
-            with recruiters, engineering teams, and other developers.
+            I’m open to software engineering internships and co-op opportunities, especially
+            in backend systems, full-stack development, automation, and developer tooling.
+            I’m always glad to connect with recruiters, engineering teams, and other developers.
           </p>
 
           <div className="contact-links" data-reveal>
@@ -30,6 +31,9 @@ function Footer() {
             <a className="button button-secondary" href="https://linkedin.com/in/quangs" target="_blank" rel="noreferrer">
               <FaLinkedin aria-hidden="true" /> LinkedIn
             </a>
+            <a className="button button-secondary" href={`${import.meta.env.BASE_URL}Quang_Huynh_Resume.pdf`} target="_blank" rel="noreferrer">
+              <FaFilePdf aria-hidden="true" /> Résumé{' '}<span className="visually-hidden">(PDF, opens in a new tab)</span>
+            </a>
           </div>
         </div>
         <Ridgeline className="contact-ridge" />
@@ -40,7 +44,7 @@ function Footer() {
           <nav className="footer-links" aria-label="More">
             <a href={aboutHref}>About Quang</a>
             <a href={photographyPageHref}>Photography</a>
-            <a href={`${import.meta.env.BASE_URL}Quang_Huynh_Resume.pdf`} target="_blank" rel="noreferrer">Résumé</a>
+            <a href={`${import.meta.env.BASE_URL}Quang_Huynh_Resume.pdf`} target="_blank" rel="noreferrer">Résumé{' '}<span className="visually-hidden">(PDF, opens in a new tab)</span></a>
           </nav>
           <p>Designed and built with React.</p>
         </div>

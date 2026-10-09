@@ -52,7 +52,7 @@ function Header() {
             <div className="hero-actions" style={{ '--i': 4 }}>
               <PersonalityButton href="#projects" personality="rally" personalityKey="hero-view-work">View my work <FaArrowRight aria-hidden="true" /></PersonalityButton>
               <a className="button button-secondary" href={`${import.meta.env.BASE_URL}Quang_Huynh_Resume.pdf`} target="_blank" rel="noreferrer">
-                View résumé <FaFilePdf aria-hidden="true" />
+                View résumé{' '}<span className="visually-hidden">(PDF, opens in a new tab)</span> <FaFilePdf aria-hidden="true" />
               </a>
             </div>
             {/* The original horizontal Meet Quang card, restored. */}

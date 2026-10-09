@@ -3,15 +3,15 @@ import koreLogo from '../../assets/logos/kore-logo.png';
 
 const work = [
   {
-    area: 'Applications',
+    area: '.NET desktop apps',
     detail: 'Developed C#/.NET WPF features for internal business applications using XAML and MVVM, including a configurable XML-generation workflow for Excel imports and a partial-match search interface for maintenance tooling.',
   },
   {
-    area: 'Data & automation',
+    area: 'SQL Server automation',
     detail: 'Built and modified SQL Server queries and stored procedures for order automation, validation, reporting, and data-quality workflows, including logic that automatically updated shipping methods, order comments, and processing status based on business rules.',
   },
   {
-    area: 'Integrations',
+    area: 'Boomi/NetSuite integrations',
     detail: 'Improved Boomi/NetSuite integration reliability and supportability by extending centralized error tracking and manual resolution workflows, building reusable transaction test harnesses, and reproducing production integration failures in QA.',
   },
 ];

@@ -100,3 +100,14 @@ test('terrain contours are deterministic', () => {
   expect(contourRings(options)).toEqual(contourRings(options));
   expect(contourRings(options)[0]).toMatch(/^M[\d.-]+ [\d.-]+C/);
 });
+
+test('contact names the roles and areas of interest and offers the résumé alongside other contact methods', async () => {
+  const { default: Footer } = await import('../sections/footer');
+  render(<Footer />);
+  expect(screen.getByText(/software engineering internships and co-op opportunities, especially\s+in backend systems, full-stack development, automation, and developer tooling/)).toBeInTheDocument();
+  const contact = document.getElementById('contact');
+  for (const name of [/Email me/, /GitHub/, /LinkedIn/, /Résumé \(PDF, opens in a new tab\)/]) {
+    expect(within(contact).getByRole('link', { name })).toBeInTheDocument();
+  }
+  expect(within(contact).getByRole('link', { name: /Résumé/ })).toHaveAttribute('href', '/Quang_Huynh_Resume.pdf');
+});
