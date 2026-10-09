@@ -1,6 +1,19 @@
 {
   "outputDirectory": "dist",
+  "redirects": [
+    { "source": "/index.html", "destination": "/", "permanent": true },
+    { "source": "/about/", "destination": "/about", "permanent": true },
+    { "source": "/about/index.html", "destination": "/about", "permanent": true },
+    { "source": "/photography", "destination": "/photography/", "permanent": true },
+    { "source": "/photography/index.html", "destination": "/photography/", "permanent": true }
+  ],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/about", "destination": "/about/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/sitemap.xml",
+      "headers": [{ "key": "Content-Type", "value": "application/xml; charset=utf-8" }]
+    }
   ]
 }

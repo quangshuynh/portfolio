@@ -76,7 +76,8 @@ test('renders the photography page and curated photographs', async () => {
     expect(renderedSlugs).toContain(photograph.slug);
   });
 
-  expect(document.title).toBe('Photography | Quang Huynh');
+  expect(document.title).toBe('Photography Portfolio | Quang Huynh');
+  expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute('href', 'https://quanghuynh.com/photography/');
 });
 
 

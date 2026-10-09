@@ -272,7 +272,7 @@ describe('routing', () => {
     expect(
       document.title,
     ).toBe(
-      'Quang Huynh | About Quang',
+      'About Quang Huynh | Software Engineer & CS Student',
     );
   });
 
@@ -343,5 +343,30 @@ describe('routing', () => {
         },
       ),
     ).toBeInTheDocument();
+  });
+});
+
+describe('page metadata', () => {
+  const robots = () => document.querySelector('meta[name="robots"]');
+
+  beforeEach(() => {
+    document.head.querySelectorAll('meta[name="robots"], link[rel="canonical"]').forEach((node) => node.remove());
+    document.head.insertAdjacentHTML('beforeend', '<meta name="robots" content="noindex, follow" /><link rel="canonical" href="" />');
+  });
+
+  test('applies the route metadata on known routes', async () => {
+    window.history.replaceState({}, '', '/about/');
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Hi, I’m Quang.' });
+    expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute('href', 'https://quanghuynh.com/about');
+    expect(robots()).toHaveAttribute('content', 'index, follow, max-image-preview:large');
+  });
+
+  test('leaves the 404 page head alone on unknown paths', () => {
+    document.title = 'Page not found | Quang Huynh';
+    window.history.replaceState({}, '', '/no-such-page');
+    render(<App />);
+    expect(document.title).toBe('Page not found | Quang Huynh');
+    expect(robots()).toHaveAttribute('content', 'noindex, follow');
   });
 });

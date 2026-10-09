@@ -14,6 +14,7 @@ import RevealAnimations from './components/utilities/revealAnimations';
 import useLocation from './components/utilities/useLocation';
 import { findPhotograph } from './data/photographs';
 import { getAppPathname } from './util/navigation';
+import { routeForAppPath } from './seo/site.mjs';
 
 const AboutPage = lazy(() => import('./components/pages/aboutPage'));
 const PhotographyPage = lazy(() => import('./components/pages/photographyPage'));
@@ -31,26 +32,24 @@ function App() {
   try { photoId = isPhotography && location.hash ? decodeURIComponent(location.hash.slice(1)) : null; } catch { photoId = '__invalid__'; }
   const selectedPhotograph = photoId ? findPhotograph(photoId) : null;
 
+  const route = routeForAppPath(path);
+
+  // Keeps the head in step with in-app navigation. Each route's static HTML already
+  // carries the same values for crawlers; unknown paths keep the 404 page's noindex head.
   useEffect(() => {
-    const title = selectedPhotograph
-      ? `${selectedPhotograph.caption} | Quang Huynh Photography`
-      : isPhotography
-        ? 'Photography | Quang Huynh'
-        : isAbout ? 'Quang Huynh | About Quang' : 'Quang Huynh | Software Engineer';
-    const description = isPhotography
-      ? 'A curated collection of amateur photography by Quang Huynh.'
-      : isAbout
-        ? 'Learn more about Quang Huynh, a software developer and Computer Science student in Rochester, NY, including his background, interests, and approach to engineering.'
-        : 'Software developer building production web applications, backend systems, developer tools, automation, and native applications.';
-    const canonicalPath = isPhotography ? '/photography/' : isAbout ? '/about' : '/';
-    const canonicalUrl = `https://quanghuynh.com${canonicalPath}`;
+    if (!route) return;
+    const title = selectedPhotograph ? `${selectedPhotograph.caption} | Quang Huynh Photography` : route.title;
+    const setContent = (selector, value) => document.querySelector(selector)?.setAttribute('content', value);
     document.title = title;
-    document.querySelector('meta[name="description"]')?.setAttribute('content', description);
-    document.querySelector('meta[property="og:title"]')?.setAttribute('content', title);
-    document.querySelector('meta[property="og:description"]')?.setAttribute('content', description);
-    document.querySelector('meta[property="og:url"]')?.setAttribute('content', canonicalUrl);
-    document.querySelector('link[rel="canonical"]')?.setAttribute('href', canonicalUrl);
-  }, [isAbout, isPhotography, selectedPhotograph]);
+    setContent('meta[name="description"]', route.description);
+    setContent('meta[name="robots"]', 'index, follow, max-image-preview:large');
+    setContent('meta[property="og:title"]', title);
+    setContent('meta[property="og:description"]', route.description);
+    setContent('meta[property="og:url"]', route.canonical);
+    setContent('meta[name="twitter:title"]', title);
+    setContent('meta[name="twitter:description"]', route.description);
+    document.querySelector('link[rel="canonical"]')?.setAttribute('href', route.canonical);
+  }, [route, selectedPhotograph]);
 
   if (isAbout) {
     return <Suspense fallback={null}><AboutPage /><RevealAnimations /></Suspense>;

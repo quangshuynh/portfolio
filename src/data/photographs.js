@@ -1,5 +1,5 @@
 import generatedRecords from './photographs.generated.json';
-import { EXIF_CAPTURE_TIMEZONE, PHOTOGRAPHY_CATEGORIES, photographOverrides } from './photographs.overrides.mjs';
+import { EXIF_CAPTURE_TIMEZONE, PHOTOGRAPHY_CATEGORIES, PHOTOGRAPHY_HERO_SLUG, photographOverrides } from './photographs.overrides.mjs';
 import { mergePhotographyMetadata } from '../../scripts/photography-utils.mjs';
 
 const derivativeAssets = import.meta.glob('../assets/photography/generated/*.jpg', {
@@ -32,7 +32,7 @@ const records = photographOverrides.map((override) => {
 
 if (records.length !== generatedRecords.length) throw new Error('Generated photography metadata contains undeclared records.');
 
-export { EXIF_CAPTURE_TIMEZONE, PHOTOGRAPHY_CATEGORIES };
+export { EXIF_CAPTURE_TIMEZONE, PHOTOGRAPHY_CATEGORIES, PHOTOGRAPHY_HERO_SLUG };
 export const photographs = Object.freeze(records.map((record) => Object.freeze(record)));
 
 // The editorial selection shown first; every photograph also stays in the full collection.

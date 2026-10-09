@@ -7,6 +7,11 @@
 // Captions stay short and factual: only what the frame or the original caption shows.
 export const EXIF_CAPTURE_TIMEZONE = 'America/New_York';
 
+// The opening frame of /photography, chosen for how it carries the title (the lit arch bridge's
+// curves and dark sky), not its place in the sequence. The build also preloads it and uses it
+// as the page's social preview image.
+export const PHOTOGRAPHY_HERO_SLUG = '_DSC0003';
+
 export const PHOTOGRAPHY_CATEGORIES = ['Automotive', 'Places', 'Landscape', 'Nature'];
 
 export const photographOverrides = [
@@ -23,7 +28,7 @@ export const photographOverrides = [
   { id: 'neon-window-blue-hour', slug: 'neon-window-blue-hour', sourceFilename: 'DSC00153.JPG', alt: 'A pink neon sign glowing behind closed blinds in a storefront window at blue hour', caption: 'Blue hour', shape: 'landscape', category: 'Places', tags: ['Dusk'] },
   { id: 'red-sun', slug: 'red-sun', sourceFilename: '_DSC0012--3e197f2d.JPG', alt: 'A red sun setting behind bare tree branches above a dark city horizon', caption: 'Red sun', shape: 'landscape', category: 'Landscape', tags: ['Dusk'], featured: 5 },
   { id: 'DIBS2164', slug: 'DIBS2164', sourceFilename: 'DIBS2164.JPG', alt: 'A small bird standing in vivid green grass at Cornell', caption: 'On the grass', shape: 'portrait', category: 'Nature' },
-  { id: '_DSC0003', slug: '_DSC0003', sourceFilename: '_DSC0003.JPG', alt: 'Rochester skyline at night', caption: 'Rochester at night', shape: 'landscape', category: 'Places', tags: ['Night'], featured: 4 },
+  { id: '_DSC0003', slug: '_DSC0003', sourceFilename: '_DSC0003.JPG', alt: 'A white arch bridge lit up at night over a river, with downtown Rochester towers and their reflections behind it', caption: 'Rochester at night', shape: 'landscape', category: 'Places', tags: ['Night'], featured: 4 },
   { id: 'afterglow-road', slug: 'afterglow-road', sourceFilename: 'DSC00292.JPG', alt: 'A red afterglow sky above a dark road lined with silhouetted trees and power lines, headlights approaching', caption: 'Afterglow', shape: 'landscape', category: 'Places', tags: ['Dusk', 'Night'] },
   { id: 'waves-on-rocks', slug: 'waves-on-rocks', sourceFilename: 'DSC00240.JPG', alt: 'A wave breaking white over dark rocks at the edge of a lake, green plants in the foreground', caption: 'Waves', shape: 'landscape', category: 'Landscape', tags: ['Water'] },
   { id: 'IMG_0758', slug: 'IMG_0758', sourceFilename: 'IMG_0758.JPG', alt: 'A red metal bridge crossing the Genesee River', caption: 'Genesee River', shape: 'portrait', category: 'Places' },
@@ -52,5 +57,5 @@ export const photographOverrides = [
   { id: 'beach-cloud-bank', slug: 'beach-cloud-bank', sourceFilename: '_DSC9015.JPG', alt: 'A bank of grey clouds over a wave-washed beach, the wet sand reflecting the pale dusk sky', caption: 'Cloud bank', shape: 'landscape', category: 'Landscape', tags: ['Dusk', 'Water'] },
   { id: 'IMG_0845', slug: 'IMG_0845', sourceFilename: 'IMG_0845.JPG', alt: 'Pink sunset clouds above a calm lakeshore in Irondequoit Bay', caption: 'Irondequoit Bay', shape: 'landscape', category: 'Landscape', tags: ['Dusk', 'Water'] },
   { id: 'IMG_0811', slug: 'IMG_0811', sourceFilename: 'IMG_0811.JPG', alt: 'A broad waterfall surrounded by summer greenery at Rochester Lower Falls', caption: 'Lower Falls', shape: 'landscape', category: 'Landscape', tags: ['Water'] },
-  { id: 'IMG_0846', slug: 'IMG_0846', sourceFilename: 'IMG_0846.JPG', alt: '2011 Subaru WRX at night', caption: 'Subaru WRX', shape: 'landscape', category: 'Automotive', tags: ['Night'] },
+  { id: 'IMG_0846', slug: 'IMG_0846', sourceFilename: 'IMG_0846.JPG', alt: 'A white 2011 Subaru WRX parked in a driveway at night', caption: 'Subaru WRX', shape: 'landscape', category: 'Automotive', tags: ['Night'] },
 ].map((record, index) => ({ ...record, curatedOrder: index + 1 }));

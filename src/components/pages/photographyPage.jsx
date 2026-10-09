@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FaArrowLeft } from 'react-icons/fa';
 import {
   PHOTOGRAPHY_CATEGORIES,
+  PHOTOGRAPHY_HERO_SLUG,
   featuredPhotographs,
   filterPhotographs,
   findPhotograph,
@@ -170,9 +171,9 @@ export const photographyCollections = PHOTOGRAPHY_CATEGORIES.map((category) => {
   const cover = members.find(({ featured }) => !featured) ?? members[0];
   return { category, count: members.length, cover };
 }).filter(({ count }) => count > 0);
-// The opening frame is chosen for how it carries the title (the lit arch bridge's curves and
-// dark sky), not its place in the sequence; Featured and the archive keep their own order.
-const heroPhotograph = findPhotograph('_DSC0003') ?? featuredPhotographs[0];
+// The opening frame is chosen in the overrides; Featured and the archive keep their own order.
+// HeroFigure's srcSet/sizes are mirrored by the build's preload (scripts/seo-plugin.mjs).
+const heroPhotograph = findPhotograph(PHOTOGRAPHY_HERO_SLUG) ?? featuredPhotographs[0];
 const cameraCount = new Set(photographs.map(({ camera }) => camera).filter(Boolean)).size;
 
 function SectionLabel({ index, id, title, headingRef, children }) {
