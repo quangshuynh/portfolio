@@ -111,3 +111,12 @@ test('contact names the roles and areas of interest and offers the résumé alon
   }
   expect(within(contact).getByRole('link', { name: /Résumé/ })).toHaveAttribute('href', '/Quang_Huynh_Resume.pdf');
 });
+
+test('at 320px the menu button collapses to an icon but keeps its text as the accessible name', async () => {
+  const { default: navCss } = await import('../../styles/nav.css?raw');
+  const block = navCss.slice(navCss.indexOf('@media (max-width: 360px)'));
+  expect(block).toMatch(/\.nav-menu-button \{[^}]*width: 2\.75rem;/);
+  expect(block).toMatch(/\.nav-menu-button__label \{[^}]*clip: rect\(0 0 0 0\);/);
+  render(<SiteNav />);
+  expect(screen.getByRole('button', { name: 'Menu' })).toHaveAttribute('aria-expanded', 'false');
+});
