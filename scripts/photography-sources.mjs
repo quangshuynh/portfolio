@@ -27,4 +27,9 @@ export const photographLibraryPaths = {
   'lamp-and-tower': 'sony-a7iii/2026-10-09/DSC09311.JPG',
   'colonnade-steps': 'sony-a7iii/2026-10-09/DSC09308.JPG',
   'nissan-350z': 'sony-a7iii/2026-10-09/DSC09322.JPG',
+  'lamplit-chairs': 'sony-a7iii/2026-10-09/DSC09346.JPG',
+  'river-arch-bridge': 'sony-a7iii/2026-10-09/DSC09339.JPG',
+  'river-gorge': 'sony-a7iii/2026-10-06/DSC09193.JPG',
+  'red-arcs': 'sony-a7iii/2026-10-06/DSC09194.JPG',
+  'mallards': 'sony-a7iii/2026-10-06/DSC09229.JPG',
 };
