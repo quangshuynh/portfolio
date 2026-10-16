@@ -3,16 +3,16 @@ import koreLogo from '../../assets/optimized/kore-logo.webp';
 
 const work = [
   {
-    area: '.NET desktop apps',
-    detail: 'Developed C#/.NET WPF features for internal business applications using XAML and MVVM, including a configurable XML-generation workflow for Excel imports and a partial-match search interface for maintenance tooling.',
+    area: '.NET DESKTOP APPLICATIONS',
+    detail: 'Developed C#/.NET WPF features using XAML and MVVM, including a configurable XML-generation interface that enabled business users to define Excel import mappings without manually editing configuration files. Redesigned maintenance part lookup with partial-match search and a results grid, improving access to part records.',
   },
   {
-    area: 'SQL Server automation',
-    detail: 'Built and modified SQL Server queries and stored procedures for order automation, validation, reporting, and data-quality workflows, including logic that automatically updated shipping methods, order comments, and processing status based on business rules.',
+    area: 'SQL SERVER & WORKFLOW AUTOMATION',
+    detail: 'Implemented SQL Server queries, stored procedures, and C# business logic to automate customer-specific order fulfillment, including carrier selection, shipping comments, and order status updates. Enhanced data validation, invoice reporting accuracy, and database-driven workflows across enterprise systems.',
   },
   {
-    area: 'Boomi/NetSuite integrations',
-    detail: 'Improved Boomi/NetSuite integration reliability and supportability by extending centralized error tracking and manual resolution workflows, building reusable transaction test harnesses, and reproducing production integration failures in QA.',
+    area: 'BOOMI & NETSUITE INTEGRATIONS',
+    detail: 'Enhanced enterprise integration reliability by extending centralized error logging, implementing manual error-resolution workflows without requiring process reruns, and improving database event tracking. Built reusable Boomi test harnesses for inventory transfers and adjustments, and reproduced production integration failures in QA to support troubleshooting.',
   },
 ];
 
@@ -30,8 +30,7 @@ function Experience() {
             <h2 id="experience-title">Experience</h2>
           </div>
           <p>
-            Production software engineering across .NET desktop applications,
-            SQL Server workflows, and Boomi/NetSuite enterprise integrations.
+            Contributed to production enterprise software through C#/.NET application development, SQL Server automation, and Boomi/NetSuite integrations, focusing on operational efficiency, data reliability, and maintainable workflows.
           </p>
         </div>
 
