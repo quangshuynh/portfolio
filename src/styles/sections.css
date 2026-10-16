@@ -222,12 +222,78 @@
 .featured-project:hover .project-permalink::after,
 .project-permalink:focus-visible::after { opacity: 1; }
 .project-permalink:hover::after { color: var(--accent); }
+/* Implementation highlights sit behind a quiet field-notes rule: a mono label,
+   a chevron, and a hairline that runs to the column edge. The panel animates
+   its row from 0fr to 1fr; while collapsed it is inert and visibility-hidden,
+   so its text is neither focusable nor announced. */
+.project-details { margin-top: 1.5rem; }
+.project-details__toggle {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: .08em;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color var(--dur-fast) ease;
+}
+.project-details__toggle::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+  transition: background-color var(--dur-fast) ease;
+}
+.project-details__toggle:hover,
+.project-details.is-open .project-details__toggle { color: var(--accent); }
+.project-details__toggle:hover::after { background: var(--border-strong); }
+.project-details__toggle:focus-visible { outline-offset: 4px; }
+.project-details__chevron {
+  flex: none;
+  width: .75rem;
+  height: .75rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.project-details.is-open .project-details__chevron { transform: rotate(180deg); }
+.project-details__panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition: grid-template-rows var(--dur-base) var(--ease-out), visibility 0s linear var(--dur-base);
+}
+.project-details.is-open .project-details__panel {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  transition: grid-template-rows var(--dur-base) var(--ease-out), visibility 0s;
+}
+.project-details__inner { min-height: 0; overflow: hidden; }
 .project-highlights {
   display: grid;
   gap: .75rem;
-  margin: 1.5rem 0 0;
-  padding: 0;
+  margin: 0;
+  padding: .75rem 0 .25rem;
   list-style: none;
+  opacity: 0;
+  transform: translateY(-.35rem);
+  transition: opacity var(--dur-fast) ease, transform var(--dur-base) var(--ease-out);
+}
+.project-details.is-open .project-highlights {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--dur-base) ease 60ms, transform var(--dur-base) var(--ease-out);
 }
 .project-highlights li {
   position: relative;
@@ -247,17 +313,21 @@
   border: 1px solid var(--accent);
   background: linear-gradient(var(--accent), var(--accent)) center / 3px 3px no-repeat;
 }
+/* Flagship: title and purpose on the left, takeaway beside the purpose; the
+   details rule and its two-column list run the full width below. */
 .case-file--wide .project-copy {
   display: grid;
   grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  grid-template-areas: 'title .' 'purpose takeaway' 'details details' 'actions actions';
   column-gap: clamp(2rem, 5vw, 4.5rem);
   margin-top: .5rem;
 }
-.case-file--wide .project-copy h3,
-.case-file--wide .project-purpose,
-.case-file--wide .project-takeaway { grid-column: 1; }
-.case-file--wide .project-highlights { grid-column: 2; grid-row: 1 / span 4; margin-top: 0; }
-.case-file--wide .project-actions { grid-column: 1; }
+.case-file--wide .project-copy h3 { grid-area: title; }
+.case-file--wide .project-purpose { grid-area: purpose; }
+.case-file--wide .project-takeaway { grid-area: takeaway; align-self: end; }
+.case-file--wide .project-details { grid-area: details; }
+.case-file--wide .project-highlights { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: clamp(2rem, 5vw, 4.5rem); }
+.case-file--wide .project-actions { grid-area: actions; }
 .project-actions { margin-top: 2rem; }
 
 /* project visuals */
@@ -558,7 +628,7 @@
     grid-template-areas: 'rail visual' 'rail copy';
   }
   .case-file--wide .project-copy { display: block; }
-  .case-file--wide .project-highlights { margin-top: 1.5rem; }
+  .case-file--wide .project-highlights { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 1080px) {
@@ -602,7 +672,7 @@
   .featured-project .case-file__visual { order: 4; margin-top: 1.5rem; }
   .featured-project .project-purpose { order: 5; margin-top: 1.5rem; }
   .featured-project .project-takeaway { order: 6; }
-  .featured-project .project-highlights { order: 7; }
+  .featured-project .project-details { order: 7; }
   .featured-project .project-stack { order: 8; margin-top: 1.75rem; }
   .featured-project .project-actions { order: 9; }
   .detail-list li { grid-template-columns: 1fr; gap: .5rem; }

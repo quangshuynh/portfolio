@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
 import PersonalityButton from '../ui/personalityButton';
 import { featuredProjects as projects } from '../../data/projects.mjs';
@@ -17,6 +17,42 @@ function ProjectActions({ project }) {
       {github && <PersonalityButton href={github} target="_blank" rel="noreferrer" aria-label={`View ${project.name} code`}>View code <FaGithub aria-hidden="true" /></PersonalityButton>}
       {live && github && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-live`} href={live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live demo`}>Live demo <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
       {documentation && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-documentation`} href={documentation} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} documentation`}>Documentation <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
+    </div>
+  );
+}
+
+/**
+ * renders a project's implementation highlights behind a disclosure toggle;
+ * the list stays in the DOM (inert while collapsed) so it can animate open
+ * and remains in the prerendered HTML
+ * :param project: project entry
+ * :returns: disclosure toggle and highlights panel markup
+ */
+function ProjectDetails({ project }) {
+  const [open, setOpen] = useState(false);
+  const panelId = `project-${project.slug}-details`;
+  return (
+    <div className={`project-details${open ? ' is-open' : ''}`}>
+      <button
+        type="button"
+        className="project-details__toggle"
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-describedby={`project-${project.slug}-title`}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span>{open ? 'Hide technical details' : 'Explore technical details'}</span>
+        <svg className="project-details__chevron" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+          <path d="M2.5 4.5 6 8l3.5-3.5" />
+        </svg>
+      </button>
+      <div className="project-details__panel" id={panelId} inert={!open}>
+        <div className="project-details__inner">
+          <ul className="project-highlights" aria-label={`${project.name} engineering highlights`}>
+            {project.highlights.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
@@ -68,9 +104,7 @@ function FeaturedProjects() {
                 </h3>
                 <p className="project-purpose">{project.summary}</p>
                 <p className="project-takeaway"><span className="project-takeaway__label">Takeaway</span> {project.takeaway}</p>
-                <ul className="project-highlights" aria-label={`${project.name} engineering highlights`}>
-                  {project.highlights.map((item) => <li key={item}>{item}</li>)}
-                </ul>
+                <ProjectDetails project={project} />
                 <ProjectActions project={project} />
               </div>
             </article>
