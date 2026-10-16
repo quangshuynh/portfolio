@@ -19,41 +19,41 @@ Also deployed to [GitHub Pages](https://quangshuynh.github.io/portfolio/) and [V
 
 ## Local development
 
+Requires Node.js 22 (the version CI uses).
+
 ```bash
 npm install
-npm run dev
+npm run dev        # http://localhost:5173
 ```
 
-Run the test suite or create a production build:
-
-```bash
-npm test
-npm run build
-```
+| Command | Purpose |
+| --- | --- |
+| `npm test` | Vitest suite, including the project data validator (no network) |
+| `npm run build` | Production build into `dist/`, with per-route HTML head tags and a sitemap |
+| `npm run preview` | Serve the production build locally |
+| `npm run check:assets` | Validate project data, then fetch every remote project image |
+| `npm run assets:refresh -- --dry-run` | Propose moving project image pins to each repository's verified latest commit |
+| `npm run prepare:images` | Regenerate WebP logo and local image derivatives |
 
 ## Deployment
 
-- CI runs on every pull request and push, installing dependencies, running tests, and verifying a production build.
-- Pushes to `main` also deploy to GitHub Pages through `.github/workflows/deploy-pages.yml`. The workflow sets Vite's `BASE_PATH` to `/portfolio/` so assets resolve correctly under the GitHub Pages subpath while root deployments keep `/`.
-- Vercel builds the same repository with the standard `npm run build` command for root deployment. `vercel.json` maps `/about` to its prerendered HTML, redirects non-canonical trailing-slash variants, and lets unknown paths fall through to `404.html` (served with a 404 status). There is deliberately no catch-all rewrite, so `/sitemap.xml` and `/robots.txt` are always the real files.
+- CI (`.github/workflows/ci.yml`) runs on every pull request and push to `main`: install, tests, `check:assets` (an unreachable CDN only warns), and a production build.
+- Pushes to `main` deploy to GitHub Pages through `.github/workflows/deploy-pages.yml`, which reruns the tests first. The workflow sets Vite's `BASE_PATH` to `/portfolio/` so assets resolve under the GitHub Pages subpath while root deployments keep `/`.
+- Vercel builds the same repository with `npm run build` for root deployment. `vercel.json` maps `/about` to its prerendered HTML, redirects non-canonical trailing-slash variants, and lets unknown paths fall through to `404.html` (served with a 404 status). There is deliberately no catch-all rewrite, so `/sitemap.xml` and `/robots.txt` are always the real files.
 
 No manual deployment step is required after merging to `main`.
 
-Portfolio content is maintained in this repository, with no GitHub API calls at runtime. Both project sections render from `src/data/projects.mjs`.
+## Projects and images
+
+Both project sections render from `src/data/projects.mjs` (order, copy, links, logos, screenshots, sizes, alt text), with no GitHub API calls at runtime. Screenshots of public projects load from each project's own repository through commit-pinned jsDelivr URLs (pins in `src/data/githubAssets.mjs`); logos are small WebP derivatives of those pinned originals, and private projects keep local images.
+
+- [docs/PROJECT_MAINTENANCE.md](docs/PROJECT_MAINTENANCE.md): adding, reordering, hiding, and updating projects; refreshing screenshots with `assets:refresh`; troubleshooting; deploying.
+- [docs/project-assets.md](docs/project-assets.md): data model, caching strategy, asset conventions, and screenshot guidelines.
+- [AGENTS.md](AGENTS.md): conventions for AI coding agents working in this repository.
 
 ## Search metadata
 
 The public routes and their titles, descriptions, canonical URLs, and JSON-LD live in `src/seo/site.mjs`. At build time `scripts/seo-plugin.mjs` writes a static HTML page per route (`index.html`, `about/index.html`, `photography/index.html`) with that route's head tags, plus `404.html` (noindex) and `sitemap.xml` (pages plus every photograph). The page body is still rendered client-side. Add a new page to `ROUTES` and it will get its own HTML, sitemap entry, and tests. `vite preview` does not apply `vercel.json`, so check redirects and 404s against a Vercel deployment.
-
-## Projects and images
-
-Projects (order, copy, links, logos, screenshots, alt text) live in `src/data/projects.mjs`. Screenshots of public projects load from each project's GitHub repository through commit-pinned jsDelivr URLs. Logos are WebP derivatives sized to about 3x their display size and derived from those pinned originals. Private projects keep local images. [docs/project-assets.md](docs/project-assets.md) covers the caching strategy, conventions, and how to add a project.
-
-```bash
-npm run prepare:images   # regenerate WebP derivatives (needs network for project logos)
-npm run check:assets     # validate project data and fetch every remote image
-npm run assets:refresh -- --dry-run [key]   # propose moving pins to each repository's latest verified commit
-```
 
 ## Photography preparation
 

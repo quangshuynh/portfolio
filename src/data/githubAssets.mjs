@@ -4,7 +4,8 @@
 // Cache-Control), so a deploy always shows exactly the images it was built
 // against. Branch URLs such as @main are cached for days at unpredictable
 // edges and can change underneath a deploy, so they are rejected here.
-// See docs/project-assets.md for the workflow.
+// See docs/project-assets.md for the rationale and docs/PROJECT_MAINTENANCE.md
+// for the workflow.
 
 export const ASSET_HOST = 'cdn.jsdelivr.net';
 
