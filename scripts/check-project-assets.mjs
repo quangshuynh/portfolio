@@ -4,23 +4,22 @@
 // jsDelivr URL. A definite answer that the asset is broken (4xx, a non-image
 // content type) fails the run. Being unable to reach the CDN at all (offline,
 // timeout, 5xx) only warns, so a CDN hiccup never blocks local work or CI.
-import { readdirSync } from 'node:fs';
 import { projects } from '../src/data/projects.mjs';
-import { validateProjects } from '../src/data/validateProjects.mjs';
+import { unusedPins, validateProjects } from '../src/data/validateProjects.mjs';
+import { readDerivatives } from './optimized-images.mjs';
 
 const LARGE_BYTES = 1024 * 1024;
 const TIMEOUT_MS = 20_000;
 
-const optimizedFiles = new Set(
-  readdirSync('src/assets/optimized').filter((file) => file.endsWith('.webp')).map((file) => file.replace(/\.webp$/, '')),
-);
-const problems = validateProjects(projects, { optimizedFiles });
+const problems = validateProjects(projects, await readDerivatives());
+unusedPins(projects).forEach((key) => problems.push(`githubAssets.mjs: ${key} is pinned but no project uses it; remove the pin`));
 if (problems.length) {
   console.error(`Project data is invalid:\n  ${problems.join('\n  ')}`);
   process.exit(1);
 }
 
-const urls = projects.flatMap((project) => [
+// Hidden projects are not on the page, so their images are not probed.
+const urls = projects.filter((project) => !project.hidden).flatMap((project) => [
   ...(project.logo?.source ? [[project.slug, 'logo source', project.logo.source]] : []),
   ...(project.screenshots ?? []).filter((shot) => shot.src).map((shot) => [project.slug, shot.caption, shot.src]),
 ]);

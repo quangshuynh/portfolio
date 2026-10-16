@@ -25,7 +25,7 @@ function flexOrder(block, selector) {
 test('every featured project exposes the parts the phone layout reorders', () => {
   render(<FeaturedProjects />);
   const articles = document.querySelectorAll('.featured-project');
-  expect(articles).toHaveLength(6);
+  expect(articles).toHaveLength(featuredProjects.length);
   articles.forEach((article) => {
     ['.case-file__index', 'h3', '.case-file__meta > div:first-child .project-number', '.case-file__visual', '.project-purpose', '.project-takeaway', '.project-details__toggle', '.project-highlights', '.case-file__meta .project-stack', '.project-actions']
       .forEach((selector) => expect(article.querySelector(selector), selector).not.toBeNull());
@@ -70,29 +70,24 @@ test('featured cards cannot be widened past the column by their gallery tabs', (
 test('gallery tab sets are named groups of toggle buttons', () => {
   const { getAllByRole } = render(<FeaturedProjects />);
   const groups = getAllByRole('group', { name: /gallery$/ });
-  expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
-    'DashPilot gallery', 'ScribeKit gallery', 'Flipper gallery', 'PuzzlePress gallery', 'GitProfileLens gallery',
-  ]);
+  // A gallery needs a logo and at least one screenshot; others show a single visual.
+  expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual(
+    featuredProjects.filter((project) => project.logo && project.screenshots?.length).map((project) => `${project.name} gallery`),
+  );
   groups.forEach((group) => {
     const pressed = [...group.querySelectorAll('button')].filter((button) => button.getAttribute('aria-pressed') === 'true');
     expect(pressed).toHaveLength(1);
   });
 });
 
-test('projects keep their order and each pairs its purpose with an engineering takeaway', () => {
+test('projects render in data order and each pairs its purpose with an engineering takeaway', () => {
+  // The curated order itself is pinned once, in src/data/projects.test.js.
   const { getAllByRole } = render(<FeaturedProjects />);
   const articles = getAllByRole('article');
-  expect(articles.map((article) => article.querySelector('h3').textContent)).toEqual([
-    '585Dashcam585', 'DashPilot', 'ScribeKit', 'Flipper', 'PuzzlePress', 'GitProfileLens',
-  ]);
-  expect(articles.map((article) => article.querySelector('.project-takeaway').textContent)).toEqual([
-    'Takeaway Production checkout and order processing with reliable payment finalization.',
-    'Takeaway Reliable shift and delivery tracking without cloud accounts or platform integrations.',
-    'Takeaway On-device transcription designed to preserve work through interruptions.',
-    'Takeaway Exact financial accounting from deal research through realized profit.',
-    'Takeaway Deterministic, independently verified print output from structured book content.',
-    'Takeaway Explainable GitHub portfolio analysis with strict privacy boundaries.',
-  ]);
+  expect(articles.map((article) => article.querySelector('h3').textContent)).toEqual(featuredProjects.map((project) => project.name));
+  expect(articles.map((article) => article.querySelector('.project-takeaway').textContent)).toEqual(
+    featuredProjects.map((project) => `Takeaway ${project.takeaway}`),
+  );
   articles.forEach((article) => {
     const purpose = article.querySelector('.project-purpose');
     expect(purpose.nextElementSibling).toHaveClass('project-takeaway');
@@ -101,7 +96,7 @@ test('projects keep their order and each pairs its purpose with an engineering t
 
 test('each project is a named, deep-linkable article whose title links to itself', () => {
   const { getByRole } = render(<FeaturedProjects />);
-  for (const [name, slug] of [['585Dashcam585', '585dashcam585'], ['DashPilot', 'dashpilot'], ['ScribeKit', 'scribekit'], ['Flipper', 'flipper'], ['PuzzlePress', 'puzzlepress'], ['GitProfileLens', 'gitprofilelens']]) {
+  for (const { name, slug } of featuredProjects) {
     const article = getByRole('article', { name });
     expect(article).toHaveAttribute('id', `project-${slug}`);
     // The heading's accessible name stays the bare project name.
@@ -119,7 +114,7 @@ test('technical details start collapsed behind a labelled, inert disclosure', ()
     const panel = document.getElementById(toggle.getAttribute('aria-controls'));
     expect(toggle).toHaveAttribute('type', 'button');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    // Six identical labels: each is described by its project title for context.
+    // Identical labels: each is described by its project title for context.
     expect(toggle).toHaveAccessibleDescription(name);
     expect(panel).toHaveAttribute('id', `project-${slug}-details`);
     expect(panel).toHaveAttribute('inert');
@@ -158,8 +153,9 @@ test('every highlight remains in the markup while collapsed', () => {
 
 test('toggling details leaves gallery tabs and project links untouched', () => {
   render(<FeaturedProjects />);
-  const article = screen.getByRole('article', { name: 'DashPilot' });
-  const gallery = within(article).getByRole('group', { name: 'DashPilot gallery' });
+  const { name } = featuredProjects.find((project) => project.logo && project.screenshots?.length > 1);
+  const article = screen.getByRole('article', { name });
+  const gallery = within(article).getByRole('group', { name: `${name} gallery` });
   const tab = within(gallery).getAllByRole('button')[1];
   fireEvent.click(tab);
   expect(tab).toHaveAttribute('aria-pressed', 'true');

@@ -25,3 +25,6 @@ yarn-error.log*
 
 # env
 .env
+
+# assets:refresh stages edits beside the data files; a crashed run may leave one
+src/data/.*.refresh-tmp.mjs
