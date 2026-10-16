@@ -52,6 +52,7 @@ Projects (order, copy, links, logos, screenshots, alt text) live in `src/data/pr
 ```bash
 npm run prepare:images   # regenerate WebP derivatives (needs network for project logos)
 npm run check:assets     # validate project data and fetch every remote image
+npm run assets:refresh -- --dry-run [key]   # propose moving pins to each repository's latest verified commit
 ```
 
 ## Photography preparation

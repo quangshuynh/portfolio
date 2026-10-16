@@ -8,8 +8,10 @@
 
 export const ASSET_HOST = 'cdn.jsdelivr.net';
 
-// One pin per public repository. Bump a SHA (and re-run `npm run check:assets`)
-// to pick up new or changed images from that repository.
+// One pin per public repository. `npm run assets:refresh` bumps these SHAs after
+// checking that every referenced image exists at the new commit; edit by hand
+// only to add a repository. Each pin stays on one line so the script can update
+// a single `commit` value without touching anything else.
 export const repositories = {
   ordixa: { owner: 'quangshuynh', repo: 'ordixa', commit: '06d4e4d70fc6924fbf2b71791a85363bd1bbfb3a' },
   flipper: { owner: 'quangshuynh', repo: 'flipper', commit: '921dac59074cbcf2ba777cc5f00c4b6c4668f8e4' },
@@ -36,7 +38,18 @@ const IMAGE_PATH = /^(?!\/)(?!.*\.\.)[\w./-]+\.(png|jpe?g|webp|avif|gif|svg)$/i;
 export function githubAsset(key, path) {
   const pin = repositories[key];
   if (!pin) throw new Error(`Unknown asset repository: ${key}`);
-  if (!COMMIT.test(pin.commit)) throw new Error(`${key} must be pinned to a full 40-character commit SHA`);
+  return pinnedAssetUrl(pin, path, key);
+}
+
+/**
+ * builds a commit-pinned jsDelivr URL from an explicit pin
+ * :param pin: { owner, repo, commit }
+ * :param path: repository-relative image path
+ * :param label: name used in error messages
+ * :returns: https://cdn.jsdelivr.net/gh/OWNER/REPO@SHA/PATH
+ */
+export function pinnedAssetUrl(pin, path, label = `${pin.owner}/${pin.repo}`) {
+  if (!COMMIT.test(pin.commit)) throw new Error(`${label} must be pinned to a full 40-character commit SHA`);
   if (!IMAGE_PATH.test(path)) throw new Error(`Not a repository-relative image path: ${path}`);
   return `https://${ASSET_HOST}/gh/${pin.owner}/${pin.repo}@${pin.commit}/${path}`;
 }
@@ -47,18 +60,23 @@ export function githubAsset(key, path) {
  * :returns: true when the URL could have come from githubAsset
  */
 export function isPinnedGithubAsset(url) {
+  return parsePinnedGithubAsset(url) !== null;
+}
+
+/**
+ * splits a commit-pinned jsDelivr GitHub image URL into its parts
+ * :param url: candidate URL
+ * :returns: { owner, repo, commit, path }, or null when the URL is not pinned
+ */
+export function parsePinnedGithubAsset(url) {
   let parsed;
   try {
     parsed = new URL(url);
   } catch {
-    return false;
+    return null;
   }
-  const match = parsed.pathname.match(/^\/gh\/[\w.-]+\/[\w.-]+@([^/]+)\/(.+)$/);
-  return parsed.protocol === 'https:'
-    && parsed.host === ASSET_HOST
-    && !parsed.search
-    && !parsed.hash
-    && Boolean(match)
-    && COMMIT.test(match[1])
-    && IMAGE_PATH.test(match[2]);
+  const match = parsed.pathname.match(/^\/gh\/([\w.-]+)\/([\w.-]+)@([^/]+)\/(.+)$/);
+  if (parsed.protocol !== 'https:' || parsed.host !== ASSET_HOST || parsed.search || parsed.hash || !match) return null;
+  const [, owner, repo, commit, path] = match;
+  return COMMIT.test(commit) && IMAGE_PATH.test(path) ? { owner, repo, commit, path } : null;
 }

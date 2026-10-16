@@ -93,8 +93,10 @@ README can then embed the same files.
 ## Adding or updating a project
 
 1. Commit the images to the **project** repository (see conventions above) and
-   push. Note the commit SHA (`git rev-parse HEAD`).
-2. In `src/data/githubAssets.mjs`, add the repository or bump its `commit`.
+   push.
+2. For a new repository, add a line for it to `src/data/githubAssets.mjs` with
+   its current commit SHA (`git rev-parse HEAD`). For an existing one, run
+   `npm run assets:refresh -- <key>` (see below) instead of editing the SHA.
 3. In `src/data/projects.mjs`, add or edit the entry. Use
    `githubAsset('<key>', 'docs/images/<file>.png')` for each screenshot and for
    `logo.source`, and set `logo.file` to the derivative name, e.g.
@@ -108,8 +110,69 @@ README can then embed the same files.
    a non-image. Offline, timeouts, and 5xx responses are warnings, so a CDN
    hiccup never blocks you. CI runs it too.
 
-To pick up changed images for an existing project, bump its SHA and repeat steps
-4 to 6. Pinned URLs never change by themselves.
+Pinned URLs never change by themselves. To pick up changed images for an
+existing project, use the refresh command below, then repeat steps 4 to 6.
+
+## Refreshing pins after updating screenshots
+
+`npm run assets:refresh` moves pins in `src/data/githubAssets.mjs` to each
+repository's latest commit, and only once that commit has passed its checks. It
+is a manual command. Nothing runs it on a schedule or during a deploy.
+
+```bash
+npm run assets:refresh -- --dry-run          # every repository, write nothing
+npm run assets:refresh -- --dry-run flipper  # one repository
+npm run assets:refresh -- flipper            # apply for one repository
+npm run assets:refresh                       # apply for every repository
+```
+
+Repositories are named by their key in `githubAssets.mjs`, either as plain
+arguments or with `--project <key>`. An unknown key stops the run, so a typo
+never falls back to refreshing everything.
+
+For each repository, the command:
+
+1. asks the GitHub API for the latest commit on the default branch;
+2. downloads, at that commit, every image `projects.mjs` references from the
+   repository (each screenshot `src` and the `logo.source`), using unauthenticated
+   `raw.githubusercontent.com` URLs, so a file that only a token could read
+   counts as missing;
+3. checks that each file exists, decodes as an image (a Git LFS pointer does
+   not), and for screenshots, still has the `width` and `height` recorded in
+   `projects.mjs`;
+4. lists which referenced images changed since the current pin, using GitHub's
+   compare API. This is for the report only;
+5. proposes `commit: '<old>' -> commit: '<new>'` with an example URL.
+
+A repository passes only if every check passes. Then the command changes that one
+quoted SHA in `githubAssets.mjs` and nothing else. Project copy, alt text, sizes,
+and the other repositories stay untouched, and `projects.mjs` is never edited. A
+repository that fails keeps its current pin, so the site keeps serving the images
+it was built against. The run reports why:
+
+| Report | Meaning | What to do |
+| --- | --- | --- |
+| `not found at this commit` | the file was renamed, moved, or deleted | restore it, or update the path in `projects.mjs` |
+| `every referenced file is missing` | images moved, or the repository went private | as above; private projects use local images |
+| `not a readable image` | corrupt file or Git LFS pointer | commit the real image |
+| `now WxH, projects.mjs records WxH` | the screenshot was re-captured at another size | update `width`/`height` in `projects.mjs`, rerun |
+| `HTTP 5xx, could not verify` / `timed out` | GitHub hiccup | rerun later |
+| `repository not found or not public (HTTP 404)` | renamed, deleted, or private | fix `owner`/`repo`, or switch to local images |
+| `GitHub API rate limit reached` | over 60 unauthenticated API calls this hour | set `GITHUB_TOKEN` (or `GH_TOKEN`) and rerun |
+
+The command uses two API calls per repository. The token is optional, and it is
+sent only to `api.github.com`, never to the file downloads. The command exits `1`
+when any requested repository was skipped, `2` for bad arguments, and `0`
+otherwise. With `--dry-run` it writes nothing.
+
+The command runs no git commands. After a real run:
+
+1. If the report says `logo changed`, run `npm run prepare:images` and keep the new
+   WebP.
+2. Run `npm test` and `npm run check:assets`. The second confirms jsDelivr serves
+   the new commit.
+3. Review `git diff` (normally one changed SHA per refreshed repository), then
+   commit on a branch and open a pull request as usual.
 
 ### Private or unavailable assets
 
@@ -142,5 +205,7 @@ deliberately left out. There is no deployed demo, so none is linked.
   a screenshot only when its tab is opened, but that request is the full PNG
   (100 to 560 KB).
 - jsDelivr's GitHub endpoint has file-size limits. Screenshots should stay far below them anyway.
-- `prepare:images` and `check:assets` need network access. `npm run build` and
-  `npm test` do not.
+- `prepare:images`, `check:assets`, and `assets:refresh` need network access.
+  `npm run build` and `npm test` do not.
+- `assets:refresh` follows each repository's default branch only. To pin a
+  commit from another branch, edit the SHA by hand and run `check:assets`.
