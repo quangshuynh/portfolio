@@ -1,7 +1,11 @@
 // Single source of truth for every project on the homepage.
 //
 // - `featured: true` projects render as case files in "Featured projects", in
-//   array order; the rest render in "More projects", also in array order.
+//   array order; the rest render in "More projects", also in array order. Keep
+//   featured entries first. Order is curated by hand: move an entry to reorder,
+//   flip `featured` to promote or demote, and set `hidden: true` to take a
+//   project off the page while keeping its entry (it still ships in the bundle,
+//   so delete entries that must not be public). See docs/PROJECT_MAINTENANCE.md.
 // - Screenshots of public projects are commit-pinned jsDelivr URLs built by
 //   githubAsset(); see docs/project-assets.md.
 // - Logos are tiny on the page, so they are served as display-sized WebP
@@ -14,8 +18,27 @@
 import { githubAsset } from './githubAssets.mjs';
 
 /** @typedef {{ src?: string, local?: string, width: number, height: number, alt: string, caption: string, label?: string }} ProjectImage */
-/** @typedef {{ file: string, source?: string, width?: number, height?: number, alt: string, className?: string }} ProjectLogo */
+/** @typedef {{ file: string, source?: string, width?: number, height?: number, alt: string, className?: string, trim?: boolean }} ProjectLogo */
+/**
+ * @typedef {object} Project
+ * @property {string} slug lowercase id; `#project-<slug>` anchor and the usual githubAssets.mjs key
+ * @property {string} name display name
+ * @property {boolean} [featured] case file in "Featured projects" (needs label, takeaway, highlights)
+ * @property {boolean} [hidden] keep the entry but render it nowhere
+ * @property {string} [label] featured: type line
+ * @property {string} [takeaway] featured: one-sentence engineering takeaway
+ * @property {string[]} [highlights] featured: two or more details behind the disclosure
+ * @property {string} [tagline] more: optional positioning line
+ * @property {string} [detail] more: supporting paragraph
+ * @property {string} summary what it is and does (both sections)
+ * @property {string[]} technologies tags, in display order
+ * @property {{ github?: string, live?: string, liveLabel?: string, documentation?: string }} links
+ * @property {ProjectLogo} [logo]
+ * @property {ProjectImage[]} [screenshots]
+ * @property {boolean} [tallScreenshots] featured: cap portrait captures at 420px
+ */
 
+/** @type {Project[]} */
 export const projects = [
   {
     slug: '585dashcam585',
@@ -430,5 +453,5 @@ export const projects = [
   },
 ];
 
-export const featuredProjects = projects.filter((project) => project.featured);
-export const moreProjects = projects.filter((project) => !project.featured);
+export const featuredProjects = projects.filter((project) => project.featured && !project.hidden);
+export const moreProjects = projects.filter((project) => !project.featured && !project.hidden);
