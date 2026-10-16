@@ -14,7 +14,7 @@ export const ASSET_HOST = 'cdn.jsdelivr.net';
 // a single `commit` value without touching anything else.
 export const repositories = {
   ordixa: { owner: 'quangshuynh', repo: 'ordixa', commit: '06d4e4d70fc6924fbf2b71791a85363bd1bbfb3a' },
-  flipper: { owner: 'quangshuynh', repo: 'flipper', commit: '921dac59074cbcf2ba777cc5f00c4b6c4668f8e4' },
+  flipper: { owner: 'quangshuynh', repo: 'flipper', commit: '652b25cfbb73fa44d4d47a3dfcf2b228176526aa' },
   gitprofilelens: { owner: 'quangshuynh', repo: 'gitprofilelens', commit: 'efefe676f02327c2404f5f817437ff292ba891e7' },
   scribekit: { owner: 'quangshuynh', repo: 'scribekit', commit: '33232da133c71f264d341f0527e11335873d45e4' },
   puzzlepress: { owner: 'quangshuynh', repo: 'puzzlepress', commit: '7491b7ea51db95b1e386765a58ced445314767ea' },
