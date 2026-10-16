@@ -15,12 +15,12 @@ export const repositories = {
   flipper: { owner: 'quangshuynh', repo: 'flipper', commit: '921dac59074cbcf2ba777cc5f00c4b6c4668f8e4' },
   gitprofilelens: { owner: 'quangshuynh', repo: 'gitprofilelens', commit: 'efefe676f02327c2404f5f817437ff292ba891e7' },
   scribekit: { owner: 'quangshuynh', repo: 'scribekit', commit: '33232da133c71f264d341f0527e11335873d45e4' },
+  puzzlepress: { owner: 'quangshuynh', repo: 'puzzlepress', commit: '7491b7ea51db95b1e386765a58ced445314767ea' },
   dashpilot: { owner: 'quangshuynh', repo: 'dashpilot', commit: 'e8a8f22d46dfafa6ee1c22116bca5419e42a301a' },
   casenotes: { owner: 'quangshuynh', repo: 'casenotes', commit: '46a3f991ad19496b453d3b5c08c4ec4177abf01f' },
   'repo-radar': { owner: 'quangshuynh', repo: 'repo-radar', commit: '3abf290cf33e27aa1d2651591ce5f9185c6a1750' },
   chessed: { owner: 'quangshuynh', repo: 'chessed', commit: '7d5f22f4929ef76f92e39be666cda667011e53df' },
   inboxsweep: { owner: 'quangshuynh', repo: 'inboxsweep', commit: 'a2429fb1d23eb3b06a8dd9e5c65ee30952ba292f' },
-  salonflow: { owner: 'quangshuynh', repo: 'salonflow', commit: '6f3c5f05b7a78631500eb06368989594697cac5f' },
   'hymical-forms': { owner: 'hymical', repo: 'forms', commit: '235f8afe0c056449f3226250854a03d6a82cb7b6' },
 };
 

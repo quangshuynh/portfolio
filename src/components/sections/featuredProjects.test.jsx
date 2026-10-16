@@ -24,7 +24,7 @@ function flexOrder(block, selector) {
 test('every featured project exposes the parts the phone layout reorders', () => {
   render(<FeaturedProjects />);
   const articles = document.querySelectorAll('.featured-project');
-  expect(articles).toHaveLength(5);
+  expect(articles).toHaveLength(6);
   articles.forEach((article) => {
     ['.case-file__index', 'h3', '.case-file__meta > div:first-child .project-number', '.case-file__visual', '.project-purpose', '.project-takeaway', '.project-highlights', '.case-file__meta .project-stack', '.project-actions']
       .forEach((selector) => expect(article.querySelector(selector), selector).not.toBeNull());
@@ -70,7 +70,7 @@ test('gallery tab sets are named groups of toggle buttons', () => {
   const { getAllByRole } = render(<FeaturedProjects />);
   const groups = getAllByRole('group', { name: /gallery$/ });
   expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
-    'Flipper gallery', 'GitProfileLens gallery', 'ScribeKit gallery', 'DashPilot gallery',
+    'DashPilot gallery', 'ScribeKit gallery', 'Flipper gallery', 'PuzzlePress gallery', 'GitProfileLens gallery',
   ]);
   groups.forEach((group) => {
     const pressed = [...group.querySelectorAll('button')].filter((button) => button.getAttribute('aria-pressed') === 'true');
@@ -82,14 +82,15 @@ test('projects keep their order and each pairs its purpose with an engineering t
   const { getAllByRole } = render(<FeaturedProjects />);
   const articles = getAllByRole('article');
   expect(articles.map((article) => article.querySelector('h3').textContent)).toEqual([
-    '585Dashcam585', 'Flipper', 'GitProfileLens', 'ScribeKit', 'DashPilot',
+    '585Dashcam585', 'DashPilot', 'ScribeKit', 'Flipper', 'PuzzlePress', 'GitProfileLens',
   ]);
   expect(articles.map((article) => article.querySelector('.project-takeaway').textContent)).toEqual([
     'Takeaway Production checkout and order processing with reliable payment finalization.',
-    'Takeaway Exact financial accounting from deal research through realized profit.',
-    'Takeaway Explainable GitHub portfolio analysis with strict privacy boundaries.',
-    'Takeaway On-device transcription designed to preserve work through interruptions.',
     'Takeaway Reliable shift and delivery tracking without cloud accounts or platform integrations.',
+    'Takeaway On-device transcription designed to preserve work through interruptions.',
+    'Takeaway Exact financial accounting from deal research through realized profit.',
+    'Takeaway Deterministic, independently verified print output from structured book content.',
+    'Takeaway Explainable GitHub portfolio analysis with strict privacy boundaries.',
   ]);
   articles.forEach((article) => {
     const purpose = article.querySelector('.project-purpose');
@@ -99,7 +100,7 @@ test('projects keep their order and each pairs its purpose with an engineering t
 
 test('each project is a named, deep-linkable article whose title links to itself', () => {
   const { getByRole } = render(<FeaturedProjects />);
-  for (const [name, slug] of [['585Dashcam585', '585dashcam585'], ['Flipper', 'flipper'], ['GitProfileLens', 'gitprofilelens'], ['ScribeKit', 'scribekit'], ['DashPilot', 'dashpilot']]) {
+  for (const [name, slug] of [['585Dashcam585', '585dashcam585'], ['DashPilot', 'dashpilot'], ['ScribeKit', 'scribekit'], ['Flipper', 'flipper'], ['PuzzlePress', 'puzzlepress'], ['GitProfileLens', 'gitprofilelens']]) {
     const article = getByRole('article', { name });
     expect(article).toHaveAttribute('id', `project-${slug}`);
     // The heading's accessible name stays the bare project name.
