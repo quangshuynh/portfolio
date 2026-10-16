@@ -6,7 +6,7 @@ export default defineConfig({
   base: process.env.BASE_PATH || '/',
   plugins: [react(), seoPlugin()],
   test: {
-    include: ['src/**/*.test.{js,jsx}'],
+    include: ['src/**/*.test.{js,jsx}', 'scripts/**/*.test.mjs'],
     environment: 'jsdom',
     globals: true,
     setupFiles: './src/setupTests.js',
