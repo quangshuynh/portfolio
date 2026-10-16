@@ -25,5 +25,10 @@ jobs:
       - name: Run tests
         run: npm test
 
+      # Fails only when a pinned project image is definitely broken (4xx or not
+      # an image); an unreachable CDN is reported as a warning.
+      - name: Check remote project images
+        run: npm run check:assets
+
       - name: Build
         run: npm run build
