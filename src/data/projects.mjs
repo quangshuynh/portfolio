@@ -57,7 +57,7 @@ export const projects = [
       'Persists driver data locally with SwiftData and supports corrections and exports without requiring an external account or delivery-platform connection',
     ],
     technologies: ['Swift', 'SwiftUI', 'SwiftData', 'Core Location', 'ActivityKit', 'App Intents', 'Swift Testing'],
-    links: { github: 'https://github.com/quangshuynh/dashpilot' },
+    links: { github: 'https://github.com/quangshuynh/dashpilot', documentation: 'https://quangshuynh.github.io/dashpilot/' },
     logo: {
       file: 'dashpilot-logo',
       source: githubAsset('dashpilot', 'docs/images/dashpilot-logo.png'),
@@ -173,7 +173,7 @@ export const projects = [
       'Compares frozen pre-purchase expectations against authoritative sale outcomes while keeping external marketplace failures isolated from local records',
     ],
     technologies: ['Python', 'FastAPI', 'SQLite', 'Jinja', 'eBay APIs', 'pytest'],
-    links: { github: 'https://github.com/quangshuynh/flipper' },
+    links: { github: 'https://github.com/quangshuynh/flipper', documentation: 'https://quangshuynh.github.io/flipper/' },
     logo: {
       file: 'flipper-logo',
       source: githubAsset('flipper', 'docs/images/flipper-logo2.png'),
@@ -349,7 +349,7 @@ export const projects = [
     summary: 'Privacy-conscious native macOS Gmail cleanup assistant that groups mail by sender, explains cleanup recommendations, and previews changes before anything happens.',
     detail: 'Built with metadata-only Gmail access, explicit OAuth scope boundaries, dry-run cleanup previews, confirmed archive and undo flows, safe unsubscribe handling, and synthetic offline test data.',
     technologies: ['Swift', 'SwiftUI', 'Gmail API', 'OAuth 2.0', 'Keychain'],
-    links: { github: 'https://github.com/quangshuynh/inboxsweep' },
+    links: { github: 'https://github.com/quangshuynh/inboxsweep', live: 'https://quangshuynh.github.io/inboxsweep/', liveLabel: 'Documentation' },
     logo: {
       file: 'inboxsweep-logo',
       source: githubAsset('inboxsweep', 'docs/images/inboxsweep-logo.png'),
@@ -362,7 +362,7 @@ export const projects = [
     summary: 'Self-hostable form ingestion service with durable, signed webhook delivery and production-minded failure handling.',
     detail: 'Built around idempotent submissions, a transactional PostgreSQL outbox, leased workers with ownership fencing, HMAC-signed webhooks, and real PostgreSQL concurrency tests.',
     technologies: ['Python', 'FastAPI', 'PostgreSQL', 'SQLAlchemy'],
-    links: { github: 'https://github.com/hymical/forms' },
+    links: { github: 'https://github.com/hymical/forms', live: 'https://hymical.github.io/forms/', liveLabel: 'Documentation' },
     logo: {
       file: 'hymical-forms-logo',
       source: githubAsset('hymical-forms', 'docs/images/logo_symbol_transparent.png'),
@@ -394,7 +394,7 @@ export const projects = [
     summary: 'Chess game review app that analyzes PGNs with Stockfish and explains move quality through engine-backed classifications and evaluations.',
     detail: 'Runs Stockfish in a Web Worker with cancellable MultiPV analysis, mover-relative evaluation, explainable move classifications, and regression testing across curated chess positions.',
     technologies: ['Next.js', 'TypeScript', 'Stockfish', 'Web Workers'],
-    links: { github: 'https://github.com/quangshuynh/chessed' },
+    links: { github: 'https://github.com/quangshuynh/chessed', live: 'https://chessed.vercel.app/' },
     logo: {
       file: 'chessed-logo',
       source: githubAsset('chessed', 'docs/images/chessed-logo.png'),
