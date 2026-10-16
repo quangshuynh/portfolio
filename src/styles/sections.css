@@ -290,6 +290,9 @@
 .gallery-stage > img,
 .gallery-stage .home-image-trigger img {
   width: auto;
+  /* Overrides the width/height attributes (kept for their aspect ratio, which
+     reserves space before a lazy screenshot loads) so max-* scale both axes. */
+  height: auto;
   max-width: 100%;
   max-height: 360px;
   margin-inline: auto;
@@ -300,6 +303,21 @@
 .gallery-stage > img { height: 260px; max-height: 260px; }
 .gallery-stage .home-image-trigger { width: auto; border-radius: var(--radius-sm); }
 .vertical-project-shot { max-height: 420px !important; }
+/* Shown in place of a screenshot that failed to load (see HomeImageTrigger). */
+.image-fallback {
+  display: grid;
+  width: min(100%, 28rem);
+  aspect-ratio: 16 / 10;
+  place-items: center;
+  margin-inline: auto;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
 .gallery-controls {
   display: flex;
   gap: 0;
@@ -382,6 +400,14 @@
 }
 .ledger-row__main p { max-width: 56ch; margin-top: .6rem; color: var(--text-secondary); line-height: 1.6; }
 .ledger-row__main .more-highlight { color: var(--text-tertiary); font-size: .92rem; }
+.ledger-row__main .ledger-row__tagline {
+  margin-top: .3rem;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
 .ledger-row__side { display: grid; align-content: start; gap: 1rem; }
 .more-card-preview { border-radius: var(--radius-sm); aspect-ratio: 16 / 10; object-fit: cover; object-position: top; }
 .tag-list {

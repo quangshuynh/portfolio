@@ -70,10 +70,24 @@ export function HomeImageTrigger({
   className = '',
   imageClassName = '',
   loading = 'lazy',
+  width,
+  height,
   gallery,
   galleryIndex,
 }) {
   const openImage = useContext(HomeLightboxContext);
+  const [failedSrc, setFailedSrc] = useState(null);
+
+  // A remote screenshot can be unreachable (CDN outage, a bad pin). Swap in a
+  // quiet placeholder that keeps the alt text instead of a broken-image icon
+  // and a button that would open an empty viewer.
+  if (failedSrc === src) {
+    return (
+      <div className={`image-fallback${imageClassName ? ` ${imageClassName}` : ''}`} role="img" aria-label={alt}>
+        <span aria-hidden="true">Preview unavailable</span>
+      </div>
+    );
+  }
 
   return (
     <button
@@ -94,7 +108,16 @@ export function HomeImageTrigger({
         )
       }
     >
-      <img className={imageClassName} src={src} alt={alt} loading={loading} decoding="async" />
+      <img
+        className={imageClassName}
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        loading={loading}
+        decoding="async"
+        onError={() => setFailedSrc(src)}
+      />
       <span className="photography-gallery-zoom-hint" aria-hidden="true"><FaSearchPlus /></span>
     </button>
   );

@@ -8,9 +8,9 @@ test('expanding moves focus to the first newly shown project; collapsing returns
 
   toggle.focus();
   fireEvent.click(toggle);
-  expect(screen.getAllByRole('article')).toHaveLength(8);
+  expect(screen.getAllByRole('article')).toHaveLength(7);
   expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  expect(document.activeElement).toBe(screen.getByRole('heading', { level: 3, name: 'Chessed' }));
+  expect(document.activeElement).toBe(screen.getByRole('heading', { level: 3, name: '585photo585' }));
 
   fireEvent.click(screen.getByRole('button', { name: 'Show fewer projects' }));
   expect(screen.getAllByRole('article')).toHaveLength(3);
@@ -20,7 +20,7 @@ test('expanding moves focus to the first newly shown project; collapsing returns
 test('collapsing while focus is inside a project being hidden returns focus to the toggle', () => {
   render(<MoreProjects />);
   fireEvent.click(screen.getByRole('button', { name: 'View more projects' }));
-  const hiddenLink = screen.getByRole('link', { name: 'Open SalonFlow repository' });
+  const hiddenLink = screen.getByRole('link', { name: 'Open Repo Radar repository' });
   hiddenLink.focus();
   // A click that does not move focus first (Safari does not focus buttons on click).
   fireEvent.click(screen.getByRole('button', { name: 'Show fewer projects' }));
