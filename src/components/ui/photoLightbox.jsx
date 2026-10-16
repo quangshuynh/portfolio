@@ -44,6 +44,7 @@ export default function PhotoLightbox({
 }) {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [failedSrc, setFailedSrc] = useState(null);
 
   const dialogRef = useRef(null);
   const closeButton = useRef(null);
@@ -322,16 +323,23 @@ export default function PhotoLightbox({
           </button>
         )}
 
-        <img
-          ref={imageElement}
-          src={image.src}
-          alt={image.alt}
-          draggable="false"
-          decoding="async"
-          style={{
-            transform: `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`,
-          }}
-        />
+        {failedSrc === image.src ? (
+          <p className="photo-lightbox-error" role="status">
+            This image could not be loaded. {image.alt}
+          </p>
+        ) : (
+          <img
+            ref={imageElement}
+            src={image.src}
+            alt={image.alt}
+            draggable="false"
+            decoding="async"
+            onError={() => setFailedSrc(image.src)}
+            style={{
+              transform: `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`,
+            }}
+          />
+        )}
 
         {onNext && (
           <button

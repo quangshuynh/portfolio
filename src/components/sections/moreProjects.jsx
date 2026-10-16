@@ -1,105 +1,23 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
-import hymicalFormsLogo from '../../assets/optimized/hymical-forms-logo.webp';
-import repoRadarLogo from '../../assets/optimized/repo-radar-logo.webp';
-import salonFlowLogo from '../../assets/optimized/salonflow-logo.webp';
-import caseNotesLogo from '../../assets/optimized/casenotes-logo.webp';
-import inboxSweepLogo from '../../assets/optimized/inboxsweep-logo.webp';
-import photoPortfolio from '../../assets/585photo585-portfolio.png';
-import chessedLogo from '../../assets/optimized/chessed-logo.webp';
-import photo585Logo from '../../assets/optimized/585photo585-logo.webp';
-import bdaLogo from '../../assets/optimized/business-data-automation-logo.webp';
 import PersonalityButton from '../ui/personalityButton';
-import { HomeImageTrigger } from '../utilities/homeLightbox';
+import { moreProjects as projects } from '../../data/projects.mjs';
+import { optimizedImage, ProjectScreenshot } from './projectMedia';
 
-const projects = [
-  {
-    name: 'Hymical Forms',
-    description:
-      'Self-hostable form ingestion service with durable, signed webhook delivery and production-minded failure handling.',
-    highlight:
-      'Built around idempotent submissions, a transactional PostgreSQL outbox, leased workers with ownership fencing, HMAC-signed webhooks, and real PostgreSQL concurrency tests.',
-    technologies: ['Python', 'FastAPI', 'PostgreSQL', 'SQLAlchemy'],
-    github: 'https://github.com/hymical/forms',
-    logo: hymicalFormsLogo,
-  },
-  {
-    name: 'Business Data Automation',
-    description:
-      'Backend data pipeline for validating related business records, reconciling financial transactions, and exposing trustworthy results through an API and dashboard.',
-    highlight:
-      'Quarantines invalid records without blocking valid processing, uses Decimal-based financial calculations, transactional PostgreSQL upserts, and automated coverage across validation, reconciliation, database, API, and end-to-end behavior.',
-    technologies: ['Python', 'FastAPI', 'PostgreSQL', 'SQLAlchemy', 'pandas'],
-    github: 'https://github.com/quangshuynh/business-data-automation',
-    logo: bdaLogo,
-  },
-  {
-    name: 'Repo Radar',
-    description:
-      'Personalized GitHub discovery tool for finding relevant repositories and open-source contribution opportunities from developer interests, feedback, and discovery history.',
-    highlight:
-      'Uses deterministic, explainable ranking to balance relevance, quality, activity, novelty, and diversity, with bounded GitHub issue discovery and reproducible offline evaluation.',
-    technologies: ['Python', 'FastAPI', 'GitHub API', 'Recommendation Systems'],
-    github: 'https://github.com/quangshuynh/repo-radar',
-    logo: repoRadarLogo,
-    logoClass: 'repo-radar-logo',
-  },
-  {
-    name: 'Chessed',
-    description:
-      'Chess game review app that analyzes PGNs with Stockfish and explains move quality through engine-backed classifications and evaluations.',
-    highlight:
-      'Runs Stockfish in a Web Worker with cancellable MultiPV analysis, mover-relative evaluation, explainable move classifications, and regression testing across curated chess positions.',
-    technologies: ['Next.js', 'TypeScript', 'Stockfish', 'Web Workers'],
-    github: 'https://github.com/quangshuynh/chessed',
-    logo: chessedLogo,
-  },
-  {
-    name: 'CaseNotes',
-    description:
-      'Local-first native iOS notes app built with SwiftUI and SwiftData for Markdown writing, nested organization, drawings, version history, and export.',
-    highlight:
-      'Uses draft-based Save/Cancel editing, SwiftData persistence and migration coverage, safe nested-folder deletion, PencilKit drawings, real-text PDF export, interface gating, privacy shielding, and accessibility support.',
-    technologies: ['Swift', 'SwiftUI', 'SwiftData', 'PencilKit'],
-    github: 'https://github.com/quangshuynh/casenotes',
-    live: 'https://quangshuynh.github.io/casenotes/',
-    liveLabel: 'Documentation',
-    logo: caseNotesLogo,
-  },
-  {
-    name: 'InboxSweep',
-    description:
-      'Privacy-conscious native macOS Gmail cleanup assistant that groups mail by sender, explains cleanup recommendations, and previews changes before anything happens.',
-    highlight:
-      'Built with metadata-only Gmail access, explicit OAuth scope boundaries, dry-run cleanup previews, confirmed archive and undo flows, safe unsubscribe handling, and synthetic offline test data.',
-    technologies: ['Swift', 'SwiftUI', 'Gmail API', 'OAuth 2.0', 'Keychain'],
-    github: 'https://github.com/quangshuynh/inboxsweep',
-    logo: inboxSweepLogo,
-  },
-  {
-    name: '585photo585',
-    description:
-      'Custom photography portfolio and lightweight CMS built and deployed for a family-owned Rochester photography business.',
-    highlight:
-      'Responsive editorial galleries, progressive loading, and full-screen lightbox navigation, with a protected admin workflow for direct uploads, metadata and alt text, publishing, drag-and-drop ordering, and deletion.',
-    technologies: ['React', 'Vite', 'Supabase', 'PostgreSQL', 'Storage', 'Auth & RLS'],
-    live: 'https://www.585photo585.com',
-    liveLabel: 'Live Site',
-    logo: photo585Logo,
-    image: photoPortfolio,
-    imageAlt: '585photo585 editorial photography portfolio homepage with Featured, Portraits, and Clips collections',
-  },
-  {
-    name: 'SalonFlow',
-    description:
-      'Multi-tenant salon management application for scheduling appointments, managing customers, staff, and services, and supporting day-to-day salon operations.',
-    highlight:
-      'Backed by Supabase authentication and PostgreSQL persistence with database-enforced tenant isolation, tenant-scoped relational integrity, and integration tests that validate RLS behavior.',
-    technologies: ['Next.js', 'TypeScript', 'Supabase', 'PostgreSQL'],
-    github: 'https://github.com/quangshuynh/salonflow',
-    logo: salonFlowLogo,
-  },
-];
+/**
+ * renders a project's repository and live/documentation links
+ * :param project: project entry
+ * :returns: links markup
+ */
+function ProjectLinks({ project }) {
+  const { github, live, liveLabel } = project.links;
+  return (
+    <div className="more-links">
+      {github && <a className="text-link" href={github} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} repository`}>Repository <FaGithub aria-hidden="true" /></a>}
+      {live && <a className="text-link" href={live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} ${liveLabel ? liveLabel.toLowerCase() : 'live demo'}`}>{liveLabel || 'Live demo'} <FaExternalLinkAlt aria-hidden="true" /></a>}
+    </div>
+  );
+}
 
 /**
  * renders the additional project collection
@@ -149,14 +67,16 @@ function MoreProjects() {
         </div>
         <div className="more-grid ledger" id="more-projects-grid" ref={grid}>
           {visibleProjects.map((project, index) => (
-            <article className={`more-card ledger-row${project.logo ? ' has-logo' : ''}`} key={project.name} data-reveal style={{ '--reveal-delay': `${(index % 3) * 70}ms` }}>
+            <article className={`more-card ledger-row${project.logo ? ' has-logo' : ''}`} key={project.slug} data-reveal style={{ '--reveal-delay': `${(index % 3) * 70}ms` }}>
               <div className="ledger-row__id">
                 <span className="ledger-row__index mono" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
                 {project.logo && (
                   <img
-                    className={`more-card-logo${project.name === 'Repo Radar' ? ' repo-radar-logo' : ''}`}
-                    src={project.logo}
-                    alt={`${project.name} project logo`}
+                    className={`more-card-logo${project.logo.className ? ` ${project.logo.className}` : ''}`}
+                    src={optimizedImage(project.logo.file)}
+                    width="44"
+                    height="44"
+                    alt={project.logo.alt}
                     loading="lazy"
                     decoding="async"
                   />
@@ -164,18 +84,16 @@ function MoreProjects() {
               </div>
               <div className="ledger-row__main">
                 <h3 tabIndex={-1}>{project.name}</h3>
-                <p>{project.description}</p>
-                <p className="more-highlight">{project.highlight}</p>
+                {project.tagline && <p className="ledger-row__tagline">{project.tagline}</p>}
+                <p>{project.summary}</p>
+                <p className="more-highlight">{project.detail}</p>
               </div>
               <div className="ledger-row__side">
-                {project.image && <HomeImageTrigger src={project.image} imageClassName="more-card-preview" alt={project.imageAlt} caption={`${project.name} project preview`} />}
+                {project.screenshots?.length > 0 && <ProjectScreenshot project={project} index={0} imageClassName="more-card-preview" />}
                 <ul className="tag-list" aria-label={`${project.name} technologies`}>
                   {project.technologies.map((item) => <li key={item}>{item}</li>)}
                 </ul>
-                <div className="more-links">
-                  {project.github && <a className="text-link" href={project.github} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} repository`}>Repository <FaGithub aria-hidden="true" /></a>}
-                  {project.live && <a className="text-link" href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} ${project.liveLabel ? project.liveLabel.toLowerCase() : 'live demo'}`}>{project.liveLabel || 'Live demo'} <FaExternalLinkAlt aria-hidden="true" /></a>}
-                </div>
+                <ProjectLinks project={project} />
               </div>
             </article>
           ))}

@@ -1,522 +1,24 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
-import { HomeImageTrigger } from '../utilities/homeLightbox';
-
-//flipper
-import flipperLogo from '../../assets/optimized/flipper-logo.webp';
-import flipperDashboard from '../../assets/flipper/flipper-dashboard.png';
-import flipperResearch from '../../assets/flipper/flipper-research.png';
-import flipperInventory from '../../assets/flipper/flipper-inventory.png';
-import flipperSale from '../../assets/flipper/flipper-sale.png';
-
-//gitprofilelens
-import gitProfileLensLogo from '../../assets/optimized/gitprofilelens-logo.webp';
-import gitProfileLensResults from '../../assets/gitprofilelens/gitprofilelens-results-vert.png';
-
-//scribekit
-import scribeKitLogo from '../../assets/optimized/scribekit-logo.webp';
-import scribeKitApp from '../../assets/scribekit/scribekit-app2.png';
-import scribeKitHistoryFind from '../../assets/scribekit/scribekit-historyfind.png';
-import scribeKitHistoryReview from '../../assets/scribekit/scribekit-historyreview.png';
-import scribeKitAudioCapture from '../../assets/scribekit/scribekit-audiocapture.png';
-
-//585dashcam585
-import dashcamStorefront from '../../assets/optimized/585dashcam585-storefront.webp';
 import PersonalityButton from '../ui/personalityButton';
-
-//dashpilot
-import dashPilotLogo from '../../assets/optimized/dashpilot-logo.webp';
-import dashPilotStacked from '../../assets/dashpilot/home-stacked-deliveries.png';
-import dashPilotOffer from '../../assets/dashpilot/offer-sheet-three-shared.png';
-import dashPilotHistory from '../../assets/dashpilot/history-current-week.png';
-import dashPilotPeriodSummary from '../../assets/dashpilot/period-summary.png';
-
-
-const projects = [
-  {
-    name: '585Dashcam585',
-    slug: '585dashcam585',
-    takeaway: 'Production checkout and order processing with reliable payment finalization.',
-    label: 'Production commerce platform',
-    purpose: 'Built and deployed a full-stack commerce platform for a family-owned Rochester automotive services business, replacing its hosted website with a custom production application.',
-    highlights: [
-      'Runs guest and authenticated checkout with server-authoritative pricing, live Stripe payments, signed webhooks, and idempotent PostgreSQL order finalization',
-      'Provides customer accounts, persistent carts and wishlists, order history, and a protected admin CRM for customers, fulfillment, catalog data, and analytics',
-      'Sends transactional email through Resend with database-backed delivery state, retry handling, stale-claim recovery, and duplicate-delivery protection',
-      'Deployed with Cloudflare Workers and Static Assets, Supabase authentication and RLS, least-privilege credentials, and privacy-conscious Cloudflare analytics',
-    ],
-    stack: 'React · Vite · JavaScript · Cloudflare Workers · Supabase · PostgreSQL · Stripe · Resend · Cloudflare GraphQL Analytics API',
-    live: 'https://www.585dashcam585.com',
-    visual: 'dashcam',
-  },
-  {
-    name: 'Flipper',
-    slug: 'flipper',
-    takeaway: 'Exact financial accounting from deal research through realized profit.',
-    label: 'Backend · Reselling & marketplace tooling',
-    purpose:
-      'Local-first reseller toolkit for researching deals, modeling sourcing economics, managing inventory, and reconciling marketplace sales from discovery through outcome.',
-
-    highlights: [
-      'Separates research estimates from authoritative accounting facts with immutable research snapshots, explicit acquisition state, and exact Decimal-based money semantics',
-      'Researches marketplace opportunities with active and sold comparables, provenance-aware evidence, travel economics, and deterministic deal scoring',
-      'Tracks inventory through acquisition and sale, including completed-order imports, buyer-paid shipping, marketplace fees, collect-and-remit taxes, and provisional economics when acquisition facts are incomplete',
-      'Compares frozen pre-purchase expectations against authoritative sale outcomes while keeping external marketplace failures isolated from local records',
-    ],
-
-    stack: 'Python · FastAPI · SQLite · Jinja · eBay APIs · pytest',
-    github: 'https://github.com/quangshuynh/flipper',
-    visual: 'flipper',
-  },
-  {
-    name: 'GitProfileLens',
-    slug: 'gitprofilelens',
-    takeaway: 'Explainable GitHub portfolio analysis with strict privacy boundaries.',
-    label: 'Developer tooling · GitHub APIs & authenticated data',
-    purpose:
-      'Audits GitHub profiles and repositories with transparent, deterministic rules to improve portfolio presentation, discoverability, and project selection without claiming to measure developer ability.',
-
-    highlights: [
-      'Analyzes public repository metadata with GitHub REST/GraphQL APIs using deterministic presentation scoring, portfolio candidacy, and pinned-repository recommendations',
-      'Supports authorized private repositories through a read-only GitHub App with encrypted session material and strict public/private output boundaries',
-      'Adds contribution discovery and follower/following analysis while withholding conclusions when GitHub data is incomplete or ambiguous',
-      'Validates scoring and recommendations against a representative evaluation corpus with regression baselines designed to expose unintended behavior changes',
-    ],
-    stack: 'JavaScript · Node.js · GitHub REST/GraphQL APIs · Vercel · Playwright',
-    github: 'https://github.com/quangshuynh/gitprofilelens',
-    live: 'https://gitprofilelens.vercel.app/',
-    visual: 'gitprofilelens',
-  },
-  {
-    name: 'ScribeKit',
-    slug: 'scribekit',
-    takeaway: 'On-device transcription designed to preserve work through interruptions.',
-    label: 'Native macOS · Audio, transcription & reliability',
-    purpose:
-      'Native macOS meeting transcription that captures selected application audio or a chosen microphone, transcribes it on-device with Apple speech frameworks, and durably writes timestamped Markdown.',
-
-    highlights: [
-      'Captures either user-selected application audio through ScreenCaptureKit or a chosen microphone, with one source per meeting and optional local audio retention',
-      'Uses Apple’s on-device SpeechAnalyzer and SpeechTranscriber stack with no network fallback',
-      'Preserves finalized speech with pause/resume, background operation, interruption handling, crash recovery, history search, and uncertainty review',
-      'Validated with extensive automated testing, fault injection, long-duration capture testing, and manual keyboard and VoiceOver release checks',
-    ],
-    stack: 'Swift · SwiftUI · ScreenCaptureKit · Speech · AVFoundation · macOS · Swift Testing',
-    github: 'https://github.com/quangshuynh/scribekit',
-    documentation: 'https://quangshuynh.github.io/scribekit/',
-    visual: 'scribekit',
-  },
-  {
-    name: 'DashPilot',
-    slug: 'dashpilot',
-    takeaway: 'Reliable shift and delivery tracking without cloud accounts or platform integrations.',
-    label: 'Native iOS · Delivery workflow & local-first data',
-    purpose:
-      'Local-first iOS companion for delivery drivers that tracks shifts, stacked deliveries, journeys, earnings, mileage, expenses, and performance without relying on delivery-platform integrations.',
-
-    highlights: [
-      'Models stacked delivery lifecycles, pickup waits, corrections, Park & Resume workflows, and historical journeys while preserving recorded delivery facts',
-      'Tracks mileage, earnings, vehicle and fuel costs, and weekly performance while keeping authoritative records separate from estimates and derived metrics',
-      'Integrates Live Activities and App Intents for glanceable delivery status and faster interaction during active shifts',
-      'Persists driver data locally with SwiftData and supports corrections and exports without requiring an external account or delivery-platform connection',
-    ],
-
-    stack:
-      'Swift · SwiftUI · SwiftData · Core Location · ActivityKit · App Intents · Swift Testing',
-
-    github: 'https://github.com/quangshuynh/dashpilot',
-    visual: 'dashpilot',
-  },
-];
+import { featuredProjects as projects } from '../../data/projects.mjs';
+import { ProjectVisual } from './projectMedia';
 
 /**
- * renders the DashPilot image gallery
- * :returns: DashPilot gallery markup
+ * renders a featured project's code, demo, and documentation links
+ * :param project: project entry
+ * :returns: action buttons markup
  */
-const dashPilotGallery = [
-  {
-    src: dashPilotStacked,
-    alt: 'DashPilot home screen during an active shift with stacked deliveries',
-    caption: 'Stacked delivery workflow',
-  },
-  {
-    src: dashPilotOffer,
-    alt: 'DashPilot offer sheet showing a multi-delivery offer',
-    caption: 'Multi-delivery offer',
-  },
-  {
-    src: dashPilotHistory,
-    alt: 'DashPilot history showing delivery activity for the current week',
-    caption: 'Weekly delivery history',
-  },
-  {
-    src: dashPilotPeriodSummary,
-    alt: 'DashPilot period summary showing delivery performance and earnings metrics',
-    caption: 'Performance summary',
-  },
-];
-
-function DashPilotGallery() {
-  const [slide, setSlide] = useState('logo');
-
-  const screenshots = {
-    today: {
-      ...dashPilotGallery[0],
-      galleryIndex: 0,
-    },
-    delivery: {
-      ...dashPilotGallery[1],
-      galleryIndex: 1,
-    },
-    history: {
-      ...dashPilotGallery[2],
-      galleryIndex: 2,
-    },
-    performance: {
-      ...dashPilotGallery[3],
-      galleryIndex: 3,
-    },
-  };
-
+function ProjectActions({ project }) {
+  const { github, live, documentation } = project.links;
   return (
-    <div className="project-visual gallery">
-      <div className="gallery-stage">
-        {slide === 'logo' ? (
-          <img
-            src={dashPilotLogo}
-            width="780"
-            height="771"
-            alt="DashPilot app logo"
-            loading="lazy"
-            decoding="async"
-          />
-        ) : (
-          <HomeImageTrigger
-            src={screenshots[slide].src}
-            imageClassName="project-result-image vertical-project-shot"
-            alt={screenshots[slide].alt}
-            caption={screenshots[slide].caption}
-            gallery={dashPilotGallery}
-            galleryIndex={screenshots[slide].galleryIndex}
-          />
-        )}
-      </div>
-
-      <div className="gallery-controls" role="group" aria-label="DashPilot gallery">
-        <button
-          type="button"
-          aria-pressed={slide === 'logo'}
-          onClick={() => setSlide('logo')}
-        >
-          Logo
-        </button>
-
-        <button
-          type="button"
-          aria-pressed={slide === 'today'}
-          onClick={() => setSlide('today')}
-        >
-          Shift
-        </button>
-
-        <button
-          type="button"
-          aria-pressed={slide === 'delivery'}
-          onClick={() => setSlide('delivery')}
-        >
-          Delivery
-        </button>
-
-        <button
-          type="button"
-          aria-pressed={slide === 'history'}
-          onClick={() => setSlide('history')}
-        >
-          History
-        </button>
-
-        <button
-          type="button"
-          aria-pressed={slide === 'performance'}
-          onClick={() => setSlide('performance')}
-        >
-          Performance
-        </button>
-      </div>
+    <div className="project-actions">
+      {live && !github && <PersonalityButton href={live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live site`}>Live Site <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
+      {github && <PersonalityButton href={github} target="_blank" rel="noreferrer" aria-label={`View ${project.name} code`}>View code <FaGithub aria-hidden="true" /></PersonalityButton>}
+      {live && github && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-live`} href={live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live demo`}>Live demo <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
+      {documentation && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-documentation`} href={documentation} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} documentation`}>Documentation <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
     </div>
   );
-}
-
-/**
- * renders the GitProfileLens project visual
- * :returns: GitProfileLens visual markup
- */
-function GitProfileLensVisual() {
-  const [slide, setSlide] = useState('logo');
-
-  return (
-    <div className="project-visual gallery">
-      <div className="gallery-stage">
-        {slide === 'logo' ? (
-          <img className="gitprofilelens-logo" src={gitProfileLensLogo} width="780" height="780" alt="GitProfileLens project logo" loading="lazy" decoding="async" />
-        ) : (
-          <HomeImageTrigger src={gitProfileLensResults} imageClassName="project-result-image" alt="GitProfileLens audit dashboard showing presentation and discoverability scores with prioritized recommendations" caption="GitProfileLens audit results" />
-        )}
-      </div>
-      <div className="gallery-controls" role="group" aria-label="GitProfileLens gallery">
-        <button type="button" aria-pressed={slide === 'logo'} onClick={() => setSlide('logo')}>Logo</button>
-        <button type="button" aria-pressed={slide === 'results'} onClick={() => setSlide('results')}>Results</button>
-      </div>
-    </div>
-  );
-}
-
-/**
- * renders the ScribeKit image gallery
- * :returns: ScribeKit gallery markup
- */
-const scribeKitGallery = [
-  {
-    src: scribeKitApp,
-    alt: 'ScribeKit macOS meeting window showing selected application audio, on-device transcription status, and a live transcript',
-    caption: 'ScribeKit macOS meeting window',
-  },
-  {
-    src: scribeKitAudioCapture,
-    alt: 'ScribeKit audio capture page',
-    caption: 'ScribeKit audio capture',
-  },
-  {
-    src: scribeKitHistoryFind,
-    alt: 'ScribeKit history and find features',
-    caption: 'ScribeKit history and find',
-  },
-  {
-    src: scribeKitHistoryReview,
-    alt: 'ScribeKit review features',
-    caption: 'ScribeKit review',
-  },
-];
-
-function ScribeKitGallery() {
-  const [slide, setSlide] = useState('logo');
-
-  return (
-    <div className="project-visual gallery">
-      <div className="gallery-stage">
-          {slide === 'logo' && (
-            <img
-              src={scribeKitLogo}
-              width="780"
-              height="730"
-              alt="ScribeKit app logo"
-              loading="lazy"
-              decoding="async"
-            />
-          )}
-
-          {slide === 'app' && (
-            <HomeImageTrigger
-              src={scribeKitApp}
-              imageClassName="project-result-image vertical-project-shot"
-              alt="ScribeKit macOS meeting window showing selected application audio, on-device transcription status, and a live transcript"
-              caption="ScribeKit macOS meeting window"
-              gallery={scribeKitGallery}
-              galleryIndex={0}
-            />
-          )}
-
-          {slide === 'audio' && (
-            <HomeImageTrigger
-              src={scribeKitAudioCapture}
-              imageClassName="project-result-image vertical-project-shot"
-              alt="ScribeKit audio capture page"
-              caption="ScribeKit audio capture"
-              gallery={scribeKitGallery}
-              galleryIndex={1}
-            />
-          )}
-
-          {slide === 'find' && (
-            <HomeImageTrigger
-              src={scribeKitHistoryFind}
-              imageClassName="project-result-image vertical-project-shot"
-              alt="ScribeKit history and find features"
-              caption="ScribeKit history and find"
-              gallery={scribeKitGallery}
-              galleryIndex={2}
-            />
-          )}
-
-          {slide === 'review' && (
-            <HomeImageTrigger
-              src={scribeKitHistoryReview}
-              imageClassName="project-result-image vertical-project-shot"
-              alt="ScribeKit review features"
-              caption="ScribeKit review"
-              gallery={scribeKitGallery}
-              galleryIndex={3}
-            />
-          )}
-        </div>
-      <div className="gallery-controls" role="group" aria-label="ScribeKit gallery">
-        <button type="button" aria-pressed={slide === 'logo'} onClick={() => setSlide('logo')}>Logo</button>
-        <button type="button" aria-pressed={slide === 'app'} onClick={() => setSlide('app')}>App</button>
-        <button type="button" aria-pressed={slide === 'audio'} onClick={() => setSlide('audio')}>Audio</button>
-        <button type="button" aria-pressed={slide === 'find'} onClick={() => setSlide('find')}>Find</button>
-        <button type="button" aria-pressed={slide === 'review'} onClick={() => setSlide('review')}>Review</button>
-      </div>
-    </div>
-  );
-}
-
-
-/** 
- * renders the Flipper project visual
- * :returns: Flipper visual markup
-*/
-const flipperGallery = [
-  {
-    src: flipperDashboard,
-    alt: 'Flipper dashboard showing inventory, workflow state, attention items, and sales economics',
-    caption: 'Flipper operational dashboard',
-  },
-  {
-    src: flipperResearch,
-    alt: 'Flipper Deals workspace showing live eBay opportunities, research modes, and comparison candidates',
-    caption: 'Flipper marketplace research workspace',
-  },
-  {
-    src: flipperInventory,
-    alt: 'Flipper inventory showing Q-number records, lifecycle status, marketplace linkage, and sale references',
-    caption: 'Flipper inventory workflow',
-  },
-  {
-    src: flipperSale,
-    alt: 'Flipper sale detail showing seller revenue, fees, reconciliation state, and provisional realized economics',
-    caption: 'Flipper sale reconciliation',
-  },
-];
-
-function FlipperVisual() {
-  const [slide, setSlide] = useState('logo');
-
-  const screenshots = {
-    dashboard: {
-      ...flipperGallery[0],
-      galleryIndex: 0,
-    },
-    research: {
-      ...flipperGallery[1],
-      galleryIndex: 1,
-    },
-    inventory: {
-      ...flipperGallery[2],
-      galleryIndex: 2,
-    },
-    sale: {
-      ...flipperGallery[3],
-      galleryIndex: 3,
-    },
-  };
-
-  return (
-    <div className="project-visual gallery">
-      <div className="gallery-stage">
-        {slide === 'logo' ? (
-          <img
-            className="flipper-logo"
-            src={flipperLogo}
-            width="780"
-            height="780"
-            alt="Flipper project logo"
-            loading="lazy"
-            decoding="async"
-          />
-        ) : (
-          <HomeImageTrigger
-            src={screenshots[slide].src}
-            imageClassName="project-result-image"
-            alt={screenshots[slide].alt}
-            caption={screenshots[slide].caption}
-            gallery={flipperGallery}
-            galleryIndex={screenshots[slide].galleryIndex}
-          />
-        )}
-      </div>
-
-      <div className="gallery-controls" role="group" aria-label="Flipper gallery">
-        <button
-          type="button"
-          aria-pressed={slide === 'logo'}
-          onClick={() => setSlide('logo')}
-        >
-          Logo
-        </button>
-        <button
-          type="button"
-          aria-pressed={slide === 'dashboard'}
-          onClick={() => setSlide('dashboard')}
-        >
-          Dashboard
-        </button>
-        <button
-          type="button"
-          aria-pressed={slide === 'research'}
-          onClick={() => setSlide('research')}
-        >
-          Research
-        </button>
-        <button
-          type="button"
-          aria-pressed={slide === 'inventory'}
-          onClick={() => setSlide('inventory')}
-        >
-          Inventory
-        </button>
-        <button
-          type="button"
-          aria-pressed={slide === 'sale'}
-          onClick={() => setSlide('sale')}
-        >
-          Sale
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/**
- * selects and renders a project visual
- * :param type: project visual type
- * :returns: selected project visual markup
- */
-function ProjectVisual({ type }) {
-  if (type === 'dashcam') {
-    return (
-      <div className="project-visual production-site-visual">
-        <HomeImageTrigger
-          src={dashcamStorefront}
-          alt="585Dashcam585 storefront showing dashcam products and local installation options"
-          caption="585Dashcam585 storefront"
-        />
-      </div>
-    );
-  }
-
-  if (type === 'flipper') {
-    return <FlipperVisual />;
-  }
-
-  if (type === 'scribekit') {
-    return <ScribeKitGallery />;
-  }
-
-  if (type === 'dashpilot') {
-    return <DashPilotGallery />;
-  }
-
-  return <GitProfileLensVisual />;
 }
 
 /**
@@ -540,7 +42,7 @@ function FeaturedProjects() {
               key={project.name}
               id={`project-${project.slug}`}
               aria-labelledby={`project-${project.slug}-title`}
-              className={`featured-project case-file${index === 0 ? ' flagship-project case-file--wide' : ''}${index % 2 === 0 ? '' : ' case-file--flip'}${project.name === 'GitProfileLens' ? ' gitprofilelens-project' : ''}`}
+              className={`featured-project case-file${index === 0 ? ' flagship-project case-file--wide' : ''}${index % 2 === 0 ? '' : ' case-file--flip'}`}
             >
               <div className="case-file__rail" data-reveal>
                 <span className="case-file__index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
@@ -550,31 +52,26 @@ function FeaturedProjects() {
                     <dt>Stack</dt>
                     <dd>
                       <ul className="tech-tags" aria-label={`${project.name} technologies`}>
-                        {project.stack.split(' · ').map((item) => <li key={item}>{item}</li>)}
+                        {project.technologies.map((item) => <li key={item}>{item}</li>)}
                       </ul>
                     </dd>
                   </div>
                 </dl>
               </div>
               <div className="case-file__visual viewfinder" data-reveal style={{ '--reveal-delay': '80ms' }}>
-                <ProjectVisual type={project.visual} />
+                <ProjectVisual project={project} />
               </div>
               <div className="project-copy" data-reveal style={{ '--reveal-delay': '140ms' }}>
                 {/* Self-linking title: gives each project a shareable /#project-… URL. */}
                 <h3 id={`project-${project.slug}-title`}>
                   <a className="project-permalink" href={`#project-${project.slug}`}>{project.name}</a>
                 </h3>
-                <p className="project-purpose">{project.purpose}</p>
+                <p className="project-purpose">{project.summary}</p>
                 <p className="project-takeaway"><span className="project-takeaway__label">Takeaway</span> {project.takeaway}</p>
                 <ul className="project-highlights" aria-label={`${project.name} engineering highlights`}>
                   {project.highlights.map((item) => <li key={item}>{item}</li>)}
                 </ul>
-                <div className="project-actions">
-                  {project.live && !project.github && <PersonalityButton href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live site`}>Live Site <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
-                  {project.github && <PersonalityButton href={project.github} target="_blank" rel="noreferrer" aria-label={`View ${project.name} code`}>View code <FaGithub aria-hidden="true" /></PersonalityButton>}
-                  {project.live && project.github && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-live`} href={project.live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live demo`}>Live demo <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
-                  {project.documentation && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-documentation`} href={project.documentation} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} documentation`}>Documentation <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
-                </div>
+                <ProjectActions project={project} />
               </div>
             </article>
           ))}

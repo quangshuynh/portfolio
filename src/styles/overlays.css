@@ -616,6 +616,18 @@
   line-height: 1.45;
 }
 
+.photo-lightbox-error {
+  max-width: 32rem;
+  margin: auto;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: .75rem;
+  color: #c9d2cd;
+  font-size: .9rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
 .photo-lightbox-help {
   margin: 0 auto;
 
