@@ -39,21 +39,20 @@ npm run build
 
 No manual deployment step is required after merging to `main`.
 
-Portfolio content is maintained locally in `src/components`, keeping featured project information available without depending on the GitHub API at runtime.
+Portfolio content is maintained in this repository, with no GitHub API calls at runtime. Both project sections render from `src/data/projects.mjs`.
 
 ## Search metadata
 
 The public routes and their titles, descriptions, canonical URLs, and JSON-LD live in `src/seo/site.mjs`. At build time `scripts/seo-plugin.mjs` writes a static HTML page per route (`index.html`, `about/index.html`, `photography/index.html`) with that route's head tags, plus `404.html` (noindex) and `sitemap.xml` (pages plus every photograph). The page body is still rendered client-side. Add a new page to `ROUTES` and it will get its own HTML, sitemap entry, and tests. `vite preview` does not apply `vercel.json`, so check redirects and 404s against a Vercel deployment.
 
-## Homepage images
+## Projects and images
 
-Logos and the 585Dashcam585 screenshot are served as WebP derivatives sized to roughly 3x their largest on-page display size. Sources stay in `src/assets`; after replacing one, regenerate the derivatives in `src/assets/optimized`:
+Projects (order, copy, links, logos, screenshots, alt text) live in `src/data/projects.mjs`. Screenshots of public projects load from each project's GitHub repository through commit-pinned jsDelivr URLs. Logos are WebP derivatives sized to about 3x their display size and derived from those pinned originals. Private projects keep local images. [docs/project-assets.md](docs/project-assets.md) covers the caching strategy, conventions, and how to add a project.
 
 ```bash
-npm run prepare:images
+npm run prepare:images   # regenerate WebP derivatives (needs network for project logos)
+npm run check:assets     # validate project data and fetch every remote image
 ```
-
-The image list, target sizes, and lossless/lossy choice live in `scripts/prepare-site-images.mjs`.
 
 ## Photography preparation
 
