@@ -17,7 +17,7 @@ model, why assets are served from jsDelivr, and screenshot guidelines is in
 | `npm run assets:refresh -- --project <key> --update-dimensions` | yes | Same, and accepts screenshots whose size changed (same shape) |
 | `npm run assets:refresh` | yes | Refreshes every repository |
 | `npm run prepare:images` | yes | Regenerates the WebP logo and local-image derivatives |
-| `npm run check:assets` | yes | Validates data, then fetches every remote image |
+| `npm run check:assets` | yes | Validates data, fetches every remote image, and probes release videos |
 
 Everything about a project lives in two files:
 
@@ -277,10 +277,15 @@ placeholder.
 - **Promote or demote.** Flip `featured` and move the entry across the
   boundary. A featured project needs `label`, `takeaway`, `highlights`, gallery
   `label`s, and a sized logo; a More project needs `detail`, and its docs link
-  moves from `links.documentation` to `links.live` + `liveLabel`. `npm test`
-  lists anything missing.
+  moves from `links.documentation` to `links.live` + `liveLabel` (`video` and
+  `links.release` are featured-only and must be removed). After flipping, run
+  `npm run prepare:images`: featured logos are 780px derivatives, More logos
+  132px, so record the new size on a featured logo and drop it on a demoted one.
+  `npm test` lists anything missing.
 - **Take off the page.** Set `hidden: true` to keep the entry (still validated,
-  easy to restore) without rendering it. Hidden entries are still in the
+  easy to restore) without rendering it (Repo Radar is kept this way). Older
+  and archived work is reached through the GitHub link under More projects,
+  not listed. Hidden entries are still in the
   JavaScript bundle; delete the entry instead if it must not be public, and
   remove its pin from `githubAssets.mjs` (`check:assets` reports unused pins).
   Never delete or archive the GitHub repository for this.
@@ -294,6 +299,43 @@ placeholder.
 - **Add, rename, or remove a screenshot.** Edit the `screenshots` array, then
   refresh with `--update-dimensions` (new files start with the
   `width: 1, height: 1` placeholders and need `--allow-aspect-change`).
+
+## Adding a project video
+
+Featured projects only. The video file stays a GitHub Release attachment (do
+not commit large MP4s here or in the project repository); its poster is a
+committed image.
+
+1. Attach the video (H.264 + AAC MP4 with faststart) to a tagged release of the
+   project repository, and commit a poster frame (JPEG, same size) under
+   `docs/media/` or `docs/images/`. Push.
+2. Refresh the pin so the poster is reachable:
+   `npm run assets:refresh -- --project <key> --dry-run`, then without
+   `--dry-run`.
+3. Add the entry, using the tag-versioned download URL (never
+   `releases/latest/`):
+
+   ```js
+   video: {
+     src: 'https://github.com/quangshuynh/<repo>/releases/download/v1.0.0/launch.mp4',
+     page: 'https://github.com/quangshuynh/<repo>/releases/tag/v1.0.0',
+     poster: githubAsset('<key>', 'docs/media/thumbnail.jpg'),
+     width: 1920,
+     height: 1080,
+     duration: 23, // whole seconds, shown on the play button
+     title: '<Project> v1.0.0 launch video',
+     caption: 'One line about what the video shows',
+   },
+   ```
+
+4. `npm test` and `npm run check:assets` (the video probe prints its size and
+   whether byte ranges work). Press play in `npm run dev`, with and without
+   reduced motion.
+
+For a new release, change the tag in `src` and `page` together; the validator
+rejects a page for a different tag. See
+[project-assets.md](project-assets.md#project-videos) for why release URLs are
+used instead of jsDelivr.
 
 ## Verifying jsDelivr URLs
 

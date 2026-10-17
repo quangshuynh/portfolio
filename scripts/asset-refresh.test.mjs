@@ -112,7 +112,10 @@ describe('expected assets', () => {
     expect(expected.ordixa).toContainEqual(expect.objectContaining({
       path: 'docs/images/workbook-summary.png', kind: 'screenshot', width: ordixa.screenshots[0].width, height: ordixa.screenshots[0].height,
     }));
-    const remote = projects.flatMap((project) => [project.logo?.source, ...(project.screenshots ?? []).map((shot) => shot.src)]).filter(Boolean);
+    // The release video itself is not in the repository; its poster is, with the video's size.
+    expect(expected.ordixa).toContainEqual({ path: 'docs/media/thumbnail.jpg', slug: 'ordixa', kind: 'poster', width: ordixa.video.width, height: ordixa.video.height });
+    const remote = projects.filter((project) => !project.hidden)
+      .flatMap((project) => [project.logo?.source, project.video?.poster, ...(project.screenshots ?? []).map((shot) => shot.src)]).filter(Boolean);
     expect(Object.values(expected).flat()).toHaveLength(new Set(remote).size);
   });
 
@@ -254,7 +257,7 @@ describe('screenshot dimension changes', () => {
     const plan = await planRepository('demo', pin, assets, deps, { updateDimensions: true });
     expect(plan).toMatchObject({ status: 'update', to: NEW, problems: [] });
     expect(plan.dimensions).toEqual([
-      { slug: 'demo', path: 'docs/images/home.png', from: { width: 1600, height: 1000 }, to: { width: 3200, height: 2000 }, aspectChanged: false },
+      { slug: 'demo', kind: 'screenshot', path: 'docs/images/home.png', from: { width: 1600, height: 1000 }, to: { width: 3200, height: 2000 }, aspectChanged: false },
     ]);
     expect(formatPlan(plan, true)).toContain('            demo docs/images/home.png: 1600x1000 -> 3200x2000 (same aspect ratio)');
   });
@@ -377,6 +380,15 @@ describe('writing screenshot sizes', () => {
     expect(changedLines(applyDimensions(source, 'flipper', updates))).toHaveLength(flipper.screenshots.length * 2);
   });
 
+  test('changes only the video size when its poster is resized', () => {
+    const { video } = projects.find((project) => project.slug === 'ordixa');
+    const next = applyDimensions(source, 'ordixa', [
+      { path: 'docs/media/thumbnail.jpg', from: { width: video.width, height: video.height }, to: { width: 1280, height: 720 } },
+    ]);
+    expect(changedLines(next).map(([line]) => line.trim())).toEqual(['width: 1280,', 'height: 720,']);
+    expect(next.slice(next.indexOf('docs/media/thumbnail.jpg'), next.indexOf('docs/media/thumbnail.jpg') + 120)).toContain('width: 1280');
+  });
+
   test('refuses to write when the recorded size is not what the plan saw', () => {
     expect(() => applyDimensions(source, 'flipper', [{ path: researchPath, from: { width: 1, height: research.height }, to: { width: 2, height: 2 } }]))
       .toThrow(/width is \d+ in projects\.mjs, expected 1; was it edited during the run/);
@@ -384,7 +396,7 @@ describe('writing screenshot sizes', () => {
 
   test('refuses unknown or ambiguous screenshots and invalid sizes', () => {
     const size = { from: { width: 1, height: 1 }, to: { width: 2, height: 2 } };
-    expect(() => applyDimensions(source, 'flipper', [{ path: 'docs/images/nope.png', ...size }])).toThrow(/expected one screenshot src in projects\.mjs, found 0/);
+    expect(() => applyDimensions(source, 'flipper', [{ path: 'docs/images/nope.png', ...size }])).toThrow(/expected one screenshot src or video poster in projects\.mjs, found 0/);
     // The logo source is not a screenshot entry.
     expect(() => applyDimensions(source, 'flipper', [{ path: 'docs/images/flipper-logo2.png', ...size }])).toThrow(/found 0/);
     const twice = `${source}\nconst x = [{ src: githubAsset('flipper', '${researchPath}'), width: 1, height: 1 }];`;

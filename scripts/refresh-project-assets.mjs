@@ -90,9 +90,10 @@ if (updates.length && !options.dryRun) {
     for (const plan of updates.filter((entry) => entry.dimensions.length)) content = applyDimensions(content, plan.key, plan.dimensions);
     // The staged copy still imports the current pins, so only sizes may differ.
     const next = structuredClone(projects);
-    for (const { slug, path, to } of resized) {
-      const shot = next.find((project) => project.slug === slug).screenshots.find((entry) => entry.src?.endsWith(`/${path}`));
-      Object.assign(shot, to);
+    for (const { slug, kind, path, to } of resized) {
+      const project = next.find((entry) => entry.slug === slug);
+      const sized = kind === 'poster' ? project.video : project.screenshots.find((entry) => entry.src?.endsWith(`/${path}`));
+      Object.assign(sized, to);
     }
     writes.push({ file: PROJECTS_FILE, original, content, verify: exportsExactly('projects', next) });
   }

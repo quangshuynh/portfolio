@@ -21,26 +21,41 @@ test('sections list every visible project exactly once, featured first, in array
 
 test('curation: featured and secondary projects keep their ranked order', () => {
   expect(featuredProjects.map((project) => project.slug)).toEqual([
-    '585dashcam585', 'dashpilot', 'scribekit', 'flipper', 'puzzlepress', 'gitprofilelens',
+    'ordixa', '585dashcam585', 'dashpilot', 'hymical-forms', 'scribekit', 'flipper',
   ]);
   expect(moreProjects.map((project) => project.slug)).toEqual([
-    'ordixa', 'inboxsweep', 'hymical-forms', '585photo585', 'chessed', 'casenotes', 'repo-radar',
+    'puzzlepress', 'gitprofilelens', 'inboxsweep', '585photo585', 'casenotes', 'chessed',
   ]);
+  // Off the page but kept in the data, so it can be restored.
+  expect(projects.filter((project) => project.hidden).map((project) => project.slug)).toEqual(['repo-radar']);
 });
 
 test('Ordixa replaces Business Data Automation with its current repository and brand', () => {
   const ordixa = projects.find((project) => project.slug === 'ordixa');
   expect(ordixa.name).toBe('Ordixa');
+  expect(ordixa.featured).toBe(true);
   expect(ordixa.links.github).toBe('https://github.com/quangshuynh/ordixa');
+  expect(ordixa.links.release).toBe('https://github.com/quangshuynh/ordixa/releases/tag/v2.0.0');
   expect(ordixa.links.live).toBeUndefined();
   expect(ordixa.logo.source).toMatch(/\/gh\/quangshuynh\/ordixa@[0-9a-f]{40}\/docs\/images\/ordixa-logo2\.png$/);
   expect(ordixa.screenshots.map((shot) => shot.src.split('/').pop())).toEqual([
-    'workbook-summary.png', 'workbook-exceptions.png', 'cli-inspect.png', 'cli-demo-run.png',
+    'workbook-summary.png', 'workbook-exceptions.png', 'workbook-change-summary.png', 'cli-demo-run.png',
   ]);
-  // Public copy states the maturity honestly and never uses the old name.
+  // Public copy states the maturity honestly, never uses the old name, and
+  // claims no web dashboard or customers.
   const copy = JSON.stringify(projects);
   expect(copy).not.toMatch(/Business Data Automation|business-data-automation|\bBDA\b/);
-  expect(ordixa.detail).toMatch(/fictional demo data/);
+  expect(ordixa.summary).toMatch(/fictional demo data/);
+  expect(JSON.stringify(ordixa)).not.toMatch(/dashboard|customers|clients/i);
+});
+
+test('the Ordixa launch video is the tag-versioned release asset with a pinned poster', () => {
+  const { video } = projects.find((project) => project.slug === 'ordixa');
+  // launch.mp4 is a release attachment, which jsDelivr's GitHub endpoint cannot serve.
+  expect(video.src).toBe('https://github.com/quangshuynh/ordixa/releases/download/v2.0.0/launch.mp4');
+  expect(video.page).toBe('https://github.com/quangshuynh/ordixa/releases/tag/v2.0.0');
+  expect(video.poster).toMatch(/^https:\/\/cdn\.jsdelivr\.net\/gh\/quangshuynh\/ordixa@[0-9a-f]{40}\/docs\/media\/thumbnail\.jpg$/);
+  expect(video).toMatchObject({ width: 1920, height: 1080, duration: 23 });
 });
 
 test('DashPilot keeps its public name until the Worklane rebrand ships', () => {
@@ -62,6 +77,17 @@ describe('validator catches bad entries', () => {
   const problemsFor = (patch) => validateProjects([{ ...valid, ...patch }], derivatives);
   const shot = (patch) => ({ screenshots: [{ ...valid.screenshots[0], ...patch }, ...valid.screenshots.slice(1)] });
   const otherRepo = pinnedAssetUrl(repositories.ordixa, 'docs/images/workbook-summary.png');
+  const video = {
+    src: 'https://github.com/quangshuynh/flipper/releases/download/v1.0.0/launch.mp4',
+    page: 'https://github.com/quangshuynh/flipper/releases/tag/v1.0.0',
+    poster: pinnedAssetUrl(repositories.flipper, 'docs/images/flipper-dashboard.png'),
+    width: 1920,
+    height: 1080,
+    duration: 30,
+    title: 'Fixture video',
+    caption: 'A fixture video',
+  };
+  const secondary = { featured: false, detail: 'Supporting line.', links: { github: valid.links.github } };
 
   test.each([
     ['a mutable branch URL', { screenshots: [{ ...valid.screenshots[0], src: valid.screenshots[0].src.replace(/@[0-9a-f]{40}/, '@main') }] }, /not a commit-pinned/],
@@ -83,6 +109,14 @@ describe('validator catches bad entries', () => {
     ['a gallery logo without a size', { logo: { ...valid.logo, width: undefined, height: undefined } }, /needs width and height/],
     ['a non-boolean hidden flag', { hidden: 'yes' }, /hidden must be true or false/],
     ['a demoted project that keeps a documentation link', { featured: false, detail: 'Supporting line.' }, /documentation links only render on featured cards/],
+    ['a release link on a More project', { ...secondary, links: { ...secondary.links, release: `${valid.links.github}/releases/tag/v1.0.0` } }, /release links only render on featured cards/],
+    ['a video on a More project', { ...secondary, video }, /videos only render on featured cards/],
+    ['a video from the latest release instead of a tag', { video: { ...video, src: 'https://github.com/quangshuynh/flipper/releases/latest/download/launch.mp4' } }, /tag-versioned GitHub release download/],
+    ['a video served from a branch', { video: { ...video, src: 'https://cdn.jsdelivr.net/gh/quangshuynh/flipper@main/launch.mp4' } }, /tag-versioned GitHub release download/],
+    ['a video from another repository', { video: { ...video, src: 'https://github.com/quangshuynh/ordixa/releases/download/v1.0.0/launch.mp4' } }, /video comes from quangshuynh\/ordixa/],
+    ['a video page for a different tag', { video: { ...video, page: 'https://github.com/quangshuynh/flipper/releases/tag/v9.9.9' } }, /release page for tag v1\.0\.0/],
+    ['an unpinned video poster', { video: { ...video, poster: 'https://raw.githubusercontent.com/quangshuynh/flipper/main/poster.jpg' } }, /video poster is not a commit-pinned/],
+    ['a video without a size or duration', { video: { ...video, width: undefined, duration: 0 } }, /video needs integer width and height[\s\S]*duration in whole seconds/],
   ])('rejects %s', (_, patch, message) => {
     expect(problemsFor(patch).join('\n')).toMatch(message);
   });
@@ -103,6 +137,10 @@ describe('validator catches bad entries', () => {
     const storefront = projects.find((project) => project.slug === '585dashcam585');
     const resized = { ...storefront, screenshots: [{ ...storefront.screenshots[0], width: 1600 }] };
     expect(validateProjects([resized], derivatives).join('\n')).toMatch(/screenshot 1 records 1600x\d+, but 585dashcam585-storefront\.webp is \d+x\d+/);
+  });
+
+  test('accepts a tag-versioned release video on a featured project', () => {
+    expect(problemsFor({ video })).toEqual([]);
   });
 
   test('accepts a hidden project and a valid minimal More entry', () => {

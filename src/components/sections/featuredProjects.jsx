@@ -5,17 +5,18 @@ import { featuredProjects as projects } from '../../data/projects.mjs';
 import { ProjectVisual } from './projectMedia';
 
 /**
- * renders a featured project's code, demo, and documentation links
+ * renders a featured project's code, demo, release, and documentation links
  * :param project: project entry
  * :returns: action buttons markup
  */
 function ProjectActions({ project }) {
-  const { github, live, documentation } = project.links;
+  const { github, live, documentation, release } = project.links;
   return (
     <div className="project-actions">
       {live && !github && <PersonalityButton href={live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live site`}>Live Site <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
       {github && <PersonalityButton href={github} target="_blank" rel="noreferrer" aria-label={`View ${project.name} code`}>View code <FaGithub aria-hidden="true" /></PersonalityButton>}
       {live && github && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-live`} href={live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live demo`}>Live demo <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
+      {release && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-release`} href={release} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} release notes`}>Release notes <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
       {documentation && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-documentation`} href={documentation} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} documentation`}>Documentation <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
     </div>
   );

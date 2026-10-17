@@ -21,14 +21,16 @@ or update a project.
 | `tagline`, `detail` | More | optional short positioning line; one supporting paragraph |
 | `summary` | both | what it is and what it does |
 | `technologies[]` | both | rendered as tags |
-| `links` | both | `github`, `live`, `liveLabel` (More), `documentation` (Featured) |
+| `links` | both | `github`, `live`, `liveLabel` (More), `documentation` and `release` (Featured) |
 | `logo` | both | `{ file, source?, width?, height?, alt, className?, trim? }` |
 | `screenshots[]` | both | `{ src \| local, width, height, alt, caption, label? }` |
+| `video` | Featured | `{ src, page, poster, width, height, duration, title, caption }`; see [Project videos](#project-videos) |
 | `tallScreenshots` | Featured | caps portrait or tall captures at 420px |
 
 A featured project with a logo and screenshots gets a tabbed gallery: a Logo tab
-followed by one tab per screenshot (`label`). Without a logo, its first
-screenshot is shown alone. In More projects, the first screenshot is the
+followed by one tab per screenshot (`label`). A project with a `video` gets a
+Video tab first, and the gallery opens on it. Without a logo, its first
+screenshot is shown alone; with only a logo, the logo. In More projects, the first screenshot is the
 preview, and clicking it opens every screenshot in the image viewer.
 
 The file is plain data with no asset imports, so Node scripts
@@ -41,6 +43,8 @@ The file is plain data with no asset imports, so Node scripts
 | Screenshots of public projects | `cdn.jsdelivr.net/gh/OWNER/REPO@SHA/path` | The repository is the source of truth; no copy lives here |
 | Logos (all projects) | `src/assets/optimized/*.webp`, bundled | Shown at 44px or 260px. The originals are 250 KB to 1.4 MB |
 | Private projects (585Dashcam585, 585photo585) | `src/assets`, through `prepare:images` | Private repositories have no public raw URLs |
+| Video posters | `cdn.jsdelivr.net/gh/OWNER/REPO@SHA/path`, like screenshots | Committed to the project repository |
+| Videos (Ordixa launch video) | `github.com/OWNER/REPO/releases/download/TAG/FILE` | Release attachment, not committed; jsDelivr cannot serve it |
 
 Logo derivatives are still *derived from GitHub*: `logo.source` records the
 pinned original, and `npm run prepare:images` downloads it and writes the WebP.
@@ -112,18 +116,65 @@ deploying) are in [PROJECT_MAINTENANCE.md](PROJECT_MAINTENANCE.md).
 - A project with no suitable image simply omits `screenshots` (and `logo`). The
   card renders without a visual. Do not create a placeholder screenshot.
 
+## Project videos
+
+A featured project may have one `video`, shown as the first gallery tab.
+
+**Hosting.** jsDelivr's GitHub endpoint serves files *committed* to a
+repository; GitHub Release attachments are not in the repository tree, so it
+cannot serve them (`/gh/quangshuynh/ordixa@<sha>/launch.mp4` and
+`.../docs/media/launch.mp4` both return 404). Ordixa's `launch.mp4` (6.9 MB,
+1920x1080, H.264 + AAC, faststart) is deliberately not committed: the Ordixa
+repository caps tracked files at 5 MB. So the video uses the release download
+URL for a fixed tag:
+
+```text
+https://github.com/quangshuynh/ordixa/releases/download/v2.0.0/launch.mp4
+```
+
+That URL answers `302` to a short-lived signed URL on
+`release-assets.githubusercontent.com`, which serves the file with
+`Accept-Ranges: bytes` (`206` for range requests) and
+`Content-Type: application/octet-stream`; Chromium plays it (checked in the
+browser). The validator accepts only `releases/download/<tag>/` URLs from the
+project's own repository, never `releases/latest/`, so a later release cannot
+change what the page plays. Copying the MP4 into this repository would
+duplicate 6.9 MB of media for no gain; do that only if the release URL proves
+unreliable for a browser you care about.
+
+**Poster.** `poster` is a commit-pinned jsDelivr image from the repository
+(Ordixa: `docs/media/thumbnail.jpg`, 1920x1080, 221 KB), so it follows the same
+pin as the screenshots. `assets:refresh` checks it and, with
+`--update-dimensions`, keeps `video.width`/`height` equal to its size. Ordixa's
+README GIF (`docs/media/ordixa-loop.gif`, 830 KB) is not used: it repeats the
+video's content at a larger cost than the poster.
+
+**Loading.** Only the poster (lazy, with intrinsic size) loads with the page.
+The `<video>` element (with `controls`, `playsInline`, `preload="metadata"`)
+is created when the visitor presses play, and playback with sound starts from
+that press; nothing autoplays. With `prefers-reduced-motion: reduce` the player
+loads paused and waits for its own controls. Poster, player, and fallback share
+one 16:9 frame, so nothing shifts. If the video cannot play, a link to the
+release page replaces it, and the caption always links there too.
+
+**Checks.** `npm run check:assets` probes the video with a 1 KB range request:
+it fails on a 4xx or a file that does not start like an MP4/WebM, warns when the
+host ignores byte ranges, and prints the size. The full file is never
+downloaded.
+
 ## Ordixa presentation
 
-Ordixa (formerly Business Data Automation, same repository, renamed) is shown in
-More projects with its mark logo (`docs/images/ordixa-logo2.png`, trimmed), the
-tagline "Business data workflows, simplified.", and four real captures from its
-fictional demo: the Summary and Exceptions workbook sheets, `inspect`, and
-the guided demo run. The copy covers only capabilities the repository lists as
-implemented: CSV and XLSX import, versioned TOML profiles, validation and
-normalization, reconciliation, the exceptions workbook, and verifiable
-manifests. It says the tool has been exercised on fictional data. Planned items
-(cross-run matching, vendor connectors, a hosted app, scheduling) are
-deliberately left out. There is no deployed demo, so none is linked.
+Ordixa (formerly Business Data Automation, same repository, renamed) is the
+first featured project: v2.0.0 launch video, mark logo
+(`docs/images/ordixa-logo2.png`, trimmed), and four real captures from its
+fictional demos: the reconciliation Summary and Exceptions sheets, the
+comparison change report, and the guided demo run. The copy covers what v2.0.0
+implements: reconcile, clean, and compare workflows, versioned TOML profiles,
+check-profile preflight, exact Decimal parsing, held-back rows with reasons,
+atomic runs, checksummed manifests, and `verify`. It says the tool has been
+exercised on fictional demo data, and claims no web dashboard, hosted app, or
+customers (`docs/images/dashboard.png` in the repository is not used). There is
+no deployed demo, so none is linked.
 
 ## Known limitations
 
@@ -135,6 +186,12 @@ deliberately left out. There is no deployed demo, so none is linked.
   about 350 KB to 500 KB in total (108 to 131 KB each), within the guideline,
   so no resizing step was added.
 - jsDelivr's GitHub endpoint has file-size limits. Screenshots should stay far below them anyway.
+- Release videos depend on GitHub's release download service, which has no SLA
+  and serves `application/octet-stream`. Chromium plays it; Safari and Firefox
+  were not tested here. If a browser refuses it, the release link takes over.
+- A release attachment can be deleted and re-uploaded under the same tag and
+  name. The URL would not change, so `check:assets` prints the file size to make
+  such a swap visible.
 - `prepare:images`, `check:assets`, and `assets:refresh` need network access.
   `npm run build` and `npm test` do not.
 - `assets:refresh` follows each repository's default branch only. To pin a

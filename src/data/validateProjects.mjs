@@ -5,6 +5,8 @@ import { parsePinnedGithubAsset, repositories } from './githubAssets.mjs';
 
 const LINK_HOSTS = /^https:\/\/([\w-]+\.)*(github\.com|github\.io|vercel\.app|585dashcam585\.com|585photo585\.com)(\/|$)/;
 const REPOSITORY_URL = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)$/;
+// A video is a GitHub release attachment at a fixed tag (never /releases/latest/).
+const RELEASE_VIDEO = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/releases\/download\/([\w.-]+)\/[\w.-]+\.(mp4|webm)$/;
 
 const blank = (value) => typeof value !== 'string' || value.trim() === '';
 const positiveInteger = (value) => Number.isInteger(value) && value > 0;
@@ -65,6 +67,7 @@ export function validateProjects(projects, { optimizedFiles, derivativeSizes } =
     }
     // More projects render only `github` and `live`; a documentation link would silently vanish.
     if (!project.featured && links.documentation) fail("documentation links only render on featured cards; in More projects use live with liveLabel: 'Documentation'");
+    if (!project.featured && links.release) fail('release links only render on featured cards');
     const ownRepo = links.github?.match(REPOSITORY_URL);
     if (links.github && !ownRepo) fail(`github link must be a repository URL (https://github.com/OWNER/REPO): ${links.github}`);
     if (links.github && !repoUrls.has(links.github) && project.screenshots?.some((shot) => shot.src)) {
@@ -91,6 +94,23 @@ export function validateProjects(projects, { optimizedFiles, derivativeSizes } =
       // Featured cards show the logo large, so its box must be reserved.
       else if (project.featured && project.screenshots?.length && !width) fail('featured gallery logo needs width and height (the size of its derivative)');
       if (!blank(project.logo.file)) checkDerivativeSize('logo', project.logo.file, project.logo);
+    }
+
+    if (project.video) {
+      const { video } = project;
+      if (!project.featured) fail('videos only render on featured cards');
+      const asset = video.src?.match(RELEASE_VIDEO);
+      if (!asset) fail(`video src must be a tag-versioned GitHub release download (https://github.com/OWNER/REPO/releases/download/TAG/FILE.mp4): ${video.src}`);
+      else {
+        if (!ownRepo || !sameRepo({ owner: asset[1], repo: asset[2] }, { owner: ownRepo[1], repo: ownRepo[2] })) fail(`video comes from ${asset[1]}/${asset[2]}, not the project's own repository`);
+        if (video.page !== `https://github.com/${asset[1]}/${asset[2]}/releases/tag/${asset[3]}`) fail(`video page must be the release page for tag ${asset[3]}: ${video.page}`);
+      }
+      if (blank(video.poster)) fail('video needs a poster');
+      else checkPinned('video poster', video.poster);
+      if (!(positiveInteger(video.width) && positiveInteger(video.height))) fail('video needs integer width and height to reserve layout space');
+      if (!positiveInteger(video.duration)) fail('video needs a duration in whole seconds');
+      if (blank(video.title)) fail('video needs a title');
+      if (blank(video.caption)) fail('video needs a caption');
     }
 
     const shots = project.screenshots ?? [];
@@ -130,7 +150,7 @@ export function validateProjects(projects, { optimizedFiles, derivativeSizes } =
  * :returns: array of unused repository keys
  */
 export function unusedPins(projects, pins = repositories) {
-  const used = new Set(projects.flatMap((project) => [project.logo?.source, ...(project.screenshots ?? []).map((shot) => shot.src)])
+  const used = new Set(projects.flatMap((project) => [project.logo?.source, project.video?.poster, ...(project.screenshots ?? []).map((shot) => shot.src)])
     .map((url) => url && parsePinnedGithubAsset(url))
     .filter(Boolean)
     .map(({ owner, repo }) => `${owner}/${repo}`.toLowerCase()));
