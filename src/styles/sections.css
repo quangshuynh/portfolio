@@ -413,6 +413,81 @@
 .gallery-controls button:hover { color: var(--text-primary); }
 .gallery-controls button[aria-pressed='true'] { color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 2px 0 var(--accent); }
 
+/* Project video (ProjectVideo): poster, player, and fallback share one 16:9
+   frame sized from the video's width/height, so nothing shifts between them. */
+.gallery-stage--video { place-items: stretch; }
+.project-video { display: grid; gap: .75rem; width: 100%; margin: 0; }
+.project-video__frame {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+}
+.project-video__frame img,
+.project-video__frame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.project-video__frame video { background: #000; object-fit: contain; }
+.project-video__poster {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.project-video__poster img { transition: transform 700ms var(--ease-out); }
+.project-video__poster:hover img { transform: scale(1.02); }
+.project-video__poster:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.project-video__play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .7rem 1.1rem;
+  border: 1px solid rgb(255 255 255 / .28);
+  border-radius: 999px;
+  background: rgb(10 12 16 / .72);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: .04em;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(6px);
+  transition: background var(--dur-fast) ease;
+}
+.project-video__play svg { width: .8em; height: .8em; }
+.project-video__poster:hover .project-video__play,
+.project-video__poster:focus-visible .project-video__play { border-color: var(--accent); background: var(--accent); color: var(--accent-contrast); }
+.project-video__fallback img { filter: blur(2px) brightness(.45); }
+.project-video__fallback p {
+  position: absolute;
+  inset: auto 1rem 50% 1rem;
+  margin: 0;
+  color: #fff;
+  text-align: center;
+  transform: translateY(50%);
+}
+.project-video__fallback a { display: inline-flex; align-items: center; gap: .35em; color: inherit; text-decoration: underline; text-underline-offset: .2em; }
+.project-video__fallback a svg { position: static; width: .8em; height: .8em; }
+.project-video__caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .35rem 1rem;
+  color: var(--text-secondary);
+  font-size: var(--step--1);
+}
+
 /* architecture schematic */
 .pipeline { display: grid; gap: .5rem; width: 100%; max-width: 34rem; }
 .pipeline-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; }
@@ -497,6 +572,7 @@
 .more-links { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; }
 .more-links .text-link { min-height: 2.75rem; }
 .more-toggle { display: flex; justify-content: center; margin-top: 2.5rem; }
+.more-archive { margin-top: 1.5rem; color: var(--text-secondary); font-size: var(--step--1); text-align: center; }
 .repo-radar-logo { filter: none; }
 
 /* ============ SKILLS: spec sheet ============ */

@@ -81,7 +81,7 @@ export function parseArgs(argv, knownKeys) {
  * groups every remote image the visible project data references by repository key
  * :param projects: entries from src/data/projects.mjs (hidden entries are skipped)
  * :param repositories: pins from src/data/githubAssets.mjs
- * :returns: { [key]: [{ path, slug, kind: 'logo' | 'screenshot', width?, height? }] }
+ * :returns: { [key]: [{ path, slug, kind: 'logo' | 'screenshot' | 'poster', width?, height? }] }
  */
 export function collectExpectedAssets(projects, repositories) {
   const keyByRepo = new Map(Object.entries(repositories).map(([key, pin]) => [`${pin.owner}/${pin.repo}`.toLowerCase(), key]));
@@ -97,6 +97,8 @@ export function collectExpectedAssets(projects, repositories) {
   for (const project of projects) {
     if (project.hidden) continue;
     if (project.logo?.source) add(project.slug, 'logo', project.logo.source);
+    // The video file itself is a release asset; only its poster lives in the repository.
+    if (project.video?.poster) add(project.slug, 'poster', project.video.poster, { width: project.video.width, height: project.video.height });
     for (const shot of project.screenshots ?? []) {
       if (shot.src) add(project.slug, 'screenshot', shot.src, { width: shot.width, height: shot.height });
     }
@@ -281,7 +283,7 @@ export async function planRepository(key, pin, assets, deps, { updateDimensions 
     const asset = assets[index];
     const where = `${asset.kind} ${asset.path}`;
     if (result.error) return void plan.problems.push(result.error.message);
-    if (result.bytes > LARGE_BYTES && asset.kind === 'screenshot') {
+    if (result.bytes > LARGE_BYTES && asset.kind !== 'logo') {
       plan.notes.push(`${where} is ${kilobytes(result.bytes)}; visitors download it at full size, so consider optimizing it`);
     }
     if (!asset.width || !asset.height || (result.size.width === asset.width && result.size.height === asset.height)) return;
@@ -294,7 +296,7 @@ export async function planRepository(key, pin, assets, deps, { updateDimensions 
     } else if (aspectChanged && !allowAspectChange) {
       plan.problems.push(`${where}: ${change}; aspect ratio changed from ${ratio(recorded)} to ${ratio(result.size)} (${asset.slug}). Check the new capture fits its card, then rerun with --project ${key} --update-dimensions --allow-aspect-change`);
     } else {
-      plan.dimensions.push({ slug: asset.slug, path: asset.path, from: recorded, to: result.size, aspectChanged });
+      plan.dimensions.push({ slug: asset.slug, kind: asset.kind, path: asset.path, from: recorded, to: result.size, aspectChanged });
     }
   });
   if (assets.length && results.every((result) => result.error?.kind === 'missing')) {
@@ -360,7 +362,7 @@ function objectRanges(source) {
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * rewrites recorded screenshot sizes in the source of projects.mjs
+ * rewrites recorded screenshot and video-poster sizes in the source of projects.mjs
  * :param source: current file contents
  * :param key: repository key the screenshots come from
  * :param updates: [{ path, from: { width, height }, to: { width, height } }]
@@ -370,9 +372,9 @@ export function applyDimensions(source, key, updates) {
   let next = source;
   for (const { path: assetPath, from, to } of updates) {
     for (const value of [to.width, to.height]) if (!(Number.isInteger(value) && value > 0)) throw new Error(`${assetPath}: refusing to write a non-positive size`);
-    const call = new RegExp(`src:\\s*githubAsset\\(\\s*(['"])${escapeRegExp(key)}\\1\\s*,\\s*(['"])${escapeRegExp(assetPath)}\\2\\s*\\)`, 'g');
+    const call = new RegExp(`(?:src|poster):\\s*githubAsset\\(\\s*(['"])${escapeRegExp(key)}\\1\\s*,\\s*(['"])${escapeRegExp(assetPath)}\\2\\s*\\)`, 'g');
     const calls = [...next.matchAll(call)];
-    if (calls.length !== 1) throw new Error(`${key} ${assetPath}: expected one screenshot src in projects.mjs, found ${calls.length}`);
+    if (calls.length !== 1) throw new Error(`${key} ${assetPath}: expected one screenshot src or video poster in projects.mjs, found ${calls.length}`);
     const at = calls[0].index;
     const [start, end] = objectRanges(next).filter(([open, close]) => open < at && close > at).sort((a, b) => b[0] - a[0])[0] ?? [];
     if (start === undefined) throw new Error(`${key} ${assetPath}: could not find the screenshot entry around its src`);

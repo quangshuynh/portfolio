@@ -114,6 +114,10 @@ function MoreProjects() {
             </PersonalityButton>
           </div>
         )}
+        <p className="more-archive">
+          Older coursework, experiments, and archived projects stay on{' '}
+          <a className="text-link" href="https://github.com/quangshuynh?tab=repositories" target="_blank" rel="noreferrer">GitHub <FaGithub aria-hidden="true" /></a>.
+        </p>
       </div>
     </section>
   );

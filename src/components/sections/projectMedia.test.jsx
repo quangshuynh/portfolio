@@ -153,7 +153,9 @@ describe('gallery (real project data)', () => {
   test.each(galleries.map((entry) => [entry.name, entry]))('every %s tab renders its screenshot at its recorded size', (_, entry) => {
     withLightbox(<ProjectGallery project={entry} />);
     const group = screen.getByRole('group', { name: `${entry.name} gallery` });
-    expect(within(group).getAllByRole('button').map((button) => button.textContent)).toEqual(['Logo', ...entry.screenshots.map((shot) => shot.label)]);
+    expect(within(group).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      ...(entry.video ? ['Video'] : []), 'Logo', ...entry.screenshots.map((shot) => shot.label),
+    ]);
     entry.screenshots.forEach((shot) => {
       expect(Number.isInteger(shot.width) && shot.width > 0, `${shot.label} width`).toBe(true);
       expect(Number.isInteger(shot.height) && shot.height > 0, `${shot.label} height`).toBe(true);
@@ -168,17 +170,119 @@ describe('gallery (real project data)', () => {
   });
 });
 
-test('the Ordixa row shows its brand, positioning, honest status, and real screenshots', () => {
-  withLightbox(<MoreProjects />);
-  const row = screen.getByRole('heading', { level: 3, name: 'Ordixa' }).closest('article');
-  expect(within(row).getByRole('img', { name: 'Ordixa logo' })).toBeInTheDocument();
-  expect(row).toHaveTextContent('Business data workflows, simplified.');
-  expect(row).toHaveTextContent(/fictional demo data/);
-  expect(within(row).getByRole('link', { name: 'Open Ordixa repository' })).toHaveAttribute('href', 'https://github.com/quangshuynh/ordixa');
-  expect(within(row).queryByRole('link', { name: /live demo/i })).not.toBeInTheDocument();
-  expect(within(row).getByRole('list', { name: 'Ordixa technologies' })).toHaveTextContent(/Python.*pandas.*openpyxl/);
+describe('project video (fixture data)', () => {
+  const videoFixture = {
+    ...fixture,
+    video: {
+      src: 'https://github.com/example/fixture/releases/download/v1.0.0/launch.mp4',
+      page: 'https://github.com/example/fixture/releases/tag/v1.0.0',
+      poster: pinnedAssetUrl(fixturePin, 'docs/media/poster.jpg'),
+      width: 1920,
+      height: 1080,
+      duration: 83,
+      title: 'Fixture launch video',
+      caption: 'Fixture caption',
+    },
+  };
+  const mediaQuery = (reduce) => vi.fn().mockImplementation((query) => ({ matches: reduce && query.includes('reduce'), media: query }));
+  let play;
+  let matchMedia;
+
+  beforeEach(() => {
+    play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+    matchMedia = window.matchMedia;
+    window.matchMedia = mediaQuery(false);
+  });
+  afterEach(() => {
+    play.mockRestore();
+    window.matchMedia = matchMedia;
+  });
+
+  test('opens on the video tab, showing only a lazy poster: no video element, no video request', () => {
+    withLightbox(<ProjectGallery project={videoFixture} />);
+    const group = screen.getByRole('group', { name: 'Fixture gallery' });
+    expect(within(group).getAllByRole('button').map((button) => button.textContent)).toEqual(['Video', 'Logo', 'One', 'Two', 'Three']);
+    expect(within(group).getByRole('button', { name: 'Video' })).toHaveAttribute('aria-pressed', 'true');
+    expect(document.querySelector('video')).toBeNull();
+
+    const play = screen.getByRole('button', { name: 'Play Fixture launch video (1:23, with sound)' });
+    const poster = play.querySelector('img');
+    expect(poster).toHaveAttribute('src', videoFixture.video.poster);
+    expect(poster).toHaveAttribute('loading', 'lazy');
+    // Intrinsic size reserves the 16:9 box before the poster arrives.
+    expect(poster).toHaveAttribute('width', '1920');
+    expect(poster).toHaveAttribute('height', '1080');
+    // The release page is always one link away, even before playing.
+    expect(screen.getByRole('link', { name: 'Open Fixture launch video on GitHub' })).toHaveAttribute('href', videoFixture.video.page);
+  });
+
+  test('pressing play mounts an inline, metadata-only player with controls, focuses it, and starts it', () => {
+    withLightbox(<ProjectGallery project={videoFixture} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Play Fixture launch video/ }));
+
+    const video = document.querySelector('video');
+    expect(video).toHaveAttribute('src', videoFixture.video.src);
+    expect(video).toHaveAttribute('poster', videoFixture.video.poster);
+    expect(video).toHaveAttribute('controls');
+    expect(video).toHaveAttribute('playsinline');
+    expect(video).toHaveAttribute('preload', 'metadata');
+    expect(video).toHaveAttribute('width', '1920');
+    // Never autoplays on its own; sound starts only from the visitor's press.
+    expect(video).not.toHaveAttribute('autoplay');
+    expect(video).toHaveAccessibleName('Fixture launch video');
+    expect(document.activeElement).toBe(video);
+    expect(play).toHaveBeenCalledTimes(1);
+  });
+
+  test('with reduced motion the player loads paused and waits for its own controls', () => {
+    window.matchMedia = mediaQuery(true);
+    withLightbox(<ProjectGallery project={videoFixture} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Play Fixture launch video/ }));
+    expect(document.querySelector('video')).toHaveAttribute('controls');
+    expect(play).not.toHaveBeenCalled();
+  });
+
+  test('a video that cannot play is replaced by a link to the release', () => {
+    withLightbox(<ProjectGallery project={videoFixture} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Play Fixture launch video/ }));
+    fireEvent.error(document.querySelector('video'));
+
+    expect(document.querySelector('video')).toBeNull();
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('The video cannot play here.');
+    expect(within(status).getByRole('link', { name: /Watch it on GitHub/ })).toHaveAttribute('href', videoFixture.video.page);
+  });
+
+  test('switching tabs stops the video, and other tabs keep working', () => {
+    withLightbox(<ProjectGallery project={videoFixture} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Play Fixture launch video/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Two' }));
+    expect(document.querySelector('video')).toBeNull();
+    expect(screen.getByRole('img', { name: 'Second fixture screen' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }));
+    expect(screen.getByRole('button', { name: /^Play Fixture launch video/ })).toBeInTheDocument();
+  });
+});
+
+test('the Ordixa case file leads with its launch video, release link, and honest status', () => {
+  withLightbox(<FeaturedProjects />);
+  const card = screen.getByRole('heading', { level: 3, name: 'Ordixa' }).closest('article');
   const ordixa = project('ordixa');
-  expect(within(row).getByRole('img', { name: ordixa.screenshots[0].alt })).toHaveAttribute('width', String(ordixa.screenshots[0].width));
+  expect(card).toHaveAttribute('id', 'project-ordixa');
+  expect(card.className).toMatch(/flagship-project/);
+  expect(within(card).getByRole('button', { name: 'Play Ordixa v2.0.0 launch video (0:23, with sound)' })).toBeInTheDocument();
+  expect(card.querySelector('video')).toBeNull();
+  expect(card).toHaveTextContent(/fictional demo data/);
+  expect(within(card).getByRole('link', { name: 'View Ordixa code' })).toHaveAttribute('href', 'https://github.com/quangshuynh/ordixa');
+  expect(within(card).getByRole('link', { name: 'Open Ordixa release notes' })).toHaveAttribute('href', ordixa.links.release);
+  expect(within(card).queryByRole('link', { name: /live demo/i })).not.toBeInTheDocument();
+  expect(within(card).getByRole('list', { name: 'Ordixa technologies' })).toHaveTextContent(/Python.*pandas.*openpyxl/);
+});
+
+test('More projects points to older and archived work on GitHub without listing it', () => {
+  withLightbox(<MoreProjects />);
+  expect(screen.getByRole('link', { name: /GitHub/ })).toHaveAttribute('href', 'https://github.com/quangshuynh?tab=repositories');
+  expect(screen.queryByRole('heading', { name: 'Repo Radar' })).not.toBeInTheDocument();
 });
 
 test('every rendered external link opens safely in a new tab', () => {
