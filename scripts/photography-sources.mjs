@@ -33,4 +33,6 @@ export const photographLibraryPaths = {
   'red-arcs': 'sony-a7iii/2026-10-06/DSC09194.JPG',
   'pier-light': 'sony-a7iii/2026-10-17/DSC09420.JPG',
   'gull-in-surf': 'sony-a7iii/2026-10-17/DSC09435.JPG',
+  'white-dahlia': 'sony-a7iii/2026-10-18/DSC09528.JPG',
+  'larch-cones': 'sony-a7iii/2026-10-18/DSC09517.JPG',
 };
