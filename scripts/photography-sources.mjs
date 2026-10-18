@@ -31,5 +31,6 @@ export const photographLibraryPaths = {
   'river-arch-bridge': 'sony-a7iii/2026-10-09/DSC09339.JPG',
   'river-gorge': 'sony-a7iii/2026-10-06/DSC09193.JPG',
   'red-arcs': 'sony-a7iii/2026-10-06/DSC09194.JPG',
-  'mallards': 'sony-a7iii/2026-10-06/DSC09229.JPG',
+  'pier-light': 'sony-a7iii/2026-10-17/DSC09420.JPG',
+  'gull-in-surf': 'sony-a7iii/2026-10-17/DSC09435.JPG',
 };
