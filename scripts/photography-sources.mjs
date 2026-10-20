@@ -11,7 +11,6 @@ export const photographLibraryPaths = {
   'orange-domes-close': 'pentax-k50/2026-07-25/IMGP0717.JPG',
   'shoreline-gold-dusk': 'sony-a7iii/2026-10-05/_DSC9077.JPG',
   'bird-in-flight': 'nikon-d3100/2026-04-05/_DSC0041.JPG',
-  'high-falls-mist': 'sony-a7iii/2026-10-06/DSC09184.JPG',
   'impreza-fence': 'nikon-d3100/_DSC0120.JPG',
   'downtown-rochester-dusk': 'nikon-d3100/2026-04-22/_DSC0032--c0c129d8.JPG',
   'sundown-streaked-clouds': 'pentax-k50/2026-07-19/IMGP0594.JPG',
@@ -35,4 +34,5 @@ export const photographLibraryPaths = {
   'gull-in-surf': 'sony-a7iii/2026-10-17/DSC09435.JPG',
   'white-dahlia': 'sony-a7iii/2026-10-18/DSC09528.JPG',
   'larch-cones': 'sony-a7iii/2026-10-18/DSC09517.JPG',
+  'high-falls-night': 'sony-a7iii/2026-10-19/DSC09546.JPG',
 };
