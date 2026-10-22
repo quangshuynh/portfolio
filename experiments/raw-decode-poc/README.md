@@ -30,17 +30,21 @@ RAW files are not committed (size, and they are private photographs). Without
 a fixture the fixture suite is reported as **skipped**, which is not evidence
 of compatibility.
 
-Validated so far: one Sony ILCE-6400 file, "Sony ARW Compressed" (lossy ARW
-2.3), 6048x4024, 24.9 MB, from `photo-archive/sony-a6400/2026-09-29`.
+Validated so far (all tests pass on each):
 
-**Missing: Sony A7 III (ILCE-7M3) files.** The archive repository holds only
-A7 III JPEGs; the ARWs are on the external drive (`E:\cameras\sony-a7iii\...`),
-which was not connected. To validate the A7 III, pick a frame with no people in
-it and run the procedure below once for each of:
+- Sony ILCE-7M3, uncompressed 14-bit: `DSC09420.ARW`, 49.3 MB.
+- Sony ILCE-7M3, uncompressed 12-bit (1 s exposure): `DSC09546.ARW`, 49.2 MB.
+  Both are from `E:\cameras\Photography-Workspace\01-RAW\Sony-A7III\`.
+- Sony ILCE-6400, "Sony ARW Compressed" (lossy ARW 2.3): `DSC00042.ARW`,
+  24.9 MB, from `photo-archive/sony-a6400/2026-09-29`.
+
+The drive is flaky, so copy a fixture locally before running. Still missing,
+because the archive holds none:
 
 - an A7 III **compressed** RAW (camera setting RAW File Type: Compressed),
-- an A7 III **uncompressed** RAW (RAW File Type: Uncompressed),
-- a DNG (for example Adobe DNG Converter output from either file).
+- a DNG (for example Adobe DNG Converter output from an A7 III ARW).
+
+Use frames with no people in them.
 
 ## Running
 

@@ -5,37 +5,55 @@ Interval 0, 2026-10-22. The proof of concept, tests and benchmark scripts are in
 
 ## Verdict
 
-Genuine in-browser decoding of Sony compressed ARW is **validated** for one
-camera body (A6400) in Chromium, using LibRaw 0.22.1 compiled to WebAssembly
-(`libraw-wasm` 1.6.0) inside a Web Worker. **The Sony A7 III is not yet
-validated**: no A7 III RAW file was reachable (see [Fixtures](#fixtures)).
+Genuine in-browser decoding is **validated** in Chromium and Node, using
+LibRaw 0.22.1 compiled to WebAssembly (`libraw-wasm` 1.6.0) inside a Web
+Worker, for:
 
-Two things make the A7 III likely to work, but neither is evidence:
+- **Sony A7 III uncompressed 14-bit ARW**, the format of the owner's archive;
+- **Sony A7 III uncompressed 12-bit ARW**, which the camera wrote for a
+  1 s exposure;
+- **Sony A6400 compressed (lossy) ARW**.
 
-- Its default "Compressed" RAW uses the same Sony ARW 2.3 lossy format and
-  the same LibRaw decode path as the A6400 file.
-- `ILCE-7M3` appears in the bundled wasm's camera tables.
+Still unvalidated:
+
+- **A7 III compressed ARW**: none exists in the archive. It uses the same
+  lossy ARW 2.3 format and decode path as the validated A6400 file.
+- **DNG**: no DNG exists in the archive.
 
 ## Fixtures
 
-| | Validated fixture | Required, missing |
-| --- | --- | --- |
-| Camera | Sony ILCE-6400, firmware v2.00 | Sony ILCE-7M3 |
-| Source | `photo-archive/sony-a6400/2026-09-29/DSC00042.ARW` (Git blob `4c96119`, SHA-256 `19783625…0cd4f28`) | `E:\cameras\sony-a7iii\…` (drive not connected) |
-| Format | "Sony ARW Compressed" (TIFF compression 32767), CFA RGGB, stored 8 bits/pixel, 14-bit range after decoding (black 512, white 15360; LibRaw maximum 16380) | One compressed and one uncompressed A7 III ARW |
-| Geometry | 6048×4024 sensor, 6000×4000 crop, `flip` 5 (portrait) | |
-| Embedded preview | 1616×1080 JPEG, 395 KB | |
-| DNG | None available (the only local `.dng` is ExifTool's 13 KB test stub) | One DNG converted from an A7 III ARW |
+| | A7 III 14-bit | A7 III 12-bit | A6400 compressed |
+| --- | --- | --- | --- |
+| File | `DSC09420.ARW` ("Pier light", 2026-10-17), 49.3 MB, SHA-256 `d64fbd28…e8fd057` | `DSC09546.ARW` ("High Falls", 2026-10-19), 49.2 MB, SHA-256 `03ff74ff…68556d7` | `DSC00042.ARW` (2026-09-29), 24.9 MB, SHA-256 `19783625…0cd4f28` |
+| Source | `E:\cameras\Photography-Workspace\01-RAW\Sony-A7III\` | same | `photo-archive` repository, `sony-a6400/` |
+| Body, firmware | ILCE-7M3 v4.04 | ILCE-7M3 v4.04 | ILCE-6400 v2.00 |
+| Exposure | 1/250 s, ISO 100 | 1 s, ISO 640 | 1/160 s, ISO 3200 |
+| Format | "Sony Uncompressed 14-bit RAW" (compression 1), 14 bits/sample | Same file type; `BitsPerSample` 12 | "Sony ARW Compressed" (compression 32767), stored 8 bits/pixel, 14-bit range after decoding |
+| Sensor data | 48,674,304 bytes (16 bits/pixel) | 48,674,304 bytes | 24,337,152 bytes |
+| Common to all | 6048×4024 CFA RGGB, black 512, white 15360, 1616×1080 embedded JPEG preview | | |
 
-The fixture is a private photograph with a person in it, so it is not
-committed, and no output from it is published. The A7 III fixtures should
-be frames without people. The reproducible procedure is in the PoC README.
+- The two A7 III frames are published, people-free photographs. The A6400
+  frame is private and has a person in it.
+- None is committed, and only the scratchpad ever held any output from them.
+
+What the archive holds (ExifTool header scan of 586 files under `01-RAW/Sony-A7III`):
+
+- 576 A7 III uncompressed 14-bit and 6 uncompressed 12-bit frames. The 12-bit
+  frames are all exposures of 1 s or longer: DSC09279, DSC09544–09548.
+- **No A7 III compressed RAW and no DNG.**
+- 4 A6400 files filed under `Sony-A7III/2026-10-05` (DSC00382 onward).
+- **No exposure-bracket set.** No frame has exposure-bracketing drive mode.
+  The only near-bracket, DSC09212–09214 (2026-10-20), varies ISO at a fixed
+  1/250 s, so it cannot extend dynamic range.
+
+The reproducible procedure is in the PoC README.
 
 ## What "genuine decoding" was checked against
 
 The embedded preview is 1616×1080, so a full-size result cannot come from it.
 Each check below is a test in `test/fixture.test.mjs`, and all of them pass
-against the fixture:
+against all three fixtures (10/10 each). The figures quoted are from the
+A6400 file.
 
 1. **Geometry:** LibRaw's `raw_width`×`raw_height` equals the CFA strip that
    the file's own TIFF SubIFD declares (parsed independently in `src/tiff.mjs`).
@@ -57,15 +75,18 @@ against the fixture:
 6. **Rejection:** feeding the preview JPEG in as input fails instead of
    producing an image.
 
-A visual check (scratchpad only, deleted afterwards) matched the camera JPEG
-in content and orientation. Before the linear-gamma fix it looked flat, which
-is what led to finding the `gamm` bug.
+Visual checks (scratchpad only, deleted afterwards) of the A6400 file and of
+A7 III DSC09420 matched the camera JPEG in content, orientation and colour.
+They look flatter, as expected for linear data with only the sRGB transfer
+applied and no camera tone curve. Before the linear-gamma fix the A6400
+render looked flat, which is what led to finding the `gamm` bug.
 
 ## Measurements
 
 Machine: Intel Core i7-9700 (8 threads), 15.9 GB RAM, Windows 11.
 - Node.js 24.18.0, and headless Chromium 153.0.8010.12 (Playwright build).
-- One fixture; medians of three runs unless noted.
+- Medians of three runs unless noted. The tables are for the A6400
+  compressed file; A7 III results follow them.
 - Settings are `LINEAR_SETTINGS`: 16-bit output, linear, camera white balance,
   no auto-bright, sRGB primaries.
 - Single-threaded throughout (see Threads below).
@@ -89,6 +110,20 @@ copying the 24.9 MB input in, and transferring the 145 MB 16-bit result out.
 | Node RSS, full AHD / DHT / half | 777 / 939 / 893 MB peak | `process.memoryUsage().rss` (whole process) |
 | Output buffer, full 16-bit RGB | 145 MB (4024×6024×3×2 bytes) | arithmetic |
 | wasm heap | 256 MB initial, 2 GB maximum | declared by the module |
+
+**A7 III uncompressed**, same machine and settings:
+
+| Case | 14-bit DSC09420 | 12-bit DSC09546 |
+| --- | --- | --- |
+| Node: linear / AHD / DHT / half size | 1,145 / 2,355 / 3,791 / 312 ms | 1,000 / 2,239 / 3,811 / 280 ms |
+| Chromium worker, full AHD, cold (with / without COOP/COEP) | 3,300 / 3,307 ms | 2,958 / 2,970 ms |
+| Chromium worker, half size (with / without) | 587 / 589 ms | 519 / 522 ms |
+| Reused worker, warm full AHD (runs 2–8) | 2,401–2,437 ms | 2,243–2,274 ms |
+| Page + worker memory: full / half / reused steady state | 606 / 339 / 725 MB | 606 / 339 / 724 MB |
+| Node peak RSS: AHD / DHT | 847 / 1,009 MB | 847 / 1,009 MB |
+
+Uncompressed files are twice the size of compressed ones (49 MB against
+25 MB) and use about 47 MB more memory, but decode at the same speed.
 
 Not measured: Firefox, Safari or any mobile device; WebGL upload of the
 decoded data; peak memory on low-RAM devices.
@@ -151,13 +186,15 @@ Recommendation for the editor:
 
 ## Unsupported or unverified
 
-- **A7 III** (compressed and uncompressed): unverified, fixtures missing.
-- **Lossless compressed ARW** (A7 IV and later): unverified. The A7 III does
-  not offer it, per Sony's specifications; confirm when fixtures arrive.
+- **A7 III compressed ARW**: unverified, because the archive has none. To
+  validate it, shoot one frame with RAW File Type set to Compressed. The
+  same lossy format is validated on the A6400.
+- **Lossless compressed ARW** (A7 IV and later bodies): unverified. The A7 III
+  does not offer it, according to Sony's specifications.
 - **DNG** of any kind: unverified, no fixture. Deflate-compressed DNG is
   probably unsupported (no zlib in the build, as above).
 - **Firefox, Safari and iOS**: untested. WASM SIMD needs Safari 16.4+. iOS
-  per-tab memory limits may not fit a 560–670 MB decode; plan for half-size
+  per-tab memory limits may not fit a 560–725 MB decode; plan for half-size
   decoding there.
 - **Embedded camera profiles, lens corrections and Sony picture profiles**:
   LibRaw does not reproduce the camera's JPEG look or apply lens corrections.

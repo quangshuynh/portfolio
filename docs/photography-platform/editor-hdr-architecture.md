@@ -234,7 +234,7 @@ there is no other "original", and for JPEG neutral is the identity.
 | Privacy | Files stay on the device | 75–150 MB of originals uploaded per merge; retention and access obligations |
 | Infrastructure | None (static hosting) | Cloudflare Workers are capped at 128 MB of memory (documented limit), so this needs containers or VMs: new cost and operations |
 | Time | About 7–10 s of decoding (3 × 2.4–3.3 s, measured per frame) plus align and merge *(estimate 2–5 s)* | Faster with native multi-threaded LibRaw, plus upload time |
-| Memory | *Estimate* 1.3–1.4 GB peak at full size: frames decoded one at a time (560–670 MB each, worker freed between), 3 × 145 MB linear frames, 291 MB float result, pyramids. Half-size mode is about a quarter of that. | Server-bounded |
+| Memory | *Estimate* 1.3–1.4 GB peak at full size: frames decoded one at a time (560–725 MB each, worker freed between), 3 × 145 MB linear frames, 291 MB float result, pyramids. Half-size mode is about a quarter of that. | Server-bounded |
 
 Main risks:
 

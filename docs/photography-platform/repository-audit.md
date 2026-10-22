@@ -62,7 +62,8 @@ from the repository or observed from the live hosts on that date.
   including 3,058 JPG, 744 NEF and 72 ARW.
   - All 72 ARWs are Sony A6400 files from `2026-09-29`.
   - The `sony-a7iii/` folders there hold JPEGs only. The A7 III ARWs are on
-    the external drive.
+    the external drive, in `E:\cameras\Photography-Workspace\01-RAW\Sony-A7III\`:
+    582 files, all uncompressed.
 - Its own gallery app (`gallery/`, TypeScript) and six owner `.cube` LUTs
   (33³, display-referred Rec.709).
 - A designed but undeployed sharing service in `docs/online-sharing*.md`:

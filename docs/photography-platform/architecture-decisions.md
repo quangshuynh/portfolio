@@ -157,7 +157,9 @@ Uint16 RGB, metadata }`, in a dedicated worker.
 - dcraw.js was rejected on evidence: the decode crashed, it has no colour
   tables for these bodies, and it is GPL.
 - Status: **validated** for A6400 compressed ARW in Chromium and Node.
-  A7 III and DNG are **unvalidated** (fixtures missing).
+  It is also **validated** for A7 III uncompressed 14-bit and 12-bit ARW.
+  A7 III compressed ARW and DNG are **unvalidated**, because the archive
+  holds neither.
 - Comparison: [raw-feasibility.md](raw-feasibility.md#candidates-compared).
 
 ## 6. Rendering and adjustment pipeline
@@ -290,8 +292,12 @@ Status: **design**.
 1. The Engineering Handoff named as the specification was not attached and
    is not in the repository. Please attach it so the roadmap can be
    reconciled.
-2. Can the A7 III ARWs be made available? Needed: compressed, uncompressed, a
-   DNG, and a tripod plus a handheld three-frame bracket, all without people.
+2. A7 III uncompressed ARWs are now validated. Still needed, all without
+   people:
+   - one compressed ARW,
+   - a DNG,
+   - a tripod and a handheld three-frame exposure bracket (the archive has
+     no bracket).
 3. Are `admin.quanghuynh.com`, Cloudflare Access and a private R2 bucket
    acceptable, on the account that holds the zone?
 4. Should publishing need a manual PR merge, or auto-merge after green

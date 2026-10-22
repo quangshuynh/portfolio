@@ -18,11 +18,14 @@ gallery. Interval 0 changed no site behaviour.
 
 **Validated in this repository:**
 
-- Real RAW decoding in the browser works for Sony compressed ARW (A6400) with
-  LibRaw 0.22.1 as WebAssembly, in a Web Worker, in Chromium.
-  - Full-resolution 16-bit AHD takes about 3.3 s cold and 2.5 s in a warm
-    worker; half size takes 0.66 s.
-  - Memory is 559 MB for a full decode and 316 MB at half size.
+- Real RAW decoding in the browser works with LibRaw 0.22.1 as WebAssembly,
+  in a Web Worker, in Chromium, for three formats:
+  - Sony A7 III uncompressed 14-bit ARW,
+  - Sony A7 III uncompressed 12-bit ARW,
+  - Sony A6400 compressed ARW.
+  - For an A7 III file, full-resolution 16-bit AHD takes 3.0–3.3 s cold and
+    2.25–2.4 s in a warm worker; half size takes 0.52–0.59 s.
+  - Memory is 606 MB for a full decode and 339 MB at half size.
   - Tests prove the output comes from sensor data, not the embedded
     1616×1080 JPEG.
 - No COOP/COEP is needed for the current build: it never starts a thread
@@ -39,11 +42,13 @@ gallery. Interval 0 changed no site behaviour.
 
 - quanghuynh.com is served by Vercel, with its DNS zone on Cloudflare.
 - The site has no auth, database, storage or server code.
-- The private archive contains no A7 III RAWs.
+- The A7 III ARWs in `E:\cameras\Photography-Workspace\01-RAW` are all
+  uncompressed. The archive has no A7 III compressed RAW, no DNG and no
+  exposure bracket.
 
 **Not validated:**
 
-- Sony A7 III RAWs, DNG, Firefox, Safari, mobile.
+- A7 III compressed ARW, DNG, Firefox, Safari, mobile.
 - Everything about GPU rendering, LUTs and HDR (design only).
 
 ## Recommendation summary
@@ -75,9 +80,9 @@ editor can progress while the owner decides on Cloudflare.
 | --- | --- | --- |
 | **1. Catalog foundation** | Machine-writable photography catalog, validator, draft/published status; gallery output unchanged (scope below) | Answer to open question 6 (orphan derivatives) |
 | 2. Editor core | `/photography/editor` route and lazy chunk; JPEG/PNG/WebP import; adjustment state; CPU reference; WebGL2 preview; before/after; full-resolution JPEG/PNG/WebP export; parity tests | None |
-| 3. RAW in the editor | libraw-wasm adapter and worker, Rec.2020 linear decoding, cancellation, memory budget and half-size fallback, Vite/base-path packaging, third-party notices | A7 III compressed and uncompressed ARWs, and a DNG |
+| 3. RAW in the editor | libraw-wasm adapter and worker, Rec.2020 linear decoding, cancellation, memory budget and half-size fallback, Vite/base-path packaging, third-party notices | One A7 III compressed ARW and a DNG (uncompressed is already validated) |
 | 4. Colour tools and sessions | Tone curves, HSL, `.cube` LUTs, presets, batch sync and export queue, IndexedDB/OPFS session restore, CSP | Whether to bundle Q-COLOR LUTs |
-| 5. HDR | Three-bracket validation, MTB alignment, radiance merge, deghosting, tone mapping, half-size mode | A7 III tripod and handheld brackets |
+| 5. HDR | Three-bracket validation, MTB alignment, radiance merge, deghosting, tone mapping, half-size mode | A7 III tripod and handheld exposure brackets (none in the archive) |
 | 6. CMS backend | Admin Worker, Access JWT verification, R2 catalog with conditional writes and history, upload endpoints, Worker tests | Cloudflare Access/R2 approval, subdomain |
 | 7. CMS UI and publishing | Admin UI on the protected host, uploads, previews, ordering, featured and collections, publish-PR workflow with derivative generation in Actions, `/admin/photography` redirect | Auto-merge or manual merge |
 | 8. Archive integration and hardening | Optional import from `photo-archive` (by path or SHA-256, never exposing private index data), accessibility and responsive audit, cross-browser checks, maintenance docs | Whether archive integration is wanted |
