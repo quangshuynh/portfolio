@@ -7,7 +7,7 @@ import { PRESETS_STORAGE_KEY, applyPreset, parsePresetFile, serializePresets } f
 import { LIMITS, exportFileName, formatBytes, proxyDimensions } from '../io/files.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { createImageWorker, usingMainThread } from '../io/workerClient.mjs';
-import { browserCapabilities, diagnosticReport } from '../io/diagnostics.mjs';
+import { browserCapabilities, debugFlag, diagnosticReport } from '../io/diagnostics.mjs';
 import { appHref } from '../../util/navigation';
 import AdjustPanel from './AdjustPanel';
 import ExportPanel from './ExportPanel';
@@ -184,7 +184,9 @@ function EditorWorkspace() {
     const meta = document.querySelector('meta[name="theme-color"]');
     const previous = meta?.getAttribute('content');
     meta?.setAttribute('content', EDITOR_THEME_COLOR);
-    document.documentElement.classList.add('pe-document');
+    const scrollLock = !debugFlag('no-scroll-lock');
+    if (scrollLock) document.documentElement.classList.add('pe-document');
+    else window.__editorStartup?.stage('scroll lock turned off by #no-scroll-lock');
     const pool = workers.current;
     return () => {
       if (previous) meta?.setAttribute('content', previous);

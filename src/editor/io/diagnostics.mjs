@@ -20,6 +20,17 @@ export function clearDiagnostics() {
   entries.length = 0;
 }
 
+/**
+ * Troubleshooting switches in the URL hash, separated by & or comma, e.g.
+ * /photography/editor#cpu-preview&startup-report. Used to isolate a device-only
+ * failure on the device itself; the hash never reaches the server.
+ *   cpu-preview     never create a WebGL2 context; preview with the CPU renderer
+ *   no-scroll-lock  leave html/body scrolling as on other pages
+ */
+export function debugFlag(name, hash = globalThis.location?.hash ?? '') {
+  return hash.replace(/^#/, '').split(/[&,]/).includes(name);
+}
+
 const safely = (probe) => {
   try {
     return probe();

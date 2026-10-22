@@ -257,7 +257,14 @@ For a page that started but shows nothing, open
 `/photography/editor#startup-report`: after 5 s the same report opens (with
 Close) regardless of start state, adding the visual viewport, the size and
 position of the editor's main parts and the element on top at the top, centre
-and bottom of the screen, measured before the panel covers the page.
+and bottom of the screen, measured before the panel covers the page. Errors
+attributed to the page URL itself are listed as `inline` (iOS reports injected
+scripts there) and never open the panel.
+
+Troubleshooting hash switches, combinable with `&` (`debugFlag` in
+`diagnostics.mjs`): `cpu-preview` never creates a WebGL2 context;
+`no-scroll-lock` skips the `pe-document` class (`overflow: hidden` on html and
+body). Example: `/photography/editor#no-scroll-lock&startup-report`.
 
 Tested with `npm run check:editor:engines` (full flow incl. 12 MP export and a
 `.cube` LUT): Playwright WebKit 26.0 (iPhone 13 emulation and desktop),

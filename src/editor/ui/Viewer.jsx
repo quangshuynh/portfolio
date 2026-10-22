@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { GlRenderer, probeEditorContext } from '../pipeline/glRenderer.mjs';
-import { recordDiagnostic } from '../io/diagnostics.mjs';
+import { debugFlag, recordDiagnostic } from '../io/diagnostics.mjs';
 import { previewEdgeLimit } from '../io/files.mjs';
 
 const MIN_ZOOM = 0.02;
@@ -14,6 +14,7 @@ const STAGE_PADDING = 24;
  * that has returned a WebGL context can never return a 2D one).
  */
 function createEngine(canvas, maxPreviewEdge) {
+  if (debugFlag('cpu-preview')) return { engine: null, reason: 'WebGL2 turned off by #cpu-preview.' };
   const { gl, reason } = probeEditorContext(canvas);
   if (!gl) return { engine: null, reason };
   try {

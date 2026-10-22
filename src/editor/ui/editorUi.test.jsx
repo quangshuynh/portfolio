@@ -7,6 +7,7 @@ import EditorApp, { AUTOSAVE_KEY } from './EditorApp';
 import { editorReducer, initialEditorState } from '../model/editorState.mjs';
 import { createEditDocument, serializeEditDocument } from '../model/editDocument.mjs';
 import { neutralAdjustments } from '../model/adjustments.mjs';
+import { debugFlag } from '../io/diagnostics.mjs';
 
 // jsdom has no canvas or image decoding. These stand in for a browser without WebGL2:
 // the viewer falls back to its CPU engine (a stub 2D context) and draws nothing.
@@ -26,6 +27,40 @@ function AdjustHarness({ onState }) {
   onState(state);
   return <AdjustPanel adjustments={state.photos[0].history.present} disabled={false} dispatch={dispatch} />;
 }
+
+describe('troubleshooting switches', () => {
+  afterEach(() => window.history.replaceState({}, '', '/'));
+
+  test('debugFlag reads hash switches joined by & or comma', () => {
+    expect(debugFlag('cpu-preview', '#cpu-preview')).toBe(true);
+    expect(debugFlag('cpu-preview', '#no-scroll-lock&cpu-preview')).toBe(true);
+    expect(debugFlag('cpu-preview', '#startup-report,cpu-preview')).toBe(true);
+    expect(debugFlag('cpu-preview', '#cpu-preview-x')).toBe(false);
+    expect(debugFlag('cpu-preview', '')).toBe(false);
+  });
+
+  test('locks page scrolling by default, and #no-scroll-lock leaves it alone', async () => {
+    window.history.replaceState({}, '', '/photography/editor');
+    const { unmount } = render(<EditorApp />);
+    await screen.findByRole('button', { name: 'Choose photos' });
+    expect(document.documentElement).toHaveClass('pe-document');
+    unmount();
+    window.history.replaceState({}, '', '/photography/editor#no-scroll-lock');
+    render(<EditorApp />);
+    await screen.findByRole('button', { name: 'Choose photos' });
+    expect(document.documentElement).not.toHaveClass('pe-document');
+    expect(document.documentElement.dataset.editor).toBe('ready');
+  });
+
+  test('#cpu-preview never asks for a WebGL2 context', async () => {
+    window.history.replaceState({}, '', '/photography/editor#cpu-preview');
+    HTMLCanvasElement.prototype.getContext.mockClear();
+    const { container } = render(<EditorApp />);
+    await screen.findByRole('button', { name: 'Choose photos' });
+    expect(HTMLCanvasElement.prototype.getContext).not.toHaveBeenCalledWith('webgl2', expect.anything());
+    expect(container.querySelector('.pe')).toHaveAttribute('data-engine', 'cpu');
+  });
+});
 
 describe('editor route', () => {
   test('renders the editor at /photography/editor with privacy messaging and a noindex head', async () => {
