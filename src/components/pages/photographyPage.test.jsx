@@ -662,7 +662,8 @@ test('a discreet link opens the photo editor in-app, without a page load', async
 
   fireEvent.click(link);
   expect(getAppPathname(window.location.pathname)).toBe('/photography/editor');
-  expect(await screen.findByRole('heading', { level: 1, name: 'Photo editor' })).toBeInTheDocument();
+  // The editor is a lazy chunk; under a full parallel test run it can take over a second.
+  expect(await screen.findByRole('heading', { level: 1, name: 'Photo editor' }, { timeout: 5000 })).toBeInTheDocument();
   expect(document.title).toBe('Photo Editor | Quang Huynh');
 });
 
