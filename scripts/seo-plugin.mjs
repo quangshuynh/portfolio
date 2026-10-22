@@ -69,6 +69,8 @@ export default function seoPlugin() {
     transformIndexHtml: {
       order: 'pre',
       handler(html, ctx) {
+        // Dev-only harness pages (src/editor/dev) are not site pages.
+        if (ctx.server && ctx.path !== '/index.html' && !html.includes(PLACEHOLDER)) return html;
         if (!html.includes(PLACEHOLDER)) throw new Error(`SEO: index.html is missing ${PLACEHOLDER}.`);
         // In dev the server answers every route with index.html; pick its metadata from the URL.
         const url = ctx.server ? new URL(ctx.originalUrl ?? '/', 'http://localhost').pathname : '/';
