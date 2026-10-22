@@ -114,3 +114,39 @@ factual (no invented places, dates, or EXIF). Never rerun
   originals, outside the repository).
 - Never run a live CMS publication or create pull requests from it without
   the owner's approval; tests mock GitHub.
+
+## Token Efficiency & Documentation Rules
+
+Prioritize implementation, correctness, testing, and maintainability over lengthy documentation or explanations.
+
+**Documentation**
+- Keep documentation concise, practical, and proportional to the changes.
+- Update existing documentation instead of creating new files whenever possible.
+- Avoid repeating information already documented elsewhere.
+- Do not generate lengthy architecture reports, implementation diaries, or excessive Markdown files.
+- Keep README updates brief and focused on installation, usage, configuration, and essential limitations.
+- Document important architectural decisions, security considerations, and non-obvious behavior, but avoid explaining straightforward code.
+- Do not create documentation files solely to summarize work already described in the final handoff.
+- Prefer short tables, bullet points, and references to existing documentation over long prose.
+
+**Implementation**
+- Spend tokens on working code, debugging, tests, and verification rather than narrating every step.
+- Avoid unnecessary abstractions, dependencies, and speculative future architecture.
+- Use clear naming and self-explanatory code instead of excessive comments.
+- Do not sacrifice security, correctness, accessibility, or test coverage to reduce token usage.
+
+**Communication**
+- Keep progress updates minimal. Only report significant milestones, blockers, or decisions.
+- Do not repeatedly summarize completed work.
+- Avoid printing large files, full logs, or extensive test output unless necessary for debugging.
+- Use targeted searches, diffs, and test runs instead of repeatedly reading entire files.
+- Keep the final handoff to approximately 300–500 words, preferably shorter.
+
+**Final handoff format**
+1. What changed (3–6 bullets).
+2. Branch and commits.
+3. Tests and build results.
+4. Important limitations or blockers.
+5. Recommended next interval.
+
+**Core rule:** Be concise in documentation and communication, but thorough in implementation and verification. Optimize token usage without cutting essential functionality or quality.
