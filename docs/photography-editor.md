@@ -253,6 +253,12 @@ counted rather than repeated, and never trigger the panel.
 `window.__editorStartup.report()` gives the same text. The engine check blocks
 the entry bundle, and injects wallet errors, in WebKit and Chromium.
 
+For a page that started but shows nothing, open
+`/photography/editor#startup-report`: after 5 s the same report opens (with
+Close) regardless of start state, adding the visual viewport, the size and
+position of the editor's main parts and the element on top at the top, centre
+and bottom of the screen, measured before the panel covers the page.
+
 Tested with `npm run check:editor:engines` (full flow incl. 12 MP export and a
 `.cube` LUT): Playwright WebKit 26.0 (iPhone 13 emulation and desktop),
 Chromium 141 (Pixel 7 emulation), Firefox 142, forced no-WebGL2 (WebKit) and
