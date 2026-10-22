@@ -1,6 +1,6 @@
 // Startup watchdog for /photography/editor. A classic script that runs before the app
 // bundle and does not depend on React: if the editor has not marked itself started
-// (<html data-editor="ready">, set by EditorApp) or shown its own error page, it shows
+// (<html data-editor>, set by EditorApp) or shown its own error page, it shows
 // what failed and a Retry button instead of a blank page. Deliberately ES5 so it still
 // runs in browsers that cannot parse the bundle. It records only error messages, script
 // paths and browser capabilities: never photographs, file names or storage contents.
@@ -9,6 +9,8 @@
   var ERROR_GRACE_MS = 2500;
   var MAX_EVENTS = 12;
   var events = [];
+  // Startup milestones reported by the app (window.__editorStartup.stage), with timings.
+  var stages = [{ name: 'shell', at: Math.round(performance.now()) }];
   var panel = null;
   var root = document.documentElement;
 
@@ -17,14 +19,40 @@
     try { return new URL(url, location.href).pathname; } catch (error) { return String(url).slice(0, 120); }
   }
 
+  // Repeats are counted, not re-added, so a noisy script cannot push out the first real error.
   function record(kind, message) {
+    if (!active()) return;
+    message =String(message || 'Unknown error').slice(0, 300);
+    for (var i = 0; i < events.length; i += 1) {
+      if (events[i].kind === kind && events[i].message === message) { events[i].count += 1; if (panel) render(); return; }
+    }
     if (events.length >= MAX_EVENTS) return;
-    events.push({ kind: kind, message: String(message || 'Unknown error').slice(0, 300), at: Math.round(performance.now()) });
+    events.push({ kind: kind, message: message, at: Math.round(performance.now()), count: 1 });
     if (panel) render();
   }
 
+  function stage(name) {
+    stages.push({ name: String(name).slice(0, 120), at: Math.round(performance.now()) });
+    if (panel) render();
+  }
+
+  // Errors raised by scripts from this origin. Browser extensions and injected scripts
+  // (e.g. a wallet provider) have another or no URL, and cross-origin errors are masked
+  // as "Script error." without one: those are reported as external, never as the cause.
+  function ownScript(filename) {
+    try { return !!filename && new URL(filename, location.href).origin === location.origin; } catch (error) { return false; }
+  }
+
   function started() {
-    return root.getAttribute('data-editor') === 'ready' || !!document.querySelector('.route-error');
+    return root.hasAttribute('data-editor') || !!document.querySelector('.route-error');
+  }
+
+  function describe(node) {
+    if (!node) return 'none';
+    var rect = node.getBoundingClientRect();
+    var style = getComputedStyle(node);
+    return node.tagName.toLowerCase() + (node.className && typeof node.className === 'string' ? '.' + node.className.trim().split(/\s+/).join('.') : '')
+      + ' ' + Math.round(rect.width) + 'x' + Math.round(rect.height) + (style.display === 'none' ? ' display:none' : '') + (style.visibility === 'hidden' ? ' hidden' : '');
   }
 
   function supports() {
@@ -49,9 +77,13 @@
       'Browser: ' + navigator.userAgent,
       'Viewport: ' + innerWidth + 'x' + innerHeight + ' @' + (window.devicePixelRatio || 1) + 'x',
       'React root children: ' + (document.getElementById('root') ? document.getElementById('root').childElementCount : 'missing'),
+      'Root content: ' + describe(document.getElementById('root') && document.getElementById('root').firstElementChild),
+      'Editor marker: ' + (root.getAttribute('data-editor') || 'not set'),
     ].concat(supports());
+    lines.push('Stages:');
+    for (var s = 0; s < stages.length; s += 1) lines.push('  [' + stages[s].at + 'ms] ' + stages[s].name);
     lines.push(events.length ? 'Errors:' : 'Errors: none captured');
-    for (var i = 0; i < events.length; i += 1) lines.push('  [' + events[i].at + 'ms ' + events[i].kind + '] ' + events[i].message);
+    for (var i = 0; i < events.length; i += 1) lines.push('  [' + events[i].at + 'ms ' + events[i].kind + (events[i].count > 1 ? ' x' + events[i].count : '') + '] ' + events[i].message);
     return lines.join('\n');
   }
 
@@ -70,7 +102,7 @@
   }
 
   function show(reason) {
-    if (panel || started()) return;
+    if (panel || started() || !active()) return;
     reasonShown = reason;
     panel = element('section', '', 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483647;overflow:auto;padding:1.5rem 1rem;background:#151515;color:#eee;font:16px/1.5 system-ui,-apple-system,sans-serif');
     panel.id = 'editor-startup-failure';
@@ -134,8 +166,9 @@
       showSoon('a page file failed to load');
       return;
     }
-    record('error', (event.message || 'Script error') + (event.filename ? ' (' + pathOf(event.filename) + ':' + event.lineno + ':' + event.colno + ')' : ''));
-    showSoon('an error stopped the page');
+    var own = ownScript(event.filename);
+    record(own ? 'error' : 'external', (event.message || 'Script error') + (event.filename ? ' (' + (own ? pathOf(event.filename) : event.filename.slice(0, 120)) + ':' + event.lineno + ':' + event.colno + ')' : ' (no script URL)'));
+    if (own) showSoon('an error stopped the page');
   }, true);
 
   window.addEventListener('unhandledrejection', function (event) {
@@ -150,5 +183,8 @@
 
   setTimeout(function () { show('the editor did not start within ' + TIMEOUT_MS / 1000 + ' seconds'); }, TIMEOUT_MS);
 
-  window.__editorStartup = { events: events, report: function () { return report('requested'); } };
+  // Only the most recently installed copy reports, should the script ever run twice.
+  var api = { events: events, stages: stages, stage: stage, report: function () { return report('requested'); } };
+  function active() { return window.__editorStartup === api; }
+  window.__editorStartup = api;
 }());

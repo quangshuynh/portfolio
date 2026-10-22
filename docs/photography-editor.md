@@ -241,12 +241,17 @@ same as `window.__photoEditorDiagnostics`. Nothing is sent anywhere.
 
 Before React, the editor HTML loads `public/photography/editor-startup.js`, a
 same-origin ES5 watchdog (allowed by the CSP's `script-src 'self'`). If
-`EditorApp` has not set `<html data-editor="ready">` within 12 s, or an error
-or failed script load leaves `#root` empty, it shows "The photo editor did not
-start" with Retry and a copyable report (errors with script paths, CSP
-violations, user agent, viewport, WebGL2/worker/storage support; no photos or
-file names). `window.__editorStartup.report()` gives the same text. The engine
-check blocks the entry bundle in WebKit and Chromium to verify it.
+`EditorApp` has not set `<html data-editor>` (`ready` or `unsupported`) within
+12 s, or a same-origin error or failed script load leaves `#root` empty, it
+shows "The photo editor did not start" with Retry and a copyable report:
+startup stages with timings (chunk requested/loaded, preview engine, editor
+mounted), what `#root` holds, errors with script paths, CSP violations, user
+agent and capabilities; no photos or file names. Errors without a same-origin
+script URL (browser extensions, injected scripts such as Brave iOS's wallet
+`window.ethereum` shim, masked "Script error.") are listed as `external`,
+counted rather than repeated, and never trigger the panel.
+`window.__editorStartup.report()` gives the same text. The engine check blocks
+the entry bundle, and injects wallet errors, in WebKit and Chromium.
 
 Tested with `npm run check:editor:engines` (full flow incl. 12 MP export and a
 `.cube` LUT): Playwright WebKit 26.0 (iPhone 13 emulation and desktop),

@@ -65,6 +65,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     element.className = 'pe-canvas';
     element.setAttribute('aria-hidden', 'true');
     host.appendChild(element);
+    window.__editorStartup?.stage('preview engine starting');
     let { engine, reason } = createEngine(element, maxPreviewEdge);
     if (!engine) {
       element.remove();
@@ -81,6 +82,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     engineRef.current = engine;
     setCanvas(element);
     setEngineKind(engine.kind);
+    window.__editorStartup?.stage(`preview engine: ${engine.kind}${engine.kind === 'cpu' ? ` (${reason})` : ''}`);
     onEngine?.({ kind: engine.kind, maxEdge: engine.maxEdge, reason: engine.kind === 'cpu' ? reason : null });
 
     const onLost = (event) => { event.preventDefault(); recordDiagnostic('webgl2', 'Graphics context lost.', 'warning'); setStatus({ state: 'error', message: 'The graphics context was lost. Restoring the preview…' }); };

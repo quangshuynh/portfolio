@@ -124,7 +124,15 @@ function Unsupported({ missing }) {
 /** The public photo editor. Everything runs in this browser tab; nothing is uploaded. */
 export default function EditorApp() {
   const [capabilities] = useState(() => browserCapabilities());
-  if (capabilities.missing.length) return <Unsupported missing={capabilities.missing} />;
+  const unsupported = capabilities.missing.length > 0;
+  // Tells the HTML-shell startup watchdog (public/photography/editor-startup.js) that a
+  // visible editor or unsupported-browser page is on screen. Runs after the children mount.
+  useEffect(() => {
+    window.__editorStartup?.stage(unsupported ? `unsupported: ${capabilities.missing.join(', ')}` : 'editor mounted');
+    document.documentElement.dataset.editor = unsupported ? 'unsupported' : 'ready';
+    return () => { delete document.documentElement.dataset.editor; };
+  }, [capabilities, unsupported]);
+  if (unsupported) return <Unsupported missing={capabilities.missing} />;
   return <EditorWorkspace />;
 }
 
@@ -177,13 +185,10 @@ function EditorWorkspace() {
     const previous = meta?.getAttribute('content');
     meta?.setAttribute('content', EDITOR_THEME_COLOR);
     document.documentElement.classList.add('pe-document');
-    // Tells the HTML-shell startup watchdog (public/photography/editor-startup.js) the editor mounted.
-    document.documentElement.dataset.editor = 'ready';
     const pool = workers.current;
     return () => {
       if (previous) meta?.setAttribute('content', previous);
       document.documentElement.classList.remove('pe-document');
-      delete document.documentElement.dataset.editor;
       Object.values(pool).forEach((client) => client?.terminate());
       exportJob.current?.client.terminate();
     };
