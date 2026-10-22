@@ -33,7 +33,10 @@ gallery. Interval 0 changed no site behaviour.
   [architecture-decisions.md](architecture-decisions.md), which could not be
   verified or set up without billing. See
   [photography-cms.md](../photography-cms.md).
-- **Interval 3** (editor core) needs authorization. Recommended scope, as
+- **Interval 3** (editor core): built on `feat/photography-editor-core`; see
+  [photography-editor.md](../photography-editor.md). The plan below is kept
+  for reference.
+- *(Earlier plan)* **Interval 3** (editor core) needs authorization. Recommended scope, as
   previously planned for Interval 2:
   - **Route and shell:** the `/photography/editor` route (`ROUTES`,
     `seo-plugin`, `vercel.json`), as a lazy chunk with no effect on the
