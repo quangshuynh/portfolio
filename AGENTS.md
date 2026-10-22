@@ -17,6 +17,8 @@ read it before changing projects or project assets.
 | `scripts/check-project-assets.mjs` | `npm run check:assets`: validation plus network probe of every remote image. |
 | `scripts/prepare-site-images.mjs` | `npm run prepare:images`: WebP derivatives in `src/assets/optimized`. |
 | `docs/project-assets.md` | Data model, caching rationale, screenshot guidelines. |
+| `docs/photography-platform/` | Interval 0 audit and architecture for the photography CMS and editor (planning only). |
+| `experiments/raw-decode-poc/` | Isolated RAW decoding proof of concept with its own `package.json`; not part of the site build or root `npm test`. |
 
 ## Project metadata
 
