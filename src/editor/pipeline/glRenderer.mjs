@@ -156,6 +156,13 @@ export class GlRenderer {
     this.texture = null;
   }
 
+  /** Frees the texture and shrinks the drawing buffer while no photo is shown. */
+  clear() {
+    this.releaseSource();
+    this.canvas.width = 1;
+    this.canvas.height = 1;
+  }
+
   dispose() {
     const { gl } = this;
     this.releaseSource();

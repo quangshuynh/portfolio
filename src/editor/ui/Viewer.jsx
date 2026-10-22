@@ -110,7 +110,7 @@ export default function Viewer({ photo, adjustments, compare, split, onSplitChan
 
   // Release the GPU texture when no photo is shown.
   useEffect(() => {
-    if (!proxy) engineRef.current?.renderer?.releaseSource();
+    if (!proxy) engineRef.current?.renderer?.clear();
   }, [proxy]);
 
   const splitFraction = compare === 'original' ? 1 : compare === 'split' ? split : 0;
@@ -169,13 +169,14 @@ export default function Viewer({ photo, adjustments, compare, split, onSplitChan
   }, []);
 
   const sourceWidth = photo?.width ?? 1;
+  const sourceHeight = photo?.height ?? 1;
   const proxyScale = proxy ? proxy.width / sourceWidth : 1;
   const fitZoom = proxy
-    ? Math.min((stageSize.width - STAGE_PADDING * 2) / sourceWidth, (stageSize.height - STAGE_PADDING * 2) / photo.height, 1)
+    ? Math.min((stageSize.width - STAGE_PADDING * 2) / sourceWidth, (stageSize.height - STAGE_PADDING * 2) / sourceHeight, 1)
     : 1;
   const zoom = view.fit ? Math.max(MIN_ZOOM, fitZoom) : view.zoom;
   const displayWidth = sourceWidth * zoom;
-  const displayHeight = (photo?.height ?? 1) * zoom;
+  const displayHeight = sourceHeight * zoom;
   const offsetX = view.fit ? (stageSize.width - displayWidth) / 2 : view.x;
   const offsetY = view.fit ? (stageSize.height - displayHeight) / 2 : view.y;
 

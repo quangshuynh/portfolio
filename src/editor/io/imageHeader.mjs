@@ -66,7 +66,7 @@ function parseJpeg(bytes, view) {
     }
     offset += 2 + length;
   }
-  throw new ImageHeaderError('corrupt', 'No image size was found in the JPEG header.');
+  throw new ImageHeaderError('corrupt', 'The JPEG header is damaged or incomplete.');
 }
 
 function parsePng(bytes, view) {

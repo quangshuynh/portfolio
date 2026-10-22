@@ -65,6 +65,7 @@ export default function EditorApp() {
   const resources = useRef(new Map());
   const proxyCache = useRef(new Map());
   const workers = useRef({});
+  const proxyJob = useRef({ busy: false, generation: 0 });
   const exportJob = useRef(null);
   const fileInputRef = useRef(null);
   const editsInputRef = useRef(null);
@@ -174,11 +175,13 @@ export default function EditorApp() {
     const resource = resources.current.get(target.id);
     if (!resource?.header) throw new Error('The original file is no longer available.');
     // One decode at a time: a newer request terminates the older one.
-    if (workers.current.proxy && workers.current.proxyBusy) {
+    const job = proxyJob.current;
+    if (workers.current.proxy && job.busy) {
       workers.current.proxy.terminate();
       workers.current.proxy = null;
     }
-    workers.current.proxyBusy = true;
+    const generation = (job.generation += 1);
+    job.busy = true;
     const size = proxyDimensions({ width: resource.header.displayWidth, height: resource.header.displayHeight }, maxEdge);
     try {
       const image = await worker('proxy').call('decode', { file: resource.file, header: resource.header, width: size.width, height: size.height });
@@ -188,7 +191,7 @@ export default function EditorApp() {
       }
       return image;
     } finally {
-      workers.current.proxyBusy = false;
+      if (generation === job.generation) job.busy = false;
     }
   }, [worker]);
 
@@ -299,6 +302,13 @@ export default function EditorApp() {
   };
 
   const openPicker = () => fileInputRef.current?.click();
+  // Rendered in the top bar on wide screens and in the Export panel on phones.
+  const sessionButtons = (className) => (
+    <div className={className}>
+      <button type="button" className="pe-button" onClick={saveEdits} disabled={!readyCount}>Save edits</button>
+      <button type="button" className="pe-button" onClick={() => editsInputRef.current?.click()}>Open edits</button>
+    </div>
+  );
   const history = photo?.history;
   const readyCount = state.photos.filter(({ status }) => status === 'ready').length;
 
@@ -339,7 +349,7 @@ export default function EditorApp() {
   });
 
   return (
-    <div className="pe" data-mobile-panel={mobilePanel} data-dragging={dragDepth > 0 || undefined} {...dragHandlers}>
+    <div className="pe" data-engine={engine?.kind} data-mobile-panel={mobilePanel} data-dragging={dragDepth > 0 || undefined} {...dragHandlers}>
       <a className="skip-link" href="#pe-workspace">Skip to workspace</a>
       <header className="pe-bar">
         <a className="pe-back" href={appHref('/photography/')}>
@@ -360,8 +370,7 @@ export default function EditorApp() {
               <button key={value} type="button" aria-pressed={compare === value} disabled={!ready} onClick={() => setCompare(value)}>{label}</button>
             ))}
           </div>
-          <button type="button" className="pe-button" onClick={saveEdits} disabled={!readyCount}>Save edits</button>
-          <button type="button" className="pe-button" onClick={() => editsInputRef.current?.click()}>Open edits</button>
+          {sessionButtons('pe-session')}
           <input ref={editsInputRef} type="file" accept="application/json,.json" hidden onChange={(event) => { openEdits(event.target.files[0]); event.target.value = ''; }} />
         </div>
       </header>
@@ -446,6 +455,7 @@ export default function EditorApp() {
             unsupportedFormats={unsupportedFormats}
             busy={exporting}
           />
+          {sessionButtons('pe-session pe-session--panel')}
         </div>
         <details className="pe-shortcuts">
           <summary>Keyboard shortcuts</summary>
