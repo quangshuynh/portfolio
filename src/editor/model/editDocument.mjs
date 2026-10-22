@@ -1,14 +1,18 @@
 // Portable edit document: adjustment values and export settings, plus enough about
-// each source to match it again on reimport. It never contains pixels. Parsing is
-// strict JSON with schema checks; nothing in a document is ever executed.
+// each source to match it again on reimport. It never contains pixels or LUT data:
+// a LUT is referenced by name and SHA-256 and must be imported again (the editor
+// shows it as missing until then). Parsing is strict JSON with schema checks;
+// nothing in a document is ever executed.
 
-import { ADJUSTMENT_KEYS, normalizeAdjustments } from './adjustments.mjs';
+import { compactAdjustments, normalizeAdjustments } from './adjustments.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { safeSuffix } from '../io/files.mjs';
 
 export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
-export const DOCUMENT_VERSION = 1;
-export const MAX_DOCUMENT_BYTES = 1024 * 1024;
+// Version 2 added curves, HSL and LUT references; version 1 files read unchanged.
+export const DOCUMENT_VERSION = 2;
+// Room for 500 photos with every control and curve point set (about 1.2 MB).
+export const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
 
 export const DEFAULT_EXPORT_SETTINGS = Object.freeze({
   format: 'jpeg',
@@ -63,12 +67,13 @@ export function createEditDocument(photos, exportSettings, now = new Date()) {
         height: photo.height,
         orientation: photo.orientation ?? 1,
       },
-      adjustments: { ...normalizeAdjustments(photo.adjustments) },
+      adjustments: compactAdjustments(photo.adjustments),
     })),
   };
 }
 
-export const serializeEditDocument = (document) => `${JSON.stringify(document, null, 2)}\n`;
+// Indented JSON, with each curve point [x, y] kept on one line.
+export const serializeEditDocument = (document) => `${JSON.stringify(document, null, 2).replace(/\[\s+(\d+),\s+(\d+)\s+\]/g, '[$1, $2]')}\n`;
 
 function parseSource(source, index) {
   if (!isObject(source)) throw new EditDocumentError(`Photo ${index + 1} has no source description.`);
@@ -87,13 +92,20 @@ function parseSource(source, index) {
   };
 }
 
+/** Settings from untrusted JSON: finite numbers, curves and a LUT reference, all validated. */
+export function parseAdjustments(input) {
+  const values = isObject(input) ? input : {};
+  const numeric = Object.fromEntries(Object.entries(values).filter(([, value]) => typeof value === 'number' && Number.isFinite(value)));
+  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut });
+}
+
 /**
  * Parses and validates a saved document. Unknown fields are ignored; out-of-range
  * adjustment values are clamped. Throws EditDocumentError with a readable message.
  */
 export function parseEditDocument(text) {
   if (typeof text !== 'string') throw new EditDocumentError('The edit file could not be read.');
-  if (text.length > MAX_DOCUMENT_BYTES) throw new EditDocumentError('The edit file is larger than 1 MB.');
+  if (text.length > MAX_DOCUMENT_BYTES) throw new EditDocumentError('The edit file is larger than 4 MB.');
   let data;
   try {
     data = JSON.parse(text);
@@ -102,7 +114,7 @@ export function parseEditDocument(text) {
   }
   if (!isObject(data) || data.type !== DOCUMENT_TYPE) throw new EditDocumentError('This is not a photo editor edit file.');
   if (!Number.isInteger(data.version) || data.version < 1) throw new EditDocumentError('The edit file has no valid version.');
-  if (data.version > DOCUMENT_VERSION) throw new EditDocumentError(`The edit file is version ${data.version}; this editor reads version ${DOCUMENT_VERSION}.`);
+  if (data.version > DOCUMENT_VERSION) throw new EditDocumentError(`The edit file is version ${data.version}; this editor reads versions 1 to ${DOCUMENT_VERSION}.`);
   if (!Array.isArray(data.photos)) throw new EditDocumentError('The edit file lists no photos.');
   if (data.photos.length > 500) throw new EditDocumentError('The edit file lists more than 500 photos.');
   return {
@@ -110,11 +122,7 @@ export function parseEditDocument(text) {
     exportSettings: normalizeExportSettings(data.exportSettings),
     photos: data.photos.map((entry, index) => {
       if (!isObject(entry)) throw new EditDocumentError(`Photo ${index + 1} is not an object.`);
-      const adjustments = isObject(entry.adjustments) ? entry.adjustments : {};
-      const numeric = Object.fromEntries(ADJUSTMENT_KEYS
-        .filter((key) => typeof adjustments[key] === 'number' && Number.isFinite(adjustments[key]))
-        .map((key) => [key, adjustments[key]]));
-      return { source: parseSource(entry.source, index), adjustments: normalizeAdjustments(numeric) };
+      return { source: parseSource(entry.source, index), adjustments: parseAdjustments(entry.adjustments) };
     }),
   };
 }
