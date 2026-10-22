@@ -278,6 +278,8 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
   .pe[data-mobile-panel='adjust'] [data-section='export'],
   .pe[data-mobile-panel='export'] [data-section='adjust'],
   .pe-inspector .pe-shortcuts { display: none; }
+  /* Diagnostics stay reachable on phones, under Export: that is where startup problems need reading. */
+  .pe[data-mobile-panel='export'] .pe-inspector .pe-diagnostics { display: block; }
   .pe-inspector__section + .pe-inspector__section { border-top: 0; }
   .pe-photo--strip .pe-photo__frame { width: 3.4rem; height: 3.4rem; }
   .pe-viewer-bar { padding-right: 11rem; }
