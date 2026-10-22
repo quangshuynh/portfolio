@@ -3,8 +3,23 @@
 // It runs spec.processLinear per pixel with two exact-enough speedups: tone mapping
 // is tabulated per render, and 8-bit encoding uses code thresholds instead of a power.
 
-import { SRGB_TO_LINEAR_8BIT, srgbToLinear } from './colorMath.mjs';
-import { exactToneLuminance, processLinear } from './spec.mjs';
+import { SRGB_TO_LINEAR_8BIT, linearToSrgb, srgbToLinear } from './colorMath.mjs';
+import { exactToneLuminance, processDisplay, processLinear } from './spec.mjs';
+
+// Tabulated transfer functions for the display stages (curves, HSL, LUT), linear between
+// entries: the encode table is indexed by sqrt(linear) to spend samples on the shadows.
+// Both stay within 1e-7 of the exact functions, far below one 8-bit code.
+const TRANSFER_TABLE_SIZE = 4096;
+const OETF_TABLE = Float64Array.from({ length: TRANSFER_TABLE_SIZE + 1 }, (_, i) => linearToSrgb((i / TRANSFER_TABLE_SIZE) ** 2));
+const EOTF_TABLE = Float64Array.from({ length: TRANSFER_TABLE_SIZE + 1 }, (_, i) => srgbToLinear(i / TRANSFER_TABLE_SIZE));
+const lookup = (table, position) => {
+  const index = Math.min(TRANSFER_TABLE_SIZE - 1, Math.floor(position));
+  return table[index] + (table[index + 1] - table[index]) * (position - index);
+};
+export const fastTransfer = Object.freeze({
+  toSrgb: (v) => (v <= 0 ? 0 : v >= 1 ? linearToSrgb(v) : lookup(OETF_TABLE, Math.sqrt(v) * TRANSFER_TABLE_SIZE)),
+  toLinear: (p) => (p <= 0 ? srgbToLinear(Math.max(0, p)) : p >= 1 ? srgbToLinear(p) : lookup(EOTF_TABLE, p * TRANSFER_TABLE_SIZE)),
+});
 
 // Linear value at which each sRGB code begins: code c covers [T[c], T[c + 1]).
 const ENCODE_THRESHOLDS = Float64Array.from({ length: 256 }, (_, code) => (code === 0 ? -Infinity : srgbToLinear((code - 0.5) / 255)));
@@ -80,6 +95,20 @@ export function renderRgba8(source, params, {
     const alpha = source[i + 3];
     if (p.neutral) {
       target[i] = source[i]; target[i + 1] = source[i + 1]; target[i + 2] = source[i + 2];
+    } else if (p.postActive) {
+      if (p.baseNeutral) {
+        rgb[0] = source[i] / 255; rgb[1] = source[i + 1] / 255; rgb[2] = source[i + 2] / 255;
+      } else {
+        rgb[0] = SRGB_TO_LINEAR_8BIT[source[i]];
+        rgb[1] = SRGB_TO_LINEAR_8BIT[source[i + 1]];
+        rgb[2] = SRGB_TO_LINEAR_8BIT[source[i + 2]];
+        processLinear(rgb, p, tone);
+        rgb[0] = fastTransfer.toSrgb(rgb[0]); rgb[1] = fastTransfer.toSrgb(rgb[1]); rgb[2] = fastTransfer.toSrgb(rgb[2]);
+      }
+      processDisplay(rgb, p, fastTransfer);
+      target[i] = Math.round(rgb[0] * 255);
+      target[i + 1] = Math.round(rgb[1] * 255);
+      target[i + 2] = Math.round(rgb[2] * 255);
     } else {
       rgb[0] = SRGB_TO_LINEAR_8BIT[source[i]];
       rgb[1] = SRGB_TO_LINEAR_8BIT[source[i + 1]];

@@ -13,6 +13,8 @@ import { build, createServer, preview } from 'vite';
 import { renderRgba8 } from '../src/editor/pipeline/cpuRenderer.mjs';
 import { deriveParams } from '../src/editor/pipeline/spec.mjs';
 import { parseEditDocument } from '../src/editor/model/editDocument.mjs';
+import { parseCube } from '../src/editor/pipeline/lut.mjs';
+import { lookCube } from '../src/editor/dev/lutFixtures.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const headed = process.argv.includes('--headed');
@@ -78,6 +80,8 @@ async function makeFixtures() {
   files.broken = path.join(fixtures, 'broken.jpg');
   writeFileSync(path.join(fixtures, 'animation.jpg'), await sharp({ create: { width: 8, height: 8, channels: 3, background: '#888' } }).gif().toBuffer());
   files.gif = path.join(fixtures, 'animation.jpg');
+  writeFileSync(path.join(fixtures, 'look-65.cube'), lookCube(65, 'Check look'));
+  files.lut65 = path.join(fixtures, 'look-65.cube');
   writeFileSync(path.join(fixtures, 'empty.jpg'), Buffer.alloc(0));
   files.empty = path.join(fixtures, 'empty.jpg');
   return files;
@@ -267,6 +271,18 @@ async function main() {
       await waitFor('document.querySelector(".pe[data-engine]")', 'editor mounted');
     });
 
+    await check('the photography page links to the editor without a full page load', async () => {
+      await navigate(`${origin}/photography/`);
+      await waitFor('document.querySelector(".photography-intro__tool a")', 'gallery rendered');
+      await evaluate('window.__sameDocument = true');
+      await click('.photography-intro__tool a');
+      await waitFor('document.querySelector(".pe[data-engine]")', 'editor mounted in-app');
+      assert.equal(await evaluate('window.__sameDocument'), true, 'the page reloaded');
+      assert.equal(await evaluate('location.pathname'), '/photography/editor');
+      await navigate(`${origin}/photography/editor`);
+      await waitFor('document.querySelector(".pe[data-engine]")', 'editor mounted');
+    });
+
     // ---------- import ----------
     let started = Date.now();
     await importFiles([files.chart, files.webp, files.alpha, files.rotated, files.duplicate, files.damaged, files.broken, files.gif, files.empty]);
@@ -352,7 +368,56 @@ async function main() {
       let max = 0;
       for (let i = 0; i < expected.length; i += 1) max = Math.max(max, Math.abs(expected[i] - exported.data[i]));
       assert.equal(max, 0, `max difference ${max}`);
+      rmSync(file);
       return { maxDifference: max };
+    });
+    await check('LUT import, HSL, curve keyboard edits and a preset: PNG export equals the CPU reference', async () => {
+      const openSection = async (id) => {
+        if (await evaluate(`document.querySelector('.pe-section[data-section-id=${id}] .pe-section__toggle').getAttribute('aria-expanded') === 'false'`)) await click(`.pe-section[data-section-id=${id}] .pe-section__toggle`);
+      };
+      await openSection('lut');
+      const started = Date.now();
+      const { root: doc } = await page.send('DOM.getDocument', { depth: -1 });
+      const { nodeId } = await page.send('DOM.querySelector', { nodeId: doc.nodeId, selector: 'input[aria-label="Import a .cube LUT"]' });
+      await page.send('DOM.setFileInputFiles', { nodeId, files: [files.lut65] });
+      await waitFor(`document.querySelector('.pe-lut select')?.value.length === 64`, 'LUT imported', 30_000);
+      const lutImportMs = Date.now() - started;
+      await setValue('Intensity', 70);
+      await openSection('hsl');
+      await click('.pe-hsl__swatch[aria-label^="Blue"]');
+      await setValue('Blue saturation', -35);
+      await click('.pe-hsl__swatch[aria-label^="Orange"]');
+      await setValue('Orange hue', 20);
+      await openSection('curves');
+      await click('.pe-curve__actions .pe-text-button');
+      await evaluate(`document.querySelector('.pe-curve__point[aria-label="Point 2 of 3"]').focus()`);
+      for (let n = 0; n < 3; n += 1) await key('ArrowUp', { keyCode: 38, modifiers: 8 });
+      assert.equal(await evaluate(`document.querySelector('.pe-curve__point[aria-label="Point 2 of 3"]').getAttribute('aria-valuetext')`), 'Input 128, output 158');
+      await blur();
+      await exportPhoto('png');
+      const file = await waitDownload('chart-edited.png');
+      const exported = await sharp(file).ensureAlpha().raw().toBuffer();
+      const source = await sharp(files.chart).ensureAlpha().raw().toBuffer();
+      const settings = { ...COMBINED, blueSaturation: -35, orangeHue: 20, lut: { sha256: '0'.repeat(64), name: 'look' }, lutIntensity: 70, curves: { master: [[0, 0], [128, 158], [255, 255]] } };
+      const expected = renderRgba8(new Uint8ClampedArray(source), deriveParams(settings, { lut: parseCube(readFileSync(files.lut65, 'utf8')) }));
+      let max = 0;
+      for (let i = 0; i < expected.length; i += 1) max = Math.max(max, Math.abs(expected[i] - exported[i]));
+      assert.equal(max, 0, `max difference ${max}`);
+      rmSync(file);
+      // A preset applies to another photo as one undo step, through the same engine.
+      await selectPhoto('photo.webp');
+      await previewReady();
+      await openSection('presets');
+      const before = await valueOf('Contrast');
+      await click('.pe-preset__apply[aria-label="Apply High Contrast"]');
+      assert.equal(await valueOf('Contrast'), '+35');
+      await blur();
+      await key('z', { modifiers: 2 });
+      assert.equal(await valueOf('Contrast'), before);
+      await selectPhoto('chart.png');
+      await previewReady();
+      report.measurements.lut65ImportMs = lutImportMs;
+      return { maxDifference: max, lut65ImportMs: lutImportMs };
     });
     await check('neutral export of an EXIF-rotated JPEG is upright and full size', async () => {
       await selectPhoto('rotated-exif6.jpg');
@@ -370,7 +435,7 @@ async function main() {
     await check('WebP export with resize keeps the aspect ratio and format', async () => {
       await selectPhoto('photo.webp');
       await previewReady();
-      await evaluate(`(() => { const s = document.querySelector('.pe-inspector select'); const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; set.call(s, 'long-edge'); s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await evaluate(`(() => { const s = document.querySelector('[data-section=export] select'); const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; set.call(s, 'long-edge'); s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
       await pause(50);
       await evaluate(`(() => { const i = document.querySelector('.pe-field--inline input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, '400'); i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
       await exportPhoto('webp');
@@ -379,7 +444,7 @@ async function main() {
       assert.equal(metadata.format, 'webp');
       assert.deepEqual([metadata.width, metadata.height], [400, 267]);
       assert.equal(metadata.exif, undefined, 'export carries EXIF');
-      await evaluate(`(() => { const s = document.querySelector('.pe-inspector select'); const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; set.call(s, 'original'); s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await evaluate(`(() => { const s = document.querySelector('[data-section=export] select'); const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; set.call(s, 'original'); s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     });
     await check('JPEG export flattens transparency onto white', async () => {
       await selectPhoto('alpha.png');
@@ -485,7 +550,10 @@ async function main() {
       const name = `photo-edits-${new Date().toISOString().slice(0, 10)}.json`;
       const document = parseEditDocument(readFileSync(await waitDownload(name), 'utf8'));
       const chart = document.photos.find(({ source }) => source.name === 'chart.png');
-      assert.deepEqual(chart.adjustments, COMBINED);
+      assert.deepEqual(Object.fromEntries(Object.keys(COMBINED).map((k) => [k, chart.adjustments[k]])), COMBINED);
+      assert.equal(chart.adjustments.lut.name, 'look-65.cube');
+      assert.deepEqual(chart.adjustments.curves.master, [[0, 0], [128, 158], [255, 255]]);
+      assert.ok(!readFileSync(path.join(downloads, name), 'utf8').includes('"data"'), 'LUT data saved in the document');
       assert.ok(!readFileSync(path.join(downloads, name), 'utf8').includes('blob:'));
       await navigate(`${origin}/photography/editor`);
       await waitFor(`document.querySelector('.pe-notice')?.textContent.includes('Reimport the original')`, 'restore notice');
@@ -494,6 +562,13 @@ async function main() {
       await selectPhoto('chart.png');
       assert.equal(await valueOf('Exposure'), '+0.35 EV');
       assert.equal(await valueOf('Saturation'), '-10');
+      // The LUT is referenced, not stored: it is reported missing and export waits for it.
+      await waitFor(`document.querySelector('.pe-lut__missing')?.textContent.includes('look-65.cube')`, 'missing LUT notice');
+      assert.ok(await evaluate(`document.querySelector('.pe-export-button').disabled`), 'export not blocked');
+      const { root: doc } = await page.send('DOM.getDocument', { depth: -1 });
+      const { nodeId } = await page.send('DOM.querySelector', { nodeId: doc.nodeId, selector: 'input[aria-label="Import a .cube LUT"]' });
+      await page.send('DOM.setFileInputFiles', { nodeId, files: [files.lut65] });
+      await waitFor(`!document.querySelector('.pe-lut__missing') && !document.querySelector('.pe-export-button').disabled`, 'LUT restored');
     });
 
     await check('removing photos releases memory', async () => {

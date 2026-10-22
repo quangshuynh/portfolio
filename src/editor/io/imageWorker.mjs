@@ -12,11 +12,12 @@ const workerCanvas = () => {
   }
 };
 const canDecode = workerCanvas() && typeof createImageBitmap === 'function';
+const NEEDS_CANVAS = new Set(['inspect', 'decode', 'export']);
 
 self.addEventListener('message', async ({ data: { id, type, payload } }) => {
   const progress = (value) => self.postMessage({ id, progress: value });
   try {
-    if (type !== 'render' && !canDecode) {
+    if (NEEDS_CANVAS.has(type) && !canDecode) {
       throw Object.assign(new Error('This browser cannot decode images in a background worker.'), { code: 'worker-canvas' });
     }
     const { result, transfer = [] } = await runTask(type, payload, progress);

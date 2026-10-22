@@ -1,11 +1,11 @@
 // Cross-engine check of /photography/editor on a production build: WebKit (iPhone
 // emulation and desktop), mobile Chromium and Firefox through Playwright, plus forced
 // fallbacks (no WebGL2, no module workers). Each run loads the page directly, imports,
-// adjusts, compares and exports, and fails on page errors or CSP violations.
+// adjusts, imports a .cube LUT, compares and exports, and fails on page errors or CSP violations.
 // WebKit here is Playwright's build, not Safari on iOS: passing it is evidence, not proof.
 // Usage: npm run check:editor:engines  (first: npx playwright install webkit firefox chromium)
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +13,8 @@ import sharp from 'sharp';
 import { build, preview } from 'vite';
 import { renderRgba8 } from '../src/editor/pipeline/cpuRenderer.mjs';
 import { deriveParams } from '../src/editor/pipeline/spec.mjs';
+import { parseCube } from '../src/editor/pipeline/lut.mjs';
+import { lookCube } from '../src/editor/dev/lutFixtures.mjs';
 
 // EDITOR_PLAYWRIGHT points at another Playwright build (e.g. an older WebKit) to test it too.
 const { chromium, devices, firefox, webkit } = await import(process.env.EDITOR_PLAYWRIGHT || 'playwright');
@@ -54,6 +56,7 @@ async function makeFixtures() {
   return {
     large: await write('photo-12mp.jpg', sharp(data, { raw: { width, height, channels: 3 } }).jpeg({ quality: 90 })),
     chart: await write('chart.png', sharp(chart, { raw: { width: 64, height: 64, channels: 4 } }).png()),
+    lut: (() => { const file = path.join(fixtures, 'look-33.cube'); writeFileSync(file, lookCube(33)); return file; })(),
   };
 }
 
@@ -170,9 +173,19 @@ async function runOne(run, files) {
       await field.fill('30');
       await field.press('Enter');
       await poll(() => field.inputValue(), (value) => value === '+30', 'saturation shows +30');
+      // A .cube LUT through the UI: parsed in the worker (or main thread), applied at 60%.
+      await page.click('.pe-section[data-section-id=lut] .pe-section__toggle');
+      await page.setInputFiles('input[aria-label="Import a .cube LUT"]', files.lut);
+      await poll(() => page.locator('.pe-lut select').inputValue(), (value) => value.length === 64, 'LUT imported');
+      const intensity = page.locator('input[aria-label="Intensity value"]');
+      await intensity.fill('60');
+      await intensity.press('Enter');
+      await poll(() => intensity.inputValue(), (value) => value === '60%', 'intensity shows 60%');
       if (run.device) await page.click('.pe-tabs button:nth-child(3)');
       await page.check('input[name=pe-format][value=png]');
-      const { max, worst } = maxDifference(renderRgba8(new Uint8ClampedArray(source), deriveParams({ saturation: 30 })), await exportRgba(page));
+      const settings = { saturation: 30, lut: { sha256: '0'.repeat(64), name: 'look' }, lutIntensity: 60 };
+      const lut = parseCube(readFileSync(files.lut, 'utf8'));
+      const { max, worst } = maxDifference(renderRgba8(new Uint8ClampedArray(source), deriveParams(settings, { lut })), await exportRgba(page));
       result.pngMaxDifference = max;
       assert.ok(max <= result.pngEncoderMaxDifference, `max difference ${max}, encoder alone ${result.pngEncoderMaxDifference} ${JSON.stringify(worst)}`);
     });

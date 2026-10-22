@@ -1,7 +1,8 @@
 // Editor state as a pure reducer: the photo list, per-photo adjustments and history,
 // export settings, and saved edits waiting for their source files to be reimported.
 
-import { clampAdjustment, neutralAdjustments, normalizeAdjustments } from './adjustments.mjs';
+import { clampAdjustment, neutralAdjustments, neutralGroup, normalizeAdjustments } from './adjustments.mjs';
+import { presetPatch } from './presets.mjs';
 import * as history from './history.mjs';
 import { DEFAULT_EXPORT_SETTINGS, normalizeExportSettings } from './editDocument.mjs';
 
@@ -83,6 +84,20 @@ export function editorReducer(state, action) {
       ));
     case 'resetAdjustment':
       return updateHistory(state, (h) => history.apply(h, { ...h.present, [action.key]: neutralAdjustments()[action.key] }));
+    // Structured or multi-key changes (curves, LUT, presets): `patch` is merged over the
+    // current settings and normalised. Preview/commit work as for sliders.
+    case 'previewSettings':
+      return updateHistory(state, (h) => history.preview(h, normalizeAdjustments({ ...h.present, ...action.patch })));
+    case 'applySettings':
+      return updateHistory(state, (h) => history.apply(
+        h,
+        normalizeAdjustments({ ...h.present, ...action.patch }),
+        { coalesceKey: action.coalesceKey ?? null, now: action.now },
+      ));
+    case 'applyPreset':
+      return updateHistory(state, (h) => history.apply(h, normalizeAdjustments({ ...h.present, ...presetPatch(action.preset) })));
+    case 'resetGroup':
+      return updateHistory(state, (h) => history.apply(h, normalizeAdjustments({ ...h.present, ...neutralGroup(action.group) })));
     case 'resetAll':
       return updateHistory(state, (h) => history.apply(h, neutralAdjustments()));
     case 'undo':

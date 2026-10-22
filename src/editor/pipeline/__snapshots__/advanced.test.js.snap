@@ -1,0 +1,38 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`combined pipeline > matches the advanced reference fixture 1`] = `
+[
+  5,
+  8,
+  21,
+  255,
+  247,
+  245,
+  223,
+  255,
+  153,
+  149,
+  111,
+  255,
+  228,
+  63,
+  29,
+  255,
+  56,
+  141,
+  183,
+  255,
+  248,
+  233,
+  156,
+  255,
+  46,
+  62,
+  52,
+  255,
+  123,
+  169,
+  96,
+  128,
+]
+`;

@@ -26,7 +26,7 @@ function NumberField({ label, value, onChange }) {
   );
 }
 
-export default function ExportPanel({ settings, photo, dispatch, onExport, onCancel, unsupportedFormats, busy }) {
+export default function ExportPanel({ settings, photo, dispatch, onExport, onCancel, unsupportedFormats, busy, blockedReason = null }) {
   const set = (changes) => dispatch({ type: 'setExportSettings', settings: changes });
   const setResize = (changes) => set({ resize: { ...settings.resize, ...changes } });
   const ready = photo?.status === 'ready';
@@ -110,10 +110,11 @@ export default function ExportPanel({ settings, photo, dispatch, onExport, onCan
           <button type="button" className="pe-text-button" onClick={onCancel}>Cancel</button>
         </div>
       ) : (
-        <button type="button" className="pe-button pe-button--primary pe-export-button" disabled={!ready || busy} onClick={onExport}>
+        <button type="button" className="pe-button pe-button--primary pe-export-button" disabled={!ready || busy || Boolean(blockedReason)} onClick={onExport}>
           Export photo
         </button>
       )}
+      {blockedReason && <p className="pe-note pe-note--error" role="alert">{blockedReason}</p>}
       {status.state === 'done' && <p className="pe-note" role="status">Saved {status.fileName} ({status.width} × {status.height}).</p>}
       {status.state === 'error' && <p className="pe-note pe-note--error" role="alert">{status.message}</p>}
       {status.state === 'cancelled' && <p className="pe-note" role="status">Export cancelled.</p>}

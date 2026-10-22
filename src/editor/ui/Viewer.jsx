@@ -40,7 +40,7 @@ const clampZoom = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
  * Centre workspace: the processed preview with zoom, pan and before/after.
  * Zoom is expressed in source pixels per CSS pixel (1 = 100%).
  */
-export default function Viewer({ photo, adjustments, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, zoomCommand }) {
+export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, zoomCommand }) {
   const stageRef = useRef(null);
   const canvasHostRef = useRef(null);
   const engineRef = useRef(null);
@@ -148,7 +148,7 @@ export default function Viewer({ photo, adjustments, compare, split, onSplitChan
     job.busy = true;
     const id = (job.latest += 1);
     try {
-      const rendered = params.neutral ? image : await renderInWorker(image, params.adjustments);
+      const rendered = params.neutral ? image : await renderInWorker(image, params.adjustments, params.lutData);
       if (id === job.latest && proxyRef.current === image) {
         engine.context.putImageData(new ImageData(new Uint8ClampedArray(rendered.data), image.width, image.height), 0, 0);
         const sourceWidth = Math.round(image.width * params.split);
@@ -172,15 +172,15 @@ export default function Viewer({ photo, adjustments, compare, split, onSplitChan
     if (!engine || !proxy) return undefined;
     cancelAnimationFrame(frameRef.current);
     frameRef.current = requestAnimationFrame(() => {
-      const params = deriveParams(adjustments);
+      const params = deriveParams(adjustments, { lut });
       if (engine.kind === 'webgl2') {
         if (!engine.renderer.lost) engine.renderer.render(params, { split: splitFraction });
       } else {
-        drawCpu({ ...params, neutral: params.neutral, adjustments, split: splitFraction });
+        drawCpu({ ...params, neutral: params.neutral, adjustments, lutData: params.lutActive ? lut : null, split: splitFraction });
       }
     });
     return () => cancelAnimationFrame(frameRef.current);
-  }, [adjustments, splitFraction, proxy, drawCpu]);
+  }, [adjustments, lut, splitFraction, proxy, drawCpu]);
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -233,17 +233,50 @@ export default function Viewer({ photo, adjustments, compare, split, onSplitChan
     return () => stage.removeEventListener('wheel', onWheel);
   }, [onWheel]);
 
+  // One pointer pans; two pointers (touch) pinch-zoom around their midpoint and pan with it.
+  const pointersRef = useRef(new Map());
+  const stagePoint = (x, y) => {
+    const rect = stageRef.current.getBoundingClientRect();
+    return { x: x - rect.left, y: y - rect.top };
+  };
+  const startGesture = (view) => {
+    const points = [...pointersRef.current.values()];
+    if (points.length >= 2) {
+      const [a, b] = points;
+      dragRef.current = { pinch: true, distance: Math.hypot(a.x - b.x, a.y - b.y) || 1, mid: stagePoint((a.x + b.x) / 2, (a.y + b.y) / 2), ...view };
+    } else if (points.length === 1) {
+      dragRef.current = { pinch: false, start: points[0], ...view };
+    } else {
+      dragRef.current = null;
+    }
+  };
   const onPointerDown = (event) => {
     if (!proxy || event.button !== 0 || event.target.closest('.pe-split')) return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    dragRef.current = { x: event.clientX, y: event.clientY, originX: offsetX, originY: offsetY, zoom };
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    startGesture({ originX: offsetX, originY: offsetY, zoom });
   };
   const onPointerMove = (event) => {
+    if (!pointersRef.current.has(event.pointerId)) return;
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     const drag = dragRef.current;
     if (!drag) return;
-    setView({ fit: false, zoom: drag.zoom, x: drag.originX + event.clientX - drag.x, y: drag.originY + event.clientY - drag.y });
+    if (drag.pinch) {
+      const [a, b] = [...pointersRef.current.values()];
+      const target = clampZoom(drag.zoom * (Math.hypot(a.x - b.x, a.y - b.y) / drag.distance));
+      const mid = stagePoint((a.x + b.x) / 2, (a.y + b.y) / 2);
+      // Keep the image point that was under the starting midpoint under the current one.
+      const ratio = target / drag.zoom;
+      setView({ fit: false, zoom: target, x: mid.x - (drag.mid.x - drag.originX) * ratio, y: mid.y - (drag.mid.y - drag.originY) * ratio });
+    } else {
+      setView({ fit: false, zoom: drag.zoom, x: drag.originX + event.clientX - drag.start.x, y: drag.originY + event.clientY - drag.start.y });
+    }
   };
-  const onPointerUp = () => { dragRef.current = null; };
+  const onPointerUp = (event) => {
+    if (!pointersRef.current.delete(event.pointerId)) return;
+    // Lifting one finger of a pinch continues as a pan from the current view.
+    startGesture({ originX: offsetX, originY: offsetY, zoom });
+  };
 
   // Split handle: pointer drag on the line, arrow keys when focused.
   const splitDragRef = useRef(false);
@@ -306,6 +339,7 @@ export default function Viewer({ photo, adjustments, compare, split, onSplitChan
         {!engineError && status.state === 'error' && <p className="pe-stage-message pe-stage-message--error" role="alert">{status.message || 'This photograph could not be shown.'}</p>}
         {photo && photo.status === 'importing' && <p className="pe-stage-message" role="status"><span className="pe-spinner" aria-hidden="true" />Reading {photo.name}…</p>}
         {compare === 'original' && proxy && <span className="pe-stage-badge" aria-live="polite">Original</span>}
+        {previewing && compare !== 'original' && proxy && <span className="pe-stage-badge" aria-live="polite">Preview: {previewing}</span>}
       </div>
       <div className="pe-viewer-bar">
         <span className="pe-readout mono" aria-live="polite">{proxy ? `${Math.round(zoom * 100)}%` : '—'}</span>

@@ -52,13 +52,14 @@ describe('adjustment panel', () => {
     expect(exposure).toHaveAttribute('min', '-5');
     expect(exposure).toHaveAttribute('max', '5');
     expect(exposure).toHaveAttribute('aria-valuetext', '0.00 EV');
+    // Only Light and Color start open; HSL, curve, LUT and presets are collapsed.
     expect(screen.getAllByRole('slider')).toHaveLength(10);
     // Disabled resets are hidden; changing a value reveals the button.
     expect(screen.queryByRole('button', { name: 'Reset Exposure' })).toBeNull();
     fireEvent.input(exposure, { target: { value: '1' } });
     expect(screen.getByRole('button', { name: 'Reset Exposure' })).toBeEnabled();
-    expect(screen.getByRole('group', { name: 'Light' })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Color' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Light/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /^Color/ })).toHaveAttribute('aria-expanded', 'true');
   });
 
   test('a pointer drag previews every value and records one undo step on release', () => {

@@ -1,10 +1,25 @@
 // WebGL2 preview renderer. Draws the preview proxy into a canvas of the same size,
 // one texel per pixel, so CSS zoom and pan never resample inside the pipeline.
 
+import { CURVE_TABLE_SIZE } from './curves.mjs';
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './shader.mjs';
 
 const UNIFORMS = ['uSource', 'uWhiteBalanceActive', 'uWhiteBalance', 'uExposureGain', 'uToneActive', 'uContrast',
-  'uHighlights', 'uShadows', 'uWhites', 'uBlacks', 'uVibrance', 'uSaturation', 'uNeutral', 'uSplit'];
+  'uHighlights', 'uShadows', 'uWhites', 'uBlacks', 'uVibrance', 'uSaturation', 'uNeutral', 'uSplit',
+  'uBaseNeutral', 'uCurvesActive', 'uCurveActive', 'uCurves', 'uHslActive', 'uHslHue', 'uHslSat', 'uHslLum',
+  'uLutActive', 'uLut', 'uLutSize', 'uLutDomainMin', 'uLutDomainMax', 'uLutIntensity'];
+
+// Texture units: the photo, the curve table, the 3D LUT.
+const UNIT = { source: 0, curves: 1, lut: 2 };
+
+/** A float texture read only with texelFetch: NEAREST, so no filtering extension is needed. */
+function floatTexture(gl, target) {
+  const texture = gl.createTexture();
+  gl.bindTexture(target, texture);
+  [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER].forEach((name) => gl.texParameteri(target, name, gl.NEAREST));
+  [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, ...(target === gl.TEXTURE_3D ? [gl.TEXTURE_WRAP_R] : [])].forEach((name) => gl.texParameteri(target, name, gl.CLAMP_TO_EDGE));
+  return texture;
+}
 
 function compile(gl, type, source) {
   const shader = gl.createShader(type);
@@ -75,6 +90,38 @@ export class GlRenderer {
     this.texture = null;
     this.width = 0;
     this.height = 0;
+    // Curve table and LUT start as tiny placeholders so every sampler is always complete.
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.activeTexture(gl.TEXTURE0 + UNIT.curves);
+    this.curveTexture = floatTexture(gl, gl.TEXTURE_2D);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 1, 1, 0, gl.RGBA, gl.FLOAT, new Float32Array(4));
+    this.curveTable = null;
+    gl.activeTexture(gl.TEXTURE0 + UNIT.lut);
+    this.lutTexture = floatTexture(gl, gl.TEXTURE_3D);
+    gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGB32F, 1, 1, 1, 0, gl.RGB, gl.FLOAT, new Float32Array(3));
+    this.lutData = null;
+  }
+
+  /** Uploads the curve table when it changed (tables are cached per curve set). */
+  setCurves(table) {
+    if (table === this.curveTable) return;
+    const { gl } = this;
+    gl.activeTexture(gl.TEXTURE0 + UNIT.curves);
+    gl.bindTexture(gl.TEXTURE_2D, this.curveTexture);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, CURVE_TABLE_SIZE, 1, 0, gl.RGBA, gl.FLOAT, table);
+    this.curveTable = table;
+  }
+
+  /** Uploads a LUT's grid (red along x, green along y, blue along z) when it changed. */
+  setLut(lut) {
+    if (lut.data === this.lutData) return;
+    const { gl } = this;
+    gl.activeTexture(gl.TEXTURE0 + UNIT.lut);
+    gl.bindTexture(gl.TEXTURE_3D, this.lutTexture);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGB32F, lut.size, lut.size, lut.size, 0, gl.RGB, gl.FLOAT, lut.data);
+    this.lutData = lut.data;
   }
 
   get lost() {
@@ -141,6 +188,28 @@ export class GlRenderer {
     gl.uniform1f(u.uBlacks, params.tone.blacks);
     gl.uniform1f(u.uVibrance, params.vibrance);
     gl.uniform1f(u.uSaturation, params.saturation);
+    gl.uniform1i(u.uBaseNeutral, params.baseNeutral ? 1 : 0);
+    gl.uniform1i(u.uCurvesActive, params.curvesActive ? 1 : 0);
+    if (params.curvesActive) this.setCurves(params.curves.table);
+    gl.uniform4i(u.uCurveActive, ...params.curves.active.map(Number));
+    gl.uniform1i(u.uHslActive, params.hslActive ? 1 : 0);
+    gl.uniform1fv(u.uHslHue, params.hsl.hue);
+    gl.uniform1fv(u.uHslSat, params.hsl.saturation);
+    gl.uniform1fv(u.uHslLum, params.hsl.luminance);
+    gl.uniform1i(u.uLutActive, params.lutActive ? 1 : 0);
+    if (params.lutActive) {
+      this.setLut(params.lut);
+      gl.uniform1i(u.uLutSize, params.lut.size);
+      gl.uniform3fv(u.uLutDomainMin, params.lut.domainMin);
+      gl.uniform3fv(u.uLutDomainMax, params.lut.domainMax);
+      gl.uniform1f(u.uLutIntensity, params.lutIntensity);
+    }
+    gl.activeTexture(gl.TEXTURE0 + UNIT.curves);
+    gl.bindTexture(gl.TEXTURE_2D, this.curveTexture);
+    gl.uniform1i(u.uCurves, UNIT.curves);
+    gl.activeTexture(gl.TEXTURE0 + UNIT.lut);
+    gl.bindTexture(gl.TEXTURE_3D, this.lutTexture);
+    gl.uniform1i(u.uLut, UNIT.lut);
     gl.uniform1f(u.uSplit, split);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
@@ -173,6 +242,8 @@ export class GlRenderer {
   dispose() {
     const { gl } = this;
     this.releaseSource();
+    gl.deleteTexture(this.curveTexture);
+    gl.deleteTexture(this.lutTexture);
     gl.deleteBuffer(this.buffer);
     gl.deleteVertexArray(this.vao);
     gl.deleteProgram(this.program);
