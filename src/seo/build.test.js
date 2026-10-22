@@ -121,6 +121,15 @@ describe('production build at the site root', () => {
     expect(readFileSync(join(outDir, 'sitemap.xml'), 'utf8')).not.toContain('editor');
   });
 
+  test('loads the editor startup watchdog as a same-origin classic script before the app bundle', () => {
+    const html = readFileSync(join(outDir, EDITOR_ROUTE.file), 'utf8');
+    const watchdog = html.indexOf('<script src="/photography/editor-startup.js"></script>');
+    expect(watchdog).toBeGreaterThan(html.indexOf('Content-Security-Policy'));
+    expect(watchdog).toBeLessThan(html.indexOf('<script type="module"'));
+    expect(existsSync(join(outDir, 'photography/editor-startup.js'))).toBe(true);
+    [...ROUTES, NOT_FOUND_ROUTE].forEach(({ file }) => expect(readFileSync(join(outDir, file), 'utf8')).not.toContain('editor-startup'));
+  });
+
   test('keeps editor code out of every other page', () => {
     const editorChunks = readdirSync(join(outDir, 'assets')).filter((name) => /photoEditorPage|imageWorker/.test(name));
     expect(editorChunks.some((name) => name.startsWith('imageWorker'))).toBe(true);
