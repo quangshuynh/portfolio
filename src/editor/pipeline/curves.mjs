@@ -22,7 +22,9 @@ export function normalizeCurve(points) {
   points.forEach(([x, y]) => byX.set(Math.min(255, Math.max(0, Math.round(x))), Math.min(255, Math.max(0, Math.round(y)))));
   if (byX.size < 2) return NEUTRAL_CURVE;
   const sorted = [...byX.entries()].sort((a, b) => a[0] - b[0]);
-  return isNeutralCurve(sorted) ? NEUTRAL_CURVE : sorted;
+  // Identity-shaped point sets are kept (a point just added on the diagonal must not
+  // vanish); isNeutralCurve() still treats them as no change.
+  return sorted;
 }
 
 /** The identity: every point on y = x and the curve spans 0–255 (so no flat ends). */

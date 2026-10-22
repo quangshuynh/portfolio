@@ -36,7 +36,9 @@ describe('tone curves', () => {
     expect(normalizeCurve([[0, 0]])).toBe(NEUTRAL_CURVE);
     expect(normalizeCurve([[0, 0], ['a', 3]])).toBe(NEUTRAL_CURVE);
     expect(normalizeCurve(Array.from({ length: 17 }, (_, i) => [i * 15, i * 15]))).toBe(NEUTRAL_CURVE);
-    expect(normalizeCurve([[0, 0], [100, 100], [255, 255]])).toBe(NEUTRAL_CURVE);
+    // Points on the diagonal are kept for editing, and still render as the identity.
+    expect(normalizeCurve([[0, 0], [100, 100], [255, 255]])).toEqual([[0, 0], [100, 100], [255, 255]]);
+    expect(deriveParams({ curves: { master: [[0, 0], [100, 100], [255, 255]] } }).curvesActive).toBe(false);
     expect(normalizeCurve('0,0;255,255')).toBe(NEUTRAL_CURVE);
   });
 

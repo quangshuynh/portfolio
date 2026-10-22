@@ -3,6 +3,7 @@ import { activePhoto, editorReducer, initialEditorState } from '../model/editorS
 import { canRedo, canUndo } from '../model/history.mjs';
 import { createEditDocument, parseEditDocument, serializeEditDocument } from '../model/editDocument.mjs';
 import { neutralAdjustments } from '../model/adjustments.mjs';
+import { PRESETS_STORAGE_KEY, applyPreset, parsePresetFile, serializePresets } from '../model/presets.mjs';
 import { LIMITS, exportFileName, formatBytes, proxyDimensions } from '../io/files.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { createImageWorker, usingMainThread } from '../io/workerClient.mjs';
@@ -41,6 +42,16 @@ function readAutosave() {
     return text ? parseEditDocument(text) : null;
   } catch {
     return null;
+  }
+}
+
+// User presets live in this browser only, as a preset pack.
+function readPresets() {
+  try {
+    const text = localStorage.getItem(PRESETS_STORAGE_KEY);
+    return text ? parsePresetFile(text).map((preset) => ({ ...preset, id: newId() })) : [];
+  } catch {
+    return [];
   }
 }
 
@@ -137,10 +148,21 @@ function EditorWorkspace() {
   const [engine, setEngine] = useState(null);
   const [restoredCount, setRestoredCount] = useState(0);
   const unsupportedFormats = useMemo(unsupportedEncoders, []);
+  // .cube LUTs imported this session, by SHA-256. Never stored or uploaded.
+  const [luts, setLuts] = useState(() => new Map());
+  const [lutStatus, setLutStatus] = useState({ busy: false, error: null });
+  const [userPresets, setUserPresets] = useState(readPresets);
+  const [presetPreview, setPresetPreview] = useState(null);
+  const imageKeys = useRef(new WeakMap());
+  const renderState = useRef({ client: null, key: null, luts: new Set() });
 
   const photo = activePhoto(state);
   const adjustments = photo?.history.present ?? neutralAdjustments();
   const ready = photo?.status === 'ready';
+  const lutFor = useCallback((settings) => (settings?.lut ? luts.get(settings.lut.sha256) ?? null : null), [luts]);
+  // While a preset is hovered or focused, the preview shows it applied (nothing is recorded).
+  const viewAdjustments = useMemo(() => (presetPreview && ready ? applyPreset(adjustments, presetPreview) : adjustments), [presetPreview, ready, adjustments]);
+  const missingLut = ready && adjustments.lut && !luts.has(adjustments.lut.sha256) ? adjustments.lut : null;
   const importing = state.photos.filter(({ status }) => status === 'importing').length;
   const exporting = state.photos.some(({ exportStatus }) => exportStatus.state === 'running');
 
@@ -159,7 +181,7 @@ function EditorWorkspace() {
     return () => {
       if (previous) meta?.setAttribute('content', previous);
       document.documentElement.classList.remove('pe-document');
-      Object.values(pool).forEach((client) => client.terminate());
+      Object.values(pool).forEach((client) => client?.terminate());
       exportJob.current?.client.terminate();
     };
   }, []);
@@ -254,20 +276,61 @@ function EditorWorkspace() {
     }
   }, [worker]);
 
-  const renderInWorker = useCallback((image, values) => worker('render').call('render', { source: image, adjustments: values }), [worker]);
+  // CPU preview: the worker keeps the proxy and LUT, so they are sent only when they
+  // change (or the worker lost them), not on every render.
+  const renderInWorker = useCallback(async (image, values, lut) => {
+    const client = worker('render');
+    const sent = renderState.current;
+    if (sent.client !== client) Object.assign(sent, { client, key: null, luts: new Set() });
+    if (!imageKeys.current.has(image)) imageKeys.current.set(image, newId());
+    const key = imageKeys.current.get(image);
+    const call = (full) => client.call('render', {
+      key,
+      adjustments: values,
+      ...(full || sent.key !== key ? { source: image } : {}),
+      ...(lut ? { lut: full || !sent.luts.has(lut.sha256) ? lut : { sha256: lut.sha256 } } : {}),
+    });
+    let result;
+    try {
+      result = await call(false);
+    } catch (error) {
+      if (!/^stale-/.test(error.code)) throw error;
+      result = await call(true);
+    }
+    sent.key = key;
+    if (lut) sent.luts.add(lut.sha256);
+    return result;
+  }, [worker]);
   const onEngine = useCallback((info) => setEngine(info), []);
+  const lutsRef = useRef(luts);
+  lutsRef.current = luts;
 
   const removePhoto = useCallback((id) => {
     resources.current.delete(id);
     [...proxyCache.current.keys()].filter((key) => key.startsWith(`${id}:`)).forEach((key) => proxyCache.current.delete(key));
     if (exportJob.current?.id === id) exportJob.current.client.terminate();
     dispatch({ type: 'remove', id });
+    // With the workspace empty, end the idle workers so their heaps (decode buffers,
+    // the cached CPU-preview proxy) are freed now rather than at the next collection.
+    if (!resources.current.size) {
+      ['proxy', 'render', 'import'].forEach((name) => {
+        workers.current[name]?.terminate();
+        workers.current[name] = null;
+      });
+      proxyCache.current.clear();
+    }
   }, []);
 
   const exportActive = useCallback(async () => {
     const target = activePhoto(stateRef.current);
     const resource = target && resources.current.get(target.id);
     if (!resource?.header || exportJob.current) return;
+    const values = target.history.present;
+    const lut = values.lut ? lutsRef.current.get(values.lut.sha256) : null;
+    if (values.lut && !lut) {
+      dispatch({ type: 'exportStatus', id: target.id, status: { state: 'error', message: `Import the LUT "${values.lut.name}" again, or remove it, before exporting.` } });
+      return;
+    }
     const settings = stateRef.current.exportSettings;
     const client = createImageWorker();
     exportJob.current = { id: target.id, client };
@@ -277,7 +340,8 @@ function EditorWorkspace() {
       const result = await client.call('export', {
         file: resource.file,
         header: resource.header,
-        adjustments: target.history.present,
+        adjustments: values,
+        lut,
         settings,
       }, { onProgress: (progress) => dispatch({ type: 'exportStatus', id: target.id, status: { state: 'running', ...progress } }) });
       performance.measure('pe-export', 'pe-export-start');
@@ -293,6 +357,33 @@ function EditorWorkspace() {
   }, []);
 
   const cancelExport = useCallback(() => exportJob.current?.client.terminate(), []);
+
+  // Parses a .cube off the main thread, adds it to this session's library and applies it
+  // to the active photo. Photos waiting for this exact file (same hash) resolve too.
+  const importLut = useCallback(async (file) => {
+    setLutStatus({ busy: true, error: null });
+    try {
+      const lut = await worker('import').call('parseCube', { file });
+      setLuts((current) => new Map(current).set(lut.sha256, lut));
+      const target = activePhoto(stateRef.current);
+      if (target?.status === 'ready') {
+        dispatch({ type: 'applySettings', patch: { lut: { sha256: lut.sha256, name: lut.name, title: lut.title, size: lut.size } } });
+      }
+      setLutStatus({ busy: false, error: null });
+    } catch (error) {
+      setLutStatus({ busy: false, error: error.code === 'lut' ? error.message : `The LUT could not be read: ${error.message}` });
+    }
+  }, [worker]);
+
+  const changePresets = useCallback((next) => {
+    setUserPresets(next);
+    try {
+      if (next.length) localStorage.setItem(PRESETS_STORAGE_KEY, serializePresets(next));
+      else localStorage.removeItem(PRESETS_STORAGE_KEY);
+    } catch {
+      setNotice({ tone: 'warning', text: 'This browser did not allow saving presets; they last until the page is closed. Export them to keep them.' });
+    }
+  }, []);
 
   const saveEdits = () => {
     const photos = state.photos.filter(({ status }) => status === 'ready').map((item) => ({ ...item, adjustments: item.history.present }));
@@ -384,7 +475,7 @@ function EditorWorkspace() {
           onClick={() => dispatch({ type: 'select', id: item.id })}
         >
           <span className="pe-photo__frame">
-            {resource?.thumbnail ? <PhotoThumb thumbnail={resource.thumbnail} adjustments={item.history.present} /> : <span className="pe-photo__placeholder" aria-hidden="true">{item.status === 'error' ? '!' : <span className="pe-spinner" />}</span>}
+            {resource?.thumbnail ? <PhotoThumb thumbnail={resource.thumbnail} adjustments={item.history.present} lut={lutFor(item.history.present)} /> : <span className="pe-photo__placeholder" aria-hidden="true">{item.status === 'error' ? '!' : <span className="pe-spinner" />}</span>}
           </span>
           {variant === 'list' && (
             <span className="pe-photo__meta">
@@ -475,7 +566,9 @@ function EditorWorkspace() {
         <h2 className="visually-hidden">Preview</h2>
         <Viewer
           photo={photo}
-          adjustments={adjustments}
+          adjustments={viewAdjustments}
+          lut={lutFor(viewAdjustments)}
+          previewing={presetPreview && ready ? presetPreview.name : null}
           compare={compare}
           split={split}
           onSplitChange={setSplit}
@@ -502,10 +595,17 @@ function EditorWorkspace() {
 
       <aside className="pe-inspector" aria-label="Adjustments and export">
         <div className="pe-inspector__section" data-section="adjust">
-          <AdjustPanel adjustments={adjustments} disabled={!ready} dispatch={dispatch} />
+          <AdjustPanel
+            adjustments={adjustments}
+            disabled={!ready}
+            dispatch={dispatch}
+            lut={{ library: [...luts.values()], onImport: importLut, status: lutStatus }}
+            presets={{ userPresets, onChange: changePresets, onPreview: setPresetPreview, onDownload: downloadBlob, newId }}
+          />
         </div>
         <div className="pe-inspector__section" data-section="export">
           <ExportPanel
+            blockedReason={missingLut ? `The LUT "${missingLut.name}" is not loaded. Import it again (LUT section) or remove it to export.` : null}
             settings={state.exportSettings}
             photo={photo}
             dispatch={dispatch}
