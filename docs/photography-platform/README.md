@@ -13,6 +13,32 @@ gallery. Interval 0 changed no site behaviour.
 | [editor-hdr-architecture.md](editor-hdr-architecture.md) | Editor pipeline, preview/export parity, LUTs, presets, batch, HDR merge |
 | [dependencies-licensing.md](dependencies-licensing.md) | Dependency and licence risks |
 | [../../experiments/raw-decode-poc](../../experiments/raw-decode-poc/README.md) | Isolated RAW decoding proof of concept with tests and benchmarks |
+| [../photography-catalog.md](../photography-catalog.md) | Interval 1 result: catalog schema, workflows, CMS contract, migration and rollback |
+
+## Status
+
+- **Interval 0** (feasibility): done.
+- **Interval 1** (catalog foundation): done on `feat/photography-catalog`
+  (2026-10-22). It went as proposed below, with two changes:
+  - the catalog is `src/data/photography.catalog.json`;
+  - the 14 orphan derivatives were kept, as the owner asked.
+  The documents in this folder describe the state before Interval 1; for the
+  current data model see [photography-catalog.md](../photography-catalog.md).
+- **Interval 2** (editor core) is next and needs authorization. Recommended
+  scope:
+  - **Route and shell:** the `/photography/editor` route (`ROUTES`,
+    `seo-plugin`, `vercel.json`), as a lazy chunk with no effect on the
+    gallery bundle.
+  - **Import and state:** JPEG/PNG/WebP import in a worker, plus the edit
+    document (schema 1).
+  - **Rendering:** a CPU reference for white balance, exposure,
+    highlights/shadows, contrast, saturation and vibrance; a WebGL2 preview
+    using the same parameters; before/after.
+  - **Export:** full-resolution JPEG/PNG/WebP.
+  - **Tests:** neutral settings reproduce the input; GPU matches the CPU
+    within 1/255; proxy matches full resolution.
+  - **Out of scope:** RAW, LUTs, curves, HSL, presets, batch, HDR, the CMS,
+    and any new dependency.
 
 ## Findings at a glance
 
