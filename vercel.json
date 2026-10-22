@@ -5,10 +5,13 @@
     { "source": "/about/", "destination": "/about", "permanent": true },
     { "source": "/about/index.html", "destination": "/about", "permanent": true },
     { "source": "/photography", "destination": "/photography/", "permanent": true },
-    { "source": "/photography/index.html", "destination": "/photography/", "permanent": true }
+    { "source": "/photography/index.html", "destination": "/photography/", "permanent": true },
+    { "source": "/photography/editor/", "destination": "/photography/editor", "permanent": true },
+    { "source": "/photography/editor/index.html", "destination": "/photography/editor", "permanent": true }
   ],
   "rewrites": [
-    { "source": "/about", "destination": "/about/index.html" }
+    { "source": "/about", "destination": "/about/index.html" },
+    { "source": "/photography/editor", "destination": "/photography/editor/index.html" }
   ],
   "headers": [
     {

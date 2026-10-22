@@ -1,0 +1,38 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CPU renderer > matches the reference fixture 1`] = `
+[
+  0,
+  0,
+  0,
+  255,
+  255,
+  255,
+  255,
+  255,
+  136,
+  134,
+  127,
+  255,
+  215,
+  75,
+  49,
+  255,
+  56,
+  131,
+  202,
+  255,
+  255,
+  237,
+  200,
+  255,
+  36,
+  63,
+  40,
+  255,
+  96,
+  157,
+  72,
+  128,
+]
+`;

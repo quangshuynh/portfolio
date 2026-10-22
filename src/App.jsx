@@ -18,6 +18,7 @@ import { routeForAppPath } from './seo/site.mjs';
 
 const AboutPage = lazy(() => import('./components/pages/aboutPage'));
 const PhotographyPage = lazy(() => import('./components/pages/photographyPage'));
+const PhotoEditorPage = lazy(() => import('./components/pages/photoEditorPage'));
 
 /**
  * renders the portfolio application
@@ -28,6 +29,7 @@ function App() {
   const path = getAppPathname(location.pathname);
   const isAbout = path === '/about';
   const isPhotography = path === '/photography';
+  const isPhotoEditor = path === '/photography/editor';
   let photoId = null;
   try { photoId = isPhotography && location.hash ? decodeURIComponent(location.hash.slice(1)) : null; } catch { photoId = '__invalid__'; }
   const selectedPhotograph = photoId ? findPhotograph(photoId) : null;
@@ -42,7 +44,7 @@ function App() {
     const setContent = (selector, value) => document.querySelector(selector)?.setAttribute('content', value);
     document.title = title;
     setContent('meta[name="description"]', route.description);
-    setContent('meta[name="robots"]', 'index, follow, max-image-preview:large');
+    setContent('meta[name="robots"]', route.indexable ? 'index, follow, max-image-preview:large' : 'noindex, follow');
     setContent('meta[property="og:title"]', title);
     setContent('meta[property="og:description"]', route.description);
     setContent('meta[property="og:url"]', route.canonical);
@@ -53,6 +55,10 @@ function App() {
 
   if (isAbout) {
     return <Suspense fallback={null}><AboutPage /><RevealAnimations /></Suspense>;
+  }
+
+  if (isPhotoEditor) {
+    return <Suspense fallback={null}><PhotoEditorPage /></Suspense>;
   }
 
   if (isPhotography) {

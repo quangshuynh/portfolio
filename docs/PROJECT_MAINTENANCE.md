@@ -19,6 +19,7 @@ model, why assets are served from jsDelivr, and screenshot guidelines is in
 | `npm run prepare:images` | yes | Regenerates the WebP logo and local-image derivatives |
 | `npm run check:assets` | yes | Validates data, fetches every remote image, and probes release videos |
 | `npm run check:photography` | no | Validates the photography catalog and its derivatives ([photography-catalog.md](photography-catalog.md)) |
+| `npm run check:editor` | no | Builds the site and checks the photo editor end to end in a local Playwright Chromium: GPU/CPU parity, import, export, memory ([photography-editor.md](photography-editor.md)) |
 | `npm run cms` | yes (publishing) | Local photography CMS: drafts, uploads, ordering, preview, publication pull requests ([photography-cms.md](photography-cms.md)) |
 
 Everything about a project lives in two files:
