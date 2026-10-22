@@ -60,12 +60,45 @@ export async function inspectFile(file) {
 }
 
 /**
- * Decodes a file to RGBA8 at the given displayed (oriented) size.
+ * A 2D canvas: OffscreenCanvas where it exists (workers, modern browsers), else a
+ * DOM canvas, which only exists on the main thread (the no-worker fallback).
+ */
+export function createCanvas(width, height) {
+  if (typeof OffscreenCanvas === 'function') return new OffscreenCanvas(width, height);
+  if (typeof document !== 'undefined') return Object.assign(document.createElement('canvas'), { width, height });
+  throw Object.assign(new Error('This browser cannot process images in a background worker.'), { code: 'worker-canvas' });
+}
+
+// Browsers cap canvas area (iOS Safari at about 16.7 MP) and fail silently above it:
+// the context is null or drawing does nothing. Checked with one pixel at the far corner,
+// loosely: anti-fingerprinting (Safari, Brave) may add small noise to readback.
+function assertCanvasWorks(context, width, height) {
+  if (context) {
+    context.fillStyle = '#ff00ff';
+    context.fillRect(width - 1, height - 1, 1, 1);
+    const [r, g, b] = context.getImageData(width - 1, height - 1, 1, 1).data;
+    context.clearRect(width - 1, height - 1, 1, 1);
+    if (r > 200 && g < 55 && b > 200) return;
+  }
+  throw Object.assign(
+    new Error(`This browser cannot hold a ${width}×${height} image (${Math.round((width * height) / 1e6)} MP) in memory. Choose a smaller export size.`),
+    { code: 'canvas-limit' },
+  );
+}
+
+/** Encodes a canvas: convertToBlob on OffscreenCanvas, toBlob on a DOM canvas. */
+export function encodeCanvas(canvas, type, quality) {
+  if (typeof canvas.convertToBlob === 'function') return canvas.convertToBlob({ type, ...(quality === undefined ? {} : { quality }) });
+  return new Promise((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('The image could not be encoded.'))), type, quality));
+}
+
+/**
+ * Decodes a file into a 2D canvas at the given displayed (oriented) size.
  * :param header: readImageHeader() result
  * :param size: { width, height } at most the displayed size
- * :returns: { width, height, data: Uint8ClampedArray }
+ * :returns: { canvas, context } with the pixels drawn; read them back in bands to bound memory
  */
-export async function decodeToRgba(file, header, { width, height }) {
+export async function decodeToCanvas(file, header, { width, height }) {
   const orients = await browserAppliesOrientation();
   const manual = !orients && header.orientation !== 1;
   const swap = manual && header.orientation >= 5;
@@ -83,13 +116,25 @@ export async function decodeToRgba(file, header, { width, height }) {
     throw new ImageHeaderError('corrupt', 'The browser could not decode this image. It may be damaged or use an unsupported variant.');
   }
   try {
-    const canvas = new OffscreenCanvas(width, height);
+    const canvas = createCanvas(width, height);
     const context = canvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
+    assertCanvasWorks(context, width, height);
     if (manual) orientationTransform(context, header.orientation, width, height);
-    context.drawImage(bitmap, 0, 0);
-    const { data } = context.getImageData(0, 0, width, height, { colorSpace: 'srgb' });
-    return { width, height, data };
+    // Explicit size: browsers that ignore the resize options still scale, never crop.
+    context.drawImage(bitmap, 0, 0, swap ? height : width, swap ? width : height);
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    return { canvas, context };
   } finally {
     bitmap.close();
   }
+}
+
+/**
+ * Decodes a file to RGBA8 at the given displayed (oriented) size.
+ * :returns: { width, height, data: Uint8ClampedArray }
+ */
+export async function decodeToRgba(file, header, size) {
+  const { context } = await decodeToCanvas(file, header, size);
+  const { data } = context.getImageData(0, 0, size.width, size.height, { colorSpace: 'srgb' });
+  return { width: size.width, height: size.height, data };
 }

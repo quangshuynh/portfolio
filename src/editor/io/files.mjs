@@ -77,6 +77,22 @@ export function exportDimensions({ width, height }, resize = { mode: 'original' 
   };
 }
 
+/**
+ * Longest preview edge for this device. Phones and devices reporting little memory
+ * get a smaller proxy: a 4096 px preview costs about 45 MB of pixels plus the same
+ * again on the GPU, more than a phone screen can show. Exports are unaffected.
+ */
+export function previewEdgeLimit(win = globalThis) {
+  const memory = win.navigator?.deviceMemory;
+  if (typeof memory === 'number' && memory <= 2) return 2048;
+  let phone = false;
+  try {
+    phone = Boolean(win.matchMedia?.('(pointer: coarse)').matches) && Math.max(win.screen?.width ?? 0, win.screen?.height ?? 0) <= 1024;
+  } catch { /* no media queries: treat as a desktop */ }
+  if (phone || (typeof memory === 'number' && memory <= 4)) return 3072;
+  return 4096;
+}
+
 /** Preview proxy size: the long edge capped at `maxEdge`, never upscaled. */
 export function proxyDimensions({ width, height }, maxEdge) {
   return exportDimensions({ width, height }, { mode: 'long-edge', longEdge: maxEdge });

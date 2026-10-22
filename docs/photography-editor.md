@@ -18,6 +18,8 @@ Built in Interval 3; the original proposal is in
 | `src/editor/ui/` | React workspace (`EditorApp`, `Viewer`, panels) and `editor.css`. |
 | `src/editor/dev/parity.html` | Dev-server-only GPU/CPU parity harness (not a build input). |
 | `scripts/check-editor-browser.mjs` | `npm run check:editor`: end-to-end check in Chromium. |
+| `scripts/check-editor-engines.mjs` | `npm run check:editor:engines`: the same flow in WebKit, mobile Chromium and Firefox, with forced fallbacks. |
+| `src/editor/io/diagnostics.mjs` | Local capability report and startup failures (Diagnostics panel, `window.__photoEditorDiagnostics`). |
 
 The route is `EDITOR_ROUTE` in `src/seo/site.mjs`: its own static HTML,
 `noindex`, kept out of `ROUTES` and the sitemap until the owner decides to
@@ -69,12 +71,13 @@ that was hidden in the source. Shadows lift noise and JPEG artefacts.
   untouched source texture (tested exact), so the two sides always share zoom,
   pan and scaling.
 - **Export**: a dedicated worker re-decodes the original at the chosen size
-  (never upscaled), renders it on the CPU in 256-row bands with progress,
-  and encodes it with `OffscreenCanvas.convertToBlob`. Cancelling terminates
-  the worker. One export runs at a time. JPEG output is flattened onto white
-  in linear light. Metadata (EXIF, GPS) is not copied. If the browser cannot
-  encode the format, the export fails with a message instead of falling back
-  to PNG.
+  (never upscaled) into one canvas, then reads, renders and writes it back in
+  256-row bands with progress, and encodes that canvas. No full-resolution copy
+  or second canvas is held. Cancelling terminates the worker. One export runs at
+  a time. JPEG output is flattened onto white in linear light. Metadata (EXIF,
+  GPS) is not copied. If the browser cannot encode the format, or cannot hold a
+  canvas of the export size (iOS Safari caps canvases at about 16.7 MP), the
+  export fails with a message instead of falling back or shrinking the image.
 
 **Expected differences**
 
@@ -131,13 +134,13 @@ machine (Windows, desktop GPU), two 6000×4000 JPEGs:
 | Measure | Result (range over 4 runs) |
 | --- | --- |
 | CPU render, 24 MP (Node, single thread) | 2.4 s |
-| Full-resolution 24 MP JPEG export | 2.3–2.4 s in page, 3.3 s until the file is written |
+| Full-resolution 24 MP JPEG export | 2.3–2.4 s in page, 3.3 s until the file is written; banded export: 2.0 s, 2.9 s (1 run) |
 | First switch to a 24 MP photo (decodes a 4096 px proxy) | 270–360 ms |
 | Switch back to a cached photo | 30–55 ms |
 | Import of two 24 MP JPEGs (hash, header, thumbnail) | 0.2–0.26 s |
 | Chromium memory, all processes incl. GPU: baseline | 1369–1418 MB |
 | … after 10 switches between the two photos | 1881–2018 MB |
-| … peak during the 24 MP export | 2474–2850 MB |
+| … peak during the 24 MP export | 2474–2850 MB (+1.1–1.4 GB); banded export: 2195 MB on a 1466 MB baseline (+0.73 GB, 1 run) |
 | … after removing every photo | 1607–1898 MB |
 
 Removing photos drops every reference (proxies, thumbnails, texture, canvas
@@ -149,13 +152,36 @@ proxies (LRU); one GPU texture; one export worker at a time; a newer proxy
 decode terminates the older one. Not measured on an M1 MacBook Air; the
 numbers above are from a desktop Windows machine.
 
-## Browser support
+## Browser support and startup failures
 
-Needs `createImageBitmap` with resize options, `OffscreenCanvas` 2D in
-workers, module workers and `crypto.subtle` (secure contexts). Current
-Chromium is verified by `check:editor`. Firefox and Safari 17+ should work but
-are **not verified**; Safari cannot encode WebP (the option is disabled when
-the browser cannot encode a format).
+Required: `createImageBitmap`, a 2D canvas and `Blob.arrayBuffer` (Safari 15.4+,
+current Chrome, Edge, Firefox). Without them the editor shows which API is
+missing instead of the workspace. Everything else has a fallback:
+
+| Missing | Fallback |
+| --- | --- |
+| WebGL2, highp float, or a shader that fails to compile | CPU preview (2048 px), reason recorded |
+| Module workers, or `OffscreenCanvas` in workers (Safari < 16.4, Playwright WebKit) | Image tasks run on the main thread, yielding between bands; export can still be cancelled |
+| `crypto.subtle` (insecure origin) | No duplicate detection by hash; edits match by name and size |
+| `localStorage` | No autosave |
+
+Phones (coarse pointer, screen ≤ 1024 px) and devices reporting ≤ 4 GB use a
+3072 px preview (2048 px at ≤ 2 GB); exports always use the full resolution.
+
+A route error boundary around every lazily loaded page shows the failing
+operation, the error and a Retry (reload) instead of a blank page, for example
+when page code cannot be downloaded after a deploy. **Diagnostics** in the
+inspector shows and copies a local report (capabilities, preview engine, image
+worker mode, recorded failures; no file names or pixels). The console has the
+same as `window.__photoEditorDiagnostics`. Nothing is sent anywhere.
+
+Tested with `npm run check:editor:engines` (full flow incl. 12 MP export):
+Playwright WebKit 26.0 (iPhone 13 emulation and desktop), Chromium 141 (Pixel 7
+emulation), Firefox 142, forced no-WebGL2 (WebKit) and no-worker (Chromium).
+Playwright's WebKit is not Safari on iOS; physical iPhones and desktop Safari
+are **not verified**. Playwright's Windows WebKit PNG encoder changes some
+values by 1 on its own, so that check allows the encoder error it measures.
+Safari cannot encode WebP (the option is disabled when the browser cannot).
 
 ## Known issues
 
@@ -163,6 +189,7 @@ the browser cannot encode a format).
 - Thumbnails re-render on the main thread (about 7 ms each, throttled).
 - No touch pinch-zoom; buttons, wheel and keyboard zoom only.
 - The CPU fallback preview copies the proxy to the worker on every render.
+- Main-thread image tasks (no worker canvas) pause the page briefly while decoding.
 
 ## Extension points
 

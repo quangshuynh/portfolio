@@ -21,6 +21,7 @@
     "check:assets": "node scripts/check-project-assets.mjs",
     "check:photography": "node scripts/check-photography-catalog.mjs",
     "check:editor": "node scripts/check-editor-browser.mjs",
+    "check:editor:engines": "node scripts/check-editor-engines.mjs",
     "cms": "node cms/server.mjs",
     "assets:refresh": "node scripts/refresh-project-assets.mjs",
     "test:hero:browser": "node scripts/check-hero-browser.mjs",
@@ -34,6 +35,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "exifr": "^7.1.3",
     "jsdom": "^30.0.1",
+    "playwright": "^1.56.1",
     "sharp": "^0.35.4",
     "vite": "^8.3.0",
     "vitest": "^5.0.0"

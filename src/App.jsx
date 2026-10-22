@@ -11,6 +11,7 @@ import HashScroll from './components/utilities/hashScroll';
 import { HomeLightboxProvider } from './components/utilities/homeLightbox';
 import SiteNav from './components/sections/siteNav';
 import RevealAnimations from './components/utilities/revealAnimations';
+import RouteErrorBoundary from './components/utilities/routeErrorBoundary';
 import useLocation from './components/utilities/useLocation';
 import { findPhotograph } from './data/photographs';
 import { getAppPathname } from './util/navigation';
@@ -54,15 +55,15 @@ function App() {
   }, [route, selectedPhotograph]);
 
   if (isAbout) {
-    return <Suspense fallback={null}><AboutPage /><RevealAnimations /></Suspense>;
+    return <RouteErrorBoundary name="About"><Suspense fallback={null}><AboutPage /><RevealAnimations /></Suspense></RouteErrorBoundary>;
   }
 
   if (isPhotoEditor) {
-    return <Suspense fallback={null}><PhotoEditorPage /></Suspense>;
+    return <RouteErrorBoundary name="The photo editor" homePath="/photography/" homeLabel="Back to photography"><Suspense fallback={null}><PhotoEditorPage /></Suspense></RouteErrorBoundary>;
   }
 
   if (isPhotography) {
-    return <Suspense fallback={null}><PhotographyPage selectedPhotograph={selectedPhotograph} invalidPhotoId={Boolean(photoId && !selectedPhotograph)} /><RevealAnimations /></Suspense>;
+    return <RouteErrorBoundary name="Photography"><Suspense fallback={null}><PhotographyPage selectedPhotograph={selectedPhotograph} invalidPhotoId={Boolean(photoId && !selectedPhotograph)} /><RevealAnimations /></Suspense></RouteErrorBoundary>;
   }
 
   return (

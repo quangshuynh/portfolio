@@ -5,7 +5,8 @@ import { createEditDocument, parseEditDocument, serializeEditDocument } from '..
 import { neutralAdjustments } from '../model/adjustments.mjs';
 import { LIMITS, exportFileName, formatBytes, proxyDimensions } from '../io/files.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
-import { createImageWorker } from '../io/workerClient.mjs';
+import { createImageWorker, usingMainThread } from '../io/workerClient.mjs';
+import { browserCapabilities, diagnosticReport } from '../io/diagnostics.mjs';
 import { appHref } from '../../util/navigation';
 import AdjustPanel from './AdjustPanel';
 import ExportPanel from './ExportPanel';
@@ -57,8 +58,66 @@ function unsupportedEncoders() {
 const isTextField = (element) => element?.matches?.('input:not([type=range]):not([type=radio]):not([type=checkbox]), textarea, select, [contenteditable="true"]');
 const isControl = (element) => element?.matches?.('input, textarea, select, [role="slider"], [contenteditable="true"]');
 
+function copyText(text) {
+  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
+  return Promise.reject(new Error('Clipboard unavailable'));
+}
+
+/** Local diagnostics: browser support, preview engine and recorded failures. Never uploaded. */
+export function DiagnosticsPanel({ engine }) {
+  const [report, setReport] = useState(null);
+  const [copied, setCopied] = useState(null);
+  const extra = { previewEngine: engine?.kind ?? null, previewMaxEdge: engine?.maxEdge ?? null, previewFallbackReason: engine?.reason ?? null, imageTasks: usingMainThread() ? 'main thread' : 'worker' };
+  return (
+    <details className="pe-shortcuts pe-diagnostics" onToggle={(event) => event.currentTarget.open && setReport(diagnosticReport(extra))}>
+      <summary>Diagnostics</summary>
+      <p className="pe-note">Browser support and startup problems, kept on this device. Contains no photos or file names.</p>
+      {report && <textarea className="pe-diagnostics__report mono" readOnly value={report} aria-label="Diagnostics report" rows={8} onFocus={(event) => event.target.select()} />}
+      <button
+        type="button"
+        className="pe-text-button"
+        onClick={() => {
+          const text = diagnosticReport(extra);
+          setReport(text);
+          copyText(text).then(() => setCopied('Copied.'), () => setCopied('Select the text above and copy it.'));
+        }}
+      >
+        Copy diagnostics
+      </button>
+      {copied && <span className="pe-note" role="status"> {copied}</span>}
+    </details>
+  );
+}
+
+/** Shown instead of the workspace when a browser lacks an API the editor cannot work without. */
+function Unsupported({ missing }) {
+  return (
+    <div className="pe pe--unsupported">
+      <header className="pe-bar">
+        <a className="pe-back" href={appHref('/photography/')}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <span>Photography</span>
+        </a>
+        <h1 className="pe-title">Photo editor</h1>
+      </header>
+      <main className="pe-unsupported" role="alert">
+        <p className="pe-empty__title">This browser cannot run the photo editor</p>
+        <p>It is missing: {missing.join(', ')}.</p>
+        <p className="pe-note">Update the browser or the device's operating system (iOS 15.4 or later, or a current Chrome, Edge, Firefox or Safari), then reload this page.</p>
+        <DiagnosticsPanel engine={null} />
+      </main>
+    </div>
+  );
+}
+
 /** The public photo editor. Everything runs in this browser tab; nothing is uploaded. */
 export default function EditorApp() {
+  const [capabilities] = useState(() => browserCapabilities());
+  if (capabilities.missing.length) return <Unsupported missing={capabilities.missing} />;
+  return <EditorWorkspace />;
+}
+
+function EditorWorkspace() {
   const [state, dispatch] = useReducer(editorReducer, undefined, initialEditorState);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -469,6 +528,7 @@ export default function EditorApp() {
           </dl>
           {engine && <p className="pe-note">Preview: {engine.kind === 'webgl2' ? 'WebGL2' : 'CPU'}, up to {engine.maxEdge} px. Exports are rendered on the CPU at full resolution.</p>}
         </details>
+        <DiagnosticsPanel engine={engine} />
       </aside>
 
       <nav className="pe-filmstrip" aria-label="Filmstrip">
