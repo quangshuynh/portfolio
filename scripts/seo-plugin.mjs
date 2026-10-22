@@ -1,10 +1,13 @@
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadPublicCollection } from './photography-catalog-files.mjs';
 import {
   DEFAULT_SOCIAL_IMAGE,
+  EDITOR_ROUTE,
   NOT_FOUND_ROUTE,
+  editorContentSecurityPolicy,
   ROUTES,
   SITE_URL,
   buildJsonLd,
@@ -119,8 +122,14 @@ export default function seoPlugin() {
         };
       };
 
-      for (const route of [...ROUTES, NOT_FOUND_ROUTE]) {
-        const html = replaceHeadTags(template, renderHeadTags(route, route.indexable ? pageOptions(route) : { image: DEFAULT_SOCIAL_IMAGE }));
+      // The editor's CSP allows the template's inline scripts (the theme bootstrap) by hash.
+      const inlineScriptHashes = [...template.matchAll(/<script>([\s\S]*?)<\/script>/g)]
+        .map(([, body]) => createHash('sha256').update(body).digest('base64'));
+      const editorOptions = () => ({ ...pageOptions(EDITOR_ROUTE), image: DEFAULT_SOCIAL_IMAGE, csp: editorContentSecurityPolicy(inlineScriptHashes) });
+
+      for (const route of [...ROUTES, EDITOR_ROUTE, NOT_FOUND_ROUTE]) {
+        const options = route === EDITOR_ROUTE ? editorOptions() : route.indexable ? pageOptions(route) : { image: DEFAULT_SOCIAL_IMAGE };
+        const html = replaceHeadTags(template, renderHeadTags(route, options));
         const file = path.join(outDir, route.file);
         await mkdir(path.dirname(file), { recursive: true });
         await writeFile(file, html);

@@ -44,6 +44,20 @@ export const ROUTES = Object.freeze([
   },
 ].map((route) => Object.freeze({ ...route, canonical: `${SITE_URL}${route.path}`, indexable: true })));
 
+// Public tool pages: real routes with their own static HTML, kept out of ROUTES so
+// they stay out of the sitemap and search index (noindex) until the owner opts in.
+export const EDITOR_ROUTE = Object.freeze({
+  id: 'photo-editor',
+  path: '/photography/editor',
+  file: 'photography/editor/index.html',
+  chunk: 'src/components/pages/photoEditorPage.jsx',
+  title: 'Photo Editor | Quang Huynh',
+  description: 'A free photo editor that runs in your browser: import JPEG, PNG or WebP photographs, adjust light and colour, and export at full resolution. Nothing is uploaded.',
+  ogType: 'website',
+  canonical: `${SITE_URL}/photography/editor`,
+  indexable: false,
+});
+
 // Served with a 404 status for any path that is not a route above.
 export const NOT_FOUND_ROUTE = Object.freeze({
   id: 'not-found',
@@ -58,7 +72,28 @@ export const NOT_FOUND_ROUTE = Object.freeze({
 /** Maps an app pathname (base path and trailing slash already stripped) to its route. */
 export function routeForAppPath(appPath) {
   if (appPath === '/') return ROUTES[0];
+  if (appPath === EDITOR_ROUTE.path) return EDITOR_ROUTE;
   return ROUTES.find(({ path }) => path !== '/' && path.replace(/\/$/, '') === appPath) ?? null;
+}
+
+/**
+ * Content Security Policy for the editor page: everything from this origin, no
+ * network access beyond it, so imported photographs cannot be sent anywhere.
+ * :param scriptHashes: base64 SHA-256 hashes of the page's inline scripts
+ */
+export function editorContentSecurityPolicy(scriptHashes = []) {
+  return [
+    "default-src 'self'",
+    `script-src 'self'${scriptHashes.map((hash) => ` 'sha256-${hash}'`).join('')}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "worker-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'none'",
+  ].join('; ');
 }
 
 export const PERSON_ID = `${SITE_URL}/#person`;
@@ -153,9 +188,10 @@ export const HEAD_END = '<!-- seo:end -->';
  * :param options: { image, jsonLd, preloads } where preloads are extra <link> attribute maps
  * :returns: HTML string
  */
-export function renderHeadTags(route, { image = DEFAULT_SOCIAL_IMAGE, jsonLd = null, preloads = [] } = {}) {
+export function renderHeadTags(route, { image = DEFAULT_SOCIAL_IMAGE, jsonLd = null, preloads = [], csp = null } = {}) {
   const meta = (key, name, content) => `<meta ${key}="${name}" content="${escapeAttribute(content)}" />`;
   const tags = [
+    ...(csp ? [meta('http-equiv', 'Content-Security-Policy', csp)] : []),
     `<title>${escapeText(route.title)}</title>`,
     meta('name', 'description', route.description),
     meta('name', 'robots', route.indexable ? 'index, follow, max-image-preview:large' : 'noindex, follow'),
