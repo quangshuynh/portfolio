@@ -37,7 +37,10 @@
   font-size: .875rem;
   line-height: 1.4;
 }
-html.pe-document, html.pe-document body { background: #151515; overflow: hidden; overscroll-behavior: none; }
+/* No overflow: hidden here. With it on both html and body, body becomes a 0px-tall
+   clipping box around the fixed editor (#root has no height), and iOS WebKit then
+   paints nothing: a blank page on iPhones. The page has nothing to scroll anyway. */
+html.pe-document, html.pe-document body { background: #151515; overscroll-behavior: none; }
 .pe *, .pe *::before, .pe *::after { box-sizing: border-box; }
 .pe .mono { font-family: var(--font-mono); font-size: .75rem; letter-spacing: 0; text-transform: none; }
 .pe :focus-visible { outline: 2px solid var(--pe-focus); outline-offset: 2px; }

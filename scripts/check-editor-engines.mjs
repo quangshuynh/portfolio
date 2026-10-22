@@ -122,6 +122,8 @@ async function runOne(run, files) {
       if (run.expectEngine) assert.equal(result.engine, run.expectEngine);
       assert.equal(await page.evaluate(() => document.documentElement.dataset.editor), 'ready');
       assert.equal(await page.$('#editor-startup-failure'), null);
+      // Clipping html and body left iPhones with a blank editor (see editor.css).
+      assert.deepEqual(await page.evaluate(() => [document.documentElement, document.body].map((node) => getComputedStyle(node).overflowY)), ['visible', 'visible']);
     });
     await step('import', async () => {
       await page.setInputFiles('input[type=file][multiple]', [files.large, files.chart]);

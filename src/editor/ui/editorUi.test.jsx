@@ -8,6 +8,7 @@ import { editorReducer, initialEditorState } from '../model/editorState.mjs';
 import { createEditDocument, serializeEditDocument } from '../model/editDocument.mjs';
 import { neutralAdjustments } from '../model/adjustments.mjs';
 import { debugFlag } from '../io/diagnostics.mjs';
+import editorCss from './editor.css?raw';
 
 // jsdom has no canvas or image decoding. These stand in for a browser without WebGL2:
 // the viewer falls back to its CPU engine (a stub 2D context) and draws nothing.
@@ -28,28 +29,26 @@ function AdjustHarness({ onState }) {
   return <AdjustPanel adjustments={state.photos[0].history.present} disabled={false} dispatch={dispatch} />;
 }
 
+describe('page around the editor', () => {
+  // On iPhones (Safari and Brave, iOS 18) overflow: hidden on both html and body made body
+  // a 0px-tall clipping box around the fixed editor, and nothing was painted.
+  test('never clips html or body, so iOS WebKit paints the fixed editor', () => {
+    const pageRules = [...editorCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(([, selector]) => /(^|[\s,])(html|body)\b/.test(selector.replace(/\/\*[\s\S]*?\*\//g, '')));
+    expect(pageRules.map(([, selector]) => selector.replace(/\/\*[\s\S]*?\*\//g, '').trim())).toContain('html.pe-document, html.pe-document body');
+    pageRules.forEach(([, , body]) => expect(body).not.toMatch(/overflow(-[xy])?\s*:\s*(hidden|clip|auto|scroll)/));
+  });
+});
+
 describe('troubleshooting switches', () => {
   afterEach(() => window.history.replaceState({}, '', '/'));
 
   test('debugFlag reads hash switches joined by & or comma', () => {
     expect(debugFlag('cpu-preview', '#cpu-preview')).toBe(true);
-    expect(debugFlag('cpu-preview', '#no-scroll-lock&cpu-preview')).toBe(true);
+    expect(debugFlag('cpu-preview', '#startup-report&cpu-preview')).toBe(true);
     expect(debugFlag('cpu-preview', '#startup-report,cpu-preview')).toBe(true);
     expect(debugFlag('cpu-preview', '#cpu-preview-x')).toBe(false);
     expect(debugFlag('cpu-preview', '')).toBe(false);
-  });
-
-  test('locks page scrolling by default, and #no-scroll-lock leaves it alone', async () => {
-    window.history.replaceState({}, '', '/photography/editor');
-    const { unmount } = render(<EditorApp />);
-    await screen.findByRole('button', { name: 'Choose photos' });
-    expect(document.documentElement).toHaveClass('pe-document');
-    unmount();
-    window.history.replaceState({}, '', '/photography/editor#no-scroll-lock');
-    render(<EditorApp />);
-    await screen.findByRole('button', { name: 'Choose photos' });
-    expect(document.documentElement).not.toHaveClass('pe-document');
-    expect(document.documentElement.dataset.editor).toBe('ready');
   });
 
   test('#cpu-preview never asks for a WebGL2 context', async () => {
