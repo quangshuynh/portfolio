@@ -191,14 +191,15 @@ export function processLinear(rgb, params, toneLuminance = exactToneLuminance) {
  * smoothly (no hard boundary between ranges).
  * :returns: [index, nextIndex, weight, nextWeight]
  */
-export function hslWeights(hue) {
+export function hslWeights(hue, out = [0, 0, 0, 0]) {
   let k = HSL_CENTERS.length - 1;
   while (k > 0 && hue < HSL_CENTERS[k]) k -= 1;
   const next = (k + 1) % HSL_CENTERS.length;
   const end = next === 0 ? 360 : HSL_CENTERS[next];
   const t = (hue - HSL_CENTERS[k]) / (end - HSL_CENTERS[k]);
   const nextWeight = 0.5 - 0.5 * Math.cos(Math.PI * t);
-  return [k, next, 1 - nextWeight, nextWeight];
+  out[0] = k; out[1] = next; out[2] = 1 - nextWeight; out[3] = nextWeight;
+  return out;
 }
 
 /** HSV colour (hue in degrees) to RGB, all encoded 0–1. */
@@ -212,7 +213,9 @@ function hsvToRgb(hue, s, v, out) {
 
 /** Pulls linear RGB into 0–1 toward its luminance `y`, as the range fit in processLinear. */
 function fitRange(rgb, y) {
-  let [r, g, b] = rgb;
+  let r = rgb[0];
+  let g = rgb[1];
+  let b = rgb[2];
   const max = Math.max(r, g, b);
   if (max > 1) {
     if (y >= 1) { r = 1; g = 1; b = 1; } else {
@@ -234,6 +237,7 @@ function fitRange(rgb, y) {
 }
 
 const scratchHsv = [0, 0, 0];
+const scratchWeights = [0, 0, 0, 0];
 const scratchLinear = [0, 0, 0];
 const scratchLut = [0, 0, 0];
 
@@ -245,7 +249,9 @@ const scratchLut = [0, 0, 0];
  * saturation so near-greys barely change. The result is range-fitted like the base.
  */
 export function applyHsl(p, hsl, toLinear = srgbToLinear, toSrgb = linearToSrgb) {
-  const [r, g, b] = p;
+  const r = p[0];
+  const g = p[1];
+  const b = p[2];
   const max = Math.max(r, g, b);
   const chroma = max - Math.min(r, g, b);
   if (chroma <= 0) return p;
@@ -253,10 +259,16 @@ export function applyHsl(p, hsl, toLinear = srgbToLinear, toSrgb = linearToSrgb)
   hue *= 60;
   if (hue < 0) hue += 360;
   const s = chroma / max;
-  const [k, n, wk, wn] = hslWeights(hue);
+  hslWeights(hue, scratchWeights);
+  const k = scratchWeights[0];
+  const n = scratchWeights[1];
+  const wk = scratchWeights[2];
+  const wn = scratchWeights[3];
   const shift = wk * hsl.hue[k] + wn * hsl.hue[n];
   const saturation = 1 + wk * hsl.saturation[k] + wn * hsl.saturation[n];
   const luminance = wk * hsl.luminance[k] + wn * hsl.luminance[n];
+  // Pixels in ranges nobody adjusted are returned exactly (the shader does the same).
+  if (shift === 0 && saturation === 1 && luminance === 0) return p;
   const lin = scratchLinear;
   for (let c = 0; c < 3; c += 1) lin[c] = toLinear(p[c]);
   let y = LUMA[0] * lin[0] + LUMA[1] * lin[1] + LUMA[2] * lin[2];

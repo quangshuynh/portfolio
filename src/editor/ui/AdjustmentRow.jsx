@@ -58,10 +58,16 @@ export function AdjustmentRow({ spec, value, disabled, dispatch, label }) {
           disabled={disabled}
           value={draft ?? formatAdjustment(spec.key, value)}
           onFocus={(event) => {
+            // The text is not changed on focus (a re-render there could land after the
+            // first typed characters); it is selected, so typing replaces it, and commit
+            // parses the formatted text ("100%", "+0.50 EV") as well as plain numbers.
             const field = event.target;
-            setDraft(String(value));
+            field.select();
+            // A mouse-up can collapse the selection; reselect once if nothing was typed yet.
             // Only while still focused: select() can re-focus a field that Enter already committed.
-            requestAnimationFrame(() => document.activeElement === field && field.select());
+            requestAnimationFrame(() => {
+              if (document.activeElement === field && field.selectionStart === field.selectionEnd && field.value === formatAdjustment(spec.key, value)) field.select();
+            });
           }}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={commitDraft}

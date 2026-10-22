@@ -59,6 +59,26 @@ describe('collapsible groups', () => {
   });
 });
 
+describe('value fields', () => {
+  test('focusing never rewrites the text, so the first typed characters are not appended to it', () => {
+    setup({ library: [LUT] });
+    act(() => dispatch({ type: 'applySettings', patch: { lut: LUT } }));
+    openSection('LUT');
+    const field = screen.getByRole('textbox', { name: 'Intensity value' });
+    fireEvent.focus(field);
+    expect(field).toHaveValue('100%');
+    fireEvent.change(field, { target: { value: '60' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(present().lutIntensity).toBe(60);
+    // The formatted text itself also commits: "+0.50 EV" is read as 0.5.
+    const exposure = screen.getByRole('textbox', { name: 'Exposure value' });
+    fireEvent.focus(exposure);
+    fireEvent.change(exposure, { target: { value: '+0.50 EV' } });
+    fireEvent.blur(exposure);
+    expect(present().exposure).toBe(0.5);
+  });
+});
+
 describe('HSL panel', () => {
   test('each colour range has hue, saturation and luminance, and resets on its own', () => {
     setup();

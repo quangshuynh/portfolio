@@ -117,17 +117,17 @@ export function identityLut(size) {
 export function sampleLut(lut, rgb) {
   const { size, data, domainMin, domainMax } = lut;
   const n = size - 1;
-  const position = [0, 0, 0];
-  const index = [0, 0, 0];
-  const fraction = [0, 0, 0];
-  for (let c = 0; c < 3; c += 1) {
-    const t = Math.min(1, Math.max(0, (rgb[c] - domainMin[c]) / (domainMax[c] - domainMin[c])));
-    position[c] = t * n;
-    index[c] = Math.min(n - 1, Math.floor(position[c]));
-    fraction[c] = position[c] - index[c];
-  }
-  const [fr, fg, fb] = fraction;
-  const base = ((index[2] * size + index[1]) * size + index[0]) * 3;
+  // Grid position per channel; locals rather than arrays, as this runs once per pixel.
+  const pr = Math.min(1, Math.max(0, (rgb[0] - domainMin[0]) / (domainMax[0] - domainMin[0]))) * n;
+  const pg = Math.min(1, Math.max(0, (rgb[1] - domainMin[1]) / (domainMax[1] - domainMin[1]))) * n;
+  const pb = Math.min(1, Math.max(0, (rgb[2] - domainMin[2]) / (domainMax[2] - domainMin[2]))) * n;
+  const ir = Math.min(n - 1, Math.floor(pr));
+  const ig = Math.min(n - 1, Math.floor(pg));
+  const ib = Math.min(n - 1, Math.floor(pb));
+  const fr = pr - ir;
+  const fg = pg - ig;
+  const fb = pb - ib;
+  const base = ((ib * size + ig) * size + ir) * 3;
   const dr = 3;
   const dg = size * 3;
   const db = size * size * 3;

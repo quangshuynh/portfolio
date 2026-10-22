@@ -166,6 +166,7 @@ vec3 applyHsl(vec3 p) {
   float shift = wk * uHslHue[k] + wn * uHslHue[n];
   float saturation = 1.0 + wk * uHslSat[k] + wn * uHslSat[n];
   float luminance = wk * uHslLum[k] + wn * uHslLum[n];
+  if (shift == 0.0 && saturation == 1.0 && luminance == 0.0) return p;
   vec3 lin = toLinear3(p);
   float y = dot(LUMA, lin);
   if (shift != 0.0) {
