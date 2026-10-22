@@ -19,7 +19,15 @@ import { routeForAppPath } from './seo/site.mjs';
 
 const AboutPage = lazy(() => import('./components/pages/aboutPage'));
 const PhotographyPage = lazy(() => import('./components/pages/photographyPage'));
-const PhotoEditorPage = lazy(() => import('./components/pages/photoEditorPage'));
+// Stages feed the editor's HTML-shell startup report (public/photography/editor-startup.js).
+const editorStage = (name) => window.__editorStartup?.stage(name);
+const PhotoEditorPage = lazy(() => {
+  editorStage('editor chunk requested');
+  return import('./components/pages/photoEditorPage').then(
+    (module) => { editorStage('editor chunk loaded'); return module; },
+    (error) => { editorStage(`editor chunk failed: ${error?.message}`); throw error; },
+  );
+});
 
 /**
  * renders the portfolio application

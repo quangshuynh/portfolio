@@ -233,6 +233,38 @@ async function checkStartupFallback(type, device) {
   }
 }
 
+/**
+ * Brave on iOS injects a wallet script that throws "window.ethereum.selectedAddress"
+ * TypeErrors on every page. Those must not stop the editor or be reported as its failure.
+ */
+async function checkInjectedErrors(type, device) {
+  const environment = `Injected wallet errors, ${device ?? type.name()}`;
+  const browser = await type.launch();
+  try {
+    const context = await browser.newContext(device ? devices[device] : {});
+    await context.addInitScript(() => {
+      const fail = () => { window.ethereum.selectedAddress = undefined; };
+      let count = 0;
+      const timer = setInterval(() => { count += 1; if (count > 5) clearInterval(timer); fail(); }, 200);
+    });
+    const page = await context.newPage();
+    await page.goto(URL_EDITOR, { waitUntil: 'load' });
+    await page.waitForSelector('.pe[data-engine]', { timeout: 15_000 });
+    await page.waitForFunction(() => document.documentElement.dataset.editor === 'ready');
+    await page.waitForTimeout(13_000);
+    assert.equal(await page.$('#editor-startup-failure'), null);
+    const report = await page.evaluate(() => window.__editorStartup.report());
+    assert.match(report, /external x\d+\]/);
+    assert.doesNotMatch(report, /\d+ms error\]/);
+    assert.match(report, /\] editor mounted/);
+    return { environment, browser: `${type.name()} ${browser.version()}`, ok: true };
+  } catch (error) {
+    return { environment, ok: false, error: error.message.split('\n')[0] };
+  } finally {
+    await browser.close();
+  }
+}
+
 async function main() {
   const files = await makeFixtures();
   await build({ root, logLevel: 'silent', configFile: path.join(root, 'vite.config.mjs') });
@@ -251,9 +283,11 @@ async function main() {
       console.log(`${result.ok === true ? 'ok  ' : result.ok === null ? 'skip' : 'FAIL'} ${run.name}${result.browser ? ` (${result.browser})` : ''} ${JSON.stringify(result.ok ? { engine: result.engine, imageTasks: result.imageTasks, export12mp: result.export12mp, jpeg: result.jpeg, pngMaxDifference: result.pngMaxDifference, pngEncoderMaxDifference: result.pngEncoderMaxDifference } : result.skipped ?? { step: result.step, error: result.error, screen: result.screen, problems: result.problems })}`);
     }
     for (const [type, device] of [[webkit, 'iPhone 13'], [chromium, 'Pixel 7']].filter(([type]) => !ONLY || ONLY.includes(type.name()))) {
-      const result = await checkStartupFallback(type, device);
-      results.push(result);
-      console.log(`${result.ok ? 'ok  ' : 'FAIL'} ${result.environment}${result.browser ? ` (${result.browser})` : ''}${result.error ? ` ${result.error}` : ''}`);
+      for (const check of [checkStartupFallback, checkInjectedErrors]) {
+        const result = await check(type, device);
+        results.push(result);
+        console.log(`${result.ok ? 'ok  ' : 'FAIL'} ${result.environment}${result.browser ? ` (${result.browser})` : ''}${result.error ? ` ${result.error}` : ''}`);
+      }
     }
   } finally {
     await server.close();

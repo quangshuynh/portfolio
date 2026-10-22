@@ -21,7 +21,7 @@ afterEach(() => {
 describe('editor startup watchdog', () => {
   test('replaces a blank page with the captured error, a report and Retry when React never mounts', () => {
     runWatchdog();
-    window.dispatchEvent(new ErrorEvent('error', { message: 'SyntaxError: Unexpected token', filename: 'https://example.test/assets/index-abc.js', lineno: 1, colno: 42 }));
+    window.dispatchEvent(new ErrorEvent('error', { message: 'SyntaxError: Unexpected token', filename: `${location.origin}/assets/index-abc.js`, lineno: 1, colno: 42 }));
     expect(panel()).toBeNull();
     vi.advanceTimersByTime(3000);
     expect(panel()).toHaveAttribute('role', 'alert');
@@ -53,6 +53,43 @@ describe('editor startup watchdog', () => {
     expect(panel()).toBeNull();
 
     document.body.innerHTML = '<div id="root"></div>';
+    runWatchdog();
+    vi.advanceTimersByTime(20000);
+    expect(panel()).toBeNull();
+  });
+
+  // Brave on iOS injects a wallet script that throws this on every page, ours or not.
+  test('reports injected and cross-origin errors as external, counted, without blaming the editor', () => {
+    runWatchdog();
+    for (let i = 0; i < 20; i += 1) {
+      window.dispatchEvent(new ErrorEvent('error', { message: "TypeError: undefined is not an object (evaluating 'window.ethereum.selectedAddress = undefined')" }));
+      window.dispatchEvent(new ErrorEvent('error', { message: 'Script error.' }));
+    }
+    window.dispatchEvent(new ErrorEvent('error', { message: 'ReferenceError: x', filename: 'https://extension.example/inject.js', lineno: 3, colno: 1 }));
+    vi.advanceTimersByTime(3000);
+    expect(panel()).toBeNull();
+    // Still shown if the editor then never starts, with the noise collapsed so a later real error fits.
+    window.__editorStartup.stage('editor chunk requested');
+    window.dispatchEvent(new ErrorEvent('error', { message: 'TypeError: real failure', filename: `${location.origin}/assets/photoEditorPage-x.js`, lineno: 9, colno: 2 }));
+    vi.advanceTimersByTime(12000);
+    const report = panel().querySelector('textarea').value;
+    expect(report).toContain("external x20] TypeError: undefined is not an object (evaluating 'window.ethereum.selectedAddress = undefined') (no script URL)");
+    expect(report).toContain('external x20] Script error. (no script URL)');
+    expect(report).toContain('external] ReferenceError: x (https://extension.example/inject.js:3:1)');
+    expect(report).toContain('error] TypeError: real failure (/assets/photoEditorPage-x.js:9:2)');
+    expect(report).toMatch(/Stages:\r?\n {2}\[\d+ms\] shell\r?\n {2}\[\d+ms\] editor chunk requested/);
+    expect(report).toContain('Editor marker: not set');
+  });
+
+  test('describes what React rendered when the editor never marks itself started', () => {
+    runWatchdog();
+    document.getElementById('root').innerHTML = '<div class="pe pe--x"></div>';
+    vi.advanceTimersByTime(12000);
+    expect(panel().querySelector('textarea').value).toMatch(/React root children: 1\r?\nRoot content: div\.pe\.pe--x \d+x\d+/);
+  });
+
+  test('treats the unsupported-browser page as started', () => {
+    document.documentElement.dataset.editor = 'unsupported';
     runWatchdog();
     vi.advanceTimersByTime(20000);
     expect(panel()).toBeNull();
