@@ -6,7 +6,8 @@ import { JSDOM } from 'jsdom';
 import { build } from 'vite';
 import catalog from '../data/photography.catalog.json';
 import { publicPhotographs } from '../../scripts/photography-catalog.mjs';
-import { NOT_FOUND_ROUTE, ROUTES, SITE_URL } from './site.mjs';
+import { createHash } from 'node:crypto';
+import { EDITOR_ROUTE, NOT_FOUND_ROUTE, ROUTES, SITE_URL } from './site.mjs';
 
 const root = resolve(__dirname, '../..');
 const photographs = publicPhotographs(catalog);
@@ -100,6 +101,37 @@ describe('production build at the site root', () => {
     expect(images).toHaveLength(photographs.length);
     images.forEach((url) => expect(existsSync(join(outDir, new URL(url).pathname))).toBe(true));
     expect(xml).not.toContain('#');
+  });
+
+  test('serves the photo editor as its own noindex page with a no-upload CSP', () => {
+    const html = readFileSync(join(outDir, EDITOR_ROUTE.file), 'utf8');
+    const head = readHead(outDir, EDITOR_ROUTE.file);
+    expect(head.querySelector('title').textContent).toBe(EDITOR_ROUTE.title);
+    expect(meta(head, 'meta[name="robots"]')).toBe('noindex, follow');
+    expect(head.querySelector('link[rel="canonical"]')).toBeNull();
+    expect(head.querySelector('script[type="application/ld+json"]')).toBeNull();
+    const csp = meta(head, 'meta[http-equiv="Content-Security-Policy"]');
+    expect(csp).toContain("connect-src 'self'");
+    expect(csp).toContain("default-src 'self'");
+    // Every inline script in the page must be allowed by hash, or the theme bootstrap breaks.
+    [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].forEach(([, body]) => {
+      expect(csp).toContain(`'sha256-${createHash('sha256').update(body).digest('base64')}'`);
+    });
+    expect(head.querySelector('link[rel="modulepreload"]').getAttribute('href')).toMatch(/photoEditorPage/);
+    expect(readFileSync(join(outDir, 'sitemap.xml'), 'utf8')).not.toContain('editor');
+  });
+
+  test('keeps editor code out of every other page', () => {
+    const editorChunks = readdirSync(join(outDir, 'assets')).filter((name) => /photoEditorPage|imageWorker/.test(name));
+    expect(editorChunks.some((name) => name.startsWith('imageWorker'))).toBe(true);
+    [...ROUTES, NOT_FOUND_ROUTE].forEach(({ file }) => {
+      const html = readFileSync(join(outDir, file), 'utf8');
+      editorChunks.forEach((chunk) => expect(html).not.toContain(chunk));
+    });
+    // The entry chunk only references the editor through a dynamic import.
+    const entry = readFileSync(join(outDir, 'index.html'), 'utf8').match(/src="\/(assets\/index-[^"]+\.js)"/)[1];
+    const entryCode = readFileSync(join(outDir, entry), 'utf8');
+    expect(entryCode).not.toMatch(/imageWorker|createEditorContext|uExposureGain/);
   });
 
   test('copies robots.txt with the sitemap directive', () => {
@@ -196,7 +228,7 @@ describe('Vercel routing', () => {
   test('serves every route and redirects its non-canonical twin', () => {
     const rewrites = new Map((config.rewrites ?? []).map(({ source, destination }) => [source, destination]));
     const redirects = new Map((config.redirects ?? []).map(({ source, destination, permanent }) => [source, { destination, permanent }]));
-    ROUTES.forEach(({ path, file }) => {
+    [...ROUTES, EDITOR_ROUTE].forEach(({ path, file }) => {
       // Static files are served as-is; extensionless paths need an explicit rewrite to their file.
       if (path.endsWith('/')) expect(file).toBe(`${path.slice(1)}index.html`);
       else expect(rewrites.get(path)).toBe(`/${file}`);
