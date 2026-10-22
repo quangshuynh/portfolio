@@ -34,6 +34,8 @@ npm run dev        # http://localhost:5173
 | `npm run check:assets` | Validate project data, then fetch every remote project image |
 | `npm run assets:refresh -- --dry-run` | Propose moving project image pins to each repository's verified latest commit |
 | `npm run prepare:images` | Regenerate WebP logo and local image derivatives |
+| `npm run check:photography` | Validate the photography catalog and its derivatives |
+| `npm run cms` | Local photography CMS on 127.0.0.1 (see [docs/photography-cms.md](docs/photography-cms.md)) |
 
 ## Deployment
 

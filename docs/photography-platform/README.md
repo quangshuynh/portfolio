@@ -24,8 +24,17 @@ gallery. Interval 0 changed no site behaviour.
   - the 14 orphan derivatives were kept, as the owner asked.
   The documents in this folder describe the state before Interval 1; for the
   current data model see [photography-catalog.md](../photography-catalog.md).
-- **Interval 2** (editor core) is next and needs authorization. Recommended
-  scope:
+- **Interval 2** became the **private photography CMS**, at the owner's
+  request (2026-10-22), on `feat/photography-cms`:
+  - a local-only server and dashboard, `npm run cms`;
+  - drafts kept in a private workspace outside the repository;
+  - publication through GitHub pull requests merged by hand.
+  It replaces the hosted Cloudflare design in decisions 1–4 of
+  [architecture-decisions.md](architecture-decisions.md), which could not be
+  verified or set up without billing. See
+  [photography-cms.md](../photography-cms.md).
+- **Interval 3** (editor core) needs authorization. Recommended scope, as
+  previously planned for Interval 2:
   - **Route and shell:** the `/photography/editor` route (`ROUTES`,
     `seo-plugin`, `vercel.json`), as a lazy chunk with no effect on the
     gallery bundle.
@@ -37,8 +46,11 @@ gallery. Interval 0 changed no site behaviour.
   - **Export:** full-resolution JPEG/PNG/WebP.
   - **Tests:** neutral settings reproduce the input; GPU matches the CPU
     within 1/255; proxy matches full resolution.
-  - **Out of scope:** RAW, LUTs, curves, HSL, presets, batch, HDR, the CMS,
-    and any new dependency.
+  - **Out of scope:** RAW, LUTs, curves, HSL, presets, batch, HDR, and any
+    new dependency.
+  - **Before it:** a first live CMS publication of one photograph, after the
+    branches are merged, to confirm push, pull request and deployment status
+    against the real GitHub.
 
 ## Findings at a glance
 

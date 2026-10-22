@@ -18,6 +18,7 @@ read it before changing projects or project assets.
 | `scripts/prepare-site-images.mjs` | `npm run prepare:images`: WebP derivatives in `src/assets/optimized`. |
 | `docs/project-assets.md` | Data model, caching rationale, screenshot guidelines. |
 | `src/data/photography.catalog.json` | Photography catalog: every photograph, published or draft, in curated order. Schema and workflows in `docs/photography-catalog.md`; logic in `scripts/photography-catalog.mjs`. |
+| `cms/` | Local photography CMS (`npm run cms`): server, API, publication, dashboard. Docs in `docs/photography-cms.md`. |
 | `docs/photography-platform/` | Interval 0 audit and architecture for the photography CMS and editor (planning only). |
 | `experiments/raw-decode-poc/` | Isolated RAW decoding proof of concept with its own `package.json`; not part of the site build or root `npm test`. |
 
@@ -107,3 +108,9 @@ factual (no invented places, dates, or EXIF). Never rerun
   they do.
 - Never change a published `id` or `slug`.
 - Keep the 14 orphaned derivatives until the owner approves removing them.
+- The CMS is local-only (loopback, sign-in link, session cookie). Do not add
+  a hosted admin route, API or CMS code to the public build.
+- Never commit, build from or serve the CMS workspace (drafts and private
+  originals, outside the repository).
+- Never run a live CMS publication or create pull requests from it without
+  the owner's approval; tests mock GitHub.

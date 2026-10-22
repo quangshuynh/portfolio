@@ -112,10 +112,10 @@ Error messages name the record and field, for example
      `src/data/photographyPipeline.test.js` protects older published links;
      changing it needs the owner's approval.
 
-## How the CMS will read and update it
+## How the CMS reads and updates it
 
-The CMS (Intervals 6–7) uses `scripts/photography-catalog.mjs`, which has no
-file or network access, so it runs in a Worker as well as in Node:
+The local CMS ([photography-cms.md](photography-cms.md), Interval 2) uses
+`scripts/photography-catalog.mjs`, which has no file or network access:
 
 1. `parseCatalog(text)` reads and validates. It throws a `CatalogError` whose
    `errors` array lists every problem.
@@ -129,10 +129,11 @@ file or network access, so it runs in a Worker as well as in Node:
    `assetReport(catalog, generated, files)` checks assets before a publish
    PR.
 
-As planned in [architecture-decisions.md](photography-platform/architecture-decisions.md),
-the working copy lives privately in R2. Publishing writes the canonical
-catalog into a pull request, and the publish workflow runs
-`prepare:photography --only` for newly published IDs.
+The working copy, with drafts, lives in a private workspace folder outside
+the repository; R2 was not used. Publishing writes only the **published**
+records into the repository catalog through a pull request, so drafts no
+longer appear in this repository at all. It also runs the image pipeline
+for newly published IDs.
 
 ## Migration from the overrides (Interval 1)
 
