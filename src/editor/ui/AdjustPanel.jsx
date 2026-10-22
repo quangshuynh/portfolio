@@ -49,7 +49,12 @@ function AdjustmentRow({ spec, value, disabled, dispatch }) {
           aria-label={`${spec.label} value`}
           disabled={disabled}
           value={draft ?? formatAdjustment(spec.key, value)}
-          onFocus={(event) => { setDraft(String(value)); requestAnimationFrame(() => event.target.select()); }}
+          onFocus={(event) => {
+            const field = event.target;
+            setDraft(String(value));
+            // Only while still focused: select() can re-focus a field that Enter already committed.
+            requestAnimationFrame(() => document.activeElement === field && field.select());
+          }}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={commitDraft}
           onKeyDown={(event) => {

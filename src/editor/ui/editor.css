@@ -168,6 +168,11 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-shortcuts summary { cursor: pointer; min-height: 1.75rem; }
 .pe-shortcuts dl { display: grid; gap: .3rem; margin: .5rem 0 0; }
 .pe-shortcuts dl div { display: flex; justify-content: space-between; gap: .75rem; }
+.pe-diagnostics .pe-note { margin: .4rem 0; }
+.pe-diagnostics__report { display: block; width: 100%; margin: .25rem 0 .5rem; padding: .5rem; border: 1px solid var(--pe-line); border-radius: 4px; background: var(--pe-stage); color: var(--pe-text-2); font-size: .6875rem; resize: vertical; }
+.pe--unsupported { grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--pe-bar) minmax(0, 1fr); grid-template-areas: "bar" "main"; }
+.pe-unsupported { grid-area: main; max-width: 34rem; margin: 0 auto; padding: 2rem 1rem; overflow: auto; }
+.pe-unsupported .pe-shortcuts { padding-inline: 0; }
 .pe-shortcuts dt { font-family: var(--font-mono); font-size: .6875rem; color: var(--pe-text); }
 .pe-shortcuts dd { margin: 0; text-align: right; }
 

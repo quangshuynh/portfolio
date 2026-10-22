@@ -1,26 +1,37 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { deriveParams } from '../pipeline/spec.mjs';
-import { GlRenderer, createEditorContext } from '../pipeline/glRenderer.mjs';
+import { GlRenderer, probeEditorContext } from '../pipeline/glRenderer.mjs';
+import { recordDiagnostic } from '../io/diagnostics.mjs';
+import { previewEdgeLimit } from '../io/files.mjs';
 
 const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 8;
 const STAGE_PADDING = 24;
 
 /**
- * Creates the preview engine for a canvas: WebGL2 when it works, otherwise the CPU
- * renderer in the image worker drawing into a 2D context.
+ * Creates the preview engine for a canvas: WebGL2 when it works, otherwise null with
+ * the reason, and the caller draws with the CPU renderer on a fresh canvas (a canvas
+ * that has returned a WebGL context can never return a 2D one).
  */
-function createEngine(canvas) {
-  const gl = createEditorContext(canvas);
-  if (gl) {
-    try {
-      return { kind: 'webgl2', renderer: new GlRenderer(canvas, gl), maxEdge: Math.min(4096, gl.getParameter(gl.MAX_TEXTURE_SIZE)) };
-    } catch {
-      // Shader compile or link failure: use the CPU path on a fresh canvas.
-      return null;
-    }
+function createEngine(canvas, maxPreviewEdge) {
+  const { gl, reason } = probeEditorContext(canvas);
+  if (!gl) return { engine: null, reason };
+  try {
+    return { engine: { kind: 'webgl2', renderer: new GlRenderer(canvas, gl), maxEdge: Math.min(maxPreviewEdge, gl.getParameter(gl.MAX_TEXTURE_SIZE)) } };
+  } catch (error) {
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    return { engine: null, reason: error.message };
   }
-  return { kind: 'cpu', context: canvas.getContext('2d'), maxEdge: 2048 };
+}
+
+function createCpuEngine(host, maxPreviewEdge) {
+  const element = document.createElement('canvas');
+  element.className = 'pe-canvas';
+  element.setAttribute('aria-hidden', 'true');
+  host.appendChild(element);
+  const context = element.getContext('2d');
+  if (!context) throw new Error('This browser cannot draw a 2D canvas, so the preview cannot be shown.');
+  return { element, engine: { kind: 'cpu', context, maxEdge: Math.min(2048, maxPreviewEdge) } };
 }
 
 const clampZoom = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
@@ -40,6 +51,8 @@ export default function Viewer({ photo, adjustments, compare, split, onSplitChan
   const [engineKind, setEngineKind] = useState(null);
   const [proxy, setProxy] = useState(null);
   const [status, setStatus] = useState({ state: 'idle' });
+  // A preview engine that could not start at all; unlike `status`, never reset by photo changes.
+  const [engineError, setEngineError] = useState(null);
   const [view, setView] = useState({ fit: true, zoom: 1, x: 0, y: 0 });
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const dragRef = useRef(null);
@@ -47,27 +60,38 @@ export default function Viewer({ photo, adjustments, compare, split, onSplitChan
   // A fresh canvas per engine: a canvas that tried WebGL2 cannot fall back to 2D.
   useLayoutEffect(() => {
     const host = canvasHostRef.current;
+    const maxPreviewEdge = previewEdgeLimit();
     let element = document.createElement('canvas');
     element.className = 'pe-canvas';
     element.setAttribute('aria-hidden', 'true');
     host.appendChild(element);
-    let engine = createEngine(element);
+    let { engine, reason } = createEngine(element, maxPreviewEdge);
     if (!engine) {
       element.remove();
-      element = document.createElement('canvas');
-      element.className = 'pe-canvas';
-      element.setAttribute('aria-hidden', 'true');
-      host.appendChild(element);
-      engine = { kind: 'cpu', context: element.getContext('2d'), maxEdge: 2048 };
+      recordDiagnostic('webgl2', `${reason} Using the CPU preview.`, 'warning');
+      try {
+        ({ element, engine } = createCpuEngine(host, maxPreviewEdge));
+      } catch (error) {
+        recordDiagnostic('preview', error.message);
+        onEngine?.({ kind: 'none', reason: error.message });
+        setEngineError(error.message);
+        return undefined;
+      }
     }
     engineRef.current = engine;
     setCanvas(element);
     setEngineKind(engine.kind);
-    onEngine?.({ kind: engine.kind, maxEdge: engine.maxEdge });
+    onEngine?.({ kind: engine.kind, maxEdge: engine.maxEdge, reason: engine.kind === 'cpu' ? reason : null });
 
-    const onLost = (event) => { event.preventDefault(); setStatus({ state: 'error', message: 'The graphics context was lost. Restoring the preview…' }); };
+    const onLost = (event) => { event.preventDefault(); recordDiagnostic('webgl2', 'Graphics context lost.', 'warning'); setStatus({ state: 'error', message: 'The graphics context was lost. Restoring the preview…' }); };
     const onRestored = () => {
-      engine.renderer = new GlRenderer(element);
+      try {
+        engine.renderer = new GlRenderer(element);
+      } catch (error) {
+        recordDiagnostic('webgl2', `Context restore failed: ${error.message}`);
+        setStatus({ state: 'error', message: 'The graphics context could not be restored. Reload the page to continue.' });
+        return;
+      }
       if (proxyRef.current) engine.renderer.setSource(proxyRef.current);
       setStatus({ state: 'ready' });
       setProxy((current) => (current ? { ...current } : current));
@@ -278,7 +302,8 @@ export default function Viewer({ photo, adjustments, compare, split, onSplitChan
           </div>
         )}
         {status.state === 'loading' && <p className="pe-stage-message" role="status"><span className="pe-spinner" aria-hidden="true" />Loading preview…</p>}
-        {status.state === 'error' && <p className="pe-stage-message pe-stage-message--error" role="alert">{status.message || 'This photograph could not be shown.'}</p>}
+        {engineError && <p className="pe-stage-message pe-stage-message--error" role="alert">{engineError}</p>}
+        {!engineError && status.state === 'error' && <p className="pe-stage-message pe-stage-message--error" role="alert">{status.message || 'This photograph could not be shown.'}</p>}
         {photo && photo.status === 'importing' && <p className="pe-stage-message" role="status"><span className="pe-spinner" aria-hidden="true" />Reading {photo.name}…</p>}
         {compare === 'original' && proxy && <span className="pe-stage-badge" aria-live="polite">Original</span>}
       </div>

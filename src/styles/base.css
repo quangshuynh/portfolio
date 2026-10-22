@@ -239,3 +239,13 @@ html:has(.photography-nav) { --nav-footprint: var(--nav-compact); }
   .reveal-ready [data-reveal] { opacity: 1; transform: none; clip-path: none; }
   ::view-transition-new(root) { animation: none; }
 }
+
+/* Shown when a lazily loaded page fails to load or start (RouteErrorBoundary). */
+.route-error { max-width: 36rem; margin: 0 auto; padding: 4rem var(--gutter, 1rem); color: var(--text-primary); }
+.route-error h1 { margin-bottom: 1rem; font-size: 1.6rem; }
+.route-error p { margin-bottom: .75rem; color: var(--text-secondary); }
+.route-error__detail { font-size: .75rem; overflow-wrap: anywhere; }
+.route-error__actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.25rem; }
+.route-error__actions :is(button, a) { min-height: 2.75rem; padding: .6rem 1rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: none; color: var(--text-primary); font: inherit; text-decoration: none; cursor: pointer; }
+.route-error__actions button { background: var(--text-primary); color: var(--bg-primary); }
+.route-error__actions :is(button, a):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }

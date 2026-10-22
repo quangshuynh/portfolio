@@ -8,9 +8,11 @@ import { editorReducer, initialEditorState } from '../model/editorState.mjs';
 import { createEditDocument, serializeEditDocument } from '../model/editDocument.mjs';
 import { neutralAdjustments } from '../model/adjustments.mjs';
 
-// jsdom has no canvas; the viewer falls back to its CPU engine and draws nothing.
+// jsdom has no canvas or image decoding. These stand in for a browser without WebGL2:
+// the viewer falls back to its CPU engine (a stub 2D context) and draws nothing.
 beforeAll(() => {
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((type) => (type === '2d' ? {} : null));
+  vi.stubGlobal('createImageBitmap', () => Promise.reject(new Error('not in jsdom')));
 });
 beforeEach(() => localStorage.clear());
 
@@ -165,5 +167,40 @@ describe('editor workspace', () => {
     expect(tabs.getByRole('button', { name: 'Adjust', hidden: true })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(tabs.getByRole('button', { name: 'Export', hidden: true }));
     expect(tabs.getByRole('button', { name: 'Export', hidden: true })).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
+describe('startup on limited browsers', () => {
+  test('a browser without createImageBitmap gets a specific compatibility message, not a blank page', () => {
+    vi.stubGlobal('createImageBitmap', undefined);
+    try {
+      render(<EditorApp />);
+      expect(screen.getByRole('alert')).toHaveTextContent('This browser cannot run the photo editor');
+      expect(screen.getByRole('alert')).toHaveTextContent('missing: image decoding (createImageBitmap)');
+      expect(screen.getByText('Diagnostics')).toBeInTheDocument();
+    } finally {
+      vi.stubGlobal('createImageBitmap', () => Promise.reject(new Error('not in jsdom')));
+    }
+  });
+
+  test('without WebGL2 the editor starts with the CPU preview and records why', () => {
+    render(<EditorApp />);
+    expect(screen.getByRole('button', { name: 'Choose photos' })).toBeInTheDocument();
+    expect(document.querySelector('.pe').dataset.engine).toBe('cpu');
+    fireEvent.click(screen.getByRole('button', { name: 'Copy diagnostics' }));
+    const report = JSON.parse(screen.getByRole('textbox', { name: 'Diagnostics report' }).value);
+    expect(report.previewEngine).toBe('cpu');
+    expect(report.events.some(({ area, message }) => area === 'webgl2' && /CPU preview/.test(message))).toBe(true);
+    expect(JSON.stringify(report)).not.toMatch(/blob:|\.jpe?g/i);
+  });
+
+  test('without any 2D canvas the preview shows an error instead of failing silently', () => {
+    const spy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((type) => (type === '2d' && !spy.mock.calls.some(([t]) => t === 'webgl2') ? {} : null));
+    try {
+      render(<EditorApp />);
+      expect(screen.getByText('This browser cannot draw a 2D canvas, so the preview cannot be shown.')).toBeInTheDocument();
+    } finally {
+      spy.mockImplementation((type) => (type === '2d' ? {} : null));
+    }
   });
 });

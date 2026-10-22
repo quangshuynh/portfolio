@@ -18,8 +18,12 @@ function compile(gl, type, source) {
   return shader;
 }
 
-/** Returns a WebGL2 context suitable for the editor, or null. */
-export function createEditorContext(canvas) {
+/**
+ * Tries to create a WebGL2 context suitable for the editor.
+ * :returns: { gl, reason } where gl is null and reason says why when it is unsuitable.
+ *   A canvas that returned a context (even an unsuitable one) cannot be reused for 2D.
+ */
+export function probeEditorContext(canvas) {
   try {
     const gl = canvas.getContext('webgl2', {
       alpha: true,
@@ -30,15 +34,18 @@ export function createEditorContext(canvas) {
       preserveDrawingBuffer: false,
       powerPreference: 'high-performance',
     });
-    if (!gl) return null;
+    if (!gl) return { gl: null, reason: 'WebGL2 is not available in this browser.' };
     const format = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
     // highp float with a 23-bit mantissa is what the parity tolerances assume.
-    if (!format || format.precision < 23) return null;
-    return gl;
-  } catch {
-    return null;
+    if (!format || format.precision < 23) return { gl: null, reason: `The GPU's high-precision float has ${format?.precision ?? 0} bits; 23 are needed.` };
+    return { gl, reason: null };
+  } catch (error) {
+    return { gl: null, reason: `WebGL2 failed to start: ${error.message}` };
   }
 }
+
+/** Returns a WebGL2 context suitable for the editor, or null. */
+export const createEditorContext = (canvas) => probeEditorContext(canvas).gl;
 
 export class GlRenderer {
   constructor(canvas, gl = createEditorContext(canvas)) {
