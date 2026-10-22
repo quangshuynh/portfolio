@@ -94,4 +94,28 @@ describe('editor startup watchdog', () => {
     vi.advanceTimersByTime(20000);
     expect(panel()).toBeNull();
   });
+
+  // An iPhone showed a blank page with no panel: the editor had mounted but was not visible.
+  test('#startup-report opens the report with the editor layout even after a successful start', () => {
+    window.history.replaceState({}, '', '/photography/editor#startup-report');
+    document.documentElement.dataset.editor = 'ready';
+    document.getElementById('root').innerHTML = '<div class="pe"><header class="pe-bar"></header></div>';
+    runWatchdog();
+    vi.advanceTimersByTime(4000);
+    expect(panel()).toBeNull();
+    vi.advanceTimersByTime(1000);
+    expect(panel().querySelector('h1').textContent).toBe('Photo editor startup report');
+    const report = panel().querySelector('textarea').value;
+    expect(report).toContain('Reason: requested with #startup-report');
+    expect(report).toContain('Editor marker: ready');
+    expect(report).toMatch(/Layout \.pe: div\.pe \d+x\d+ at \d+,\d+/);
+    expect(report).toMatch(/Layout \.pe-bar: header\.pe-bar /);
+    expect(report).toContain('Layout .pe-canvas: none');
+    expect(report).toContain('On top at centre: ');
+    // Stays until closed, although the editor has started.
+    vi.advanceTimersByTime(5000);
+    const close = [...panel().querySelectorAll('button')].find((button) => button.textContent === 'Close');
+    close.click();
+    expect(panel()).toBeNull();
+  });
 });

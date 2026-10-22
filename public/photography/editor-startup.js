@@ -7,6 +7,7 @@
 (function () {
   var TIMEOUT_MS = 12000;
   var ERROR_GRACE_MS = 2500;
+  var REQUESTED_DELAY_MS = 5000;
   var MAX_EVENTS = 12;
   var events = [];
   // Startup milestones reported by the app (window.__editorStartup.stage), with timings.
@@ -52,8 +53,29 @@
     var rect = node.getBoundingClientRect();
     var style = getComputedStyle(node);
     return node.tagName.toLowerCase() + (node.className && typeof node.className === 'string' ? '.' + node.className.trim().split(/\s+/).join('.') : '')
-      + ' ' + Math.round(rect.width) + 'x' + Math.round(rect.height) + (style.display === 'none' ? ' display:none' : '') + (style.visibility === 'hidden' ? ' hidden' : '');
+      + ' ' + Math.round(rect.width) + 'x' + Math.round(rect.height) + ' at ' + Math.round(rect.left) + ',' + Math.round(rect.top)
+      + (style.display === 'none' ? ' display:none' : '') + (style.visibility === 'hidden' ? ' hidden' : '')
+      + (Number(style.opacity) < 1 ? ' opacity:' + style.opacity : '');
   }
+
+  // Where the editor's parts are and what is actually on top of the screen. Taken before
+  // the panel covers the page, so a mounted but invisible editor shows what hides it.
+  function layout() {
+    var lines = [];
+    var viewport = window.visualViewport;
+    if (viewport) lines.push('Visual viewport: ' + Math.round(viewport.width) + 'x' + Math.round(viewport.height) + ' scale ' + viewport.scale + ' offset ' + Math.round(viewport.offsetLeft) + ',' + Math.round(viewport.offsetTop));
+    var parts = ['.pe', '.pe-bar', '.pe-stage', '.pe-canvas', '.pe-inspector', '.pe-tabs'];
+    for (var i = 0; i < parts.length; i += 1) lines.push('Layout ' + parts[i] + ': ' + describe(document.querySelector(parts[i])));
+    var points = [['top', innerWidth / 2, Math.min(40, innerHeight / 4)], ['centre', innerWidth / 2, innerHeight / 2], ['bottom', innerWidth / 2, innerHeight - 30]];
+    for (var p = 0; p < points.length; p += 1) {
+      var hit = null;
+      try { hit = document.elementFromPoint(points[p][1], points[p][2]); } catch (error) { hit = null; }
+      lines.push('On top at ' + points[p][0] + ': ' + describe(hit));
+    }
+    return lines;
+  }
+
+  var layoutSnapshot = [];
 
   function supports() {
     var checks = [];
@@ -79,7 +101,7 @@
       'React root children: ' + (document.getElementById('root') ? document.getElementById('root').childElementCount : 'missing'),
       'Root content: ' + describe(document.getElementById('root') && document.getElementById('root').firstElementChild),
       'Editor marker: ' + (root.getAttribute('data-editor') || 'not set'),
-    ].concat(supports());
+    ].concat(supports(), layoutSnapshot);
     lines.push('Stages:');
     for (var s = 0; s < stages.length; s += 1) lines.push('  [' + stages[s].at + 'ms] ' + stages[s].name);
     lines.push(events.length ? 'Errors:' : 'Errors: none captured');
@@ -101,18 +123,20 @@
     output.value = report(reasonShown);
   }
 
-  function show(reason) {
-    if (panel || started() || !active()) return;
+  // requested: opened with #startup-report, even though the editor started.
+  function show(reason, requested) {
+    if (panel || !active() || (!requested && started())) return;
     reasonShown = reason;
+    layoutSnapshot = layout();
     panel = element('section', '', 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483647;overflow:auto;padding:1.5rem 1rem;background:#151515;color:#eee;font:16px/1.5 system-ui,-apple-system,sans-serif');
     panel.id = 'editor-startup-failure';
     panel.setAttribute('role', 'alert');
     panel.setAttribute('aria-labelledby', 'editor-startup-title');
     var box = element('div', '', 'max-width:40rem;margin:0 auto');
-    var title = element('h1', 'The photo editor did not start', 'font-size:1.4rem;margin:0 0 .75rem');
+    var title = element('h1', requested ? 'Photo editor startup report' : 'The photo editor did not start', 'font-size:1.4rem;margin:0 0 .75rem');
     title.id = 'editor-startup-title';
     box.appendChild(title);
-    box.appendChild(element('p', 'Something stopped the editor before it could appear. Retry, or copy the report below and send it to the site owner. It contains error messages and browser details only, never your photographs.', 'margin:0 0 1rem;color:#bbb'));
+    box.appendChild(element('p', (requested ? 'Copy the report below and send it to the site owner.' : 'Something stopped the editor before it could appear. Retry, or copy the report below and send it to the site owner.') + ' It contains error messages, page layout and browser details only, never your photographs.', 'margin:0 0 1rem;color:#bbb'));
     var actions = element('div', '', 'display:flex;flex-wrap:wrap;gap:.75rem;margin:0 0 1rem');
     var retry = element('button', 'Retry', 'min-height:2.75rem;padding:.5rem 1.1rem;border:0;border-radius:4px;background:#eee;color:#111;font:inherit;cursor:pointer');
     retry.type = 'button';
@@ -133,6 +157,12 @@
     actions.appendChild(retry);
     actions.appendChild(copy);
     actions.appendChild(back);
+    if (requested) {
+      var close = element('button', 'Close', 'min-height:2.75rem;padding:.5rem 1.1rem;border:1px solid #666;border-radius:4px;background:none;color:#eee;font:inherit;cursor:pointer');
+      close.type = 'button';
+      close.onclick = function () { panel.parentNode.removeChild(panel); panel = null; };
+      actions.appendChild(close);
+    }
     box.appendChild(actions);
     var output = element('textarea', '', 'width:100%;min-height:16rem;box-sizing:border-box;padding:.75rem;border:1px solid #444;border-radius:4px;background:#0c0c0c;color:#ddd;font:12px/1.45 ui-monospace,Menlo,monospace');
     output.readOnly = true;
@@ -142,6 +172,7 @@
     (document.body || root).appendChild(panel);
     render();
     retry.focus();
+    if (requested) return;
     // A slow but successful start removes the panel.
     var poll = setInterval(function () {
       if (!started()) return;
@@ -182,6 +213,12 @@
   });
 
   setTimeout(function () { show('the editor did not start within ' + TIMEOUT_MS / 1000 + ' seconds'); }, TIMEOUT_MS);
+
+  // /photography/editor#startup-report opens the report even when the editor started, for a
+  // page that mounted but shows nothing. The hash never reaches the server.
+  if (location.hash === '#startup-report') {
+    setTimeout(function () { show('requested with #startup-report', true); }, REQUESTED_DELAY_MS);
+  }
 
   // Only the most recently installed copy reports, should the script ever run twice.
   var api = { events: events, stages: stages, stage: stage, report: function () { return report('requested'); } };
