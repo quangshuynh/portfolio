@@ -3,17 +3,19 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import exifr from 'exifr';
 import sharp from 'sharp';
-import { EXIF_CAPTURE_TIMEZONE, photographOverrides as publicOverrides } from '../src/data/photographs.overrides.mjs';
+import { publishedRecords } from './photography-catalog.mjs';
+import {
+  DEFAULT_CATALOG_PATH,
+  DERIVATIVES_DIRECTORY,
+  GENERATED_MANIFEST_PATH,
+  catalogPath,
+  readCatalog,
+} from './photography-catalog-files.mjs';
 import { photographLibraryPaths } from './photography-sources.mjs';
 import { derivativeFilenames, normalizeCamera, parseExifTimestamp } from './photography-utils.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const publicSourcePath = path.join(projectRoot, 'src', 'assets', 'about', 'photography');
-const outputDirectory = path.join(projectRoot, 'src', 'assets', 'photography', 'generated');
-const manifestPath = path.join(projectRoot, 'src', 'data', 'photographs.generated.json');
-const photographOverrides = publicOverrides.map((record) => (
-  photographLibraryPaths[record.id] ? { ...record, libraryPath: photographLibraryPaths[record.id] } : record
-));
 
 function readOption(args, name, envName) {
   const index = args.indexOf(name);
@@ -34,18 +36,34 @@ function readArguments() {
     libraryDirectory: libraryValue ? path.resolve(libraryValue) : null,
     only: onlyValue ? new Set(onlyValue.split(',').map((id) => id.trim()).filter(Boolean)) : null,
     allowPublicSource: args.includes('--allow-public-source'),
+    // Defaults are the repository's catalog, derivatives folder and manifest; tests
+    // point these at temporary copies.
+    catalogFile: path.resolve(readOption(args, '--catalog') ?? catalogPath()),
+    outputDirectory: path.resolve(readOption(args, '--output-dir') ?? DERIVATIVES_DIRECTORY),
+    manifestPath: path.resolve(readOption(args, '--manifest') ?? GENERATED_MANIFEST_PATH),
   };
+}
+
+// Only published photographs get public derivatives and manifest entries; a draft is
+// generated when it is published.
+async function loadDeclarations(catalogFile) {
+  const catalog = await readCatalog(catalogFile);
+  const records = publishedRecords(catalog).map((record) => (
+    photographLibraryPaths[record.id] ? { ...record, libraryPath: photographLibraryPaths[record.id] } : record
+  ));
+  return { catalog, photographOverrides: records, captureTimeZone: catalog.captureTimeZone };
 }
 
 function sourceKey(record) {
   return (record.libraryPath ?? record.sourceFilename).split(path.sep).join('/').toLowerCase();
 }
 
-function validateDeclarations() {
+function validateDeclarations({ catalog, photographOverrides }, catalogFile) {
   const ids = new Set();
   const sources = new Set();
-  for (const id of Object.keys(photographLibraryPaths)) {
-    if (!publicOverrides.some((record) => record.id === id)) throw new Error(`Library path declared for unknown photograph: ${id}`);
+  // photography-sources.mjs describes the repository catalog, not test catalogs.
+  for (const id of catalogFile === DEFAULT_CATALOG_PATH ? Object.keys(photographLibraryPaths) : []) {
+    if (!catalog.photographs.some((record) => record.id === id)) throw new Error(`Library path declared for unknown photograph: ${id}`);
   }
   for (const record of photographOverrides) {
     const key = sourceKey(record);
@@ -77,11 +95,11 @@ function whiteBalanceName(whiteBalance, lightSource) {
   return null;
 }
 
-function normalizeExif(exif) {
+function normalizeExif(exif, captureTimeZone) {
   const capturedAt = parseExifTimestamp(
     exif?.DateTimeOriginal ?? exif?.CreateDate,
     exif?.OffsetTimeOriginal ?? exif?.OffsetTime,
-    EXIF_CAPTURE_TIMEZONE,
+    captureTimeZone,
   );
   const values = {
     capturedAt,
@@ -167,7 +185,7 @@ async function resolveSources(records, { sourceDirectory, libraryDirectory }) {
   return resolved;
 }
 
-async function readExistingManifest() {
+async function readExistingManifest(manifestPath) {
   try {
     return JSON.parse(await readFile(manifestPath, 'utf8'));
   } catch (error) {
@@ -181,15 +199,20 @@ async function main() {
   if (options.sourceDirectory === publicSourcePath && !options.allowPublicSource) {
     throw new Error('The production asset directory cannot be used as an originals source without --allow-public-source.');
   }
-  validateDeclarations();
+  const { outputDirectory, manifestPath } = options;
+  const declarations = await loadDeclarations(options.catalogFile);
+  const { catalog, photographOverrides, captureTimeZone } = declarations;
+  validateDeclarations(declarations, options.catalogFile);
   for (const id of options.only ?? []) {
-    if (!photographOverrides.some((record) => record.id === id)) throw new Error(`--only names an undeclared photograph: ${id}`);
+    const record = catalog.photographs.find((photograph) => photograph.id === id);
+    if (!record) throw new Error(`--only names an undeclared photograph: ${id}`);
+    if (record.status !== 'published') throw new Error(`--only names draft "${id}"; set its status to "published" first.`);
   }
   const selected = photographOverrides.filter(({ id }) => !options.only || options.only.has(id));
   const sources = await resolveSources(selected, options);
 
   await mkdir(outputDirectory, { recursive: true });
-  const generatedById = new Map((await readExistingManifest()).map((record) => [record.id, record]));
+  const generatedById = new Map((await readExistingManifest(manifestPath)).map((record) => [record.id, record]));
   const audit = [];
   for (const override of selected) {
     const sourcePath = sources.get(override.id);
@@ -199,7 +222,7 @@ async function main() {
     const { galleryFilename, viewerFilename } = derivativeFilenames(override.id);
     const gallery = await createDerivative(sourcePath, path.join(outputDirectory, galleryFilename), { width: 900, height: 1200 }, 82);
     const viewer = await createDerivative(sourcePath, path.join(outputDirectory, viewerFilename), { width: 2200, height: 1800 }, 88);
-    const publicMetadata = normalizeExif(exif);
+    const publicMetadata = normalizeExif(exif, captureTimeZone);
     generatedById.set(override.id, {
       id: override.id,
       sourceFilename: override.sourceFilename,

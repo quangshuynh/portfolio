@@ -1,8 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mergePhotographyMetadata } from './photography-utils.mjs';
-import { PHOTOGRAPHY_HERO_SLUG, photographOverrides } from '../src/data/photographs.overrides.mjs';
+import { loadPublicCollection } from './photography-catalog-files.mjs';
 import {
   DEFAULT_SOCIAL_IMAGE,
   NOT_FOUND_ROUTE,
@@ -19,10 +18,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLACEHOLDER = '<!--seo-head-->';
 const PHOTO_ASSET_DIR = 'src/assets/photography/generated/';
 
+// Published photographs only: drafts never reach the sitemap, JSON-LD or preloads.
 async function loadPhotographs() {
-  const generated = JSON.parse(await readFile(path.join(root, 'src/data/photographs.generated.json'), 'utf8'));
-  const byId = new Map(generated.map((record) => [record.id, record]));
-  return photographOverrides.map((override) => mergePhotographyMetadata(byId.get(override.id), override));
+  const { heroSlug, merged } = await loadPublicCollection();
+  return { heroSlug, photographs: merged };
 }
 
 const toPosix = (value) => value.split(path.sep).join('/');
@@ -86,7 +85,8 @@ export default function seoPlugin() {
         return fileName;
       };
 
-      const photographs = (await loadPhotographs()).map((photograph) => ({
+      const { heroSlug, photographs: publicPhotographs } = await loadPhotographs();
+      const photographs = publicPhotographs.map((photograph) => ({
         ...photograph,
         galleryFile: assetPath(photograph.galleryFilename),
         viewerFile: assetPath(photograph.viewerFilename),
@@ -96,7 +96,7 @@ export default function seoPlugin() {
         viewerUrl: `${SITE_URL}/${photograph.viewerFile}`,
       }));
       const featured = photographs.filter(({ featured: order }) => order).sort((a, b) => a.featured - b.featured);
-      const hero = photographs.find(({ slug }) => slug === PHOTOGRAPHY_HERO_SLUG) ?? featured[0];
+      const hero = photographs.find(({ slug }) => slug === heroSlug) ?? featured[0];
 
       const pageOptions = (route) => {
         const preloads = routeChunkFiles(bundle, route.chunk)

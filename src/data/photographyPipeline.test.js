@@ -1,11 +1,13 @@
 import generatedRecords from './photographs.generated.json';
-import { photographOverrides } from './photographs.overrides.mjs';
+import catalog from './photography.catalog.json';
+import { publicPhotographs } from '../../scripts/photography-catalog.mjs';
 import {
   derivativeFilenames,
   mergePhotographyMetadata,
   parseExifTimestamp,
 } from '../../scripts/photography-utils.mjs';
 
+const photographOverrides = publicPhotographs(catalog);
 
 test('normalizes explicit and America/New_York capture timestamps', () => {
   expect(

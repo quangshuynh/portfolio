@@ -1,6 +1,15 @@
-import generatedRecords from './photographs.generated.json';
-import { EXIF_CAPTURE_TIMEZONE, PHOTOGRAPHY_CATEGORIES, PHOTOGRAPHY_HERO_SLUG, photographOverrides } from './photographs.overrides.mjs';
+// Published photographs only, from photography.catalog.json via the build-time
+// photography-catalog plugin; drafts never reach this module or the bundle.
+import publicCollection from 'virtual:photography-catalog';
 import { mergePhotographyMetadata } from '../../scripts/photography-utils.mjs';
+
+const {
+  captureTimeZone: EXIF_CAPTURE_TIMEZONE,
+  categories: PHOTOGRAPHY_CATEGORIES,
+  heroSlug: PHOTOGRAPHY_HERO_SLUG,
+  photographs: photographOverrides,
+  generated: generatedRecords,
+} = publicCollection;
 
 const derivativeAssets = import.meta.glob('../assets/photography/generated/*.jpg', {
   eager: true,

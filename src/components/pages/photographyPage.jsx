@@ -171,7 +171,7 @@ export const photographyCollections = PHOTOGRAPHY_CATEGORIES.map((category) => {
   const cover = members.find(({ featured }) => !featured) ?? members[0];
   return { category, count: members.length, cover };
 }).filter(({ count }) => count > 0);
-// The opening frame is chosen in the overrides; Featured and the archive keep their own order.
+// The opening frame is the catalog's `hero`; Featured and the archive keep their own order.
 // HeroFigure's srcSet/sizes are mirrored by the build's preload (scripts/seo-plugin.mjs).
 const heroPhotograph = findPhotograph(PHOTOGRAPHY_HERO_SLUG) ?? featuredPhotographs[0];
 const cameraCount = new Set(photographs.map(({ camera }) => camera).filter(Boolean)).size;

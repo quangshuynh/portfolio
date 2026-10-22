@@ -1,13 +1,15 @@
 // @vitest-environment node
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { JSDOM } from 'jsdom';
 import { build } from 'vite';
-import { photographOverrides as photographs } from '../data/photographs.overrides.mjs';
+import catalog from '../data/photography.catalog.json';
+import { publicPhotographs } from '../../scripts/photography-catalog.mjs';
 import { NOT_FOUND_ROUTE, ROUTES, SITE_URL } from './site.mjs';
 
 const root = resolve(__dirname, '../..');
+const photographs = publicPhotographs(catalog);
 
 async function buildSite(base) {
   const outDir = mkdtempSync(join(tmpdir(), 'portfolio-seo-'));
@@ -102,6 +104,69 @@ describe('production build at the site root', () => {
 
   test('copies robots.txt with the sitemap directive', () => {
     expect(readFileSync(join(outDir, 'robots.txt'), 'utf8')).toContain('Sitemap: https://quanghuynh.com/sitemap.xml');
+  });
+});
+
+describe('draft photographs', () => {
+  // A draft whose every field is a unique marker, so any leak into any output is visible.
+  const draft = {
+    id: 'zzdraftid7341',
+    slug: 'zzdraftslug7341',
+    status: 'draft',
+    sourceFilename: 'ZZDRAFTSOURCE7341.ARW',
+    caption: 'Zz draft caption 7341',
+    alt: 'Zz draft alt text 7341',
+    shape: 'landscape',
+    category: catalog.categories[0],
+    tags: ['Zzdrafttag7341'],
+    metadata: { location: 'Zz draft location 7341' },
+  };
+  const markers = ['7341', 'zzdraft', 'ZZDRAFT', 'Zz draft'];
+  const publishedMarker = 'Published marker 7342';
+  let outDir;
+  let catalogDir;
+
+  beforeAll(async () => {
+    catalogDir = mkdtempSync(join(tmpdir(), 'portfolio-catalog-'));
+    const file = join(catalogDir, 'catalog.json');
+    // Inserted mid-sequence, so it would also shift curated numbering if it leaked.
+    // The first published caption also changes, to prove this catalog is what was built.
+    const photographsWithDraft = catalog.photographs.map((record, index) => (index === 0 ? { ...record, caption: publishedMarker } : record));
+    photographsWithDraft.splice(3, 0, draft);
+    writeFileSync(file, JSON.stringify({ ...catalog, photographs: photographsWithDraft }));
+    process.env.PHOTOGRAPHY_CATALOG = file;
+    try {
+      outDir = await buildSite('/');
+    } finally {
+      delete process.env.PHOTOGRAPHY_CATALOG;
+    }
+  }, 60_000);
+  afterAll(() => {
+    if (outDir) rmSync(outDir, { recursive: true, force: true });
+    if (catalogDir) rmSync(catalogDir, { recursive: true, force: true });
+  });
+
+  const outputFiles = (directory) => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => (
+    entry.isDirectory() ? outputFiles(join(directory, entry.name)) : [join(directory, entry.name)]
+  ));
+
+  test('appear in no built file name or text output', () => {
+    const files = outputFiles(outDir);
+    const textFiles = files.filter((file) => /\.(html|js|css|xml|json|txt|webmanifest)$/.test(file));
+    expect(textFiles.length).toBeGreaterThan(5);
+    const leaks = files.filter((file) => markers.some((marker) => file.includes(marker)))
+      .concat(textFiles.filter((file) => markers.some((marker) => readFileSync(file, 'utf8').includes(marker))));
+    expect(leaks).toEqual([]);
+    // Control: published copy from the same catalog does reach the output.
+    expect(textFiles.some((file) => readFileSync(file, 'utf8').includes(publishedMarker))).toBe(true);
+  });
+
+  test('leave the sitemap and structured data listing only published photographs', () => {
+    const xml = readFileSync(join(outDir, 'sitemap.xml'), 'utf8');
+    expect(xml.match(/<image:loc>/g)).toHaveLength(photographs.length);
+    const head = readHead(outDir, 'photography/index.html');
+    const data = JSON.parse(head.querySelector('script[type="application/ld+json"]').textContent);
+    expect(data.hasPart).toHaveLength(photographs.filter(({ featured }) => featured).length);
   });
 });
 
