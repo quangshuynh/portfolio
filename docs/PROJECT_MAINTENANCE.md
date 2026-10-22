@@ -18,6 +18,8 @@ model, why assets are served from jsDelivr, and screenshot guidelines is in
 | `npm run assets:refresh` | yes | Refreshes every repository |
 | `npm run prepare:images` | yes | Regenerates the WebP logo and local-image derivatives |
 | `npm run check:assets` | yes | Validates data, fetches every remote image, and probes release videos |
+| `npm run check:photography` | no | Validates the photography catalog and its derivatives ([photography-catalog.md](photography-catalog.md)) |
+| `npm run cms` | yes (publishing) | Local photography CMS: drafts, uploads, ordering, preview, publication pull requests ([photography-cms.md](photography-cms.md)) |
 
 Everything about a project lives in two files:
 

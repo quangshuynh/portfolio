@@ -34,6 +34,8 @@ npm run dev        # http://localhost:5173
 | `npm run check:assets` | Validate project data, then fetch every remote project image |
 | `npm run assets:refresh -- --dry-run` | Propose moving project image pins to each repository's verified latest commit |
 | `npm run prepare:images` | Regenerate WebP logo and local image derivatives |
+| `npm run check:photography` | Validate the photography catalog and its derivatives |
+| `npm run cms` | Local photography CMS on 127.0.0.1 (see [docs/photography-cms.md](docs/photography-cms.md)) |
 
 ## Deployment
 
@@ -63,4 +65,4 @@ Retained originals live outside this public repository. Generate public gallery 
 npm run prepare:photography -- --source-dir /path/to/retained/originals
 ```
 
-The command validates source identity, reads EXIF locally, auto-orients and resizes each image, strips embedded metadata, and writes deterministic derivatives plus `src/data/photographs.generated.json`. Human-authored captions, alt text, IDs, and curated order remain in `src/data/photographs.overrides.mjs`. Capture times without an EXIF offset are interpreted in `America/New_York`; exact GPS coordinates are never written to public metadata.
+The command validates source identity, reads EXIF locally, auto-orients and resizes each image, strips embedded metadata, and writes deterministic derivatives plus `src/data/photographs.generated.json`. Only published photographs are processed. Captions, alt text, IDs, publication status, categories, and curated order live in the machine-writable catalog `src/data/photography.catalog.json`; `npm run check:photography` validates it, and [docs/photography-catalog.md](docs/photography-catalog.md) describes the schema and workflows. Capture times without an EXIF offset are interpreted in the catalog's `captureTimeZone` (`America/New_York`); exact GPS coordinates are never written to public metadata.

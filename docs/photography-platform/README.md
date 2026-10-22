@@ -13,6 +13,44 @@ gallery. Interval 0 changed no site behaviour.
 | [editor-hdr-architecture.md](editor-hdr-architecture.md) | Editor pipeline, preview/export parity, LUTs, presets, batch, HDR merge |
 | [dependencies-licensing.md](dependencies-licensing.md) | Dependency and licence risks |
 | [../../experiments/raw-decode-poc](../../experiments/raw-decode-poc/README.md) | Isolated RAW decoding proof of concept with tests and benchmarks |
+| [../photography-catalog.md](../photography-catalog.md) | Interval 1 result: catalog schema, workflows, CMS contract, migration and rollback |
+
+## Status
+
+- **Interval 0** (feasibility): done.
+- **Interval 1** (catalog foundation): done on `feat/photography-catalog`
+  (2026-10-22). It went as proposed below, with two changes:
+  - the catalog is `src/data/photography.catalog.json`;
+  - the 14 orphan derivatives were kept, as the owner asked.
+  The documents in this folder describe the state before Interval 1; for the
+  current data model see [photography-catalog.md](../photography-catalog.md).
+- **Interval 2** became the **private photography CMS**, at the owner's
+  request (2026-10-22), on `feat/photography-cms`:
+  - a local-only server and dashboard, `npm run cms`;
+  - drafts kept in a private workspace outside the repository;
+  - publication through GitHub pull requests merged by hand.
+  It replaces the hosted Cloudflare design in decisions 1–4 of
+  [architecture-decisions.md](architecture-decisions.md), which could not be
+  verified or set up without billing. See
+  [photography-cms.md](../photography-cms.md).
+- **Interval 3** (editor core) needs authorization. Recommended scope, as
+  previously planned for Interval 2:
+  - **Route and shell:** the `/photography/editor` route (`ROUTES`,
+    `seo-plugin`, `vercel.json`), as a lazy chunk with no effect on the
+    gallery bundle.
+  - **Import and state:** JPEG/PNG/WebP import in a worker, plus the edit
+    document (schema 1).
+  - **Rendering:** a CPU reference for white balance, exposure,
+    highlights/shadows, contrast, saturation and vibrance; a WebGL2 preview
+    using the same parameters; before/after.
+  - **Export:** full-resolution JPEG/PNG/WebP.
+  - **Tests:** neutral settings reproduce the input; GPU matches the CPU
+    within 1/255; proxy matches full resolution.
+  - **Out of scope:** RAW, LUTs, curves, HSL, presets, batch, HDR, and any
+    new dependency.
+  - **Before it:** a first live CMS publication of one photograph, after the
+    branches are merged, to confirm push, pull request and deployment status
+    against the real GitHub.
 
 ## Findings at a glance
 

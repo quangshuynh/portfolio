@@ -7,6 +7,11 @@ Interval 0, 2026-10-22. Each decision is labelled with its status:
 - **Design:** reasoned, not yet built.
 - **Assumption:** needs confirming by the owner or an account check.
 
+> **Superseded in part (Interval 2):** decisions 1–4 (hosted CMS on
+> Cloudflare Access, a Worker and R2) were not built. The CMS is a local-only
+> server with GitHub pull requests; see [photography-cms.md](../photography-cms.md).
+> The other decisions stand.
+
 Background is in [repository-audit.md](repository-audit.md),
 [raw-feasibility.md](raw-feasibility.md) and
 [editor-hdr-architecture.md](editor-hdr-architecture.md).

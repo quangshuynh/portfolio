@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Photography CMS · local</title>
+    <script>
+      // Same theme preference as the portfolio, applied before first paint.
+      (function () {
+        var theme = 'dark';
+        try { theme = localStorage.getItem('portfolio-theme') || 'dark'; } catch (error) {}
+        document.documentElement.dataset.theme = theme;
+      }());
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/cms/admin/main.jsx"></script>
+  </body>
+</html>

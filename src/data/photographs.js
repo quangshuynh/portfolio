@@ -1,6 +1,15 @@
-import generatedRecords from './photographs.generated.json';
-import { EXIF_CAPTURE_TIMEZONE, PHOTOGRAPHY_CATEGORIES, PHOTOGRAPHY_HERO_SLUG, photographOverrides } from './photographs.overrides.mjs';
+// Published photographs only, from photography.catalog.json via the build-time
+// photography-catalog plugin; drafts never reach this module or the bundle.
+import publicCollection from 'virtual:photography-catalog';
 import { mergePhotographyMetadata } from '../../scripts/photography-utils.mjs';
+
+const {
+  captureTimeZone: EXIF_CAPTURE_TIMEZONE,
+  categories: PHOTOGRAPHY_CATEGORIES,
+  heroSlug: PHOTOGRAPHY_HERO_SLUG,
+  photographs: photographOverrides,
+  generated: generatedRecords,
+} = publicCollection;
 
 const derivativeAssets = import.meta.glob('../assets/photography/generated/*.jpg', {
   eager: true,
@@ -9,7 +18,8 @@ const derivativeAssets = import.meta.glob('../assets/photography/generated/*.jpg
 });
 
 function resolveDerivative(filename) {
-  const asset = derivativeAssets[`../assets/photography/generated/${filename}`];
+  // `assetUrls` exists only in the local CMS preview, for photographs not yet in the repository.
+  const asset = publicCollection.assetUrls?.[filename] ?? derivativeAssets[`../assets/photography/generated/${filename}`];
   if (!asset) throw new Error(`Generated photography derivative not found: ${filename}`);
   return asset;
 }
