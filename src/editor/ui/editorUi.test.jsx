@@ -52,7 +52,7 @@ describe('adjustment panel', () => {
     expect(exposure).toHaveAttribute('min', '-5');
     expect(exposure).toHaveAttribute('max', '5');
     expect(exposure).toHaveAttribute('aria-valuetext', '0.00 EV');
-    expect(screen.getAllByRole('slider')).toHaveLength(10);
+    expect(screen.getAllByRole('slider')).toHaveLength(35);
     // Disabled resets are hidden; changing a value reveals the button.
     expect(screen.queryByRole('button', { name: 'Reset Exposure' })).toBeNull();
     fireEvent.input(exposure, { target: { value: '1' } });

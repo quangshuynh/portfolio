@@ -1,8 +1,11 @@
 // GLSL mirror of spec.mjs. Constants come from the JS spec so the two cannot drift;
-// the per-pixel steps follow processLinear() and toneCurve() in the same order.
+// the per-pixel steps follow processLinear(), toneCurve() and processDisplay() in the
+// same order. Curve tables and LUTs are read with texelFetch and interpolated here,
+// exactly as the CPU does, so no float-texture filtering extension is needed.
 
 import { LUMA } from './colorMath.mjs';
-import { BLACK_EPSILON, TONE_PIVOT } from './spec.mjs';
+import { CURVE_TABLE_SIZE } from './curves.mjs';
+import { BLACK_EPSILON, HSL_CENTERS, HSL_LUMINANCE_EV, TONE_PIVOT } from './spec.mjs';
 
 const f = (value) => {
   const text = String(value);
@@ -20,6 +23,7 @@ void main() {
 
 export const FRAGMENT_SHADER = `#version 300 es
 precision highp float;
+precision highp sampler3D;
 uniform sampler2D uSource;
 uniform bool uWhiteBalanceActive;
 uniform mat3 uWhiteBalance;
@@ -33,6 +37,21 @@ uniform float uBlacks;
 uniform float uVibrance;
 uniform float uSaturation;
 uniform bool uNeutral;
+uniform bool uBaseNeutral;
+// Tone curves: CURVE_SIZE RGBA32F texels; r, g, b = channel curves, a = master.
+uniform bool uCurvesActive;
+uniform bvec4 uCurveActive;
+uniform sampler2D uCurves;
+uniform bool uHslActive;
+uniform float uHslHue[8];
+uniform float uHslSat[8];
+uniform float uHslLum[8];
+uniform bool uLutActive;
+uniform sampler3D uLut;
+uniform int uLutSize;
+uniform vec3 uLutDomainMin;
+uniform vec3 uLutDomainMax;
+uniform float uLutIntensity;
 // Split comparison: pixels with x below uSplit (0..1 of the width) show the source.
 uniform float uSplit;
 in vec2 vUv;
@@ -41,6 +60,10 @@ out vec4 outColor;
 const vec3 LUMA = vec3(${f(LUMA[0])}, ${f(LUMA[1])}, ${f(LUMA[2])});
 const float PIVOT = ${f(TONE_PIVOT)};
 const float BLACK_EPSILON = ${f(BLACK_EPSILON)};
+const int CURVE_SIZE = ${CURVE_TABLE_SIZE};
+const float HSL_EV = ${f(HSL_LUMINANCE_EV)};
+const float HSL_CENTERS[8] = float[8](${HSL_CENTERS.map(f).join(', ')});
+const float PI = 3.141592653589793;
 
 float toLinear(float v) {
   return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4);
@@ -49,6 +72,8 @@ float toSrgb(float v) {
   if (v <= 0.0) return 0.0;
   return v <= 0.0031308 ? v * 12.92 : 1.055 * pow(v, 1.0 / 2.4) - 0.055;
 }
+vec3 toLinear3(vec3 v) { return vec3(toLinear(v.r), toLinear(v.g), toLinear(v.b)); }
+vec3 toSrgb3(vec3 v) { return vec3(toSrgb(v.r), toSrgb(v.g), toSrgb(v.b)); }
 
 float toneCurve(float p) {
   float x = clamp(p, 0.0, 1.0);
@@ -68,6 +93,14 @@ float toneCurve(float p) {
 
 float toneLuminance(float y) {
   return toLinear(toneCurve(toSrgb(y)));
+}
+
+vec3 fitRange(vec3 rgb, float y) {
+  float hi = max(rgb.r, max(rgb.g, rgb.b));
+  if (hi > 1.0) rgb = y >= 1.0 ? vec3(1.0) : y + (rgb - y) * ((1.0 - y) / (hi - y));
+  float lo = min(rgb.r, min(rgb.g, rgb.b));
+  if (lo < 0.0) rgb = y <= 0.0 ? vec3(0.0) : y + (rgb - y) * (y / (y - lo));
+  return clamp(rgb, 0.0, 1.0);
 }
 
 vec3 process(vec3 rgb) {
@@ -90,11 +123,89 @@ vec3 process(vec3 rgb) {
     rgb = y + (rgb - y) * max(0.0, 1.0 + uVibrance * (1.0 - chroma));
   }
   if (uSaturation != 1.0) rgb = y + (rgb - y) * uSaturation;
-  float hi = max(rgb.r, max(rgb.g, rgb.b));
-  if (hi > 1.0) rgb = y >= 1.0 ? vec3(1.0) : y + (rgb - y) * ((1.0 - y) / (hi - y));
-  float lo = min(rgb.r, min(rgb.g, rgb.b));
-  if (lo < 0.0) rgb = y <= 0.0 ? vec3(0.0) : y + (rgb - y) * (y / (y - lo));
-  return clamp(rgb, 0.0, 1.0);
+  return fitRange(rgb, y);
+}
+
+float curveAt(int c, float v) {
+  float position = clamp(v, 0.0, 1.0) * float(CURVE_SIZE - 1);
+  int index = min(CURVE_SIZE - 2, int(floor(position)));
+  float a = texelFetch(uCurves, ivec2(index, 0), 0)[c];
+  float b = texelFetch(uCurves, ivec2(index + 1, 0), 0)[c];
+  return a + (b - a) * (position - float(index));
+}
+
+vec3 applyCurves(vec3 p) {
+  for (int c = 0; c < 3; c++) {
+    float v = p[c];
+    if (uCurveActive.a) v = curveAt(3, v);
+    if (uCurveActive[c]) v = curveAt(c, v);
+    p[c] = v;
+  }
+  return p;
+}
+
+vec3 hsvToRgb(float hue, float s, float v) {
+  vec3 k = mod(vec3(5.0, 3.0, 1.0) + hue / 60.0, 6.0);
+  return v - v * s * max(vec3(0.0), min(min(k, 4.0 - k), vec3(1.0)));
+}
+
+vec3 applyHsl(vec3 p) {
+  float hi = max(p.r, max(p.g, p.b));
+  float chroma = hi - min(p.r, min(p.g, p.b));
+  if (chroma <= 0.0) return p;
+  float hue = hi == p.r ? (p.g - p.b) / chroma : hi == p.g ? (p.b - p.r) / chroma + 2.0 : (p.r - p.g) / chroma + 4.0;
+  hue *= 60.0;
+  if (hue < 0.0) hue += 360.0;
+  float s = chroma / hi;
+  int k = 0;
+  for (int i = 1; i < 8; i++) if (hue >= HSL_CENTERS[i]) k = i;
+  int n = k == 7 ? 0 : k + 1;
+  float end = n == 0 ? 360.0 : HSL_CENTERS[n];
+  float wn = 0.5 - 0.5 * cos(PI * ((hue - HSL_CENTERS[k]) / (end - HSL_CENTERS[k])));
+  float wk = 1.0 - wn;
+  float shift = wk * uHslHue[k] + wn * uHslHue[n];
+  float saturation = 1.0 + wk * uHslSat[k] + wn * uHslSat[n];
+  float luminance = wk * uHslLum[k] + wn * uHslLum[n];
+  vec3 lin = toLinear3(p);
+  float y = dot(LUMA, lin);
+  if (shift != 0.0) {
+    float turned = hue + shift;
+    lin = toLinear3(hsvToRgb(turned - 360.0 * floor(turned / 360.0), s, hi));
+    float turnedY = dot(LUMA, lin);
+    if (turnedY > BLACK_EPSILON) lin *= y / turnedY;
+  }
+  if (saturation != 1.0) lin = y + (lin - y) * max(0.0, saturation);
+  if (luminance != 0.0) {
+    float gain = exp2(HSL_EV * luminance * s);
+    lin *= gain;
+    y *= gain;
+  }
+  return toSrgb3(fitRange(lin, y));
+}
+
+vec3 lutAt(ivec3 i) { return texelFetch(uLut, i, 0).rgb; }
+
+// Tetrahedral interpolation, as sampleLut() in lut.mjs.
+vec3 applyLut(vec3 p) {
+  vec3 t = clamp((p - uLutDomainMin) / (uLutDomainMax - uLutDomainMin), 0.0, 1.0);
+  vec3 position = t * float(uLutSize - 1);
+  ivec3 base = min(ivec3(floor(position)), ivec3(uLutSize - 2));
+  vec3 fr = position - vec3(base);
+  vec3 c000 = lutAt(base);
+  vec3 c111 = lutAt(base + ivec3(1));
+  vec3 v;
+  if (fr.r > fr.g) {
+    if (fr.g > fr.b) v = (1.0 - fr.r) * c000 + (fr.r - fr.g) * lutAt(base + ivec3(1, 0, 0)) + (fr.g - fr.b) * lutAt(base + ivec3(1, 1, 0)) + fr.b * c111;
+    else if (fr.r > fr.b) v = (1.0 - fr.r) * c000 + (fr.r - fr.b) * lutAt(base + ivec3(1, 0, 0)) + (fr.b - fr.g) * lutAt(base + ivec3(1, 0, 1)) + fr.g * c111;
+    else v = (1.0 - fr.b) * c000 + (fr.b - fr.r) * lutAt(base + ivec3(0, 0, 1)) + (fr.r - fr.g) * lutAt(base + ivec3(1, 0, 1)) + fr.g * c111;
+  } else if (fr.b > fr.g) {
+    v = (1.0 - fr.b) * c000 + (fr.b - fr.g) * lutAt(base + ivec3(0, 0, 1)) + (fr.g - fr.r) * lutAt(base + ivec3(0, 1, 1)) + fr.r * c111;
+  } else if (fr.b > fr.r) {
+    v = (1.0 - fr.g) * c000 + (fr.g - fr.b) * lutAt(base + ivec3(0, 1, 0)) + (fr.b - fr.r) * lutAt(base + ivec3(0, 1, 1)) + fr.r * c111;
+  } else {
+    v = (1.0 - fr.g) * c000 + (fr.g - fr.r) * lutAt(base + ivec3(0, 1, 0)) + (fr.r - fr.b) * lutAt(base + ivec3(1, 1, 0)) + fr.b * c111;
+  }
+  return p + (clamp(v, 0.0, 1.0) - p) * uLutIntensity;
 }
 
 void main() {
@@ -103,7 +214,15 @@ void main() {
     outColor = source;
     return;
   }
-  vec3 linear = vec3(toLinear(source.r), toLinear(source.g), toLinear(source.b));
-  vec3 rgb = process(linear);
-  outColor = vec4(toSrgb(rgb.r), toSrgb(rgb.g), toSrgb(rgb.b), source.a);
+  vec3 p;
+  if (uBaseNeutral) {
+    p = source.rgb;
+  } else {
+    vec3 rgb = process(toLinear3(source.rgb));
+    p = toSrgb3(rgb);
+  }
+  if (uCurvesActive) p = applyCurves(p);
+  if (uHslActive) p = applyHsl(p);
+  if (uLutActive) p = applyLut(p);
+  outColor = vec4(p, source.a);
 }`;

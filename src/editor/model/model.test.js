@@ -13,13 +13,17 @@ const neutral = neutralAdjustments();
 const withValue = (key, value) => ({ ...neutral, [key]: value });
 
 describe('adjustment registry', () => {
-  test('every control has a range around a neutral zero default', () => {
-    ADJUSTMENTS.forEach(({ min, max, step, default: value }) => {
+  test('every relative control has a range around a neutral zero default', () => {
+    ADJUSTMENTS.filter(({ signed }) => signed).forEach(({ min, max, step, default: value }) => {
       expect(min).toBeLessThan(0);
       expect(max).toBeGreaterThan(0);
       expect(step).toBeGreaterThan(0);
       expect(value).toBe(0);
     });
+  });
+
+  test('the only unsigned control is LUT intensity, a 0–100% amount that defaults to full', () => {
+    expect(ADJUSTMENTS.filter(({ signed }) => !signed)).toEqual([expect.objectContaining({ key: 'lutIntensity', min: 0, max: 100, default: 100 })]);
   });
 
   test('clamps to range and step, rejecting non-numbers', () => {

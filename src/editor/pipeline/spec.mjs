@@ -1,15 +1,20 @@
 // The rendering specification. `deriveParams` turns slider values into the numbers
-// both renderers use, and `toneCurve`/`processPixel` are the reference per-pixel
-// definition. The GLSL in shader.mjs mirrors these functions line for line; the
-// browser parity check compares the two. Change both together, and update
-// docs/photography-editor.md.
+// both renderers use, and `toneCurve`/`processLinear`/`processDisplay` are the
+// reference per-pixel definition. The GLSL in shader.mjs mirrors these functions line
+// for line; the browser parity check compares the two. Change both together, and
+// update docs/photography-editor.md.
 //
-// Fixed order, in linear sRGB (Rec.709 primaries, D65):
+// Fixed order. In linear sRGB (Rec.709 primaries, D65):
 //   decode sRGB -> white balance -> exposure -> tone (contrast, highlights, shadows,
 //   whites, blacks on luminance) -> vibrance -> saturation -> range fit -> encode sRGB.
+// Then on the sRGB-encoded values (display-referred, 0–1):
+//   tone curves (master, then per channel) -> HSL -> 3D LUT (mixed by intensity).
+// Each later stage is skipped when neutral, so earlier edits render unchanged.
 
 import { LUMA, linearToSrgb, srgbToLinear, whiteBalanceMatrix } from './colorMath.mjs';
-import { normalizeAdjustments } from '../model/adjustments.mjs';
+import { HSL_RANGES, hslKey, normalizeAdjustments } from '../model/adjustments.mjs';
+import { curveTables, sampleCurve } from './curves.mjs';
+import { sampleLut } from './lut.mjs';
 
 // Middle grey (18% linear) in the sRGB-encoded tone domain: the contrast pivot.
 export const TONE_PIVOT = linearToSrgb(0.18);
@@ -29,12 +34,20 @@ export const TONE_LIMITS = Object.freeze({
 /** Luminance below which a pixel is treated as black for ratio-based tone mapping. */
 export const BLACK_EPSILON = 1e-7;
 
+/** HSL hue sliders at ±100 move hues by this many degrees. */
+export const HUE_SHIFT_MAX = 30;
+/** HSL luminance sliders at ±100 change fully saturated colours by this many stops. */
+export const HSL_LUMINANCE_EV = 1;
+export const HSL_CENTERS = Object.freeze(HSL_RANGES.map(({ center }) => center));
+
 /**
  * Slider values -> renderer parameters.
- * :param adjustments: adjustment values (normalised here)
+ * :param adjustments: settings (normalised here)
+ * :param options: { lut } the parsed LUT that `adjustments.lut` refers to, if loaded;
+ *   a referenced LUT that is not loaded is skipped (the UI reports it as missing)
  * :returns: plain object; `neutral` is true when the pipeline is the identity
  */
-export function deriveParams(adjustments) {
+export function deriveParams(adjustments, { lut = null } = {}) {
   const a = normalizeAdjustments(adjustments);
   const highlights = a.highlights / 100;
   const shadows = a.shadows / 100;
@@ -56,8 +69,25 @@ export function deriveParams(adjustments) {
     vibrance: a.vibrance / 100,
     saturation: 1 + a.saturation / 100,
   };
-  params.neutral = !whiteBalanceActive && params.exposureGain === 1 && !toneActive
+  params.baseNeutral = !whiteBalanceActive && params.exposureGain === 1 && !toneActive
     && params.vibrance === 0 && params.saturation === 1;
+
+  params.curves = curveTables(a.curves);
+  params.curvesActive = params.curves.active.some(Boolean);
+  const hsl = { hue: [], saturation: [], luminance: [] };
+  HSL_RANGES.forEach(({ id }) => {
+    hsl.hue.push((a[hslKey(id, 'hue')] / 100) * HUE_SHIFT_MAX);
+    hsl.saturation.push(a[hslKey(id, 'saturation')] / 100);
+    hsl.luminance.push(a[hslKey(id, 'luminance')] / 100);
+  });
+  params.hsl = hsl;
+  params.hslActive = [...hsl.hue, ...hsl.saturation, ...hsl.luminance].some((value) => value !== 0);
+  params.lut = a.lut && lut ? lut : null;
+  params.lutIntensity = a.lutIntensity / 100;
+  params.lutActive = Boolean(params.lut) && params.lutIntensity > 0;
+  params.lutMissing = Boolean(a.lut) && !lut;
+  params.postActive = params.curvesActive || params.hslActive || params.lutActive;
+  params.neutral = params.baseNeutral && !params.postActive;
   return params;
 }
 
@@ -153,4 +183,124 @@ export function processLinear(rgb, params, toneLuminance = exactToneLuminance) {
   rgb[1] = Math.min(1, Math.max(0, g));
   rgb[2] = Math.min(1, Math.max(0, b));
   return rgb;
+}
+
+/**
+ * HSL range weights for a hue in degrees [0, 360): the two ranges whose centres
+ * enclose it, blended with a raised cosine so the weights sum to 1 and change
+ * smoothly (no hard boundary between ranges).
+ * :returns: [index, nextIndex, weight, nextWeight]
+ */
+export function hslWeights(hue) {
+  let k = HSL_CENTERS.length - 1;
+  while (k > 0 && hue < HSL_CENTERS[k]) k -= 1;
+  const next = (k + 1) % HSL_CENTERS.length;
+  const end = next === 0 ? 360 : HSL_CENTERS[next];
+  const t = (hue - HSL_CENTERS[k]) / (end - HSL_CENTERS[k]);
+  const nextWeight = 0.5 - 0.5 * Math.cos(Math.PI * t);
+  return [k, next, 1 - nextWeight, nextWeight];
+}
+
+/** HSV colour (hue in degrees) to RGB, all encoded 0–1. */
+function hsvToRgb(hue, s, v, out) {
+  for (let c = 0; c < 3; c += 1) {
+    const k = (5 - 2 * c + hue / 60) % 6;
+    out[c] = v - v * s * Math.max(0, Math.min(k, 4 - k, 1));
+  }
+  return out;
+}
+
+/** Pulls linear RGB into 0–1 toward its luminance `y`, as the range fit in processLinear. */
+function fitRange(rgb, y) {
+  let [r, g, b] = rgb;
+  const max = Math.max(r, g, b);
+  if (max > 1) {
+    if (y >= 1) { r = 1; g = 1; b = 1; } else {
+      const t = (1 - y) / (max - y);
+      r = y + (r - y) * t; g = y + (g - y) * t; b = y + (b - y) * t;
+    }
+  }
+  const min = Math.min(r, g, b);
+  if (min < 0) {
+    if (y <= 0) { r = 0; g = 0; b = 0; } else {
+      const t = y / (y - min);
+      r = y + (r - y) * t; g = y + (g - y) * t; b = y + (b - y) * t;
+    }
+  }
+  rgb[0] = Math.min(1, Math.max(0, r));
+  rgb[1] = Math.min(1, Math.max(0, g));
+  rgb[2] = Math.min(1, Math.max(0, b));
+  return rgb;
+}
+
+const scratchHsv = [0, 0, 0];
+const scratchLinear = [0, 0, 0];
+const scratchLut = [0, 0, 0];
+
+/**
+ * HSL on one encoded pixel. Range weights come from the HSV hue of the encoded
+ * values; greys (no chroma) are untouched. Hue turns around the HSV colour wheel at
+ * constant luminance; saturation scales chroma about luminance in linear light;
+ * luminance is a gain of up to ±HSL_LUMINANCE_EV stops, scaled by the pixel's HSV
+ * saturation so near-greys barely change. The result is range-fitted like the base.
+ */
+export function applyHsl(p, hsl, toLinear = srgbToLinear, toSrgb = linearToSrgb) {
+  const [r, g, b] = p;
+  const max = Math.max(r, g, b);
+  const chroma = max - Math.min(r, g, b);
+  if (chroma <= 0) return p;
+  let hue = max === r ? (g - b) / chroma : max === g ? (b - r) / chroma + 2 : (r - g) / chroma + 4;
+  hue *= 60;
+  if (hue < 0) hue += 360;
+  const s = chroma / max;
+  const [k, n, wk, wn] = hslWeights(hue);
+  const shift = wk * hsl.hue[k] + wn * hsl.hue[n];
+  const saturation = 1 + wk * hsl.saturation[k] + wn * hsl.saturation[n];
+  const luminance = wk * hsl.luminance[k] + wn * hsl.luminance[n];
+  const lin = scratchLinear;
+  for (let c = 0; c < 3; c += 1) lin[c] = toLinear(p[c]);
+  let y = LUMA[0] * lin[0] + LUMA[1] * lin[1] + LUMA[2] * lin[2];
+  if (shift !== 0) {
+    const turned = hue + shift;
+    hsvToRgb(turned - 360 * Math.floor(turned / 360), s, max, scratchHsv);
+    for (let c = 0; c < 3; c += 1) lin[c] = toLinear(scratchHsv[c]);
+    const turnedY = LUMA[0] * lin[0] + LUMA[1] * lin[1] + LUMA[2] * lin[2];
+    if (turnedY > BLACK_EPSILON) for (let c = 0; c < 3; c += 1) lin[c] *= y / turnedY;
+  }
+  if (saturation !== 1) {
+    const factor = Math.max(0, saturation);
+    for (let c = 0; c < 3; c += 1) lin[c] = y + (lin[c] - y) * factor;
+  }
+  if (luminance !== 0) {
+    const gain = 2 ** (HSL_LUMINANCE_EV * luminance * s);
+    for (let c = 0; c < 3; c += 1) lin[c] *= gain;
+    y *= gain;
+  }
+  fitRange(lin, y);
+  for (let c = 0; c < 3; c += 1) p[c] = toSrgb(lin[c]);
+  return p;
+}
+
+/**
+ * The display-referred stages on one pixel of sRGB-encoded values. Mutates and returns `p`.
+ * :param transfer: { toLinear, toSrgb }; the CPU renderer passes tabulated versions
+ */
+export function processDisplay(p, params, { toLinear = srgbToLinear, toSrgb = linearToSrgb } = {}) {
+  if (params.curvesActive) {
+    const { table, active } = params.curves;
+    for (let c = 0; c < 3; c += 1) {
+      let v = p[c];
+      if (active[3]) v = sampleCurve(table, 3, v);
+      if (active[c]) v = sampleCurve(table, c, v);
+      p[c] = v;
+    }
+  }
+  if (params.hslActive) applyHsl(p, params.hsl, toLinear, toSrgb);
+  if (params.lutActive) {
+    scratchLut[0] = p[0]; scratchLut[1] = p[1]; scratchLut[2] = p[2];
+    sampleLut(params.lut, scratchLut);
+    const t = params.lutIntensity;
+    for (let c = 0; c < 3; c += 1) p[c] += (scratchLut[c] - p[c]) * t;
+  }
+  return p;
 }
