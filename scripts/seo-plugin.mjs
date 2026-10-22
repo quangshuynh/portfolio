@@ -20,6 +20,8 @@ import {
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLACEHOLDER = '<!--seo-head-->';
 const PHOTO_ASSET_DIR = 'src/assets/photography/generated/';
+// React-independent startup watchdog for the editor (public/photography/editor-startup.js).
+const EDITOR_STARTUP_SCRIPT = 'photography/editor-startup.js';
 
 // Published photographs only: drafts never reach the sitemap, JSON-LD or preloads.
 async function loadPhotographs() {
@@ -76,7 +78,8 @@ export default function seoPlugin() {
         const url = ctx.server ? new URL(ctx.originalUrl ?? '/', 'http://localhost').pathname : '/';
         const appPath = url.replace(/\/+$/, '') || '/';
         const route = routeForAppPath(appPath) ?? ROUTES[0];
-        return html.replace(PLACEHOLDER, renderHeadTags(route, { jsonLd: buildJsonLd(route) }).trimStart());
+        const scripts = route === EDITOR_ROUTE ? [`${base}${EDITOR_STARTUP_SCRIPT}`] : [];
+        return html.replace(PLACEHOLDER, renderHeadTags(route, { jsonLd: buildJsonLd(route), scripts }).trimStart());
       },
     },
 
@@ -127,7 +130,7 @@ export default function seoPlugin() {
       // The editor's CSP allows the template's inline scripts (the theme bootstrap) by hash.
       const inlineScriptHashes = [...template.matchAll(/<script>([\s\S]*?)<\/script>/g)]
         .map(([, body]) => createHash('sha256').update(body).digest('base64'));
-      const editorOptions = () => ({ ...pageOptions(EDITOR_ROUTE), image: DEFAULT_SOCIAL_IMAGE, csp: editorContentSecurityPolicy(inlineScriptHashes) });
+      const editorOptions = () => ({ ...pageOptions(EDITOR_ROUTE), image: DEFAULT_SOCIAL_IMAGE, csp: editorContentSecurityPolicy(inlineScriptHashes), scripts: [`${base}${EDITOR_STARTUP_SCRIPT}`] });
 
       for (const route of [...ROUTES, EDITOR_ROUTE, NOT_FOUND_ROUTE]) {
         const options = route === EDITOR_ROUTE ? editorOptions() : route.indexable ? pageOptions(route) : { image: DEFAULT_SOCIAL_IMAGE };

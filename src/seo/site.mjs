@@ -188,10 +188,12 @@ export const HEAD_END = '<!-- seo:end -->';
  * :param options: { image, jsonLd, preloads } where preloads are extra <link> attribute maps
  * :returns: HTML string
  */
-export function renderHeadTags(route, { image = DEFAULT_SOCIAL_IMAGE, jsonLd = null, preloads = [], csp = null } = {}) {
+export function renderHeadTags(route, { image = DEFAULT_SOCIAL_IMAGE, jsonLd = null, preloads = [], csp = null, scripts = [] } = {}) {
   const meta = (key, name, content) => `<meta ${key}="${name}" content="${escapeAttribute(content)}" />`;
   const tags = [
     ...(csp ? [meta('http-equiv', 'Content-Security-Policy', csp)] : []),
+    // Classic blocking scripts: they run before the app's module bundle.
+    ...scripts.map((src) => `<script src="${escapeAttribute(src)}"></script>`),
     `<title>${escapeText(route.title)}</title>`,
     meta('name', 'description', route.description),
     meta('name', 'robots', route.indexable ? 'index, follow, max-image-preview:large' : 'noindex, follow'),

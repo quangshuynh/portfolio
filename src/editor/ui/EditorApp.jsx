@@ -177,10 +177,13 @@ function EditorWorkspace() {
     const previous = meta?.getAttribute('content');
     meta?.setAttribute('content', EDITOR_THEME_COLOR);
     document.documentElement.classList.add('pe-document');
+    // Tells the HTML-shell startup watchdog (public/photography/editor-startup.js) the editor mounted.
+    document.documentElement.dataset.editor = 'ready';
     const pool = workers.current;
     return () => {
       if (previous) meta?.setAttribute('content', previous);
       document.documentElement.classList.remove('pe-document');
+      delete document.documentElement.dataset.editor;
       Object.values(pool).forEach((client) => client?.terminate());
       exportJob.current?.client.terminate();
     };

@@ -239,6 +239,15 @@ inspector shows and copies a local report (capabilities, preview engine, image
 worker mode, recorded failures; no file names or pixels). The console has the
 same as `window.__photoEditorDiagnostics`. Nothing is sent anywhere.
 
+Before React, the editor HTML loads `public/photography/editor-startup.js`, a
+same-origin ES5 watchdog (allowed by the CSP's `script-src 'self'`). If
+`EditorApp` has not set `<html data-editor="ready">` within 12 s, or an error
+or failed script load leaves `#root` empty, it shows "The photo editor did not
+start" with Retry and a copyable report (errors with script paths, CSP
+violations, user agent, viewport, WebGL2/worker/storage support; no photos or
+file names). `window.__editorStartup.report()` gives the same text. The engine
+check blocks the entry bundle in WebKit and Chromium to verify it.
+
 Tested with `npm run check:editor:engines` (full flow incl. 12 MP export and a
 `.cube` LUT): Playwright WebKit 26.0 (iPhone 13 emulation and desktop),
 Chromium 141 (Pixel 7 emulation), Firefox 142, forced no-WebGL2 (WebKit) and

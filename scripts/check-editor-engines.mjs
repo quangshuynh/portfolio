@@ -24,7 +24,8 @@ const work = mkdtempSync(path.join(tmpdir(), 'editor-engines-'));
 const fixtures = path.join(work, 'fixtures');
 mkdirSync(fixtures, { recursive: true });
 const PORT = 4181;
-const URL_EDITOR = `http://localhost:${PORT}/photography/editor`;
+// Trailing slash: vite preview then serves the editor's own HTML (CSP, startup watchdog), as Vercel does without it.
+const URL_EDITOR = `http://localhost:${PORT}/photography/editor/`;
 
 const RUNS = [
   { name: 'WebKit, iPhone 13 emulation', type: webkit, device: 'iPhone 13' },
@@ -119,6 +120,8 @@ async function runOne(run, files) {
       await page.waitForSelector('.pe[data-engine]', { timeout: 15_000 });
       result.engine = await page.$eval('.pe', (e) => e.dataset.engine);
       if (run.expectEngine) assert.equal(result.engine, run.expectEngine);
+      assert.equal(await page.evaluate(() => document.documentElement.dataset.editor), 'ready');
+      assert.equal(await page.$('#editor-startup-failure'), null);
     });
     await step('import', async () => {
       await page.setInputFiles('input[type=file][multiple]', [files.large, files.chart]);
@@ -207,6 +210,29 @@ async function runOne(run, files) {
   return result;
 }
 
+/**
+ * Blocks the app's entry bundle so React never mounts, as a browser that cannot run it
+ * would, and checks the HTML-shell watchdog replaces the blank page with its report.
+ */
+async function checkStartupFallback(type, device) {
+  const browser = await type.launch();
+  try {
+    const context = await browser.newContext(device ? devices[device] : {});
+    const page = await context.newPage();
+    await page.route(/\/assets\/index-[^/]+\.js$/, (route) => route.abort());
+    await page.goto(URL_EDITOR, { waitUntil: 'load' });
+    await page.waitForSelector('#editor-startup-failure[role=alert]', { timeout: 20_000 });
+    const report = await page.$eval('#editor-startup-failure textarea', (e) => e.value);
+    assert.match(report, /Could not load \/assets\/index-/);
+    assert.ok(await page.isVisible('#editor-startup-failure button:has-text("Retry")'));
+    return { environment: `Startup fallback, ${device ?? type.name()}`, browser: `${type.name()} ${browser.version()}`, ok: true };
+  } catch (error) {
+    return { environment: `Startup fallback, ${device ?? type.name()}`, ok: false, error: error.message.split('\n')[0] };
+  } finally {
+    await browser.close();
+  }
+}
+
 async function main() {
   const files = await makeFixtures();
   await build({ root, logLevel: 'silent', configFile: path.join(root, 'vite.config.mjs') });
@@ -223,6 +249,11 @@ async function main() {
       }
       results.push(result);
       console.log(`${result.ok === true ? 'ok  ' : result.ok === null ? 'skip' : 'FAIL'} ${run.name}${result.browser ? ` (${result.browser})` : ''} ${JSON.stringify(result.ok ? { engine: result.engine, imageTasks: result.imageTasks, export12mp: result.export12mp, jpeg: result.jpeg, pngMaxDifference: result.pngMaxDifference, pngEncoderMaxDifference: result.pngEncoderMaxDifference } : result.skipped ?? { step: result.step, error: result.error, screen: result.screen, problems: result.problems })}`);
+    }
+    for (const [type, device] of [[webkit, 'iPhone 13'], [chromium, 'Pixel 7']].filter(([type]) => !ONLY || ONLY.includes(type.name()))) {
+      const result = await checkStartupFallback(type, device);
+      results.push(result);
+      console.log(`${result.ok ? 'ok  ' : 'FAIL'} ${result.environment}${result.browser ? ` (${result.browser})` : ''}${result.error ? ` ${result.error}` : ''}`);
     }
   } finally {
     await server.close();

@@ -36,6 +36,8 @@ describe('editor route', () => {
     expect(screen.getByRole('button', { name: 'Choose photos' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Photography' })).toHaveAttribute('href', '/photography/');
     expect(document.title).toBe('Photo Editor | Quang Huynh');
+    // The HTML-shell startup watchdog waits for this marker.
+    expect(document.documentElement.dataset.editor).toBe('ready');
     window.history.replaceState({}, '', '/');
   });
 });
