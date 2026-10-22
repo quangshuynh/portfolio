@@ -95,6 +95,19 @@ describe('editor startup watchdog', () => {
     expect(panel()).toBeNull();
   });
 
+  // Brave on iOS reported its injected wallet error at the page URL, line 1, so it was
+  // counted as this site's error.
+  test('lists errors attributed to the page URL itself as inline, not as editor errors', () => {
+    runWatchdog();
+    window.dispatchEvent(new ErrorEvent('error', { message: "TypeError: undefined is not an object (evaluating 'window.ethereum.selectedAddress = undefined')", filename: `${location.origin}/photography/editor`, lineno: 1, colno: 16 }));
+    vi.advanceTimersByTime(3000);
+    expect(panel()).toBeNull();
+    vi.advanceTimersByTime(9000);
+    const report = panel().querySelector('textarea').value;
+    expect(report).toMatch(/inline\] TypeError: undefined is not an object .* \(\/photography\/editor:1:16\)/);
+    expect(report).not.toMatch(/\d+ms error\]/);
+  });
+
   // An iPhone showed a blank page with no panel: the editor had mounted but was not visible.
   test('#startup-report opens the report with the editor layout even after a successful start', () => {
     window.history.replaceState({}, '', '/photography/editor#startup-report');
@@ -112,10 +125,21 @@ describe('editor startup watchdog', () => {
     expect(report).toMatch(/Layout \.pe-bar: header\.pe-bar /);
     expect(report).toContain('Layout .pe-canvas: none');
     expect(report).toContain('On top at centre: ');
+    expect(report).toContain('Hash switches: #startup-report');
+    expect(report).toMatch(/Scroll: html overflow:\S+ \d+px tall, body overflow:\S+ \d+px tall/);
+    expect(report).toMatch(/Root box: div /);
     // Stays until closed, although the editor has started.
     vi.advanceTimersByTime(5000);
     const close = [...panel().querySelectorAll('button')].find((button) => button.textContent === 'Close');
     close.click();
     expect(panel()).toBeNull();
+  });
+
+  test('opens the report when #startup-report is combined with other switches', () => {
+    window.history.replaceState({}, '', '/photography/editor#cpu-preview&startup-report');
+    document.documentElement.dataset.editor = 'ready';
+    runWatchdog();
+    vi.advanceTimersByTime(5000);
+    expect(panel().querySelector('textarea').value).toContain('Hash switches: #cpu-preview&startup-report');
   });
 });

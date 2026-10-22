@@ -257,7 +257,20 @@ For a page that started but shows nothing, open
 `/photography/editor#startup-report`: after 5 s the same report opens (with
 Close) regardless of start state, adding the visual viewport, the size and
 position of the editor's main parts and the element on top at the top, centre
-and bottom of the screen, measured before the panel covers the page.
+and bottom of the screen, measured before the panel covers the page. Errors
+attributed to the page URL itself are listed as `inline` (iOS reports injected
+scripts there) and never open the panel.
+
+Troubleshooting hash switch (`debugFlag` in `diagnostics.mjs`, combinable with
+`&`): `cpu-preview` never creates a WebGL2 context. Example:
+`/photography/editor#cpu-preview&startup-report`.
+
+Never put `overflow: hidden` on html and body for the editor. With both
+clipped, body is a 0px-tall clipping box around the fixed `.pe` (`#root` has no
+height) and iOS WebKit (Safari and Brave, iOS 18) paints nothing, though the
+editor is mounted and hit-testable. Found on a real iPhone by turning the
+scroll lock off; desktop WebKit does not reproduce it. A CSS test and the
+engine check guard it.
 
 Tested with `npm run check:editor:engines` (full flow incl. 12 MP export and a
 `.cube` LUT): Playwright WebKit 26.0 (iPhone 13 emulation and desktop),

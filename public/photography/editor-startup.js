@@ -37,11 +37,26 @@
     if (panel) render();
   }
 
-  // Errors raised by scripts from this origin. Browser extensions and injected scripts
-  // (e.g. a wallet provider) have another or no URL, and cross-origin errors are masked
-  // as "Script error." without one: those are reported as external, never as the cause.
-  function ownScript(filename) {
-    try { return !!filename && new URL(filename, location.href).origin === location.origin; } catch (error) { return false; }
+  // Where an error came from: 'error' for this site's script files; 'inline' for code
+  // attributed to the page URL itself, which is where iOS reports scripts a browser
+  // injects into the page (Brave's wallet shim throws there at line 1); 'external' for
+  // other or no URL, including cross-origin errors masked as "Script error.". Only
+  // 'error' can open the panel early; the others are listed but never the cause.
+  function errorSource(filename) {
+    var url;
+    try { url = filename ? new URL(filename, location.href) : null; } catch (error) { url = null; }
+    if (!url || url.origin !== location.origin) return 'external';
+    return url.pathname === location.pathname ? 'inline' : 'error';
+  }
+
+  function overflowOf(node) {
+    if (!node) return 'missing';
+    var style = getComputedStyle(node);
+    return 'overflow:' + style.overflowX + '/' + style.overflowY + ' ' + Math.round(node.getBoundingClientRect().height) + 'px tall';
+  }
+
+  function hashFlags() {
+    return location.hash.replace(/^#/, '').split(/[&,]/);
   }
 
   function started() {
@@ -101,6 +116,9 @@
       'React root children: ' + (document.getElementById('root') ? document.getElementById('root').childElementCount : 'missing'),
       'Root content: ' + describe(document.getElementById('root') && document.getElementById('root').firstElementChild),
       'Editor marker: ' + (root.getAttribute('data-editor') || 'not set'),
+      'Hash switches: ' + (location.hash || 'none'),
+      'Scroll: html ' + overflowOf(root) + ', body ' + overflowOf(document.body) + ', html classes "' + root.className + '"',
+      'Root box: ' + describe(document.getElementById('root')),
     ].concat(supports(), layoutSnapshot);
     lines.push('Stages:');
     for (var s = 0; s < stages.length; s += 1) lines.push('  [' + stages[s].at + 'ms] ' + stages[s].name);
@@ -197,9 +215,9 @@
       showSoon('a page file failed to load');
       return;
     }
-    var own = ownScript(event.filename);
-    record(own ? 'error' : 'external', (event.message || 'Script error') + (event.filename ? ' (' + (own ? pathOf(event.filename) : event.filename.slice(0, 120)) + ':' + event.lineno + ':' + event.colno + ')' : ' (no script URL)'));
-    if (own) showSoon('an error stopped the page');
+    var source = errorSource(event.filename);
+    record(source, (event.message || 'Script error') + (event.filename ? ' (' + (source === 'external' ? event.filename.slice(0, 120) : pathOf(event.filename)) + ':' + event.lineno + ':' + event.colno + ')' : ' (no script URL)'));
+    if (source === 'error') showSoon('an error stopped the page');
   }, true);
 
   window.addEventListener('unhandledrejection', function (event) {
@@ -216,7 +234,7 @@
 
   // /photography/editor#startup-report opens the report even when the editor started, for a
   // page that mounted but shows nothing. The hash never reaches the server.
-  if (location.hash === '#startup-report') {
+  if (hashFlags().indexOf('startup-report') !== -1) {
     setTimeout(function () { show('requested with #startup-report', true); }, REQUESTED_DELAY_MS);
   }
 
