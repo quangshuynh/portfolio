@@ -14,7 +14,14 @@ import {
 const VIRTUAL_ID = 'virtual:photography-catalog';
 const RESOLVED_ID = `\0${VIRTUAL_ID}`;
 
-export default function photographyCatalogPlugin() {
+export { RESOLVED_ID as PHOTOGRAPHY_CATALOG_MODULE_ID };
+
+/**
+ * :param options.loadPreview: CMS preview only (never the site build): returns the
+ *   collection to show instead of the repository's, with `assetUrls` mapping derivative
+ *   file names that are not in the repository to URLs on the local CMS server.
+ */
+export default function photographyCatalogPlugin({ loadPreview } = {}) {
   return {
     name: 'photography-catalog',
     resolveId(id) {
@@ -22,6 +29,7 @@ export default function photographyCatalogPlugin() {
     },
     async load(id) {
       if (id !== RESOLVED_ID) return null;
+      if (loadPreview) return `export default ${JSON.stringify(await loadPreview())};`;
       this.addWatchFile(catalogPath());
       this.addWatchFile(GENERATED_MANIFEST_PATH);
       // Every derivative in the folder ships (import.meta.glob), so a draft's derivative

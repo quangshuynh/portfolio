@@ -18,7 +18,8 @@ const derivativeAssets = import.meta.glob('../assets/photography/generated/*.jpg
 });
 
 function resolveDerivative(filename) {
-  const asset = derivativeAssets[`../assets/photography/generated/${filename}`];
+  // `assetUrls` exists only in the local CMS preview, for photographs not yet in the repository.
+  const asset = publicCollection.assetUrls?.[filename] ?? derivativeAssets[`../assets/photography/generated/${filename}`];
   if (!asset) throw new Error(`Generated photography derivative not found: ${filename}`);
   return asset;
 }
