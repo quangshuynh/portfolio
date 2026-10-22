@@ -648,3 +648,27 @@ test('the opening photograph is an existing photograph and opens in the existing
   expect(window.location.hash).toBe(`#${photograph.slug}`);
   expect(screen.getByRole('dialog', { name: new RegExp(photograph.caption, 'i') })).toBeInTheDocument();
 });
+
+
+test('a discreet link opens the photo editor in-app, without a page load', async () => {
+  vi.stubGlobal('createImageBitmap', () => Promise.reject(new Error('not in jsdom')));
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((type) => (type === '2d' ? {} : null));
+  render(<App />);
+
+  const link = await screen.findByRole('link', { name: 'Edit a photo' });
+  expect(link).toHaveAttribute('href', '/photography/editor');
+  // Secondary to the photographs: a text link in the intro, not a banner or button.
+  expect(link.closest('header.photography-intro')).not.toBeNull();
+
+  fireEvent.click(link);
+  expect(getAppPathname(window.location.pathname)).toBe('/photography/editor');
+  expect(await screen.findByRole('heading', { level: 1, name: 'Photo editor' })).toBeInTheDocument();
+  expect(document.title).toBe('Photo Editor | Quang Huynh');
+});
+
+test('modified clicks on the editor link are left to the browser', async () => {
+  render(<App />);
+  const link = await screen.findByRole('link', { name: 'Edit a photo' });
+  fireEvent.click(link, { ctrlKey: true });
+  expect(getAppPathname(window.location.pathname)).toBe('/photography');
+});

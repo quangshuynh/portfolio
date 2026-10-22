@@ -247,6 +247,13 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
     return () => document.querySelector('.photography-page')?.removeAttribute('inert');
   }, [selectedPhotograph]);
 
+  // In-app navigation to the editor; modified clicks keep the browser's own behaviour.
+  const openEditor = useCallback((event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    navigate(event.currentTarget.href);
+  }, []);
+
   const backToAbout = useCallback((event) => {
     event.preventDefault();
     const nextState = { ...(window.history.state ?? {}), restorePhotographyModal: true, returnSection: 'beyond-software' };
@@ -287,6 +294,9 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
               <p className="photography-intro__tagline">Cars, places, and whatever catches my eye.</p>
               <p className="photography-intro__facts mono">
                 <span>{photographs.length} photographs</span> · <span>{photographyCollections.length} collections</span> · <span>{cameraCount} cameras</span>
+              </p>
+              <p className="photography-intro__tool">
+                <a href={appHref('/photography/editor')} onClick={openEditor}>Edit a photo<span aria-hidden="true"> ↗</span></a>
               </p>
               <nav className="photography-index" aria-label="Photography sections">
                 <button type="button" onClick={() => jumpTo(featuredRef)}><span className="mono" aria-hidden="true">01</span> Featured</button>

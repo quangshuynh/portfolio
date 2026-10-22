@@ -29,7 +29,8 @@
     "title title"
     "hero hero"
     "tagline index"
-    "facts index";
+    "facts index"
+    "tool index";
   align-items: start;
   gap: 1.25rem clamp(1.5rem, 4vw, 3rem);
 }
@@ -54,6 +55,11 @@
   letter-spacing: .06em;
   text-transform: uppercase;
 }
+/* A quiet way into the photo editor: secondary to the photographs, never a banner. */
+.photography-intro__tool { grid-area: tool; margin-top: -.5rem; font-family: var(--font-mono); font-size: var(--step--2); letter-spacing: .06em; text-transform: uppercase; }
+.photography-intro__tool a { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--text-secondary); text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: .3em; transition: color var(--dur-fast) ease, text-decoration-color var(--dur-fast) ease; }
+.photography-intro__tool a:hover { color: var(--accent); text-decoration-color: currentColor; }
+.photography-intro__tool a:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 2px; }
 /* In-page index: the URL hash belongs to the photo viewer, so these scroll rather than link. */
 .photography-index { grid-area: index; display: grid; border-bottom: 1px solid var(--border); }
 .photography-index button {
@@ -132,7 +138,7 @@
     gap: 0 clamp(2.5rem, 4.5vw, 4.5rem);
   }
   .photography-intro__text { display: grid; gap: 1.25rem; align-content: end; padding-bottom: 2.6rem; container-type: inline-size; }
-  .photography-intro :is(h1, .photography-intro__tagline, .photography-intro__facts, .photography-index), .photography-hero { grid-area: auto; }
+  .photography-intro :is(h1, .photography-intro__tagline, .photography-intro__facts, .photography-intro__tool, .photography-index), .photography-hero { grid-area: auto; }
   /* Sized to the column so the stepped second line never runs into the photograph. */
   .photography-intro h1 { font-size: min(10.5rem, 29cqi); line-height: .8; margin-bottom: .75rem; }
   .photography-intro__title > span { display: block; }
@@ -145,7 +151,7 @@
 
 /* Phones: title, then the photograph edge to edge, then the words. */
 @media (max-width: 760px) {
-  .photography-intro__grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "hero" "tagline" "facts" "index"; row-gap: 1rem; }
+  .photography-intro__grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "hero" "tagline" "facts" "tool" "index"; row-gap: 1rem; }
   .photography-hero { margin: .25rem calc(-1 * var(--gutter)) .75rem; }
   .photography-hero figcaption { margin-top: .7rem; padding-inline: var(--gutter); font-size: .82rem; }
   .photography-index { margin-top: .5rem; }
