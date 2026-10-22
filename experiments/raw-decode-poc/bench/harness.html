@@ -1,0 +1,72 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>RAW decode benchmark</title>
+<script type="module">
+  // Uses the package's own entry point, which decodes in a Web Worker, so the timings
+  // include worker start-up and transferring the 16-bit result back to the page.
+  import LibRaw from '/libraw/index.js';
+
+  // Same as LINEAR_SETTINGS in src/decode.mjs (six gamm values: ybouane/LibRaw-Wasm#8).
+  const LINEAR = { outputBps: 16, outputColor: 1, gamm: [1, 1, 0, 0, 0, 0], noAutoBright: true, useCameraWb: true, userQual: 3 };
+  const CASES = [
+    { name: 'full AHD 16-bit linear', settings: LINEAR },
+    { name: 'half-size 16-bit linear', settings: { ...LINEAR, halfSize: true } },
+  ];
+
+  async function measureMemory() {
+    if (!self.crossOriginIsolated || !performance.measureUserAgentSpecificMemory) return null;
+    return (await performance.measureUserAgentSpecificMemory()).bytes;
+  }
+
+  window.runBenchmark = async (runs = 3) => {
+    const report = { crossOriginIsolated: self.crossOriginIsolated, sharedArrayBuffer: typeof SharedArrayBuffer === 'function', cases: [] };
+    const fileBytes = new Uint8Array(await (await fetch('/fixture')).arrayBuffer());
+    report.fileBytes = fileBytes.byteLength;
+    for (const { name, settings } of CASES) {
+      const result = { name, runs: [] };
+      for (let run = 0; run < runs; run += 1) {
+        const raw = new LibRaw();
+        try {
+          const started = performance.now();
+          await raw.open(fileBytes.slice(), settings);
+          const opened = performance.now();
+          const image = await raw.imageData();
+          const decoded = performance.now();
+          result.runs.push({
+            openMs: Math.round(opened - started),
+            imageDataMs: Math.round(decoded - opened),
+            totalMs: Math.round(decoded - started),
+            width: image.width, height: image.height, bits: image.bits, samples: image.data.length,
+            memoryBytesWithWorker: await measureMemory(),
+          });
+        } catch (error) {
+          result.runs.push({ error: String(error?.message ?? error) });
+          break;
+        } finally {
+          raw.dispose();
+        }
+      }
+      report.cases.push(result);
+    }
+
+    // Batch editing would reuse one worker for many files; check that its heap is
+    // recycled between open() calls rather than growing toward the 2 GB wasm limit.
+    const reuse = { name: 'one worker, 8 sequential full decodes', runs: [] };
+    const shared = new LibRaw();
+    try {
+      for (let run = 0; run < 8; run += 1) {
+        const started = performance.now();
+        await shared.open(fileBytes.slice(), LINEAR);
+        const image = await shared.imageData();
+        reuse.runs.push({ totalMs: Math.round(performance.now() - started), samples: image.data.length, memoryBytesWithWorker: await measureMemory() });
+      }
+    } catch (error) {
+      reuse.runs.push({ error: String(error?.message ?? error) });
+    } finally {
+      shared.dispose();
+    }
+    report.cases.push(reuse);
+    return report;
+  };
+  window.harnessReady = true;
+</script>

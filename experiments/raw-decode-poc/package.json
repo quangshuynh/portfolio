@@ -1,0 +1,15 @@
+{
+  "name": "raw-decode-poc",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Interval 0 proof of concept: genuine Sony ARW decoding with LibRaw compiled to WebAssembly. Not part of the site build.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "bench:node": "node bench/node.mjs",
+    "bench:browser": "node bench/browser.mjs"
+  },
+  "dependencies": {
+    "libraw-wasm": "1.6.0"
+  }
+}

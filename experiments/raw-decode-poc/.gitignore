@@ -1,0 +1,4 @@
+node_modules/
+# RAW fixtures and benchmark output stay local; see README.md.
+fixtures/
+results/
