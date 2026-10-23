@@ -1,6 +1,7 @@
-// Detail exports rendered on several workers. Detail is the slow part of an export (about
+// Exports rendered on several workers (desktops). Detail is the slow part of an export (about
 // 1 s per megapixel per thread with every control on), and its bands are independent once
-// the guide is known: each band needs only its rows plus the halo. The page holds the
+// the guide is known: each band needs only its rows plus the halo. Without Detail, bands
+// need no halo at all (the per-pixel stages take 1.5–4.5 s per 24 MP on one thread). The page holds the
 // decoded image, computes the guide (yielding between bands), and hands bands to a small
 // pool of render workers; each band comes back as RGBA8 and is written into the output
 // canvas. Every band is rendered by the same code from the same rows as in the one-thread
@@ -59,19 +60,11 @@ async function analyse(image, prepared, signal) {
 }
 
 /**
- * Renders an in-memory image with Detail settings on `workers` helpers.
- * :param image: { kind?, width, height, data } (RGBA8, or RAW/HDR linear RGB)
- * :param settings: { adjustments, lut, raw, nativeWidth, nativeHeight, flattenAlpha }
- * :param options: { workers, onBand({ row, rows, data }), onProgress(fraction), signal: { cancelled }, spawn }
- * :returns: when every band has been delivered
+ * Renders the bands of `image` on `workers` helpers: each is prepared with `begin`
+ * ([task, payload]), then renders bands with `rowsTask` from the band's rows plus `halo`
+ * rows above and below. Bands are delivered as they finish.
  */
-export async function renderDetailParallel(image, settings, { workers, onBand, onProgress = () => {}, signal = { cancelled: false }, spawn = spawnRenderWorker }) {
-  const { adjustments, lut = null, raw = null, nativeWidth = image.width, nativeHeight = image.height, flattenAlpha = false } = settings;
-  const prepared = prepareRender(deriveParams(adjustments, { lut, raw }));
-  const { guide, transparent } = await analyse(image, prepared, signal);
-  const scale = Math.min(1, Math.max(image.width, image.height) / Math.max(nativeWidth, nativeHeight));
-  const halo = detailHalo(prepared.params.detail, scale);
-  const options = { width: image.width, height: image.height, nativeWidth, nativeHeight, guide, transparent };
+async function renderBands(image, { begin: [beginTask, beginPayload], rowsTask, halo, flattenAlpha }, { workers, onBand, onProgress = () => {}, signal = { cancelled: false }, spawn = spawnRenderWorker }) {
   const channels = channelsOf(image);
   const job = `${Date.now()}-${Math.random()}`;
   const clients = [];
@@ -82,7 +75,7 @@ export async function renderDetailParallel(image, settings, { workers, onBand, o
   try {
     // Spawned inside the try: if a later spawn throws, the earlier workers are still ended.
     for (let i = 0; i < Math.max(1, workers); i += 1) clients.push(createWorkerClient(spawn()));
-    await Promise.all(clients.map((client) => client.call('detailBegin', { job, adjustments, lut, raw, options })));
+    await Promise.all(clients.map((client) => client.call(beginTask, { job, ...beginPayload })));
     const lane = async (client) => {
       while (bands.length) {
         if (signal.cancelled) throw new WorkerCancelled();
@@ -93,7 +86,7 @@ export async function renderDetailParallel(image, settings, { workers, onBand, o
         // A copy of just these rows: posting a view would clone its whole buffer.
         const data = image.data.slice(top * image.width * channels, bottom * image.width * channels);
         const source = { kind: image.kind, width: image.width, height: bottom - top, y0: top, data };
-        const band = await client.call('detailRows', { job, source, y0: row, y1: row + rows, flattenAlpha }, { transfer: [data.buffer] });
+        const band = await client.call(rowsTask, { job, source, y0: row, y1: row + rows, flattenAlpha }, { transfer: [data.buffer] });
         if (signal.cancelled) throw new WorkerCancelled();
         onBand({ row, rows, data: band });
         done += rows;
@@ -107,13 +100,43 @@ export async function renderDetailParallel(image, settings, { workers, onBand, o
 }
 
 /**
- * A JPEG, PNG or WebP export with Detail on several workers: `decoder` (an image worker
- * client) decodes the original at the export size, the bands are rendered in parallel
- * into a page canvas, which is encoded. The one-thread export renders in place in the
- * decode canvas instead; this holds the decoded pixels and the canvas (8 bytes per pixel).
+ * Renders an in-memory image with Detail settings on `workers` helpers.
+ * :param image: { kind?, width, height, data } (RGBA8, or RAW/HDR linear RGB)
+ * :param settings: { adjustments, lut, raw, nativeWidth, nativeHeight, flattenAlpha }
+ * :param options: { workers, onBand({ row, rows, data }), onProgress(fraction), signal: { cancelled }, spawn }
+ * :returns: when every band has been delivered
+ */
+export async function renderDetailParallel(image, settings, options) {
+  const { adjustments, lut = null, raw = null, nativeWidth = image.width, nativeHeight = image.height, flattenAlpha = false } = settings;
+  const signal = options.signal ?? { cancelled: false };
+  const prepared = prepareRender(deriveParams(adjustments, { lut, raw }));
+  const { guide, transparent } = await analyse(image, prepared, signal);
+  const scale = Math.min(1, Math.max(image.width, image.height) / Math.max(nativeWidth, nativeHeight));
+  const halo = detailHalo(prepared.params.detail, scale);
+  const begin = { adjustments, lut, raw, options: { width: image.width, height: image.height, nativeWidth, nativeHeight, guide, transparent } };
+  return renderBands(image, { begin: ['detailBegin', begin], rowsTask: 'detailRows', halo, flattenAlpha }, { ...options, signal });
+}
+
+/**
+ * Renders an in-memory image without Detail on `workers` helpers, with the per-pixel
+ * renderer of the one-thread export. Pixels do not depend on their neighbours, so the
+ * bands need no halo and the result is the same bit for bit (tested).
+ * :param image: { kind?, width, height, data } (RGBA8, or RAW linear RGB)
+ * :param settings: { adjustments, lut, raw, flattenAlpha }
+ */
+export function renderPixelsParallel(image, { adjustments, lut = null, raw = null, flattenAlpha = false }, options) {
+  return renderBands(image, { begin: ['pixelBegin', { adjustments, lut, raw }], rowsTask: 'pixelRows', halo: 0, flattenAlpha }, options);
+}
+
+/**
+ * A JPEG, PNG or WebP export on several workers: `decoder` (an image worker client)
+ * decodes the original at the export size, the bands are rendered in parallel (with or
+ * without Detail) into a page canvas, which is encoded. The one-thread export renders in
+ * place in the decode canvas instead; this holds the decoded pixels and the canvas
+ * (8 bytes per pixel).
  * :returns: { blob, width, height, timings }
  */
-export async function exportImageWithDetail(decoder, { file, header, adjustments, lut = null, settings }, { workers, onProgress = () => {}, signal, spawn }) {
+export async function exportImageInBands(decoder, { file, header, adjustments, lut = null, settings }, { workers, onProgress = () => {}, signal, spawn }) {
   const started = performance.now();
   const format = FORMATS[settings.format];
   const size = exportDimensions({ width: header.displayWidth, height: header.displayHeight }, settings.resize);
@@ -123,7 +146,8 @@ export async function exportImageWithDetail(decoder, { file, header, adjustments
   onProgress({ stage: 'decoding', fraction: 0 });
   const image = await decoder.call('decode', { file, header, width: size.width, height: size.height });
   const decodedAt = performance.now();
-  await renderDetailParallel(image, { adjustments, lut, nativeWidth: header.displayWidth, nativeHeight: header.displayHeight, flattenAlpha: settings.format === 'jpeg' }, {
+  const render = deriveParams(adjustments, { lut }).detailActive ? renderDetailParallel : renderPixelsParallel;
+  await render(image, { adjustments, lut, nativeWidth: header.displayWidth, nativeHeight: header.displayHeight, flattenAlpha: settings.format === 'jpeg' }, {
     workers,
     signal,
     spawn,
@@ -135,5 +159,5 @@ export async function exportImageWithDetail(decoder, { file, header, adjustments
   const blob = await encodeCanvas(canvas, format.mime, settings.format === 'png' ? undefined : settings.quality);
   if (signal.cancelled) throw new WorkerCancelled();
   if (blob.type !== format.mime) throw Object.assign(new Error(`This browser cannot encode ${format.label}. Choose another format.`), { code: 'encoder' });
-  return { blob, width: size.width, height: size.height, timings: { decode: decodedAt - started, render: renderedAt - decodedAt, encode: performance.now() - renderedAt, detailWorkers: workers } };
+  return { blob, width: size.width, height: size.height, timings: { decode: decodedAt - started, render: renderedAt - decodedAt, encode: performance.now() - renderedAt, bandWorkers: workers } };
 }

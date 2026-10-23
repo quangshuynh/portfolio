@@ -8,7 +8,7 @@ import { PRESETS_STORAGE_KEY, applyPreset, parsePresetFile, serializePresets } f
 import { LIMITS, exportDimensions, exportFileName, formatBytes, previewEdgeLimit, proxyDimensions } from '../io/files.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { createImageWorker, usingMainThread } from '../io/workerClient.mjs';
-import { detailWorkerCount, exportImageWithDetail } from '../io/detailPool.mjs';
+import { detailWorkerCount, exportImageInBands } from '../io/detailPool.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { RAW_FORMATS, RAW_SNIFF_BYTES, isTiff } from '../raw/rawFormat.mjs';
 import { createRawQueue, exportRaw, rawConcurrency } from '../raw/rawClient.mjs';
@@ -527,8 +527,9 @@ function EditorWorkspace() {
     onCancel(() => { signal.cancelled = true; client.terminate(); });
     const workers = detailWorkerCount();
     try {
-      if (workers > 0 && deriveParams(values, { lut }).detailActive) {
-        return await exportImageWithDetail(client, { file: resource.file, header: resource.header, adjustments: values, lut, settings }, { workers, onProgress, signal });
+      // Band workers when there is something to render (a neutral export only re-encodes).
+      if (workers > 0 && !deriveParams(values, { lut }).neutral) {
+        return await exportImageInBands(client, { file: resource.file, header: resource.header, adjustments: values, lut, settings }, { workers, onProgress, signal });
       }
       return await client.call('export', { file: resource.file, header: resource.header, adjustments: values, lut, settings }, { onProgress });
     } finally {

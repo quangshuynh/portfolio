@@ -3,7 +3,7 @@
 // image worker, or on the main thread where workers cannot decode images. Everything
 // stays in this browser; nothing here performs network requests.
 
-import { prepareRender, renderImage, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
+import { prepareRender, renderImage, renderRawRgba8, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
 import { computeImageGuide, createAreaAccumulator, guideSize, guideSource, prepareDetailRender, renderDetailImage, renderDetailRows, rowsHaveAlpha } from '../pipeline/detailRenderer.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { groupKeys, normalizeAdjustments } from '../model/adjustments.mjs';
@@ -138,6 +138,22 @@ export const handlers = {
   },
 
   /** :param options: prepareDetailRender options, with the guide already computed */
+  /** Band exports without Detail: the one-thread export's per-pixel renderer, per band. */
+  async pixelBegin({ job, adjustments, lut = null, raw = null }) {
+    detailJobs.clear();
+    detailJobs.set(job, { pixels: prepareRender(deriveParams(adjustments, { lut, raw })) });
+    return { result: true };
+  },
+
+  async pixelRows({ job, source, flattenAlpha = false }) {
+    const prepared = detailJobs.get(job)?.pixels;
+    if (!prepared) throw stale('pixels');
+    const band = new Uint8ClampedArray(source.width * source.height * 4);
+    if (source.kind === 'raw') renderRawRgba8(source.data, prepared, { target: band });
+    else renderRgba8(source.data, prepared, { target: band, flattenAlpha });
+    return { result: band, transfer: [band.buffer] };
+  },
+
   async detailBegin({ job, adjustments, lut = null, raw = null, options }) {
     detailJobs.clear();
     detailJobs.set(job, prepareDetailRender(prepareRender(deriveParams(adjustments, { lut, raw })), options));
