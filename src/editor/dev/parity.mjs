@@ -67,6 +67,24 @@ const RAW_EDITS = [
   ['RAW everything', { ...COMBINED, exposure: 1.2, curves: CURVES, orangeHue: -20, blueLuminance: -40, lut: ref('look33'), lutIntensity: 70 }, 'look33'],
 ];
 
+// Merged RAW HDR: float camera RGB up to 4x the sensor white (a -2 EV darkest frame).
+const HDR_INFO = { ...RAW_INFO, hdrWhite: 4 };
+function hdrChart() {
+  const raw = rawChart();
+  return { kind: 'hdr', width: 64, height: 64, data: Float32Array.from(raw.data, (v, i) => (v / 65535) * (i % 7 === 0 ? 4 : 1.7)) };
+}
+const HDR_EDITS = [
+  ['HDR neutral', {}],
+  ['HDR exposure -1', { exposure: -1 }],
+  ['HDR exposure +1.5', { exposure: 1.5 }],
+  ['HDR compression 0', { hdrHighlights: 0 }],
+  ['HDR compression 100', { hdrHighlights: 100 }],
+  ['HDR shadow lift 100', { hdrShadows: 100 }],
+  ['HDR stronger look', { hdrHighlights: 85, hdrShadows: 45 }],
+  ['HDR daylight', { raw: { whiteBalance: 'daylight' } }],
+  ['HDR everything', { ...COMBINED, hdrHighlights: 70, hdrShadows: 30, curves: CURVES, orangeHue: -20, lut: ref('look33'), lutIntensity: 70 }, 'look33'],
+];
+
 function compare(gpu, cpu) {
   let max = 0;
   let sum = 0;
@@ -118,6 +136,21 @@ function run() {
     const i = (y * 64 + x) * 4;
     for (let c = 0; c < 3; c += 1) rawSplitMax = Math.max(rawSplitMax, Math.abs(rawSplit[i + c] - neutralCpu[i + c]));
   }
+  // Merged HDR sources: RGB32F texture, developed with the HDR tone stage.
+  const hdr = hdrChart();
+  renderer.setSource(hdr);
+  const hdrResults = HDR_EDITS.map(([name, adjustments, lutKey]) => {
+    const params = deriveParams(adjustments, { lut: lutKey ? LUTS[lutKey] : null, raw: HDR_INFO });
+    return { name, ...compare(renderer.readPixels(params), renderRawRgba8(hdr.data, params)) };
+  });
+  const hdrBefore = deriveParams(neutralAdjustments(), { raw: HDR_INFO });
+  const hdrSplit = renderer.readPixels(deriveParams(HDR_EDITS.at(-1)[1], { lut: LUTS.look33, raw: HDR_INFO }), { split: 0.5, before: hdrBefore });
+  const hdrNeutral = renderRawRgba8(hdr.data, hdrBefore);
+  let hdrSplitMax = 0;
+  for (let y = 0; y < 64; y += 1) for (let x = 0; x < 32; x += 1) {
+    const i = (y * 64 + x) * 4;
+    for (let c = 0; c < 3; c += 1) hdrSplitMax = Math.max(hdrSplitMax, Math.abs(hdrSplit[i + c] - hdrNeutral[i + c]));
+  }
   renderer.setSource(source);
   // Rendering many frames back to back with changing curves and LUTs (texture reuse).
   const started = performance.now();
@@ -132,6 +165,8 @@ function run() {
     splitSourceExact,
     rawResults,
     rawSplitMax,
+    hdrResults,
+    hdrSplitMax,
     frameMs64: Number(frameMs.toFixed(3)),
   };
 }

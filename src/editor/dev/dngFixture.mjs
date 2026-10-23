@@ -20,6 +20,7 @@ export const XYZ_TO_LINEAR_SRGB = [
  *   colorMatrix    ColorMatrix1, XYZ -> camera (defaults to a camera with sRGB primaries)
  *   orientation    TIFF orientation (1–8)
  *   black, white   sensor levels
+ *   exposureTime   [numerator, denominator] seconds; fNumber; iso (EXIF exposure tags)
  * :returns: Uint8Array of the DNG file
  */
 export function createSyntheticDng({
@@ -33,6 +34,9 @@ export function createSyntheticDng({
   white = 16383,
   make = 'Synthetic',
   model = 'Test DNG',
+  exposureTime = [1, 125],
+  fNumber = 5.6,
+  iso = 200,
 } = {}) {
   const pattern = [0, 1, 1, 2]; // RGGB
   const pixels = new Uint16Array(width * height);
@@ -61,9 +65,9 @@ export function createSyntheticDng({
     [284, 'SHORT', [1]],
     [33421, 'SHORT', [2, 2]],
     [33422, 'BYTE', pattern],
-    [33434, 'RATIONAL', [[1, 125]]],
-    [33437, 'RATIONAL', [[56, 10]]],
-    [34855, 'SHORT', [200]],
+    [33434, 'RATIONAL', [exposureTime]],
+    [33437, 'RATIONAL', [[Math.round(fNumber * 10), 10]]],
+    [34855, 'SHORT', [iso]],
     [50706, 'BYTE', [1, 4, 0, 0]],
     [50708, 'ASCII', `${make} ${model}`],
     [50714, 'LONG', [black]],
@@ -71,6 +75,8 @@ export function createSyntheticDng({
     [50721, 'SRATIONAL', colorMatrix.map((value) => rational(value, 10000))],
     [50728, 'RATIONAL', neutral.map((value) => rational(value))],
     [50778, 'SHORT', [21]],
+    // Exif IFD (after the pixels) with the ISO, where cameras record it and LibRaw reads it.
+    [34665, 'LONG', ['EXIF']],
   ];
   const encoded = entries.map(([tag, typeName, values]) => {
     const type = TYPES[typeName];
@@ -88,7 +94,8 @@ export function createSyntheticDng({
     }
   });
   const stripOffset = dataOffset;
-  const buffer = new ArrayBuffer(stripOffset + pixels.byteLength);
+  const exifOffset = stripOffset + pixels.byteLength;
+  const buffer = new ArrayBuffer(exifOffset + 18);
   const view = new DataView(buffer);
   const bytes = new Uint8Array(buffer);
   bytes.set([0x49, 0x49]);
@@ -98,7 +105,7 @@ export function createSyntheticDng({
   const write = (at, type, value) => {
     if (type === TYPES.BYTE || type === TYPES.ASCII) view.setUint8(at, value);
     else if (type === TYPES.SHORT) view.setUint16(at, value, true);
-    else if (type === TYPES.LONG) view.setUint32(at, value === 'STRIP' ? stripOffset : value, true);
+    else if (type === TYPES.LONG) view.setUint32(at, value === 'STRIP' ? stripOffset : value === 'EXIF' ? exifOffset : value, true);
     else if (type === TYPES.RATIONAL) { view.setUint32(at, value[0], true); view.setUint32(at + 4, value[1], true); }
     else { view.setInt32(at, value[0], true); view.setInt32(at + 4, value[1], true); }
   };
@@ -113,5 +120,11 @@ export function createSyntheticDng({
   });
   view.setUint32(ifdOffset + 2 + encoded.length * 12, 0, true);
   bytes.set(new Uint8Array(pixels.buffer), stripOffset);
+  view.setUint16(exifOffset, 1, true);
+  view.setUint16(exifOffset + 2, 34855, true);
+  view.setUint16(exifOffset + 4, TYPES.SHORT, true);
+  view.setUint32(exifOffset + 6, 1, true);
+  view.setUint16(exifOffset + 10, iso, true);
+  view.setUint32(exifOffset + 14, 0, true);
   return bytes;
 }
