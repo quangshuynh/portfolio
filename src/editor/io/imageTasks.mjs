@@ -98,7 +98,27 @@ export async function exportDetailBands(context, size, prepared, native, setting
   }
 }
 
+// Parallel Detail export (detailPool.mjs): each helper worker keeps the render context of
+// the current job (settings, guide) and renders the bands of rows it is sent.
+const detailJobs = new Map();
+
 export const handlers = {
+  /** :param options: prepareDetailRender options, with the guide already computed */
+  async detailBegin({ job, adjustments, lut = null, raw = null, options }) {
+    detailJobs.clear();
+    detailJobs.set(job, prepareDetailRender(prepareRender(deriveParams(adjustments, { lut, raw })), options));
+    return { result: true };
+  },
+
+  /** Rows [y0, y1) from `source` (those rows plus the halo, starting at row source.y0). */
+  async detailRows({ job, source, y0, y1, flattenAlpha = false }) {
+    const context = detailJobs.get(job);
+    if (!context) throw stale('detail');
+    const band = new Uint8ClampedArray((y1 - y0) * source.width * 4);
+    renderDetailRows(source, context, y0, y1, band, { flattenAlpha });
+    return { result: band, transfer: [band.buffer] };
+  },
+
   async inspect({ file, thumbnailEdge }) {
     const { header, sha256 } = await inspectFile(file);
     const size = proxyDimensions({ width: header.displayWidth, height: header.displayHeight }, thumbnailEdge);
