@@ -312,7 +312,7 @@ async function runOne(run, files, reference, genuine) {
       const [download] = await Promise.all([page.waitForEvent('download'), page.locator('button:has-text("Save edits"):visible').first().click()]);
       const document = JSON.parse(readFileSync(await download.path(), 'utf8'));
       const hdr = document.photos.find(({ source }) => source.format === 'hdr' && source.hdr.mode === 'radiance');
-      assert.equal(document.version, 4);
+      assert.equal(document.version, 5);
       assert.deepEqual(hdr.source.hdr.inputs.map(({ name, role }) => [name, role]), [['bracket-1.dng', 'under'], ['bracket-0.dng', 'normal'], ['bracket-2.dng', 'over']]);
       assert.equal(hdr.adjustments.exposure, 0.5);
     });
