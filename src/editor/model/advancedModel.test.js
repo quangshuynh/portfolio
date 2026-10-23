@@ -1,11 +1,11 @@
 // @vitest-environment node
 import { adjustmentsEqual, compactAdjustments, groupIsNeutral, isNeutral, neutralAdjustments, normalizeAdjustments } from './adjustments.mjs';
-import { DOCUMENT_TYPE, createEditDocument, parseEditDocument, serializeEditDocument } from './editDocument.mjs';
+import { DOCUMENT_TYPE, MAX_DOCUMENT_BYTES, createEditDocument, parseEditDocument, readEditDocumentFile, serializeEditDocument } from './editDocument.mjs';
 import { editorReducer, initialEditorState } from './editorState.mjs';
 import { canUndo } from './history.mjs';
 import {
   BUILT_IN_PRESETS, PRESET_PACK_TYPE, PresetError, applyPreset, changedPresetGroups, createPreset,
-  parsePresetFile, presetPatch, serializePresets, uniquePresetName,
+  MAX_PRESET_FILE_BYTES, parsePresetFile, presetPatch, readPresetFile, serializePresets, uniquePresetName,
 } from './presets.mjs';
 
 const LUT = { sha256: 'f'.repeat(64), name: 'teal-orange.cube', title: 'Teal & Orange', size: 33 };
@@ -218,5 +218,23 @@ describe('Detail settings', () => {
     const [imported] = parsePresetFile(serializePresets([{ ...preset, settings: { ...preset.settings, colorNoise: 250, clarity: 'x' } }]));
     expect(imported.settings).toMatchObject({ colorNoise: 100, texture: 30 });
     expect(imported.settings.clarity).toBeUndefined();
+  });
+});
+
+describe('reading edit and preset files', () => {
+  // A file whose contents must never be read: text() would load all of it into memory.
+  const huge = (size) => ({ size, text: () => { throw new Error('read the whole file'); } });
+
+  it('refuses oversized files from their size, before reading them', async () => {
+    await expect(readEditDocumentFile(huge(MAX_DOCUMENT_BYTES + 1))).rejects.toThrow('larger than 4 MB');
+    await expect(readPresetFile(huge(MAX_PRESET_FILE_BYTES + 1))).rejects.toThrow('larger than 1 MB');
+  });
+
+  it('parses files within the limit', async () => {
+    const text = serializeEditDocument(createEditDocument([], { format: 'jpeg', quality: 0.9, resize: { mode: 'original' } }));
+    const document = await readEditDocumentFile({ size: text.length, text: async () => text });
+    expect(document.photos).toEqual([]);
+    const presets = serializePresets([createPreset('Warm', neutralAdjustments(), ['exposure'])]);
+    expect(await readPresetFile({ size: presets.length, text: async () => presets })).toHaveLength(1);
   });
 });

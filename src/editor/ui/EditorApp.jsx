@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { activePhoto, editorReducer, initialEditorState, selectedPhotos } from '../model/editorState.mjs';
 import { canRedo, canUndo } from '../model/history.mjs';
-import { createEditDocument, parseEditDocument, serializeEditDocument } from '../model/editDocument.mjs';
+import { createEditDocument, parseEditDocument, readEditDocumentFile, serializeEditDocument } from '../model/editDocument.mjs';
 import { adjustmentsEqual, isNeutral, neutralAdjustments } from '../model/adjustments.mjs';
 import { DEFAULT_SYNC_GROUPS, planSync, sourceKind } from '../model/sync.mjs';
 import { PRESETS_STORAGE_KEY, applyPreset, parsePresetFile, serializePresets } from '../model/presets.mjs';
@@ -777,7 +777,7 @@ function EditorWorkspace() {
   const openEdits = async (file) => {
     if (!file) return;
     try {
-      const document = parseEditDocument(await file.text());
+      const document = await readEditDocumentFile(file);
       dispatch({ type: 'loadDocument', document });
       const matched = document.photos.filter((entry) => stateRef.current.photos.some((item) => item.status === 'ready'
         && (entry.source.sha256 && item.sha256 ? entry.source.sha256 === item.sha256 : entry.source.name === item.name && entry.source.size === item.size))).length;

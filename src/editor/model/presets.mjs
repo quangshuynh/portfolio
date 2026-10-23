@@ -106,6 +106,12 @@ export function parsePreset(input, index = 0) {
   return { name, groups, settings: groupSettings(values, groups) };
 }
 
+/** Reads a preset File, refusing an oversized one before any of it is read into memory. */
+export async function readPresetFile(file) {
+  if (file.size > MAX_PRESET_FILE_BYTES) throw new PresetError('The preset file is larger than 1 MB.');
+  return parsePresetFile(await file.text());
+}
+
 /** Reads a preset file: a single preset or a pack. Returns validated presets. */
 export function parsePresetFile(text) {
   if (typeof text !== 'string') throw new PresetError('The preset file could not be read.');
