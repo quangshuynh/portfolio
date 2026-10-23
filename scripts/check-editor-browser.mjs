@@ -359,7 +359,7 @@ async function main() {
     };
     await check('PNG export equals the CPU reference exactly', async () => {
       await exportPhoto('png');
-      const file = await waitDownload('chart-edited.png');
+      const file = await waitDownload('chart-quangedit.png');
       const exported = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
       const source = await sharp(files.chart).ensureAlpha().raw().toBuffer();
       const expected = renderRgba8(new Uint8ClampedArray(source), deriveParams(COMBINED));
@@ -395,7 +395,7 @@ async function main() {
       assert.equal(await evaluate(`document.querySelector('.pe-curve__point[aria-label="Point 2 of 3"]').getAttribute('aria-valuetext')`), 'Input 128, output 158');
       await blur();
       await exportPhoto('png');
-      const file = await waitDownload('chart-edited.png');
+      const file = await waitDownload('chart-quangedit.png');
       const exported = await sharp(file).ensureAlpha().raw().toBuffer();
       const source = await sharp(files.chart).ensureAlpha().raw().toBuffer();
       const settings = { ...COMBINED, blueSaturation: -35, orangeHue: 20, lut: { sha256: '0'.repeat(64), name: 'look' }, lutIntensity: 70, curves: { master: [[0, 0], [128, 158], [255, 255]] } };
@@ -423,7 +423,7 @@ async function main() {
       await selectPhoto('rotated-exif6.jpg');
       await previewReady();
       await exportPhoto('png');
-      const file = await waitDownload('rotated-exif6-edited.png');
+      const file = await waitDownload('rotated-exif6-quangedit.png');
       const { data, info } = await sharp(file).raw().toBuffer({ resolveWithObject: true });
       assert.deepEqual([info.width, info.height], [400, 600]);
       const at = (x, y) => [...data.subarray((y * info.width + x) * info.channels, (y * info.width + x) * info.channels + 3)];
@@ -439,7 +439,7 @@ async function main() {
       await pause(50);
       await evaluate(`(() => { const i = document.querySelector('.pe-field--inline input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, '400'); i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
       await exportPhoto('webp');
-      const file = await waitDownload('photo-edited.webp');
+      const file = await waitDownload('photo-quangedit.webp');
       const metadata = await sharp(file).metadata();
       assert.equal(metadata.format, 'webp');
       assert.deepEqual([metadata.width, metadata.height], [400, 267]);
@@ -450,7 +450,7 @@ async function main() {
       await selectPhoto('alpha.png');
       await previewReady();
       await exportPhoto('jpeg');
-      const file = await waitDownload('alpha-edited.jpg');
+      const file = await waitDownload('alpha-quangedit.jpg');
       const { data, info } = await sharp(file).raw().toBuffer({ resolveWithObject: true });
       assert.equal(info.channels, 3);
       // 50% of (30, 90, 160) over white in linear light.
@@ -488,7 +488,7 @@ async function main() {
       const sampler = setInterval(() => { const m = memoryMb(); if (m) peaks.push(m); }, 400);
       const t = Date.now();
       await exportPhoto('jpeg');
-      const file = await waitDownload('large-24mp-edited.jpg', 180_000);
+      const file = await waitDownload('large-24mp-quangedit.jpg', 180_000);
       clearInterval(sampler);
       const wall = Date.now() - t;
       const metadata = await sharp(file).metadata();
@@ -514,7 +514,7 @@ async function main() {
       await click('.pe-export-progress button');
       await waitFor(`document.querySelector('.pe-inspector')?.textContent.includes('Export cancelled.')`, 'cancel message');
       await pause(500);
-      assert.ok(!existsSync(path.join(downloads, 'large-24mp-edited.png')));
+      assert.ok(!existsSync(path.join(downloads, 'large-24mp-quangedit.png')));
     });
 
     // ---------- screenshots ----------

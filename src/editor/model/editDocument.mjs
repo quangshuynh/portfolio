@@ -6,11 +6,13 @@
 
 import { compactAdjustments, normalizeAdjustments } from './adjustments.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
-import { safeSuffix } from '../io/files.mjs';
+import { DEFAULT_EXPORT_SUFFIX, safeSuffix } from '../io/files.mjs';
 
 export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // Version 2 added curves, HSL and LUT references; version 1 files read unchanged.
 export const DOCUMENT_VERSION = 2;
+// The default suffix before Interval 5; saved settings that still have it get the new one.
+const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).
 export const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
 
@@ -18,7 +20,7 @@ export const DEFAULT_EXPORT_SETTINGS = Object.freeze({
   format: 'jpeg',
   quality: 0.92,
   resize: Object.freeze({ mode: 'original', longEdge: 3840, maxWidth: 3840, maxHeight: 3840 }),
-  suffix: '-edited',
+  suffix: DEFAULT_EXPORT_SUFFIX,
 });
 
 export class EditDocumentError extends Error {}
@@ -39,7 +41,7 @@ export function normalizeExportSettings(input = {}) {
       maxWidth: positiveInteger(resize.maxWidth) ?? DEFAULT_EXPORT_SETTINGS.resize.maxWidth,
       maxHeight: positiveInteger(resize.maxHeight) ?? DEFAULT_EXPORT_SETTINGS.resize.maxHeight,
     },
-    suffix: typeof source.suffix === 'string' ? safeSuffix(source.suffix) : DEFAULT_EXPORT_SETTINGS.suffix,
+    suffix: typeof source.suffix === 'string' && source.suffix !== LEGACY_DEFAULT_SUFFIX ? safeSuffix(source.suffix) : DEFAULT_EXPORT_SETTINGS.suffix,
   };
 }
 

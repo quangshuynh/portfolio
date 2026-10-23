@@ -88,6 +88,28 @@ describe('filenames', () => {
     expect(safeSuffix('...v2')).toBe('v2');
     expect(() => exportFileName('a.jpg', 'gif')).toThrow();
   });
+
+  test.each([
+    ['DSC09420.ARW', 'jpeg', 'DSC09420-quangedit.jpg'],
+    ['IMG_1234.JPG', 'jpeg', 'IMG_1234-quangedit.jpg'],
+    ['portrait.png', 'webp', 'portrait-quangedit.webp'],
+    ['scan.DNG', 'png', 'scan-quangedit.png'],
+    ['trip.2026.10.17.jpeg', 'jpeg', 'trip.2026.10.17-quangedit.jpg'],
+    ['Phố cổ Hội An.JPG', 'webp', 'Phố cổ Hội An-quangedit.webp'],
+    ['no extension', 'png', 'no extension-quangedit.png'],
+    ['version 1.2 final', 'jpeg', 'version 1.2 final-quangedit.jpg'],
+    ['DSC09420-quangedit.jpg', 'jpeg', 'DSC09420-quangedit.jpg'],
+    ['DSC09420-QUANGEDIT.JPG', 'png', 'DSC09420-QUANGEDIT.png'],
+    ['../../evil:name?.ARW', 'jpeg', 'evil-name-quangedit.jpg'],
+    ['CON.ARW', 'jpeg', 'photo-quangedit.jpg'],
+  ])('default export name for %j as %s is %j', (name, format, expected) => {
+    expect(exportFileName(name, format)).toBe(expected);
+  });
+
+  test('a custom suffix is kept, and an empty one keeps the bare name', () => {
+    expect(exportFileName('DSC09420.ARW', 'jpeg', '_print-v2')).toBe('DSC09420_print-v2.jpg');
+    expect(exportFileName('DSC09420.ARW', 'png', '')).toBe('DSC09420.png');
+  });
 });
 
 describe('export and preview sizing', () => {

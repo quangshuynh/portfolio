@@ -142,7 +142,7 @@ describe('export panel', () => {
   test('summarises the output file and size, and hides quality for PNG', () => {
     const dispatch = vi.fn();
     const { rerender } = render(<ExportPanel settings={settings} photo={photo} dispatch={dispatch} onExport={vi.fn()} onCancel={vi.fn()} unsupportedFormats={[]} />);
-    expect(screen.getByText('DSC0001-edited.jpg')).toBeInTheDocument();
+    expect(screen.getByText('DSC0001-quangedit.jpg')).toBeInTheDocument();
     expect(screen.getByText('6000 × 4000 (original)')).toBeInTheDocument();
     expect(screen.getByRole('slider', { name: 'Quality' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('radio', { name: 'PNG' }));

@@ -5,6 +5,7 @@ import {
   DOCUMENT_TYPE,
   EditDocumentError,
   createEditDocument,
+  normalizeExportSettings,
   parseEditDocument,
   serializeEditDocument,
 } from './editDocument.mjs';
@@ -185,6 +186,13 @@ describe('edit document', () => {
     expect(parsed.photos[0].adjustments).toEqual(normalizeAdjustments(photo.adjustments));
     expect(parsed.photos[0].source).toMatchObject({ name: 'DSC0001.jpg', size: 1234, sha256: photo.sha256 });
     expect(parsed.exportSettings).toMatchObject({ format: 'png', suffix: '-v2' });
+  });
+
+  test('export settings default to the -quangedit suffix; the old default is migrated, custom ones kept', () => {
+    expect(normalizeExportSettings({}).suffix).toBe('-quangedit');
+    expect(normalizeExportSettings({ suffix: '-edited' }).suffix).toBe('-quangedit');
+    expect(normalizeExportSettings({ suffix: '-print' }).suffix).toBe('-print');
+    expect(normalizeExportSettings({ suffix: '' }).suffix).toBe('');
   });
 
   test('never stores pixels or object URLs', () => {
