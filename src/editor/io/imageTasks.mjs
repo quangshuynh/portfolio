@@ -3,7 +3,7 @@
 // image worker, or on the main thread where workers cannot decode images. Everything
 // stays in this browser; nothing here performs network requests.
 
-import { prepareRender, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
+import { prepareRender, renderImage, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { decodeToCanvas, decodeToRgba, encodeCanvas, inspectFile } from './decode.mjs';
 import { exportDimensions, proxyDimensions } from './files.mjs';
@@ -34,8 +34,11 @@ export const handlers = {
     return { result: image, transfer: [image.data.buffer] };
   },
 
-  /** CPU preview render. `source` and `lut.data` are sent only when not cached here. */
-  async render({ key, source, adjustments, lut }) {
+  /**
+   * CPU preview render. `source` and `lut.data` are sent only when not cached here.
+   * `raw` is the photo's RAW colour info when the source is a RAW proxy.
+   */
+  async render({ key, source, adjustments, lut, raw = null }) {
     if (source) Object.assign(renderCache, { key, source });
     else if (!key || renderCache.key !== key) throw stale('source');
     if (lut?.data) {
@@ -45,7 +48,7 @@ export const handlers = {
     const lutData = lut ? renderCache.luts.get(lut.sha256) : null;
     if (lut && !lutData) throw stale('lut');
     const image = renderCache.source;
-    const data = renderRgba8(image.data, deriveParams(adjustments, { lut: lutData }));
+    const data = renderImage(image, deriveParams(adjustments, { lut: lutData, raw }));
     return { result: { width: image.width, height: image.height, data }, transfer: [data.buffer] };
   },
 

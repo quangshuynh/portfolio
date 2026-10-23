@@ -20,6 +20,7 @@ read it before changing projects or project assets.
 | `src/data/photography.catalog.json` | Photography catalog: every photograph, published or draft, in curated order. Schema and workflows in `docs/photography-catalog.md`; logic in `scripts/photography-catalog.mjs`. |
 | `cms/` | Local photography CMS (`npm run cms`): server, API, publication, dashboard. Docs in `docs/photography-cms.md`. |
 | `docs/photography-platform/` | Interval 0 audit and architecture for the photography CMS and editor (planning only). |
+| `src/editor/raw/` | Editor RAW support (Interval 5): content sniffing, LibRaw wrapper, colour math, worker tasks, queue. Behaviour, limits and measurements in `docs/photography-editor.md` (RAW); notices in `public/photography/third-party-notices.txt`. |
 | `experiments/raw-decode-poc/` | Isolated RAW decoding proof of concept with its own `package.json`; not part of the site build or root `npm test`. |
 
 ## Project metadata

@@ -69,7 +69,7 @@ export function createCanvas(width, height) {
 // Browsers cap canvas area (iOS Safari at about 16.7 MP) and fail silently above it:
 // the context is null or drawing does nothing. Checked with one pixel at the far corner,
 // loosely: anti-fingerprinting (Safari, Brave) may add small noise to readback.
-function assertCanvasWorks(context, width, height) {
+export function assertCanvasWorks(context, width, height) {
   if (context) {
     context.fillStyle = '#ff00ff';
     context.fillRect(width - 1, height - 1, 1, 1);

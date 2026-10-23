@@ -9,6 +9,12 @@ export const LIMITS = Object.freeze({
   maxPhotos: 50,
 });
 
+/** Default export suffix: DSC09420.ARW -> DSC09420-quangedit.jpg. */
+export const DEFAULT_EXPORT_SUFFIX = '-quangedit';
+
+// A trailing extension: a dot and 1–5 letters or digits (".JPG", ".ARW", ".webp").
+const EXTENSION = /\.[a-z0-9]{1,5}$/i;
+
 // Windows reserves these names regardless of extension.
 const RESERVED = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i;
 
@@ -18,7 +24,7 @@ const RESERVED = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i;
  */
 export function safeBaseName(name, fallback = 'photo') {
   const leaf = String(name ?? '').split(/[\\/]/).pop();
-  const withoutExtension = leaf.replace(/\.[^.]{1,5}$/, '');
+  const withoutExtension = leaf.replace(EXTENSION, '');
   const cleaned = withoutExtension
     .normalize('NFC')
     .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, '-')
@@ -36,11 +42,21 @@ export function safeSuffix(suffix) {
   return String(suffix ?? '').replace(/[^\w.-]+/g, '').replace(/^\.+/, '').slice(0, 40);
 }
 
-/** Download filename for an export. */
-export function exportFileName(sourceName, format, suffix = '') {
+/**
+ * Download filename for an export: the source's base name (last extension removed,
+ * sanitised), the suffix unless the name already ends with it, and the extension of
+ * the chosen format. Every export path (single, and later batch or ZIP) uses this.
+ */
+export function exportFileName(sourceName, format, suffix = DEFAULT_EXPORT_SUFFIX) {
   const extension = FORMATS[format]?.extension;
   if (!extension) throw new Error(`Unsupported export format: ${format}`);
-  return `${safeBaseName(sourceName)}${safeSuffix(suffix)}.${extension}`;
+  const base = safeBaseName(sourceName);
+  const tail = safeSuffix(suffix);
+  if (tail && base.toLowerCase().endsWith(tail.toLowerCase())) return `${base}.${extension}`;
+  // "name-" + "-quangedit" would give a double separator.
+  const joined = /^[-_]/.test(tail) ? base.replace(/[-_]+$/, '') || base : base;
+  const named = `${joined}${tail}`;
+  return `${named}.${extension}`;
 }
 
 /** User-facing message when a header's size breaks the decode limits, else null. */

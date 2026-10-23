@@ -36,6 +36,7 @@ export function editorReducer(state, action) {
     case 'photosAdded': {
       const added = action.photos.map((photo) => ({
         status: 'importing',
+        progress: null,
         error: null,
         exportStatus: { state: 'idle' },
         history: history.createHistory(neutralAdjustments()),
@@ -56,6 +57,8 @@ export function editorReducer(state, action) {
       }));
       return match ? { ...next, pendingEdits: next.pendingEdits.filter((entry) => entry !== match) } : next;
     }
+    case 'importProgress':
+      return updatePhoto(state, action.id, (photo) => (photo.status === 'importing' ? { progress: action.progress } : {}));
     case 'importFailed':
       return updatePhoto(state, action.id, () => ({ status: 'error', error: action.error }));
     case 'remove': {

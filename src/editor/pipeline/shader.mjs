@@ -5,7 +5,7 @@
 
 import { LUMA } from './colorMath.mjs';
 import { CURVE_TABLE_SIZE } from './curves.mjs';
-import { BLACK_EPSILON, HSL_CENTERS, HSL_LUMINANCE_EV, TONE_PIVOT } from './spec.mjs';
+import { BLACK_EPSILON, HSL_CENTERS, HSL_LUMINANCE_EV, ROLLOFF_KNEE, TONE_PIVOT } from './spec.mjs';
 
 const f = (value) => {
   const text = String(value);
@@ -24,7 +24,14 @@ void main() {
 export const FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 precision highp sampler3D;
+precision highp usampler2D;
 uniform sampler2D uSource;
+// RAW sources: 16-bit camera RGB as an integer texture, developed by developRaw().
+uniform bool uRaw;
+uniform usampler2D uRawSource;
+uniform vec3 uRawGain;
+uniform mat3 uRawMatrix;
+uniform float uRolloffWhite;
 uniform bool uWhiteBalanceActive;
 uniform mat3 uWhiteBalance;
 uniform float uExposureGain;
@@ -52,8 +59,6 @@ uniform int uLutSize;
 uniform vec3 uLutDomainMin;
 uniform vec3 uLutDomainMax;
 uniform float uLutIntensity;
-// Split comparison: pixels with x below uSplit (0..1 of the width) show the source.
-uniform float uSplit;
 in vec2 vUv;
 out vec4 outColor;
 
@@ -64,6 +69,7 @@ const int CURVE_SIZE = ${CURVE_TABLE_SIZE};
 const float HSL_EV = ${f(HSL_LUMINANCE_EV)};
 const float HSL_CENTERS[8] = float[8](${HSL_CENTERS.map(f).join(', ')});
 const float PI = 3.141592653589793;
+const float ROLLOFF_KNEE = ${f(ROLLOFF_KNEE)};
 
 float toLinear(float v) {
   return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4);
@@ -103,10 +109,21 @@ vec3 fitRange(vec3 rgb, float y) {
   return clamp(rgb, 0.0, 1.0);
 }
 
+float highlightRolloff(float y) {
+  float excess = y - ROLLOFF_KNEE;
+  float a = (uRolloffWhite - 1.0) / ((1.0 - ROLLOFF_KNEE) * (uRolloffWhite - ROLLOFF_KNEE));
+  return ROLLOFF_KNEE + excess / (1.0 + excess * a);
+}
+
 vec3 process(vec3 rgb) {
   if (uWhiteBalanceActive) rgb = max(uWhiteBalance * rgb, 0.0);
   rgb *= uExposureGain;
   float y = dot(LUMA, rgb);
+  if (uRolloffWhite > 0.0 && y > ROLLOFF_KNEE) {
+    float ratio = highlightRolloff(y) / y;
+    rgb *= ratio;
+    y *= ratio;
+  }
   if (uToneActive) {
     if (y > BLACK_EPSILON) {
       float ratio = toneLuminance(y) / y;
@@ -210,20 +227,24 @@ vec3 applyLut(vec3 p) {
 }
 
 void main() {
-  vec4 source = texture(uSource, vUv);
-  if (uNeutral || vUv.x < uSplit) {
-    outColor = source;
-    return;
-  }
   vec3 p;
-  if (uBaseNeutral) {
-    p = source.rgb;
+  float alpha = 1.0;
+  if (uRaw) {
+    ivec2 size = textureSize(uRawSource, 0);
+    ivec2 at = min(ivec2(vUv * vec2(size)), size - 1);
+    vec3 camera = min(vec3(texelFetch(uRawSource, at, 0).rgb) / 65535.0 * uRawGain, 1.0);
+    p = toSrgb3(process(uRawMatrix * camera));
   } else {
-    vec3 rgb = process(toLinear3(source.rgb));
-    p = toSrgb3(rgb);
+    vec4 source = texture(uSource, vUv);
+    if (uNeutral) {
+      outColor = source;
+      return;
+    }
+    alpha = source.a;
+    p = uBaseNeutral ? source.rgb : toSrgb3(process(toLinear3(source.rgb)));
   }
   if (uCurvesActive) p = applyCurves(p);
   if (uHslActive) p = applyHsl(p);
   if (uLutActive) p = applyLut(p);
-  outColor = vec4(p, source.a);
+  outColor = vec4(p, alpha);
 }`;

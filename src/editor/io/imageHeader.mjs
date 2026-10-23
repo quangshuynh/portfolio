@@ -120,7 +120,7 @@ function parseWebp(bytes, view) {
  */
 export function readImageHeader(bytes) {
   const format = sniffFormat(bytes);
-  if (!format) throw new ImageHeaderError('unsupported', 'Only JPEG, PNG and WebP images are supported.');
+  if (!format) throw new ImageHeaderError('unsupported', 'Only JPEG, PNG, WebP and RAW (Sony ARW, DNG) files are supported.');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let header;
   try {

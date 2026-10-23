@@ -4,7 +4,7 @@
 // is tabulated per render, and 8-bit encoding uses code thresholds instead of a power.
 
 import { SRGB_TO_LINEAR_8BIT, linearToSrgb, srgbToLinear } from './colorMath.mjs';
-import { exactToneLuminance, processDisplay, processLinear } from './spec.mjs';
+import { developRaw, exactToneLuminance, processDisplay, processLinear } from './spec.mjs';
 
 // Tabulated transfer functions for the display stages (curves, HSL, LUT), linear between
 // entries: the encode table is indexed by sqrt(linear) to spend samples on the shadows.
@@ -60,12 +60,15 @@ export function toneTable(tone, maxLuminance) {
   };
 }
 
-// Brightest luminance white balance can produce from an 8-bit source, times exposure.
+const positiveRowSums = (m) => [0, 1, 2].map((row) => m.slice(row * 3, row * 3 + 3).reduce((sum, v) => sum + Math.max(0, v), 0));
+
+// Brightest luminance white balance can produce from the source (8-bit, or a RAW
+// development clipped at the sensor white), times exposure. Beyond it the table falls
+// back to the exact function, so this only needs to be a sensible range.
 const maxLuminance = (params) => {
-  const rowSums = params.whiteBalanceActive
-    ? [0, 1, 2].map((row) => params.whiteBalance.slice(row * 3, row * 3 + 3).reduce((sum, v) => sum + Math.max(0, v), 0))
-    : [1, 1, 1];
-  return Math.max(...rowSums) * params.exposureGain;
+  const source = params.raw ? Math.max(...positiveRowSums(params.raw.matrix)) : 1;
+  const balance = params.whiteBalanceActive ? Math.max(...positiveRowSums(params.whiteBalance)) : 1;
+  return source * balance * params.exposureGain;
 };
 
 /** Per-render state for renderRgba8: build once, reuse across bands. */
@@ -145,4 +148,52 @@ export function renderRgba8InBands(source, params, { width, height, target, flat
     onBand?.(last / height);
   }
   return out;
+}
+
+/**
+ * Renders a RAW development to 8-bit RGBA (opaque).
+ * :param source: Uint16Array of RGB camera values (decoder output, 0–65535)
+ * :param params: deriveParams() result with `raw`, or a prepareRender() result
+ * :param options: { target, start, end } with start/end pixel indices
+ */
+export function renderRawRgba8(source, params, {
+  target = new Uint8ClampedArray((source.length / 3) * 4),
+  start = 0,
+  end = source.length / 3,
+} = {}) {
+  const prepared = params.tone && params.params ? params : prepareRender(params);
+  const { params: p, tone } = prepared;
+  const rgb = [0, 0, 0];
+  const scale = 1 / 65535;
+  for (let pixel = start; pixel < end; pixel += 1) {
+    const i = pixel * 3;
+    const o = pixel * 4;
+    developRaw(source[i] * scale, source[i + 1] * scale, source[i + 2] * scale, p.raw, rgb);
+    processLinear(rgb, p, tone);
+    if (p.postActive) {
+      rgb[0] = fastTransfer.toSrgb(rgb[0]); rgb[1] = fastTransfer.toSrgb(rgb[1]); rgb[2] = fastTransfer.toSrgb(rgb[2]);
+      processDisplay(rgb, p, fastTransfer);
+      target[o] = Math.round(rgb[0] * 255);
+      target[o + 1] = Math.round(rgb[1] * 255);
+      target[o + 2] = Math.round(rgb[2] * 255);
+    } else {
+      target[o] = encodeSrgb8(rgb[0]);
+      target[o + 1] = encodeSrgb8(rgb[1]);
+      target[o + 2] = encodeSrgb8(rgb[2]);
+    }
+    target[o + 3] = 255;
+  }
+  return target;
+}
+
+/**
+ * Renders a decoded image of either kind: { kind: 'raw', data: Uint16Array RGB } or
+ * RGBA8 { data }. RAW sources need params derived with the photo's RAW colour info.
+ */
+export function renderImage(image, params, options) {
+  if (image.kind === 'raw') {
+    if (!(params.params ?? params).raw) throw new Error('A RAW image needs RAW development parameters.');
+    return renderRawRgba8(image.data, params, options);
+  }
+  return renderRgba8(image.data, params, options);
 }

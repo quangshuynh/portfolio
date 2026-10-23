@@ -7,6 +7,8 @@ import { PRESETS_STORAGE_KEY, applyPreset, parsePresetFile, serializePresets } f
 import { LIMITS, exportFileName, formatBytes, proxyDimensions } from '../io/files.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { createImageWorker, usingMainThread } from '../io/workerClient.mjs';
+import { RAW_FORMATS, RAW_SNIFF_BYTES, isTiff } from '../raw/rawFormat.mjs';
+import { createRawQueue, exportRaw } from '../raw/rawClient.mjs';
 import { browserCapabilities, diagnosticReport } from '../io/diagnostics.mjs';
 import { appHref } from '../../util/navigation';
 import AdjustPanel from './AdjustPanel';
@@ -18,7 +20,9 @@ import './editor.css';
 export const AUTOSAVE_KEY = 'photo-editor:edits:v1';
 const THUMBNAIL_EDGE = 320;
 const PROXY_CACHE_SIZE = 2;
-const ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';
+const ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.arw,.dng,image/x-sony-arw,image/x-adobe-dng';
+const formatLabel = (format) => FORMATS[format]?.label ?? RAW_FORMATS[format]?.label ?? format;
+const IMPORT_PROGRESS = { waiting: 'Waiting for the RAW decoder…', decoding: 'Decoding RAW sensor data…' };
 const EDITOR_THEME_COLOR = '#151515';
 
 const newId = () => (globalThis.crypto?.randomUUID ? crypto.randomUUID() : `photo-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -144,6 +148,13 @@ function EditorWorkspace() {
   const proxyCache = useRef(new Map());
   const workers = useRef({});
   const proxyJob = useRef({ busy: false, generation: 0 });
+  // RAW work runs in short-lived workers through one bounded queue.
+  const rawQueue = useRef(null);
+  const rawProxyJob = useRef(null);
+  const raws = useCallback(() => {
+    rawQueue.current ??= createRawQueue();
+    return rawQueue.current;
+  }, []);
   const exportJob = useRef(null);
   const fileInputRef = useRef(null);
   const editsInputRef = useRef(null);
@@ -230,7 +241,21 @@ function EditorWorkspace() {
       const resource = resources.current.get(entry.id);
       if (!resource) continue;
       try {
-        const { header, sha256, thumbnail } = await worker('import').call('inspect', { file: resource.file, thumbnailEdge: THUMBNAIL_EDGE });
+        // Identified by content: TIFF-structured files go to the RAW decoder, which
+        // accepts Sony ARW and DNG and explains anything else.
+        const head = new Uint8Array(await resource.file.slice(0, RAW_SNIFF_BYTES).arrayBuffer());
+        let inspected;
+        if (isTiff(head)) {
+          const job = raws().run('inspect', { file: resource.file, thumbnailEdge: THUMBNAIL_EDGE }, {
+            onProgress: ({ stage }) => stage === 'decoding' && dispatch({ type: 'importProgress', id: entry.id, progress: 'decoding' }),
+          });
+          resource.job = job;
+          dispatch({ type: 'importProgress', id: entry.id, progress: 'waiting' });
+          inspected = await job.promise.finally(() => { resource.job = null; });
+        } else {
+          inspected = await worker('import').call('inspect', { file: resource.file, thumbnailEdge: THUMBNAIL_EDGE });
+        }
+        const { header, sha256, thumbnail, raw = null } = inspected;
         if (!resources.current.has(entry.id)) continue;
         const duplicate = sha256 && [...resources.current.entries()].find(([id, other]) => id !== entry.id && other.sha256 === sha256);
         if (duplicate) {
@@ -239,18 +264,20 @@ function EditorWorkspace() {
           dispatch({ type: 'importFailed', id: entry.id, error: `Already in the workspace${original ? ` as ${original.name}` : ''}.`, code: 'duplicate' });
           continue;
         }
-        Object.assign(resource, { header, sha256, thumbnail });
+        Object.assign(resource, { header, sha256, thumbnail, raw });
         dispatch({
           type: 'importSucceeded',
           id: entry.id,
-          info: { format: header.format, width: header.displayWidth, height: header.displayHeight, orientation: header.orientation, sha256 },
+          info: { format: header.format, width: header.displayWidth, height: header.displayHeight, orientation: header.orientation, sha256, raw },
         });
       } catch (error) {
+        // Cancelled: the photo was removed while it was being read.
+        if (error.code === 'cancelled' || !resources.current.has(entry.id)) continue;
         resources.current.delete(entry.id);
         dispatch({ type: 'importFailed', id: entry.id, error: error.message || 'This file could not be read.' });
       }
     }
-  }, [worker]);
+  }, [worker, raws]);
 
   const loadProxy = useCallback(async (target, maxEdge) => {
     const key = `${target.id}:${maxEdge}`;
@@ -263,6 +290,22 @@ function EditorWorkspace() {
     }
     const resource = resources.current.get(target.id);
     if (!resource?.header) throw new Error('The original file is no longer available.');
+    if (resource.raw) {
+      // Half-size sensor data (never the embedded JPEG); a newer request cancels this one.
+      rawProxyJob.current?.cancel();
+      const job = raws().run('decode', { file: resource.file, maxEdge });
+      rawProxyJob.current = job;
+      try {
+        const image = await job.promise;
+        if (resources.current.has(target.id)) {
+          cache.set(key, image);
+          while (cache.size > PROXY_CACHE_SIZE) cache.delete(cache.keys().next().value);
+        }
+        return image;
+      } finally {
+        if (rawProxyJob.current === job) rawProxyJob.current = null;
+      }
+    }
     // One decode at a time: a newer request terminates the older one.
     const job = proxyJob.current;
     if (workers.current.proxy && job.busy) {
@@ -282,11 +325,11 @@ function EditorWorkspace() {
     } finally {
       if (generation === job.generation) job.busy = false;
     }
-  }, [worker]);
+  }, [worker, raws]);
 
   // CPU preview: the worker keeps the proxy and LUT, so they are sent only when they
   // change (or the worker lost them), not on every render.
-  const renderInWorker = useCallback(async (image, values, lut) => {
+  const renderInWorker = useCallback(async (image, values, lut, raw = null) => {
     const client = worker('render');
     const sent = renderState.current;
     if (sent.client !== client) Object.assign(sent, { client, key: null, luts: new Set() });
@@ -295,6 +338,7 @@ function EditorWorkspace() {
     const call = (full) => client.call('render', {
       key,
       adjustments: values,
+      raw,
       ...(full || sent.key !== key ? { source: image } : {}),
       ...(lut ? { lut: full || !sent.luts.has(lut.sha256) ? lut : { sha256: lut.sha256 } } : {}),
     });
@@ -314,6 +358,7 @@ function EditorWorkspace() {
   lutsRef.current = luts;
 
   const removePhoto = useCallback((id) => {
+    resources.current.get(id)?.job?.cancel();
     resources.current.delete(id);
     [...proxyCache.current.keys()].filter((key) => key.startsWith(`${id}:`)).forEach((key) => proxyCache.current.delete(key));
     if (exportJob.current?.id === id) exportJob.current.client.terminate();
@@ -325,6 +370,7 @@ function EditorWorkspace() {
         workers.current[name]?.terminate();
         workers.current[name] = null;
       });
+      rawProxyJob.current?.cancel();
       proxyCache.current.clear();
     }
   }, []);
@@ -340,29 +386,37 @@ function EditorWorkspace() {
       return;
     }
     const settings = stateRef.current.exportSettings;
-    const client = createImageWorker();
+    const onProgress = (progress) => dispatch({ type: 'exportStatus', id: target.id, status: { state: 'running', ...progress } });
+    // A RAW export runs in the RAW queue; cancelling ends its worker.
+    const rawJob = { job: null, cancelled: false };
+    const client = resource.raw
+      ? { terminate: () => { rawJob.cancelled = true; rawJob.job?.cancel(); } }
+      : createImageWorker();
     exportJob.current = { id: target.id, client };
     dispatch({ type: 'exportStatus', id: target.id, status: { state: 'running', stage: 'decoding', fraction: 0 } });
     performance.mark('pe-export-start');
     try {
-      const result = await client.call('export', {
-        file: resource.file,
-        header: resource.header,
-        adjustments: values,
-        lut,
-        settings,
-      }, { onProgress: (progress) => dispatch({ type: 'exportStatus', id: target.id, status: { state: 'running', ...progress } }) });
+      const result = resource.raw
+        ? await exportRaw(raws(), { file: resource.file, raw: resource.raw, adjustments: values, lut, settings }, {
+          onProgress,
+          onStart: (job) => {
+            rawJob.job = job;
+            if (rawJob.cancelled) job.cancel();
+          },
+        })
+        : await client.call('export', { file: resource.file, header: resource.header, adjustments: values, lut, settings }, { onProgress });
+      if (rawJob.cancelled) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
       performance.measure('pe-export', 'pe-export-start');
       const fileName = exportFileName(target.name, settings.format, settings.suffix);
       downloadBlob(result.blob, fileName);
-      dispatch({ type: 'exportStatus', id: target.id, status: { state: 'done', fileName, width: result.width, height: result.height, bytes: result.blob.size, timings: result.timings } });
+      dispatch({ type: 'exportStatus', id: target.id, status: { state: 'done', fileName, width: result.width, height: result.height, bytes: result.blob.size, timings: result.timings, raw: Boolean(resource.raw) } });
     } catch (error) {
       dispatch({ type: 'exportStatus', id: target.id, status: error.code === 'cancelled' ? { state: 'cancelled' } : { state: 'error', message: error.message } });
     } finally {
       client.terminate();
       exportJob.current = null;
     }
-  }, []);
+  }, [raws]);
 
   const cancelExport = useCallback(() => exportJob.current?.client.terminate(), []);
 
@@ -483,14 +537,14 @@ function EditorWorkspace() {
           onClick={() => dispatch({ type: 'select', id: item.id })}
         >
           <span className="pe-photo__frame">
-            {resource?.thumbnail ? <PhotoThumb thumbnail={resource.thumbnail} adjustments={item.history.present} lut={lutFor(item.history.present)} /> : <span className="pe-photo__placeholder" aria-hidden="true">{item.status === 'error' ? '!' : <span className="pe-spinner" />}</span>}
+            {resource?.thumbnail ? <PhotoThumb thumbnail={resource.thumbnail} adjustments={item.history.present} lut={lutFor(item.history.present)} raw={item.raw} /> : <span className="pe-photo__placeholder" aria-hidden="true">{item.status === 'error' ? '!' : <span className="pe-spinner" />}</span>}
           </span>
           {variant === 'list' && (
             <span className="pe-photo__meta">
               <span className="pe-photo__name">{item.name}</span>
               <span className="pe-photo__detail mono">
-                {item.status === 'ready' && `${item.width}×${item.height} · ${FORMATS[item.format].label} · ${formatBytes(item.size)}`}
-                {item.status === 'importing' && 'Reading…'}
+                {item.status === 'ready' && `${item.width}×${item.height} · ${formatLabel(item.format)} · ${formatBytes(item.size)}`}
+                {item.status === 'importing' && (IMPORT_PROGRESS[item.progress] ?? 'Reading…')}
                 {item.status === 'error' && item.error}
               </span>
               {item.restored && <span className="pe-photo__badge">Saved edits applied</span>}
@@ -566,7 +620,7 @@ function EditorWorkspace() {
         {state.photos.length ? (
           <ul className="pe-photo-list">{photoList('list')}</ul>
         ) : (
-          <p className="pe-note">JPEG, PNG or WebP, up to {LIMITS.maxPixels / 1e6} MP and {LIMITS.maxFileBytes / (1024 * 1024)} MB each. Drag files anywhere onto the editor.</p>
+          <p className="pe-note">JPEG, PNG, WebP, or RAW (Sony ARW, DNG), up to {LIMITS.maxPixels / 1e6} MP and {LIMITS.maxFileBytes / (1024 * 1024)} MB each. Drag files anywhere onto the editor.</p>
         )}
       </aside>
 
@@ -588,7 +642,7 @@ function EditorWorkspace() {
         {!state.photos.length && (
           <div className="pe-empty">
             <p className="pe-empty__title">Edit photographs in your browser</p>
-            <p>Drop JPEG, PNG or WebP files here, or</p>
+            <p>Drop JPEG, PNG, WebP or RAW (Sony ARW, DNG) files here, or</p>
             <button type="button" className="pe-button pe-button--primary pe-button--large" onClick={openPicker}>Choose photos</button>
             <p className="pe-note">Your photographs are decoded, edited and exported on this device. They are never uploaded, and no account is needed.</p>
           </div>
@@ -609,6 +663,7 @@ function EditorWorkspace() {
             dispatch={dispatch}
             lut={{ library: [...luts.values()], onImport: importLut, status: lutStatus }}
             presets={{ userPresets, onChange: changePresets, onPreview: setPresetPreview, onDownload: downloadBlob, newId }}
+            raw={ready ? photo.raw ?? null : null}
           />
         </div>
         <div className="pe-inspector__section" data-section="export">
@@ -637,6 +692,9 @@ function EditorWorkspace() {
           {engine && <p className="pe-note">Preview: {engine.kind === 'webgl2' ? 'WebGL2' : 'CPU'}, up to {engine.maxEdge} px. Exports are rendered on the CPU at full resolution.</p>}
         </details>
         <DiagnosticsPanel engine={engine} />
+        <p className="pe-note pe-notices-link">
+          RAW decoding uses LibRaw (CDDL-1.0) and other open-source code. <a href={appHref('/photography/third-party-notices.txt')} target="_blank" rel="noopener">Open-source notices</a>
+        </p>
       </aside>
 
       <nav className="pe-filmstrip" aria-label="Filmstrip">

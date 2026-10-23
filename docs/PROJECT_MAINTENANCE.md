@@ -20,6 +20,7 @@ model, why assets are served from jsDelivr, and screenshot guidelines is in
 | `npm run check:assets` | yes | Validates data, fetches every remote image, and probes release videos |
 | `npm run check:photography` | no | Validates the photography catalog and its derivatives ([photography-catalog.md](photography-catalog.md)) |
 | `npm run check:editor` | no | Builds the site and checks the photo editor end to end in a local Playwright Chromium: GPU/CPU parity, import, export, memory ([photography-editor.md](photography-editor.md)) |
+| `npm run check:editor:raw` | no | Builds the site and checks RAW in Playwright Chromium, Firefox and WebKit (plus iPhone emulation and no WebGL2): RAW GPU/CPU parity, synthetic DNG import, unsupported and damaged files, white balance, exports against the Node reference, `-quangedit` names. With `RAW_FIXTURE_DIR` (folder with `DSC09420.ARW`) also a genuine ARW import and full-size export with timings and memory. RAW camera files are never committed; `RAW_FIXTURE_DIR` also enables `src/editor/raw/rawFixtures.test.js` in `npm test` |
 | `npm run check:editor:engines` | no | Builds the site and runs the editor flow (load, import, adjust, compare, export) in Playwright WebKit (iPhone emulation and desktop), mobile Chromium and Firefox, plus no-WebGL2 and no-worker fallbacks. First run `npx playwright install webkit firefox chromium` |
 | `npm run cms` | yes (publishing) | Local photography CMS: drafts, uploads, ordering, preview, publication pull requests ([photography-cms.md](photography-cms.md)) |
 
