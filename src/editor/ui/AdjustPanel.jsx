@@ -44,7 +44,7 @@ function Section({ id, title, open, onToggle, edited, onReset, resetDisabled, ch
 
 /**
  * The adjustment inspector: collapsible groups for RAW development (RAW photos only),
- * light, colour, HSL, tone curve, LUT and presets. Only RAW, Light and Color start
+ * light, colour, HSL, detail, tone curve, LUT and presets. Only RAW, Light and Color start
  * open; the choice is remembered locally.
  * :param raw: the active photo's RAW info, or null for JPEG, PNG and WebP
  * :param hdr: the active photo's merge description when it is a merged HDR, else null
@@ -74,7 +74,7 @@ export default function AdjustPanel({ adjustments, disabled, dispatch, lut, pres
     );
   };
   const rows = (group) => ADJUSTMENTS.filter((spec) => spec.group === group).map((spec) => (
-    <AdjustmentRow key={spec.key} spec={spec} value={adjustments[spec.key]} disabled={disabled} dispatch={dispatch} />
+    <AdjustmentRow key={spec.key} spec={spec} value={adjustments[spec.key]} disabled={disabled} dispatch={dispatch} label={spec.shortLabel} />
   ));
 
   return (
@@ -90,6 +90,12 @@ export default function AdjustPanel({ adjustments, disabled, dispatch, lut, pres
       {section('light', 'Light', rows('light'))}
       {section('color', 'Color', rows('color'))}
       {section('hsl', 'HSL', <HslPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} />)}
+      {section('detail', 'Detail', (
+        <>
+          {rows('detail')}
+          <p className="pe-note">Rendered on the CPU, so the preview follows after a moment. Sharpening and noise reduction act on full-resolution pixels: the preview shows them as a downscaled export would.</p>
+        </>
+      ))}
       {section('curves', 'Tone Curve', <CurveEditor curves={adjustments.curves} disabled={disabled} dispatch={dispatch} />)}
       {section('lut', 'LUT', <LutPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} {...lut} />, { edited: Boolean(adjustments.lut) })}
       {section('presets', 'Presets', <PresetPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} {...presets} />, { reset: false, edited: false })}

@@ -7,6 +7,8 @@ export const ROLE_LABELS = Object.freeze({ under: 'Underexposed', normal: 'Norma
 export const BRACKET_SIZE = 3;
 /** Neighbouring exposures closer than this add almost no range. */
 export const MIN_STEP_EV = 0.6;
+/** Recorded exposures closer than this (EV) are the same exposure. */
+export const SAME_EXPOSURE_EV = 0.05;
 /** Beyond this the darkest and brightest frames share too few well-exposed tones to align and normalise. */
 export const MAX_SPAN_EV = 8;
 /** Relative difference in aspect ratio still treated as the same framing (raster inputs are scaled to match). */
@@ -123,8 +125,11 @@ export const hasExposure = (exposure) => Boolean(exposure?.shutter && exposure.a
  */
 export const exposureStops = (exposure) => (hasExposure(exposure) ? Math.log2((exposure.shutter * exposure.iso) / (exposure.aperture ** 2)) : null);
 
+/** Shutter speed as cameras show it: 1/N below 0.3 s (where N is a round number), else decimal seconds. */
+export const formatShutter = (seconds) => (seconds >= 0.3 ? `${Number(seconds.toFixed(1))} s` : `1/${Math.round(1 / seconds)} s`);
+
 const describe = ({ shutter, aperture, iso }) => [
-  shutter && (shutter >= 1 ? `${Number(shutter.toFixed(1))} s` : `1/${Math.round(1 / shutter)} s`),
+  shutter && formatShutter(shutter),
   aperture && `f/${Number(aperture.toFixed(1))}`,
   iso && `ISO ${Math.round(iso)}`,
 ].filter(Boolean).join(', ');
@@ -206,8 +211,12 @@ export function validateBracket(inputs) {
   if (known.length === BRACKET_SIZE) {
     const stops = inputs.map(({ exposure }) => exposureStops(exposure));
     const sorted = [...stops].sort((a, b) => a - b);
-    if (sorted[2] - sorted[0] < 0.05) {
+    const pair = [[0, 1], [1, 2], [0, 2]].find(([i, j]) => Math.abs(stops[i] - stops[j]) < SAME_EXPOSURE_EV);
+    if (sorted[2] - sorted[0] < SAME_EXPOSURE_EV) {
       errors.push(`All three photos were taken with the same exposure (${describe(first.exposure)}), so they hold no extra highlight or shadow information. This is not an exposure bracket (for example, Sony DRO bracketing saves one exposure several times).`);
+    } else if (pair) {
+      const [i, j] = pair;
+      errors.push(`${inputs[i].name} and ${inputs[j].name} were taken with the same exposure (${describe(inputs[i].exposure)}), so only two different exposures remain. A compensation bracket in M mode with Auto ISO changes nothing once ISO reaches its limit; bracket the shutter speed at a fixed ISO instead.`);
     } else if (sorted[1] - sorted[0] < MIN_STEP_EV || sorted[2] - sorted[1] < MIN_STEP_EV) {
       warnings.push(`Two of the exposures are less than ${MIN_STEP_EV} EV apart; the merge adds little range.`);
     }

@@ -2,6 +2,7 @@
 // of edits. Results land on window.parityResult for scripts/check-editor-browser.mjs.
 import { ADJUSTMENTS, neutralAdjustments } from '../model/adjustments.mjs';
 import { renderRawRgba8, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
+import { renderDetailImage } from '../pipeline/detailRenderer.mjs';
 import { GlRenderer, createEditorContext } from '../pipeline/glRenderer.mjs';
 import { identityLut } from '../pipeline/lut.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
@@ -151,6 +152,21 @@ function run() {
     const i = (y * 64 + x) * 4;
     for (let c = 0; c < 3; c += 1) hdrSplitMax = Math.max(hdrSplitMax, Math.abs(hdrSplit[i + c] - hdrNeutral[i + c]));
   }
+  // Detail: the CPU frame drawn by the GPU must come out unchanged, the split side being
+  // the shader's neutral development (RAW) or the source.
+  const DETAIL = { clarity: 40, sharpening: 60, texture: -30, luminanceNoise: 20 };
+  const detailFrame = { width: 64, height: 64, data: renderDetailImage(raw, deriveParams(DETAIL, { raw: RAW_INFO })) };
+  renderer.setSource(raw);
+  const drawn = renderer.readPixels(deriveParams(DETAIL, { raw: RAW_INFO }), { rendered: detailFrame, split: 0.5, before });
+  let detailFrameMax = 0;
+  let detailSplitMax = 0;
+  for (let y = 0; y < 64; y += 1) for (let x = 0; x < 64; x += 1) {
+    const i = (y * 64 + x) * 4;
+    for (let c = 0; c < 3; c += 1) {
+      if (x < 32) detailSplitMax = Math.max(detailSplitMax, Math.abs(drawn[i + c] - neutralCpu[i + c]));
+      else detailFrameMax = Math.max(detailFrameMax, Math.abs(drawn[i + c] - detailFrame.data[i + c]));
+    }
+  }
   renderer.setSource(source);
   // Rendering many frames back to back with changing curves and LUTs (texture reuse).
   const started = performance.now();
@@ -167,6 +183,8 @@ function run() {
     rawSplitMax,
     hdrResults,
     hdrSplitMax,
+    detailFrameMax,
+    detailSplitMax,
     frameMs64: Number(frameMs.toFixed(3)),
   };
 }

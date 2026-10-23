@@ -3,6 +3,8 @@
 // Sources are RGBA8 (JPEG, PNG, WebP), 16-bit camera RGB from a RAW decode, kept
 // as an integer texture so no precision is lost before the shader develops it, or
 // float camera RGB of a merged RAW HDR (RGB32F, read with texelFetch).
+// Photos with Detail settings are rendered on the CPU (detailRenderer.mjs, the export
+// engine) and drawn from that frame here; only the "before" side still runs the shader.
 
 import { CURVE_TABLE_SIZE } from './curves.mjs';
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './shader.mjs';
@@ -136,6 +138,7 @@ export class GlRenderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
     this.raw = false;
     this.hdr = false;
+    this.renderedTexture = null;
   }
 
   /** Uploads the curve table when it changed (tables are cached per curve set). */
@@ -214,15 +217,18 @@ export class GlRenderer {
    * :param options: { split, before } `split` is the fraction of the width (from the
    *   left) drawn with `before` instead: the untouched source by default, which a RAW
    *   photo does not have, so it passes its neutral development (deriveParams of neutral
-   *   settings with the same RAW info)
+   *   settings with the same RAW info); `rendered` is a CPU-rendered RGBA8 frame
+   *   { width, height, data } (the Detail preview) drawn instead of the pipeline, scaled
+   *   to the canvas when it is smaller
    */
-  render(params, { split = 0, before = null } = {}) {
+  render(params, { split = 0, before = null, rendered = null } = {}) {
     const { gl } = this;
     if (!this.texture) return;
     gl.viewport(0, 0, this.width, this.height);
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
-    this.draw(params);
+    if (rendered) this.draw({ ...params, neutral: true }, this.uploadRendered(rendered));
+    else this.draw(params);
     // Pixel x is "before" when its centre lies left of the split, (x + 0.5) / width < split.
     const columns = Math.min(this.width, Math.max(0, Math.ceil(split * this.width - 0.5)));
     if (columns > 0) {
@@ -233,19 +239,39 @@ export class GlRenderer {
     }
   }
 
-  draw(params) {
-    const { gl, uniforms: u } = this;
+  /** Uploads a CPU-rendered RGBA8 frame into its own texture (linear filtering for scaling). */
+  uploadRendered({ width, height, data }) {
+    const { gl } = this;
+    if (!this.renderedTexture) this.renderedTexture = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.raw || this.hdr ? this.sourcePlaceholder : this.texture);
+    gl.bindTexture(gl.TEXTURE_2D, this.renderedTexture);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data instanceof Uint8Array ? data : new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return this.renderedTexture;
+  }
+
+  /** :param frame: a texture drawn as is (neutral) instead of the photo's source */
+  draw(params, frame = null) {
+    const { gl, uniforms: u } = this;
+    const raw = this.raw && !frame;
+    const hdr = this.hdr && !frame;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, frame ?? (raw || hdr ? this.sourcePlaceholder : this.texture));
     gl.uniform1i(u.uSource, 0);
     gl.activeTexture(gl.TEXTURE0 + UNIT.raw);
-    gl.bindTexture(gl.TEXTURE_2D, this.raw ? this.texture : this.rawPlaceholder);
+    gl.bindTexture(gl.TEXTURE_2D, raw ? this.texture : this.rawPlaceholder);
     gl.uniform1i(u.uRawSource, UNIT.raw);
-    gl.uniform1i(u.uRaw, this.raw ? 1 : 0);
+    gl.uniform1i(u.uRaw, raw ? 1 : 0);
     gl.activeTexture(gl.TEXTURE0 + UNIT.hdr);
-    gl.bindTexture(gl.TEXTURE_2D, this.hdr ? this.texture : this.hdrPlaceholder);
+    gl.bindTexture(gl.TEXTURE_2D, hdr ? this.texture : this.hdrPlaceholder);
     gl.uniform1i(u.uHdrSource, UNIT.hdr);
-    gl.uniform1i(u.uHdr, this.hdr ? 1 : 0);
+    gl.uniform1i(u.uHdr, hdr ? 1 : 0);
     gl.uniform3fv(u.uRawGain, params.raw?.gain ?? [1, 1, 1]);
     gl.uniformMatrix3fv(u.uRawMatrix, true, new Float32Array(params.raw?.matrix ?? IDENTITY));
     gl.uniform1f(u.uRawWhite, params.raw?.white ?? 1);
@@ -305,7 +331,9 @@ export class GlRenderer {
 
   releaseSource() {
     if (this.texture) this.gl.deleteTexture(this.texture);
+    if (this.renderedTexture) this.gl.deleteTexture(this.renderedTexture);
     this.texture = null;
+    this.renderedTexture = null;
     this.raw = false;
     this.hdr = false;
   }

@@ -40,6 +40,16 @@ describe('page around the editor', () => {
   });
 });
 
+describe('viewer bar', () => {
+  // A long note (Detail preview, "Preview at …") once widened the viewer grid at 375 px,
+  // pushing the photo off centre and the note under the zoom buttons.
+  test('the viewer grid column and the note can shrink below their text width', () => {
+    const rule = (selector) => [...editorCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(([, s]) => s.trim() === selector)?.[2] ?? '';
+    expect(rule('.pe-viewer')).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+    expect(rule('.pe-readout-note')).toMatch(/min-width:\s*0/);
+  });
+});
+
 describe('troubleshooting switches', () => {
   afterEach(() => window.history.replaceState({}, '', '/'));
 

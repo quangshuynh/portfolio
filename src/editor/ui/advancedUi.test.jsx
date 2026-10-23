@@ -239,3 +239,43 @@ describe('presets panel', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('This is not a photo editor preset file.');
   });
 });
+
+describe('Detail section', () => {
+  test('sits between HSL and Tone Curve, starts collapsed and holds the six controls', () => {
+    setup();
+    const order = screen.getAllByRole('button', { expanded: false }).map((button) => button.getAttribute('aria-label')).filter(Boolean);
+    expect(order.indexOf('Detail')).toBeGreaterThan(order.indexOf('HSL'));
+    expect(order.indexOf('Detail')).toBeLessThan(order.indexOf('Tone Curve'));
+    openSection('Detail');
+    ['Texture', 'Clarity', 'Dehaze', 'Sharpening', 'Luminance noise reduction', 'Color noise reduction'].forEach((name) => expect(screen.getByRole('slider', { name })).toBeVisible());
+    expect(screen.getByRole('slider', { name: 'Sharpening' })).toHaveAttribute('min', '0');
+    expect(screen.getByRole('slider', { name: 'Texture' })).toHaveAttribute('min', '-100');
+  });
+
+  test('slider, value field, per-control reset, group reset and undo', () => {
+    setup();
+    openSection('Detail');
+    fireEvent.input(screen.getByRole('slider', { name: 'Clarity' }), { target: { value: '35' } });
+    expect(present().clarity).toBe(35);
+    const field = screen.getByRole('textbox', { name: 'Sharpening value' });
+    fireEvent.focus(field);
+    fireEvent.change(field, { target: { value: '140' } });
+    fireEvent.blur(field);
+    expect(present().sharpening).toBe(100);
+    expect(screen.getByRole('button', { name: 'Detail (edited)' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Sharpening' }));
+    expect(present()).toMatchObject({ sharpening: 0, clarity: 35 });
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Detail' }));
+    expect(present().clarity).toBe(0);
+    act(() => dispatch({ type: 'undo' }));
+    expect(present().clarity).toBe(35);
+  });
+
+  test('presets offer the Detail group when Detail is edited', () => {
+    setup();
+    act(() => dispatch({ type: 'applySettings', patch: { texture: 20, colorNoise: 40 } }));
+    openSection('Presets');
+    fireEvent.click(screen.getByRole('button', { name: 'Save current as preset…' }));
+    expect(screen.getByRole('checkbox', { name: 'Detail' })).toBeChecked();
+  });
+});

@@ -4,7 +4,8 @@ A public, local-first editor for JPEG, PNG, WebP and RAW (Sony ARW, DNG). No
 account, no upload, no server: files are decoded, edited and exported in the
 visitor's browser. Built in Interval 3 (light and colour), extended in Interval 4
 (tone curves, HSL, `.cube` LUTs, presets), Interval 5 (RAW, see [RAW](#raw)) and
-Interval 6 (three-exposure HDR, see [Merge HDR](#merge-hdr));
+Interval 6 (three-exposure HDR, see [Merge HDR](#merge-hdr)) and Interval 7 (Texture,
+Clarity, Dehaze, sharpening and noise reduction, see [Detail](#detail));
 the original proposal is in
 [photography-platform/editor-hdr-architecture.md](photography-platform/editor-hdr-architecture.md).
 `/photography` links to it with a small "Edit a photo" text link (in-app
@@ -19,6 +20,7 @@ navigation).
 | `src/editor/model/presets.mjs` | Preset schema, validation, built-in presets, apply rules. |
 | `src/editor/pipeline/colorMath.mjs` | sRGB transfer, matrices, daylight locus, Bradford white balance. |
 | `src/editor/pipeline/cpuRenderer.mjs` | Deterministic CPU renderer: tests, export, no-WebGL2 preview. |
+| `src/editor/pipeline/detail.mjs`, `detailRenderer.mjs` | Detail stage (spatial filters, guide) and the tiled renderer used by the Detail preview and every export with Detail. |
 | `src/editor/pipeline/shader.mjs`, `glRenderer.mjs` | WebGL2 preview: GLSL mirror of `spec.mjs`, constants injected from it. |
 | `src/editor/model/` | Adjustment registry, bounded undo history, reducer, edit document. |
 | `src/editor/io/` | Header parsing, limits and filenames, decoding, the image worker. |
@@ -30,6 +32,7 @@ navigation).
 | `src/editor/raw/` | RAW: format sniffing, LibRaw wrapper (`rawDecoder`), colour math (`rawColor`), worker tasks, job queue and export (`rawClient`). |
 | `src/editor/hdr/` | Merge HDR: bracket metadata and validation, registration (`hdrAlign`), radiance merge, ghost masks and exposure fusion (`hdrMerge`), worker tasks, page orchestration and export (`hdrClient`), document form (`hdrSource`). |
 | `scripts/check-editor-hdr.mjs` | `npm run check:editor:hdr`: HDR parity, Merge HDR flow and exports in Chromium, Firefox and WebKit; genuine A7 III files with `HDR_FIXTURE_DIR`. |
+| `scripts/check-editor-detail.mjs` | `npm run check:editor:detail`: Detail controls, preview, PNG export against the Node reference, 24 MP export timing, iPhone emulation; a genuine ARW with `DETAIL_FIXTURE_DIR`. |
 | `scripts/check-editor-raw.mjs` | `npm run check:editor:raw`: RAW parity, import, white balance, exports in Chromium, Firefox and WebKit; genuine ARW with `RAW_FIXTURE_DIR`. |
 | `public/photography/third-party-notices.txt` | Licence notices for the RAW decoder, linked from the inspector. |
 
@@ -54,6 +57,7 @@ the GPU, in this fixed order:
 | Saturation | ±100 | Scales the distance from luminance; −100 is grey. |
 | Range fit | – | Out-of-range colours move toward their own luminance instead of clipping channels independently. |
 | Encode | – | sRGB OETF. |
+| Detail | Texture, Clarity, Dehaze (±100); Sharpening, Luminance and Color noise reduction (0–100) | Spatial, on the encoded values; see [Detail](#detail). |
 | Tone curves | Master RGB, then Red, Green, Blue: 2–16 integer points on 0–255 | On encoded values. Monotone cubic (Fritsch–Carlson/PCHIP slopes): passes through every point, never overshoots, flat beyond the first and last point. Points stay ordered and distinct. Both renderers sample the same 1024-entry table linearly. |
 | HSL | Hue, Saturation, Luminance (±100) for Red 0°, Orange 30°, Yellow 60°, Green 120°, Aqua 180°, Blue 240°, Purple 270°, Magenta 300° | Range weights from the HSV hue of the encoded pixel, blended between neighbouring centres with a raised cosine (sums to 1, no hard edges). Hue turns ±30° on the HSV wheel at constant luminance; saturation scales chroma about luminance in linear light; luminance is up to ±1 EV × the pixel's HSV saturation. Greys and untouched ranges are returned exactly. Then range fit. |
 | 3D LUT | Intensity 0–100% | Encoded RGB mapped through `DOMAIN_MIN`…`DOMAIN_MAX` to the grid, tetrahedral interpolation, output clamped to 0–1, mixed with the input by intensity. |
@@ -192,7 +196,7 @@ differently processed JPEG previews), so there is nothing to merge; the editor r
 
 **Inputs.** Exactly three files, all RAW (Sony ARW and DNG as in [RAW](#raw)) or all
 JPEG/PNG/WebP. Refused with a reason: mixed kinds, duplicates (hash), different cameras
-or RAW sizes, different orientation or aspect ratio, the same recorded exposure, more
+or RAW sizes, different orientation or aspect ratio, the same recorded exposure (all three, or any two), more
 than 8 EV span, unrelated scenes, motion that would crop more than 30%, roles that
 contradict the measured brightness. Raster inputs of different sizes are merged at the
 smallest. Roles (under, normal, over) are suggested from shutter, aperture and ISO when all
@@ -238,11 +242,11 @@ Highlight compression 0–100 (the rolloff knee from 0.9 to 0.1; 50 is the RAW k
 and Shadow lift 0–100 (up to 2× in the deepest tones, monotonic), with Natural and
 Stronger looks; global and per pixel, so no halos and GPU = CPU. Exposure, RAW white
 balance, tone, colour, curves, HSL, LUTs, presets (which never change HDR controls),
-undo and before/after all work; Original shows the merge with default tone mapping. No
-local contrast operator (see [Detail adjustments](#detail-adjustments-carried-forward)).
+undo and before/after all work; Original shows the merge with default tone mapping.
+[Detail](#detail) (Clarity, Dehaze) adds local contrast on top of the global rolloff.
 HDR GPU preview vs CPU: at most 1 code value (9 cases; 0 in Chromium).
 
-**Saving and export.** Edit documents (version 4) store `format: "hdr"` with the mode, the
+**Saving and export.** Edit documents (version 4 and later) store `format: "hdr"` with the mode, the
 three inputs by role (name, size, SHA-256) and the merge settings; restoring asks for
 those files and the merge picks up its saved roles, settings and edits. Export decodes
 the three sources again at the chosen size (RAW: half-size sensor data when enough, else
@@ -271,13 +275,18 @@ while a new LibRaw worker starts decoding (the Interval 5 issue; nine LibRaw job
 export make it likely); not reproduced with HDR code alone, nor in Chromium or Firefox.
 Safari on macOS and iOS is not verified.
 
-**Real-world validation.** The only genuine bracket available, `_DSC9015–9017` (A7 III,
-2026-10-05), is a DRO bracket: identical exposure (1/30 s, f/3.5, ISO 100), identical
-sensor data. It is refused, as it should be, both from metadata and from the measured
-data. No genuine exposure bracket was available (962 RAW files scanned), so **merge
-quality on real hand-held brackets (alignment of real motion, real ghosts, real colour
-across exposures) is not validated**; the evidence is synthetic brackets and genuine
-sensor data with simulated exposure and motion.
+**Real-world validation** (A7 III, Windows i7-9700; genuine-file tests and the browser step
+run only with the folder variables set):
+
+| Set | What it is | Result |
+| --- | --- | --- |
+| `DSC09640–09642` (2026-10-23, `HDR_BRACKET_DIR`) | Genuine shutter bracket: 0.8, 3.2, 13 s at f/8, ISO 100, A mode, 15 s apart; indoor, window in frame | Measured −1.99 / +2.00 EV (EXIF −2 / +2); shifts of 9–10 px removed (edge mismatch 1.3% → 0.0%, 1.1% → 0.2%); ghost mask 0%; merged white 3.98. The normal frame clips 0.76% of pixels, the Natural merge 0.55% (the curtain pattern blown in the normal frame is back, but flat under the global rolloff), Stronger 0.41%; mean brightness equal to the normal frame (62.6 vs 62.5); shadows visibly cleaner; no doubled edges at 100%. Chromium: merge 5.5 s (decode 1.6, analyse 2.5, merge 1.1), full-size JPEG export 14.8 s at 6002×4018 as `DSC09641-HDR-quangedit.jpg`, browser memory 506 → 801 (merge) → 1849 MB (export), equal to the Node reference within JPEG re-encoding (mean 0.53) |
+| `DSC09636–09638` (`HDR_AUTO_ISO_DIR`) | −2/0/+2 compensation bracket in M mode with Auto ISO: 1/160 s, f/6.3 at ISO 4000, 6400, 6400 | ISO hit its limit, so 0 and +2 hold the same exposure (0.005 EV apart; independent noise). Earlier versions merged it when the duplicate got the "over" role; now refused from metadata and measured data. Forced merge: hand-held alignment 2.6% → 1.3%, ghost mask 0.15%, noise σ 5.5 → 4.0 codes; 0.69 EV is too little range to judge highlights |
+| `DSC09633–09635` | Same, all at ISO 6400 | Refused (same exposure) |
+| `_DSC9015–9017` (2026-10-05, `HDR_FIXTURE_DIR`) | Sony DRO bracket: one exposure, identical sensor data | Refused; used for simulated brackets on genuine sensor data |
+
+Not validated on real files: hand-held brackets with large motion, moving subjects (real
+ghosts), outdoor scenes, Firefox and WebKit timings for genuine files.
 
 ## Rendering, preview and export
 
@@ -318,6 +327,86 @@ Display P3 and other wide-gamut sources are converted to sRGB on decode, and
 exports are untagged sRGB. Semi-transparent PNG/WebP pixels pass through the
 canvas's premultiplied storage, so very low alpha loses precision.
 
+## Detail
+
+Texture, Clarity, Dehaze, Sharpening and Luminance/Color noise reduction, in a Detail
+section between HSL and Tone Curve. All operate on pixels (`pipeline/detail.mjs`), after
+the base stage and before curves, HSL and LUT, on the encoded values split into luma
+`P` and chroma (`R − P`, `B − P`), so luminance edits never shift hue; the result is
+range-fitted toward `P` like the base stage.
+
+| Control | Method |
+| --- | --- |
+| Color NR (0–100) | Chroma pulled to its box mean (radius 1–8 native px), kept where luma or chroma varies more than noise (an edge, also between colours of equal luma). |
+| Luminance NR (0–100) | Adaptive Wiener (Lee) filter on `P`, radius 1–3 px, noise level up to 0.06; 10% of the removed detail is put back so surfaces do not look plastic. |
+| Dehaze (±100) | Koschmieder model `I = J·t + A(1 − t)` in linear light. Transmission from the per-pixel dark channel of the guide (He et al.), refined by a guided filter on luma; grey airlight (mean luminance of the haziest 0.1%), so no colour cast; floor t ≥ 0.25 (at most 4× gain, so noise in dense haze grows up to 4×). Negative adds grey haze, more where the estimate says farther. A bounded approximation, not a physical reconstruction: on clear skies it darkens and saturates the sky. |
+| Clarity (±100) | Self-guided filter on `P` (box radius 1.2% of the long edge, edge threshold 0.015): base = `a·P + b`, detail = `P − base`; strong edges stay in the base, so halos stay small (≤ 6 codes at a black–white step, tested). Weighted toward mid-tones, soft-limited, detail below 0.02 boosted less. It lifts fine structure too, so on high-ISO files it raises grain (combine with NR). |
+| Texture (±100) | Band between Gaussians of σ 1 and 4 native px; large band values (edges) boosted less, noise-level values not boosted. Negative removes the band. |
+| Sharpening (0–100) | Unsharp mask against the σ 1 Gaussian, gain up to 2, noise threshold 0.008, overshoot soft-limited to 0.08. |
+
+Order: colour and luminance NR (from the same input), Dehaze, Clarity, then Texture and
+Sharpening (from the same input). Measured on a 2048 px synthetic image (unit tests): Texture
+lifts 12–24 px structure ×1.5 and leaves 96 px structure alone, Clarity also lifts
+160 px structure ×1.4, Sharpening acts below 12 px; ±100 moves mean brightness less than
+one code. On a genuine ISO 6400 A7 III frame (flat patch, σ in codes): luminance NR 50/100
+3.8 → 1.7/1.1 with chroma unchanged; colour NR 50/100 5.6 → 2.2/0.9 with luma unchanged;
+Texture +100 raises luma noise by 25%, Clarity +100 by 45%.
+
+**Resolution independence.** Fine filters (NR, Texture, Sharpening) run at the render size
+with radii in the photo's native pixels times render/native, so a preview looks like the
+export downscaled (tested: mean difference within 1.5 codes of the plain downscale
+difference). Below about one native pixel they fade, as fine detail does when an image is
+downscaled: at fit zoom on a 24 MP photo Sharpening and NR are barely visible, exactly as in
+a downscaled export. Clarity and Dehaze use a **guide**: the base stage of the image
+area-averaged to at most 768 px, where guided-filter coefficients are computed; every
+render samples them bilinearly and applies them to its own full-resolution luma (fast
+guided filter), so edges stay sharp and preview, export and any export size share one
+guide.
+
+**Tiles and bands.** A tile (512 px wide, 256 rows) is processed with a halo equal to the
+sum of the fine filters' footprints (`detailHalo`, at most about 17 px at full size),
+clamped at the image edge (edge pixels replicated), and only its core is kept. Tiled and
+whole renders are bit-identical (tested down to 1-row bands and 7 px tiles, raster with
+alpha, RAW, merged HDR). Scratch planes are sized by one tile plus halo and reused; nothing
+is allocated per image besides the output. Transparent pixels: blurs are normalised by
+alpha and the guide averages colour weighted by alpha, so colours under transparent pixels
+never reach visible ones; alpha is copied.
+
+**Preview.** The GPU shader is not used for Detail: with any Detail value set, the worker
+renders the frame with the export's renderer (same code, so the same result), first a
+1024 px draft, then a 2048 px frame when values stop changing; the viewer says which one is
+shown ("Detail: draft preview", "Detail preview at W×H"). The guide is cached while only
+fine filters change. WebGL2 draws the frame (scaled to the canvas) and still renders the
+"before" side; the CPU fallback draws it on its 2D canvas. With all Detail values at 0 the
+GPU path runs as before, bit for bit. A multi-pass WebGL2 version was not built: it needs
+float render targets (several 64–128 MB textures at a 4096 px proxy, a risk on phones) and
+its own parity checks; the CPU frame is exact.
+
+**Export.** JPEG/PNG/WebP render in place in the decode canvas, band by band, each band
+keeping a copy of the rows above it before they are overwritten (tested equal to a whole
+render); RAW and merged HDR exports render from the decoded image in memory. Cancelling
+works between bands.
+
+**Measurements** (`npm run check:editor:detail`, Windows i7-9700, headless Playwright,
+whole browser incl. GPU and workers; draft / final frame after a value is committed):
+
+| Browser | 24 MP JPEG (4096 px proxy): first Detail value · Sharpening change · Exposure change · four more controls | Full-size JPEG export, all six controls | Memory: baseline → export peak |
+| --- | --- | --- | --- |
+| Chromium 141 | 1.1/2.3 s · 0.18/1.3 s · 0.28/1.8 s · 0.85/2.8 s | 16.2 s (6000×4000) | 444 → 1120 MB |
+| Firefox 142 | 0.53/1.1 s · 0.21/0.78 s · 0.36/1.1 s · 1.0/2.9 s | 24.8 s | 810 → 1428 MB |
+| WebKit 26 (2 runs) | 1.4–1.8/2.2–2.7 s · 0.47–0.60/1.1–1.5 s · 0.61–0.70/1.7–2.1 s · 0.64/2.0–4.7 s | 18.4–18.6 s | 421–465 → 1070–1185 MB |
+
+Genuine ISO 6400 ARW (`DSC09356`, Texture and luminance NR): first value 1.1/2.3 s
+(Chromium), 1.1/2.5 s (Firefox); full-size export 11.8 s at 1689 MB peak (Chromium), 25.8 s
+at 1994 MB (Firefox). Against Interval 6: photos without Detail are unchanged (GPU preview,
+2.0–2.4 s for a 24 MP JPEG export); Detail costs about 7–10 s more per 24 MP export with
+all six controls, and its preview is not interactive at GPU speed. PNG exports equal the
+Node reference exactly in all five environments. Playwright's Windows WebKit has no
+worker canvas, so decoding runs on the main thread there, but Detail rendering stays in its
+worker; the iPhone 13 emulation (WebKit) has
+the Detail section reachable in the Adjust tab with no sideways scrolling. Not measured on
+a physical phone.
+
 ## Edit documents and persistence
 
 ```json
@@ -341,6 +430,8 @@ canvas's premultiplied storage, so very low alpha loses precision.
 - Values are relative to neutral (LUT intensity defaults to 100). The ten
   Interval 3 controls are always written; other controls, curves and the LUT
   only when they change something. Missing keys are neutral.
+- Version 5 added the Detail controls `texture`, `clarity`, `dehaze`,
+  `sharpening`, `luminanceNoise`, `colorNoise`; older files open with Detail neutral.
 - Version 4 added merged HDR sources (see [Merge HDR](#merge-hdr)) and the HDR tone
   controls `hdrHighlights`, `hdrShadows`.
 - Version 2 added curves, HSL and LUTs; version 3 RAW sources (`"format": "arw"`
@@ -364,7 +455,7 @@ canvas's premultiplied storage, so very low alpha loses precision.
 ## Presets
 
 - A preset is a name plus the **groups** it contains: Exposure, White balance,
-  Tone, Vibrance and saturation, HSL, Tone curve, LUT. **Applying replaces those
+  Tone, Vibrance and saturation, HSL, Detail, Tone curve, LUT. **Applying replaces those
   groups exactly** (anything the preset leaves out of a group becomes neutral)
   and leaves every other group of the photo alone, in one undo step.
 - Hovering or focusing a preset previews it on the photo (badge "Preview:
@@ -520,16 +611,15 @@ Safari cannot encode WebP (the option is disabled when the browser cannot).
 - Pinch-zoom works with two pointers on the preview; it has not been tried on a
   physical phone.
 
-**Deferred: sharpening and noise reduction.** Both are spatial filters, unlike
-every stage above. Done properly they need a multi-pass GPU pipeline with float
-render targets, overlapping bands in the export, and (the deciding issue) a
-preview that is a downscaled proxy: at fit zoom, or at 100% on a 24 MP photo
-(proxy at 0.68×), the preview cannot show what a 1-pixel radius does to the
-export, so preview and export would disagree. They wait for a full-resolution
-tiled preview at 100% zoom, which would also remove the first known issue.
-Edge-preserving noise reduction (bilateral or non-local means) is also beyond
-the single-thread CPU budget measured above; a plain blur would be the
-low-quality approximation the brief rules out.
+- Playwright's Windows WebKit (not Safari) crashes the page now and then while LibRaw
+  decodes the RAW bracket in `check:editor:hdr` (Merge HDR step, mostly the iPhone 13
+  emulation): 0 of 18 runs before Interval 7, 7 of 40 since its first commit, which only
+  adds pure Detail code to the bundles the RAW worker loads. No Detail code runs in that
+  step; the crash is the Interval 5 LibRaw/WebKit one, apparently sensitive to the worker
+  bundle. Chromium, Firefox and the Detail check are unaffected. Not seen on real Safari
+  (not tested).
+- Detail renders on one CPU thread: see the measurements in [Detail](#detail). A
+  multi-pass WebGL2 Detail preview and a 1:1 Detail preview of the visible area are not built.
 
 ## Extension points
 
@@ -540,28 +630,10 @@ at render time), local and exportable at full resolution. Not built yet:
 | --- | --- |
 | More RAW formats (NEF, then CR2/CR3, RAF, ORF) | LibRaw decodes them already; add the maker to `sniffRaw`, then genuine fixtures and `rawFixtures.test.js` cases before claiming support. X-Trans (RAF) needs checking against `checkDecodable`. |
 | Crop, rotate, straighten, perspective, resize | A geometry stage before the per-pixel pipeline: proxy and export sample through one transform; a `geometry` object in the settings (new document version). |
-| Creative filters (bleach bypass, grain, halation, bloom) | Per-pixel looks fit after the LUT; grain, halation and bloom are spatial (see sharpening above). |
+| Creative filters (bleach bypass, grain, halation, bloom) | Per-pixel looks fit after the LUT; grain, halation and bloom are spatial: the tiled renderer in `detailRenderer.mjs`. |
 | Text, layers, blend modes | A layer list in the document composited after the photo pipeline, by the same engine in preview and banded export. |
 | Brushes, masks, gradients, local adjustments | Per-layer masks evaluated per pixel; brush masks need a stored raster or stroke list. |
-| Retouching, healing, noise reduction | Spatial; need the tiled full-resolution path below. |
+| Retouching, healing | Spatial; the tiled renderer and halo bands in `detailRenderer.mjs`. |
 | Faster export | Split bands across several workers (the band loop in `imageTasks.mjs` is already independent per band). |
-| Sharpening, noise reduction, 1:1 preview | Tiled full-resolution decode around the viewport, a spatial stage after the per-pixel ones, band overlap in export. |
+| 1:1 Detail preview, GPU Detail | A full-resolution decode of the visible tiles rendered by `renderDetailRows`; a multi-pass WebGL2 version needs float render targets and parity checks. |
 | Batch export, ZIP, preset sync | Queue over the export worker (and the RAW queue); names from `exportFileName()`; presets already apply per group to any photo. |
-| Detail: Texture, Clarity, Dehaze | Carried forward; see below. |
-
-### Detail adjustments (carried forward)
-
-Requested in Interval 6 and **not built**: Texture, Clarity and Dehaze (±100, 0 neutral) in
-a Detail section that will also hold sharpening and noise reduction (neither exists yet).
-All three are spatial, unlike every stage above, so they need, in this order:
-
-1. A resolution-independent definition: filter radii as fractions of the image, so the
-   2048–4096 px proxy and a 24 MP export agree (or a tiled 1:1 preview).
-2. Edge-aware base/detail decomposition (guided filter or bilateral grid) on linear
-   luminance; Texture = small-scale detail gain, Clarity = mid-scale (about 1–3% of the
-   long edge) local contrast with highlight and shadow protection, Dehaze = dark-channel
-   transmission estimate with a floor, applied before tone so colour stays natural.
-3. Export bands with overlap equal to the largest radius (edge handling: mirror), and a
-   multi-pass WebGL2 path with float render targets; CPU/GPU tolerance justified per filter.
-4. Tests: neutral at 0 bit for bit, edge and band-seam regressions, halo bounds at step
-   edges, alpha preserved, RAW/raster/HDR, presets and documents (new version).

@@ -7,13 +7,14 @@ import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
 import { SYNTHETIC_RAW_INFO, pixelRadiance as sceneRadiance, syntheticRasterFrame, syntheticRawFrame } from '../dev/hdrFixtures.mjs';
 import {
-  BRACKET_SIZE, exposureStops, parseExifDate, readRasterExposure, rolesComplete, suggestRolesFromBrightness, suggestRolesFromMetadata, validateBracket,
+  BRACKET_SIZE, exposureLabel, exposureStops, formatShutter, parseExifDate, readRasterExposure, rolesComplete, suggestRolesFromBrightness, suggestRolesFromMetadata, validateBracket,
 } from './hdrMetadata.mjs';
 import { ALIGN, alignmentStatus, commonCrop, cropAt, estimateTransform } from './hdrAlign.mjs';
 import { HdrError, analyzeBracket, createFusionMerge, createRadianceMerge, framePlanes, medianBrightness, whiteBalanceToReference } from './hdrMerge.mjs';
 import { describeHdrSource, hdrIdentity, hdrPhotoName, hdrSourceMatches, parseHdrSource } from './hdrSource.mjs';
 import { checkHdrExport, hdrExportGeometry } from './hdrClient.mjs';
 import { downscale, handlers } from './hdrTasks.mjs';
+import { renderDetailImage } from '../pipeline/detailRenderer.mjs';
 import { deriveParams, hdrKnee, highlightRolloff, processLinear, shadowLift } from '../pipeline/spec.mjs';
 import { renderImage } from '../pipeline/cpuRenderer.mjs';
 import { neutralAdjustments } from '../model/adjustments.mjs';
@@ -142,6 +143,19 @@ describe('import and metadata', () => {
     expect(validateBracket(noIso).warnings.join(' ')).toMatch(/same shutter speed and aperture \(1\/30 s, f\/3.5\) and no ISO/);
   });
 
+  test('shutter speeds read as the camera shows them: fractions below 0.3 s, decimal seconds above', () => {
+    expect([1 / 4000, 1 / 160, 1 / 4, 0.3, 0.8, 1, 3.2, 13].map(formatShutter)).toEqual(['1/4000 s', '1/160 s', '1/4 s', '0.3 s', '0.8 s', '1 s', '3.2 s', '13 s']);
+    expect(exposureLabel(exposure(0.8, { aperture: 8 }))).toBe('0.8 s, f/8, ISO 100');
+  });
+
+  test('two frames with the same exposure are refused, naming them (Auto ISO at its limit, 2026-10-23)', () => {
+    // DSC09636–09638: a −2/0/+2 compensation bracket in M mode with Auto ISO; 0 and +2 both hit ISO 6400.
+    const shot = (name, iso) => input({ name, kind: 'raw', format: 'arw', exposure: exposure(1 / 160, { aperture: 6.3, iso }) });
+    const result = validateBracket([shot('DSC09636.ARW', 4000), shot('DSC09637.ARW', 6400), shot('DSC09638.ARW', 6400)]);
+    expect(result.errors.join(' ')).toMatch(/DSC09637\.ARW and DSC09638\.ARW were taken with the same exposure \(1\/160 s, f\/6\.3, ISO 6400\).*Auto ISO/);
+    expect(result.warnings.join(' ')).not.toMatch(/less than 0\.6 EV/);
+  });
+
   test('suggests roles from exposure metadata in any input order, never from file names', () => {
     const inputs = [
       input({ name: 'DSC0001.jpg', exposure: exposure(1 / 30) }),
@@ -251,6 +265,16 @@ describe('radiance merge', () => {
     const frames = rawBracket({ exposures: [1, 1, 1] });
     frames.forEach((frame) => { frame.image = frames[1].image; frame.stops = 0; });
     expect(() => analyzeBracket(frames, { mode: 'radiance', reference: 1 })).toThrow(/contain the same exposure.*Sony DRO bracketing/);
+  });
+
+  test('a frame with the same measured exposure as the reference is refused, whatever its role', () => {
+    // Recorded stops missing or wrong must not let a duplicate exposure pass as "overexposed".
+    const frames = rawBracket({ exposures: [0.25, 1, 1.004] });
+    frames.forEach((frame) => { frame.stops = null; });
+    expect(() => analyzeBracket(frames, { mode: 'radiance', reference: 1 })).toThrow(/overexposed photo has the same exposure as the normal one/);
+    frames[2].role = 'normal';
+    frames[1].role = 'over';
+    expect(() => analyzeBracket(frames, { mode: 'radiance', reference: 2 })).toThrow(/overexposed photo has the same exposure as the normal one/);
   });
 
   test('is deterministic', () => {
@@ -457,6 +481,23 @@ describe('worker tasks, export geometry and naming', () => {
     expect(result).toMatchObject(size);
     expect(bands.reduce((rows, band) => rows + band.rows, 0)).toBe(size.height);
     await expect(handlers.add({ index: 0, image: frames[0].image })).rejects.toThrow(/No HDR export/);
+  });
+
+  test('an export with Detail settings renders the merge like the Detail renderer, band for band', async () => {
+    const frames = rawBracket({ motion: MOTION });
+    const analysis = analyzeBracket(frames, { mode: 'radiance', reference: 1 });
+    await handlers.begin({ analysis, frames: frames.map(({ asShot }) => ({ asShot })), size: { width: W, height: H } });
+    for (const [index, frame] of frames.entries()) await handlers.add({ index, image: frame.image });
+    const raw = { ...SYNTHETIC_RAW_INFO, hdrWhite: analysis.white };
+    const adjustments = { ...neutralAdjustments(), clarity: 40, sharpening: 60, dehaze: 20, luminanceNoise: 30 };
+    const native = { width: W * 2, height: H * 2 };
+    const bands = [];
+    await handlers.render({ adjustments, raw, native }, ({ band }) => band && bands.push(band));
+    const merged = merge(frames).image;
+    const reference = renderDetailImage(merged, deriveParams(adjustments, { raw }), { nativeWidth: native.width, nativeHeight: native.height });
+    const out = new Uint8ClampedArray(reference.length);
+    bands.forEach(({ row, data }) => out.set(data, row * merged.width * 4));
+    expect(out.every((value, i) => value === reference[i])).toBe(true);
   });
 
   test('export geometry scales from the source size and never upscales the preview', () => {

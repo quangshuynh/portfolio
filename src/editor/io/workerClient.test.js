@@ -47,6 +47,21 @@ describe('image worker client', () => {
     expect(usingMainThread()).toBe(true);
   });
 
+  test('canvas-free tasks (CPU and Detail rendering) keep their worker when only decoding moved to the main thread', async () => {
+    const decoder = createImageWorker(() => new FakeWorker(({ id }, post) => post({ id, ok: false, error: { code: 'worker-canvas', message: 'no OffscreenCanvas' } })));
+    await decoder.call('render', { source, adjustments: {} });
+    expect(usingMainThread()).toBe(true);
+    const renderer = createImageWorker(() => new FakeWorker(({ id }, post) => post({ id, ok: true, result: 'from worker' })), { canvas: false });
+    await expect(renderer.call('render', {})).resolves.toBe('from worker');
+  });
+
+  test('canvas-free tasks move to the main thread too when workers cannot start at all', async () => {
+    const broken = createImageWorker(() => { throw new TypeError('Module scripts are not supported'); });
+    await broken.call('render', { source, adjustments: {} });
+    const renderer = createImageWorker(() => { throw new Error('should not spawn'); }, { canvas: false });
+    await expect(renderer.call('render', { source, adjustments: {} })).resolves.toMatchObject({ width: 1 });
+  });
+
   test('falls back when module workers are not supported at all', async () => {
     const client = createImageWorker(() => { throw new TypeError('Module scripts are not supported'); });
     await expect(client.call('render', { source, adjustments: {} })).resolves.toMatchObject({ width: 1 });

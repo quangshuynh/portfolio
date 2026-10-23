@@ -8,6 +8,10 @@ import { previewEdgeLimit } from '../io/files.mjs';
 const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 8;
 const STAGE_PADDING = 24;
+// Detail preview (rendered on the CPU by the export's renderer): a quick draft while
+// values change, then the final frame. Long edges in pixels, capped by the proxy.
+export const DETAIL_DRAFT_EDGE = 1024;
+export const DETAIL_FINAL_EDGE = 2048;
 
 /**
  * Creates the preview engine for a canvas: WebGL2 when it works, otherwise null with
@@ -51,6 +55,10 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   const cpuJobRef = useRef({ latest: 0, busy: false, queued: null });
   // CPU preview of a RAW photo: its neutral development, for Original and Split.
   const cpuBeforeRef = useRef({ image: null, data: null });
+  // Detail preview: the request waiting to run, and the last frame shown with its settings key.
+  const detailJobRef = useRef({ busy: false, pending: null, frame: null, key: null, image: null, generation: 0 });
+  const splitRef = useRef(0);
+  const [detailQuality, setDetailQuality] = useState(null);
   const [canvas, setCanvas] = useState(null);
   const [engineKind, setEngineKind] = useState(null);
   const [proxy, setProxy] = useState(null);
@@ -144,6 +152,94 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   }, [proxy]);
 
   const splitFraction = compare === 'original' ? 1 : compare === 'split' ? split : 0;
+  splitRef.current = splitFraction;
+
+  // The "before" side of the CPU preview: the source itself, or for RAW and merged RAW
+  // HDR its neutral development.
+  const cpuBefore = useCallback(async (image, raw) => {
+    if (image.kind !== 'raw' && image.kind !== 'hdr') return image;
+    const cache = cpuBeforeRef.current;
+    if (cache.image !== image) Object.assign(cache, { image, data: (await renderInWorker(image, neutralAdjustments(), null, raw)).data });
+    return { data: cache.data };
+  }, [renderInWorker]);
+
+  /** Shows a Detail frame (any size; scaled to the canvas) with the current split. */
+  const paintDetail = useCallback(async (frame, request) => {
+    const engine = engineRef.current;
+    const image = proxyRef.current;
+    if (!engine || image !== request.image) return;
+    const split = splitRef.current;
+    if (engine.kind === 'webgl2') {
+      const before = request.raw ? deriveParams(neutralAdjustments(), { raw: request.raw }) : null;
+      if (!engine.renderer.lost) engine.renderer.render(request.params, { split, before, rendered: frame });
+      return;
+    }
+    const sourceWidth = Math.round(image.width * split);
+    const before = sourceWidth > 0 ? await cpuBefore(image, request.raw) : null;
+    if (proxyRef.current !== image) return;
+    const { context } = engine;
+    if (frame.width === image.width && frame.height === image.height) {
+      context.putImageData(new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height), 0, 0);
+    } else {
+      const scratch = document.createElement('canvas');
+      scratch.width = frame.width;
+      scratch.height = frame.height;
+      scratch.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height), 0, 0);
+      context.drawImage(scratch, 0, 0, image.width, image.height);
+    }
+    if (before) context.putImageData(new ImageData(new Uint8ClampedArray(before.data), image.width, image.height), 0, 0, 0, 0, sourceWidth, image.height);
+  }, [cpuBefore]);
+
+  /**
+   * Runs Detail renders one at a time, keeping only the newest request: a draft at
+   * DETAIL_DRAFT_EDGE first, then, if nothing newer arrived, the final frame.
+   */
+  const runDetail = useCallback(async (request) => {
+    const job = detailJobRef.current;
+    job.pending = request;
+    if (job.busy) return;
+    job.busy = true;
+    const needsFinal = (current) => Math.max(current.image.width, current.image.height) > DETAIL_DRAFT_EDGE;
+    try {
+      let current = null;
+      let final = false;
+      for (;;) {
+        if (job.pending) {
+          current = job.pending;
+          job.pending = null;
+          final = false;
+        } else if (current && !final && needsFinal(current)) {
+          final = true;
+        } else {
+          break;
+        }
+        const { image } = current;
+        if (proxyRef.current !== image) {
+          current = null;
+          continue; // eslint-disable-line no-continue
+        }
+        if (job.key !== current.key) setDetailQuality('rendering');
+        const frame = await renderInWorker(image, current.adjustments, current.lut, current.raw, {
+          edge: final ? DETAIL_FINAL_EDGE : DETAIL_DRAFT_EDGE,
+          nativeWidth: current.nativeWidth,
+          nativeHeight: current.nativeHeight,
+        });
+        // Newer values, another photo, or Detail turned off meanwhile: this frame is stale.
+        if (current.generation !== job.generation) current = null;
+        if (!current || job.pending || proxyRef.current !== image) continue; // eslint-disable-line no-continue
+        Object.assign(job, { frame, key: current.key, image });
+        const quality = final || !needsFinal(current) ? 'final' : 'draft';
+        setDetailQuality(quality === 'final' ? { width: frame.width, height: frame.height } : 'draft');
+        await paintDetail(frame, current);
+        // Local timing marks for the browser checks (never sent anywhere).
+        performance.mark?.(`pe-detail-${quality}`, { detail: { width: frame.width, height: frame.height } });
+      }
+    } catch (error) {
+      if (error.code !== 'cancelled') setStatus({ state: 'error', message: error.message });
+    } finally {
+      job.busy = false;
+    }
+  }, [renderInWorker, paintDetail]);
 
   const drawCpu = useCallback(async (params) => {
     const job = cpuJobRef.current;
@@ -156,13 +252,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     try {
       const rendered = params.neutral ? image : await renderInWorker(image, params.adjustments, params.lutData, params.raw);
       const sourceWidth = Math.round(image.width * params.split);
-      // The "before" side: the source itself, or for RAW and merged RAW HDR its neutral development.
-      let before = image;
-      if ((image.kind === 'raw' || image.kind === 'hdr') && sourceWidth > 0) {
-        const cache = cpuBeforeRef.current;
-        if (cache.image !== image) Object.assign(cache, { image, data: (await renderInWorker(image, neutralAdjustments(), null, params.raw)).data });
-        before = { data: cache.data };
-      }
+      const before = sourceWidth > 0 ? await cpuBefore(image, params.raw) : image;
       if (id === job.latest && proxyRef.current === image) {
         engine.context.putImageData(new ImageData(new Uint8ClampedArray(rendered.data), image.width, image.height), 0, 0);
         if (sourceWidth > 0) engine.context.putImageData(new ImageData(new Uint8ClampedArray(before.data), image.width, image.height), 0, 0, 0, 0, sourceWidth, image.height);
@@ -177,7 +267,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         drawCpu(next);
       }
     }
-  }, [renderInWorker]);
+  }, [renderInWorker, cpuBefore]);
 
   // Render on the next frame with the latest values; intermediate values are dropped.
   // Never with another photo's settings: wait until this photo's proxy is loaded.
@@ -188,6 +278,18 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     cancelAnimationFrame(frameRef.current);
     frameRef.current = requestAnimationFrame(() => {
       const params = deriveParams(adjustments, { lut, raw });
+      if (params.detailActive) {
+        // Spatial Detail: the CPU renders the frame (draft, then final); a split or
+        // compare change alone repaints the last frame.
+        const key = `${photo.id}|${JSON.stringify(adjustments)}|${params.lutActive ? lut.sha256 : ''}`;
+        const job = detailJobRef.current;
+        const request = { key, image: proxyRef.current, adjustments, params, lut: params.lutActive ? lut : null, raw, nativeWidth: photo.width, nativeHeight: photo.height, generation: job.generation };
+        if (job.key === key && job.frame && job.image === proxyRef.current && !job.pending && !job.busy) paintDetail(job.frame, request);
+        else runDetail(request);
+        return;
+      }
+      Object.assign(detailJobRef.current, { key: null, pending: null, generation: detailJobRef.current.generation + 1 });
+      setDetailQuality(null);
       if (engine.kind === 'webgl2') {
         // "Before" of a RAW photo is its neutral development, not undeveloped sensor data.
         const before = raw ? deriveParams(neutralAdjustments(), { raw }) : null;
@@ -197,7 +299,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       }
     });
     return () => cancelAnimationFrame(frameRef.current);
-  }, [adjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu]);
+  }, [adjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -362,6 +464,16 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         <span className="pe-readout mono" aria-live="polite">{proxy ? `${Math.round(zoom * 100)}%` : '—'}</span>
         {beyondProxy && <span className="pe-readout-note">Preview at {proxy.width}×{proxy.height}; export uses full resolution</span>}
         {engineKind === 'cpu' && <span className="pe-readout-note">CPU preview (WebGL2 unavailable)</span>}
+        {proxy && detailQuality && (
+          <span
+            className="pe-readout-note"
+            data-detail-preview={typeof detailQuality === 'string' ? detailQuality : 'final'}
+            aria-live="polite"
+            title={typeof detailQuality === 'object' ? 'Detail is rendered on the CPU; the export renders it at full resolution.' : undefined}
+          >
+            {detailQuality === 'rendering' ? 'Rendering Detail…' : detailQuality === 'draft' ? 'Detail: draft preview' : `Detail preview at ${detailQuality.width}×${detailQuality.height}; export renders it at full resolution`}
+          </span>
+        )}
       </div>
     </div>
   );

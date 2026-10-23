@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +38,12 @@ const GENUINE_DIR = process.env.HDR_FIXTURE_DIR ?? '';
 const GENUINE_NAMES = ['_DSC9015.ARW', '_DSC9016.ARW', '_DSC9017.ARW'];
 const GENUINE = GENUINE_DIR && GENUINE_NAMES.every((name) => existsSync(path.join(GENUINE_DIR, name)));
 const ONLY = process.env.EDITOR_ENGINES?.split(',');
+// A genuine three-exposure RAW bracket (any three .ARW/.DNG files in HDR_BRACKET_DIR, e.g.
+// A7 III DSC09640–09642, 0.8/3.2/13 s): merged and exported at full size, timed.
+const BRACKET_DIR = process.env.HDR_BRACKET_DIR ?? '';
+const BRACKET_FILES = BRACKET_DIR && existsSync(BRACKET_DIR)
+  ? readdirSync(BRACKET_DIR).filter((name) => /\.(arw|dng)$/i.test(name)).sort().map((name) => path.join(BRACKET_DIR, name))
+  : [];
 
 const RUNS = [
   { name: 'Chromium, desktop', type: chromium, genuine: true },
@@ -196,8 +202,10 @@ async function runOne(run, files, reference, genuine) {
       const parity = await page.waitForFunction(() => window.parityResult, null, { timeout: 60_000 }).then((h) => h.jsonValue());
       if (!parity.available) { result.parity = 'no WebGL2'; return; }
       const worst = (list) => Math.max(...list.map(({ max }) => max));
-      result.parity = { hdrCases: parity.hdrResults.length, hdrWorstMax: worst(parity.hdrResults), hdrMeanMax: Math.max(...parity.hdrResults.map(({ mean }) => mean)).toFixed(3), hdrSplitMax: parity.hdrSplitMax, rawWorstMax: worst(parity.rawResults), rasterWorstMax: worst(parity.results) };
+      result.parity = { hdrCases: parity.hdrResults.length, hdrWorstMax: worst(parity.hdrResults), hdrMeanMax: Math.max(...parity.hdrResults.map(({ mean }) => mean)).toFixed(3), hdrSplitMax: parity.hdrSplitMax, rawWorstMax: worst(parity.rawResults), rasterWorstMax: worst(parity.results), detailFrameMax: parity.detailFrameMax, detailSplitMax: parity.detailSplitMax };
       assert.ok(result.parity.hdrWorstMax <= 1 && parity.hdrSplitMax <= 1 && result.parity.rawWorstMax <= 1 && result.parity.rasterWorstMax <= 1, JSON.stringify(result.parity));
+      // The Detail frame is drawn as is; its split side is the shader's neutral development.
+      assert.ok(parity.detailFrameMax === 0 && parity.detailSplitMax <= 1, JSON.stringify(result.parity));
     });
     await step('load', async () => {
       await page.goto(URL_EDITOR, { waitUntil: 'load' });
@@ -306,7 +314,7 @@ async function runOne(run, files, reference, genuine) {
       const [download] = await Promise.all([page.waitForEvent('download'), page.locator('button:has-text("Save edits"):visible').first().click()]);
       const document = JSON.parse(readFileSync(await download.path(), 'utf8'));
       const hdr = document.photos.find(({ source }) => source.format === 'hdr' && source.hdr.mode === 'radiance');
-      assert.equal(document.version, 4);
+      assert.equal(document.version, 5);
       assert.deepEqual(hdr.source.hdr.inputs.map(({ name, role }) => [name, role]), [['bracket-1.dng', 'under'], ['bracket-0.dng', 'normal'], ['bracket-2.dng', 'over']]);
       assert.equal(hdr.adjustments.exposure, 0.5);
     });
@@ -361,6 +369,44 @@ async function runOne(run, files, reference, genuine) {
         assert.ok(meta.width > 5900 && meta.height > 3900, measures.exportSize);
         measures.format = format;
         result.genuine = measures;
+      });
+    }
+    if (run.genuine && BRACKET_FILES.length === 3) {
+      await step('genuine exposure bracket: merge and full-size export', async () => {
+        const measures = { baselineMb: memoryMb(profile) };
+        result.bracket = measures;
+        await openDialog(page, tab);
+        await page.setInputFiles(dialogInput, BRACKET_FILES);
+        await readyRows(page, 3);
+        measures.dialog = (await page.textContent('.pe-dialog')).replace(/\s+/g, ' ').slice(0, 400);
+        const stopMerge = sampler(profile);
+        const started = Date.now();
+        await page.click('.pe-dialog__foot button:has-text("Merge")');
+        await page.waitForSelector('.pe-dialog', { state: 'detached', timeout: 300_000 });
+        await poll(() => page.evaluate(() => !document.querySelector('.pe-stage-message')), Boolean, 'bracket preview', 120_000);
+        measures.mergeMs = Date.now() - started;
+        measures.stages = await page.evaluate(() => Object.fromEntries(['decode', 'analyse', 'merge'].map((stage) => [stage, Math.round(performance.getEntriesByName(`pe-hdr-${stage}`).at(-1)?.duration ?? -1)])));
+        measures.mergePeakMb = stopMerge();
+        await tab(2);
+        measures.panel = (await page.textContent('.pe-section[data-section-id=hdr] .pe-raw__meta')).replace(/\s+/g, ' ').slice(0, 400);
+        await tab(3);
+        const format = await page.isEnabled('input[name=pe-format][value=jpeg]') ? 'jpeg' : 'png';
+        await page.check(`input[name=pe-format][value=${format}]`);
+        const stop = sampler(profile);
+        const exportStarted = Date.now();
+        const [download] = await Promise.all([page.waitForEvent('download', { timeout: 600_000 }), page.click('.pe-export-button')]);
+        measures.exportMs = Date.now() - exportStarted;
+        measures.exportPeakMb = stop();
+        measures.afterExportMb = memoryMb(profile);
+        measures.fileName = download.suggestedFilename();
+        assert.match(measures.fileName, new RegExp(`-HDR-quangedit\.${format === 'jpeg' ? 'jpg' : 'png'}$`));
+        const meta = await sharp(await download.path()).metadata();
+        measures.exportSize = `${meta.width}×${meta.height}`;
+        if (process.env.HDR_BRACKET_OUT) {
+          mkdirSync(process.env.HDR_BRACKET_OUT, { recursive: true });
+          await download.saveAs(path.join(process.env.HDR_BRACKET_OUT, `${run.name.replace(/\W+/g, '-')}-${measures.fileName}`));
+        }
+        assert.ok(meta.width > 5900 && meta.height > 3900, measures.exportSize);
       });
     }
     const csp = await page.evaluate(() => window.__csp);

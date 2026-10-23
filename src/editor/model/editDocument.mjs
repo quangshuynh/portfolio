@@ -13,9 +13,10 @@ import { describeHdrSource, parseHdrSource } from '../hdr/hdrSource.mjs';
 export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // Version 2 added curves, HSL and LUT references; version 3 RAW sources and their white
 // balance (`raw`); version 4 merged HDR sources (`format: 'hdr'` with `hdr`: mode,
-// the three inputs by role, merge settings) and the HDR tone controls. Older versions
-// read unchanged; older editors reject newer files instead of silently dropping settings.
-export const DOCUMENT_VERSION = 4;
+// the three inputs by role, merge settings) and the HDR tone controls; version 5 the
+// Detail controls. Older versions read unchanged (Detail neutral); older editors reject
+// newer files instead of silently dropping settings.
+export const DOCUMENT_VERSION = 5;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).

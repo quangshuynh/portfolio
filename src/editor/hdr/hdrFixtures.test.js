@@ -18,7 +18,7 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import exifr from 'exifr';
 import factory from 'libraw-wasm/dist/libraw.js';
 import { decodeRaw } from '../raw/rawDecoder.mjs';
-import { validateBracket } from './hdrMetadata.mjs';
+import { exposureLabel, exposureStops, suggestRolesFromMetadata, validateBracket } from './hdrMetadata.mjs';
 import { analyzeBracket, createRadianceMerge } from './hdrMerge.mjs';
 
 const dir = process.env.HDR_FIXTURE_DIR ?? '';
@@ -113,5 +113,89 @@ describe.skipIf(!available)('genuine Sony A7 III DRO bracket (_DSC9015–9017)',
     // Simulated from one exposure, nothing moves: the ghost detector should find (almost) nothing.
     expect(analysis.ghost.fraction).toBeLessThan(0.01);
     expect(merged.width).toBeGreaterThan(image.width * 0.99);
+  }, 300_000);
+});
+
+// Genuine A7 III compensation bracket (−2/0/+2) shot in M mode with Auto ISO, 2026-10-23:
+// set HDR_AUTO_ISO_DIR to a folder holding DSC09636.ARW, DSC09637.ARW and DSC09638.ARW.
+// ISO reached its 6400 limit, so the 0 and +2 frames hold the same exposure.
+const autoIsoDir = process.env.HDR_AUTO_ISO_DIR ?? '';
+const AUTO_ISO_NAMES = ['DSC09636.ARW', 'DSC09637.ARW', 'DSC09638.ARW'];
+const autoIsoAvailable = Boolean(autoIsoDir) && AUTO_ISO_NAMES.every((name) => existsSync(path.join(autoIsoDir, name)));
+
+describe.skipIf(!autoIsoAvailable)('genuine Sony A7 III Auto ISO bracket (DSC09636–09638)', () => {
+  let frames;
+  let inputs;
+  beforeAll(async () => {
+    const module = Module ?? await factory({ wasmBinary: await readFile(fileURLToPath(import.meta.resolve('libraw-wasm/dist/libraw.wasm'))) });
+    frames = [];
+    inputs = [];
+    for (const name of AUTO_ISO_NAMES) {
+      const { info, image } = decodeRaw(module, new Uint8Array(await readFile(path.join(autoIsoDir, name))), { format: 'arw', halfSize: true });
+      const exposure = { shutter: info.shutter, aperture: info.aperture, iso: info.iso, model: info.model, captured: info.captured };
+      inputs.push({ name, size: 1, sha256: null, kind: 'raw', format: 'arw', width: info.width, height: info.height, orientation: 1, exposure });
+      frames.push({ image, asShot: info.asShot, stops: null });
+    }
+  }, 120_000);
+
+  test('metadata: 1/160 s, f/6.3 at ISO 4000, 6400, 6400; refused as two equal exposures', () => {
+    expect(inputs.map(({ exposure }) => exposure.iso)).toEqual([4000, 6400, 6400]);
+    expect(validateBracket(inputs).errors.join(' ')).toMatch(/DSC09637\.ARW and DSC09638\.ARW were taken with the same exposure \(1\/160 s, f\/6\.3, ISO 6400\)/);
+  });
+
+  test('sensor data: the duplicate exposure is refused in either role order', () => {
+    for (const [reference, roles] of [[1, ['under', 'normal', 'over']], [2, ['under', 'over', 'normal']]]) {
+      frames.forEach((frame, index) => { frame.role = roles[index]; });
+      expect(() => analyzeBracket(frames, { mode: 'radiance', reference })).toThrow(/same exposure as the normal one/);
+    }
+  }, 120_000);
+});
+
+// Genuine A7 III shutter-speed bracket, 2026-10-23: set HDR_BRACKET_DIR to a folder holding
+// DSC09640.ARW (0.8 s), DSC09641.ARW (3.2 s) and DSC09642.ARW (13 s), all f/8, ISO 100.
+const bracketDir = process.env.HDR_BRACKET_DIR ?? '';
+const BRACKET_NAMES = ['DSC09640.ARW', 'DSC09641.ARW', 'DSC09642.ARW'];
+const bracketAvailable = Boolean(bracketDir) && BRACKET_NAMES.every((name) => existsSync(path.join(bracketDir, name)));
+
+describe.skipIf(!bracketAvailable)('genuine Sony A7 III exposure bracket (DSC09640–09642)', () => {
+  let frames;
+  let inputs;
+  beforeAll(async () => {
+    const module = Module ?? await factory({ wasmBinary: await readFile(fileURLToPath(import.meta.resolve('libraw-wasm/dist/libraw.wasm'))) });
+    frames = [];
+    inputs = [];
+    for (const name of BRACKET_NAMES) {
+      const { info, image } = decodeRaw(module, new Uint8Array(await readFile(path.join(bracketDir, name))), { format: 'arw', halfSize: true });
+      const exposure = { shutter: info.shutter, aperture: info.aperture, iso: info.iso, model: info.model, captured: info.captured };
+      inputs.push({ name, size: 1, sha256: null, kind: 'raw', format: 'arw', width: info.width, height: info.height, orientation: 1, exposure });
+      frames.push({ image, asShot: info.asShot, stops: exposureStops(exposure) });
+    }
+  }, 120_000);
+
+  test('metadata: −2/0/+2 EV by shutter speed, accepted with roles from EXIF', () => {
+    expect(inputs.map(({ exposure }) => exposureLabel(exposure))).toEqual(['0.8 s, f/8, ISO 100', '3.2 s, f/8, ISO 100', '13 s, f/8, ISO 100']);
+    expect(validateBracket(inputs).errors).toEqual([]);
+    expect(suggestRolesFromMetadata(inputs).roles).toEqual(['under', 'normal', 'over']);
+  });
+
+  test('measured exposures match EXIF; alignment converges; no ghosts; merged white about 4', () => {
+    frames.forEach((frame, index) => { frame.role = ['under', 'normal', 'over'][index]; });
+    const analysis = analyzeBracket(frames, { mode: 'radiance', reference: 1 });
+    expect(Math.log2(analysis.exposures[0])).toBeCloseTo(-2, 1);
+    expect(Math.log2(analysis.exposures[2])).toBeCloseTo(2, 1);
+    expect(analysis.warnings).toEqual([]);
+    [0, 2].forEach((index) => {
+      expect(analysis.alignment[index].status).toBe('aligned');
+      expect(analysis.alignment[index].after).toBeLessThan(0.005);
+    });
+    expect(analysis.ghost.fraction).toBeLessThan(0.01);
+    expect(analysis.white).toBeGreaterThan(3.8);
+    const merge = createRadianceMerge(analysis, frames, { width: frames[1].image.width, height: frames[1].image.height });
+    frames.forEach((frame, index) => merge.add(index, frame.image));
+    const merged = merge.finish();
+    // Highlights clipped in the normal frame keep values above its white (recovered from the 0.8 s frame).
+    let above = 0;
+    for (let i = 1; i < merged.data.length; i += 3) if (merged.data[i] > 1.05) above += 1;
+    expect(above / (merged.data.length / 3)).toBeGreaterThan(0.0005);
   }, 300_000);
 });

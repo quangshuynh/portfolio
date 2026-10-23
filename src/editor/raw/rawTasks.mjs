@@ -4,6 +4,7 @@
 // here performs network requests; the file never leaves this browser.
 
 import { prepareRender, renderRawRgba8 } from '../pipeline/cpuRenderer.mjs';
+import { guideSource, prepareDetailRender, renderDetailRows } from '../pipeline/detailRenderer.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { exportDimensions, LIMITS, proxyDimensions } from '../io/files.mjs';
 import { contentHash } from '../io/hash.mjs';
@@ -95,11 +96,17 @@ export function createRawHandlers(loadModule) {
         throw new RawDecodeError('corrupt', `LibRaw returned ${image.width}×${image.height} instead of ${size.width}×${size.height}.`);
       }
       const decodedAt = performance.now();
-      const prepared = prepareRender(deriveParams(adjustments, { lut, raw }));
+      const params = deriveParams(adjustments, { lut, raw });
+      const prepared = prepareRender(params);
+      // Detail reads neighbouring rows, which the decoded image holds in full.
+      const detail = params.detailActive
+        ? prepareDetailRender(prepared, { width: size.width, height: size.height, nativeWidth: raw.width, nativeHeight: raw.height, guideImage: guideSource(image) })
+        : null;
       for (let row = 0; row < size.height; row += RAW_BAND_ROWS) {
         const rows = Math.min(RAW_BAND_ROWS, size.height - row);
         const data = new Uint8ClampedArray(size.width * rows * 4);
-        renderRawRgba8(image.data.subarray(row * size.width * 3, (row + rows) * size.width * 3), prepared, { target: data });
+        if (detail) renderDetailRows(image, detail, row, row + rows, data);
+        else renderRawRgba8(image.data.subarray(row * size.width * 3, (row + rows) * size.width * 3), prepared, { target: data });
         progress({ stage: 'rendering', fraction: (row + rows) / size.height, band: { row, rows, data } });
       }
       return {

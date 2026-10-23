@@ -200,7 +200,8 @@ function EditorWorkspace() {
   const exporting = state.photos.some(({ exportStatus }) => exportStatus.state === 'running');
 
   const worker = useCallback((name) => {
-    workers.current[name] ??= createImageWorker();
+    // The render worker only computes (CPU and Detail previews), so it needs no worker canvas.
+    workers.current[name] ??= createImageWorker(undefined, { canvas: name !== 'render' });
     return workers.current[name];
   }, []);
 
@@ -359,7 +360,8 @@ function EditorWorkspace() {
 
   // CPU preview: the worker keeps the proxy and LUT, so they are sent only when they
   // change (or the worker lost them), not on every render.
-  const renderInWorker = useCallback(async (image, values, lut, raw = null) => {
+  // `detail` ({ edge, nativeWidth, nativeHeight }) renders Detail settings at that preview size.
+  const renderInWorker = useCallback(async (image, values, lut, raw = null, detail = null) => {
     const client = worker('render');
     const sent = renderState.current;
     if (sent.client !== client) Object.assign(sent, { client, key: null, luts: new Set() });
@@ -369,6 +371,7 @@ function EditorWorkspace() {
       key,
       adjustments: values,
       raw,
+      detail,
       ...(full || sent.key !== key ? { source: image } : {}),
       ...(lut ? { lut: full || !sent.luts.has(lut.sha256) ? lut : { sha256: lut.sha256 } } : {}),
     });

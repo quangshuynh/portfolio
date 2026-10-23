@@ -55,6 +55,13 @@ export const ADJUSTMENTS = Object.freeze([
     max: 100,
     step: 1,
   }))),
+  // Detail (pipeline/detail.mjs): spatial, rendered on the CPU in preview and export.
+  { key: 'texture', group: 'detail', label: 'Texture', min: -100, max: 100, step: 1 },
+  { key: 'clarity', group: 'detail', label: 'Clarity', min: -100, max: 100, step: 1 },
+  { key: 'dehaze', group: 'detail', label: 'Dehaze', min: -100, max: 100, step: 1 },
+  { key: 'sharpening', group: 'detail', label: 'Sharpening', min: 0, max: 100, step: 1, signed: false },
+  { key: 'luminanceNoise', group: 'detail', label: 'Luminance noise reduction', shortLabel: 'Luminance NR', min: 0, max: 100, step: 1, signed: false },
+  { key: 'colorNoise', group: 'detail', label: 'Color noise reduction', shortLabel: 'Color NR', min: 0, max: 100, step: 1, signed: false },
   { key: 'rawTemperature', group: 'raw', label: 'RAW temperature', ...RAW_KELVIN, unit: 'K', default: DAYLIGHT_KELVIN, signed: false, track: 'temperature' },
   { key: 'rawTint', group: 'raw', label: 'RAW tint', ...RAW_TINT, track: 'tint' },
   // Merged RAW HDR only: tone mapping of the scene values (spec.hdrKnee, shadowLift).
@@ -68,6 +75,7 @@ export const ADJUSTMENT_GROUPS = Object.freeze([
   { id: 'light', label: 'Light' },
   { id: 'color', label: 'Color' },
   { id: 'hsl', label: 'HSL' },
+  { id: 'detail', label: 'Detail' },
   { id: 'curves', label: 'Tone Curve' },
   { id: 'lut', label: 'LUT' },
   { id: 'raw', label: 'RAW' },

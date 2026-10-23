@@ -5,7 +5,7 @@
 // through the same engine. Files are strict JSON with schema checks; nothing in them
 // is executed.
 
-import { ADJUSTMENTS, HSL_RANGES, compactAdjustments, hslKey, normalizeAdjustments } from './adjustments.mjs';
+import { ADJUSTMENTS, HSL_RANGES, compactAdjustments, groupKeys, hslKey, normalizeAdjustments } from './adjustments.mjs';
 
 export const PRESET_TYPE = 'quanghuynh.photo-editor.preset';
 export const PRESET_PACK_TYPE = 'quanghuynh.photo-editor.presets';
@@ -24,6 +24,7 @@ export const PRESET_GROUPS = Object.freeze([
   { id: 'tone', label: 'Tone', keys: ['contrast', 'highlights', 'shadows', 'whites', 'blacks'] },
   { id: 'presence', label: 'Vibrance and saturation', keys: ['vibrance', 'saturation'] },
   { id: 'hsl', label: 'HSL', keys: HSL_KEYS },
+  { id: 'detail', label: 'Detail', keys: groupKeys('detail') },
   { id: 'curves', label: 'Tone curve', keys: [], structured: 'curves' },
   { id: 'lut', label: 'LUT', keys: ['lutIntensity'], structured: 'lut' },
 ].map(Object.freeze));

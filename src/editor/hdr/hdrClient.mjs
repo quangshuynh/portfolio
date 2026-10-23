@@ -105,7 +105,7 @@ export function hdrExportGeometry(inputs, analysis, resize) {
   const frame = scale === 1 ? full : { width: Math.round(full.width * scale), height: Math.round(full.height * scale) };
   const crop = cropAt(analysis.crop, frame.width, frame.height);
   const fullDecode = Boolean(inputs[0].raw) && (frame.width > Math.floor(full.width / 2) || frame.height > Math.floor(full.height / 2));
-  return { full, frame, output: { width: crop.width, height: crop.height }, fullDecode };
+  return { full, frame, output: { width: crop.width, height: crop.height }, native: { width: cropFull.width, height: cropFull.height }, fullDecode };
 }
 
 /**
@@ -172,7 +172,7 @@ export async function exportHdr(inputs, analysis, { adjustments, raw, lut, setti
       await client.call('add', { index, image }, { transfer: [image.data.buffer] });
     }
     const merged = performance.now();
-    const result = await client.call('render', { adjustments, raw, lut, flattenAlpha: settings.format === 'jpeg' }, {
+    const result = await client.call('render', { adjustments, raw, lut, flattenAlpha: settings.format === 'jpeg', native: geometry.native }, {
       onProgress: ({ band, ...progress }) => {
         if (band) context.putImageData(new ImageData(band.data, output.width, band.rows), 0, band.row);
         onProgress(progress);

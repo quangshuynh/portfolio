@@ -174,3 +174,49 @@ describe('presets', () => {
     });
   });
 });
+
+describe('Detail settings', () => {
+  const DETAIL = { texture: 30, clarity: -20, dehaze: 15, sharpening: 40, luminanceNoise: 25, colorNoise: 50 };
+
+  test('the Detail group: neutral detection, reset and undo/redo', () => {
+    expect(groupIsNeutral(neutralAdjustments(), 'detail')).toBe(true);
+    expect(groupIsNeutral(normalizeAdjustments({ sharpening: 1 }), 'detail')).toBe(false);
+    let state = readyState();
+    state = editorReducer(state, { type: 'setAdjustment', key: 'clarity', value: 35 });
+    state = editorReducer(state, { type: 'setAdjustment', key: 'contrast', value: 10 });
+    expect(present(state)).toMatchObject({ clarity: 35, contrast: 10 });
+    state = editorReducer(state, { type: 'resetGroup', group: 'detail' });
+    expect(present(state)).toMatchObject({ clarity: 0, contrast: 10 });
+    state = editorReducer(state, { type: 'undo' });
+    expect(present(state).clarity).toBe(35);
+    state = editorReducer(state, { type: 'redo' });
+    expect(present(state).clarity).toBe(0);
+  });
+
+  test('documents save Detail values (version 5) and read them back; older documents get neutral Detail', () => {
+    const text = serializeEditDocument(createEditDocument([{ name: 'a.jpg', size: 1, lastModified: 0, sha256: null, format: 'jpeg', width: 10, height: 10, adjustments: normalizeAdjustments(DETAIL) }], {}, new Date(0)));
+    const saved = JSON.parse(text);
+    expect(saved.version).toBe(5);
+    expect(saved.photos[0].adjustments).toMatchObject(DETAIL);
+    expect(parseEditDocument(text).photos[0].adjustments).toMatchObject(DETAIL);
+    // Neutral Detail values are left out of the compact form.
+    expect(Object.keys(compactAdjustments(normalizeAdjustments({ contrast: 5 })))).not.toContain('sharpening');
+    const v4 = JSON.stringify({ type: DOCUMENT_TYPE, version: 4, photos: [{ source: { name: 'x.jpg', size: 1 }, adjustments: { contrast: 12 } }] });
+    expect(parseEditDocument(v4).photos[0].adjustments).toMatchObject({ contrast: 12, texture: 0, clarity: 0, dehaze: 0, sharpening: 0, luminanceNoise: 0, colorNoise: 0 });
+    const junk = JSON.stringify({ type: DOCUMENT_TYPE, version: 5, photos: [{ source: { name: 'x.jpg', size: 1 }, adjustments: { sharpening: 900, texture: '50', dehaze: -400 } }] });
+    expect(parseEditDocument(junk).photos[0].adjustments).toMatchObject({ sharpening: 100, texture: 0, dehaze: -100 });
+  });
+
+  test('presets carry Detail as their own group; presets without it leave Detail alone', () => {
+    expect(changedPresetGroups(normalizeAdjustments({ sharpening: 30 }))).toEqual(['detail']);
+    const preset = createPreset('Crisp', { ...DETAIL, contrast: 10 }, ['detail']);
+    expect(preset.settings).toEqual(DETAIL);
+    const applied = applyPreset(normalizeAdjustments({ contrast: 20, sharpening: 90, texture: -50 }), createPreset('Only sharpening', { sharpening: 25 }, ['detail']));
+    expect(applied).toMatchObject({ contrast: 20, sharpening: 25, texture: 0, clarity: 0 });
+    const toneOnly = applyPreset(normalizeAdjustments({ sharpening: 60 }), BUILT_IN_PRESETS[0]);
+    expect(toneOnly.sharpening).toBe(60);
+    const [imported] = parsePresetFile(serializePresets([{ ...preset, settings: { ...preset.settings, colorNoise: 250, clarity: 'x' } }]));
+    expect(imported.settings).toMatchObject({ colorNoise: 100, texture: 30 });
+    expect(imported.settings.clarity).toBeUndefined();
+  });
+});
