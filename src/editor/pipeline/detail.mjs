@@ -215,17 +215,27 @@ function minFilter(src, w, h, r) {
   const tmp = new Float32Array(w * h);
   const out = new Float32Array(w * h);
   for (let y = 0; y < h; y += 1) {
+    const o = y * w;
     for (let x = 0; x < w; x += 1) {
+      const end = x + r < w ? x + r : w - 1;
       let m = Infinity;
-      for (let k = Math.max(0, x - r); k <= Math.min(w - 1, x + r); k += 1) m = Math.min(m, src[y * w + k]);
-      tmp[y * w + x] = m;
+      for (let k = x - r > 0 ? x - r : 0; k <= end; k += 1) if (src[o + k] < m) m = src[o + k];
+      tmp[o + x] = m;
     }
   }
-  for (let y = 0; y < h; y += 1) {
-    for (let x = 0; x < w; x += 1) {
-      let m = Infinity;
-      for (let k = Math.max(0, y - r); k <= Math.min(h - 1, y + r); k += 1) m = Math.min(m, tmp[k * w + x]);
-      out[y * w + x] = m;
+  out.set(tmp);
+  for (let k = 1; k <= r; k += 1) {
+    // Rows k above and below, folded in one offset at a time (row-wise, cache friendly).
+    for (let y = 0; y < h; y += 1) {
+      const o = y * w;
+      const up = (y - k > 0 ? y - k : 0) * w;
+      const down = (y + k < h ? y + k : h - 1) * w;
+      for (let x = 0; x < w; x += 1) {
+        const a = tmp[up + x];
+        const b = tmp[down + x];
+        const m = a < b ? a : b;
+        if (m < out[o + x]) out[o + x] = m;
+      }
     }
   }
   return out;
@@ -299,7 +309,11 @@ export function computeGuide(planes, w, h, detail, transfer) {
   for (let i = 0; i < n; i += 1) luma[i] = LR * planes.r[i] + LG * planes.g[i] + LB * planes.b[i];
   const guide = { width: w, height: h, air: [1, 1, 1], haze: null, clarity: null };
   if (detail.dehaze) {
-    const lin = [planes.r, planes.g, planes.b].map((plane) => Float32Array.from(plane, transfer.toLinear));
+    const lin = [planes.r, planes.g, planes.b].map((plane) => {
+      const out = new Float32Array(n);
+      for (let i = 0; i < n; i += 1) out[i] = transfer.toLinear(plane[i]);
+      return out;
+    });
     const patch = Math.max(1, Math.round(DETAIL.hazePatch * edge));
     const darkest = new Float32Array(n);
     for (let i = 0; i < n; i += 1) darkest[i] = Math.min(lin[0][i], lin[1][i], lin[2][i]);
@@ -327,8 +341,8 @@ export function computeGuide(planes, w, h, detail, transfer) {
     // a coloured airlight such as blue sky would tint the whole photo.
     const air = Math.max(DETAIL.hazeAirMin, Math.min(1, (LR * sums[0] + LG * sums[1] + LB * sums[2]) / selected));
     guide.air = [air, air, air];
-    for (let i = 0; i < n; i += 1) darkest[i] = Math.min(lin[0][i] / guide.air[0], lin[1][i] / guide.air[1], lin[2][i] / guide.air[2]);
-    const transmission = Float32Array.from(darkest, (value) => 1 - DETAIL.hazeOmega * value);
+    const transmission = new Float32Array(n);
+    for (let i = 0; i < n; i += 1) transmission[i] = 1 - DETAIL.hazeOmega * (Math.min(lin[0][i], lin[1][i], lin[2][i]) / air);
     guide.haze = guidedCoefficients(luma, transmission, w, h, Math.max(1, DETAIL.hazeRadius * edge), DETAIL.hazeEps);
     if (detail.clarity) {
       // Clarity follows Dehaze, so its guide is the dehazed luma.
