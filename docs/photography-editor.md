@@ -3,7 +3,8 @@
 A public, local-first editor for JPEG, PNG, WebP and RAW (Sony ARW, DNG). No
 account, no upload, no server: files are decoded, edited and exported in the
 visitor's browser. Built in Interval 3 (light and colour), extended in Interval 4
-(tone curves, HSL, `.cube` LUTs, presets) and Interval 5 (RAW, see [RAW](#raw));
+(tone curves, HSL, `.cube` LUTs, presets), Interval 5 (RAW, see [RAW](#raw)) and
+Interval 6 (three-exposure HDR, see [Merge HDR](#merge-hdr));
 the original proposal is in
 [photography-platform/editor-hdr-architecture.md](photography-platform/editor-hdr-architecture.md).
 `/photography` links to it with a small "Edit a photo" text link (in-app
@@ -27,6 +28,8 @@ navigation).
 | `scripts/check-editor-engines.mjs` | `npm run check:editor:engines`: the same flow in WebKit, mobile Chromium and Firefox, with forced fallbacks. |
 | `src/editor/io/diagnostics.mjs` | Local capability report and startup failures (Diagnostics panel, `window.__photoEditorDiagnostics`). |
 | `src/editor/raw/` | RAW: format sniffing, LibRaw wrapper (`rawDecoder`), colour math (`rawColor`), worker tasks, job queue and export (`rawClient`). |
+| `src/editor/hdr/` | Merge HDR: bracket metadata and validation, registration (`hdrAlign`), radiance merge, ghost masks and exposure fusion (`hdrMerge`), worker tasks, page orchestration and export (`hdrClient`), document form (`hdrSource`). |
+| `scripts/check-editor-hdr.mjs` | `npm run check:editor:hdr`: HDR parity, Merge HDR flow and exports in Chromium, Firefox and WebKit; genuine A7 III files with `HDR_FIXTURE_DIR`. |
 | `scripts/check-editor-raw.mjs` | `npm run check:editor:raw`: RAW parity, import, white balance, exports in Chromium, Firefox and WebKit; genuine ARW with `RAW_FIXTURE_DIR`. |
 | `public/photography/third-party-notices.txt` | Licence notices for the RAW decoder, linked from the inspector. |
 
@@ -179,6 +182,103 @@ wrapper, LibRaw under CDDL-1.0, Little CMS, IJG libjpeg, zlib) is a separate
 `public/photography/third-party-notices.txt`. Licence decisions:
 [dependencies-licensing.md](photography-platform/dependencies-licensing.md).
 
+## Merge HDR
+
+**Capturing a bracket.** Three frames of one scene, 2 EV apart (−2, 0, +2), ideally on
+a tripod: on Sony bodies Drive mode → Bracket (continuous, 3 frames, 2.0 EV), in M or A
+mode so the shutter speed changes and ISO and aperture stay fixed. **DRO bracketing is
+not an exposure bracket**: it records one exposure and saves it several times (with
+differently processed JPEG previews), so there is nothing to merge; the editor refuses it.
+
+**Inputs.** Exactly three files, all RAW (Sony ARW and DNG as in [RAW](#raw)) or all
+JPEG/PNG/WebP. Refused with a reason: mixed kinds, duplicates (hash), different cameras
+or RAW sizes, different orientation or aspect ratio, the same recorded exposure, more
+than 8 EV span, unrelated scenes, motion that would crop more than 30%, roles that
+contradict the measured brightness. Raster inputs of different sizes are merged at the
+smallest. Roles (under, normal, over) are suggested from shutter, aperture and ISO when all
+three record them (never from file names), else from measured brightness, and can be
+changed; the normal exposure is the reference. Inputs can be new files or photos already
+imported; they are never changed.
+
+**RAW merge (radiance).** Each frame is LibRaw's 16-bit linear camera RGB (black and white
+levels, AHD demosaic, as-shot balance; [RAW](#raw)), brought to the reference's white
+balance, divided by its exposure relative to the reference and averaged with weights
+proportional to that exposure (brighter frames carry less relative noise), falling
+smoothly to zero as any channel nears its sensor white (0.80–0.96). The exposure ratio is
+**measured** from mutually well-exposed pixels (median, linear data) and compared with
+EXIF; a difference over 0.35 EV is reported and the measured value used. The result is
+float32 camera RGB in reference units, unclipped up to the darkest frame's sensor white
+(`hdrWhite`, 4 for a −2 EV frame). Areas clipped in every frame stay at that white.
+
+**Raster merge (exposure fusion).** JPEG/PNG/WebP are already tone mapped and clipped, so
+no scene radiance is reconstructed: the frames are blended by contrast, saturation and
+well-exposedness in a Laplacian pyramid (Mertens et al. 2007). The UI and the HDR panel
+call it exposure fusion; the result is an ordinary 8-bit photo.
+
+**Alignment.** Median-threshold bitmaps (exposure-independent) searched over an image
+pyramid, with rotation searched in 0.25° steps up to ±1°, then Lucas–Kanade refinement of
+translation and rotation on rank-equalised luminance using the reference's gradients
+(no noise bias), on the largest pyramid level up to 1600 px. The HDR panel shows the
+measured bitmap mismatch before → after per frame; above 20% (or a shift over 6% of the
+width) alignment is reported as failed and that frame is merged unaligned with a warning;
+featureless frames are merged unaligned with a warning. The output is cropped to the
+area all frames cover, so there are no empty borders. Large parallax and perspective
+changes are not modelled (similarity transform only). Accuracy: synthetic brackets
+within 0.2 px; genuine A7 III sensor data with simulated motion within 0.3 px and 0.15°.
+
+**Ghosts.** At analysis size (≤ 1024 px) each frame is compared with the reference where
+both are well exposed (RAW: exposure-normalised log ratio; raster: after histogram
+matching); disagreement beyond a threshold set by Ghost reduction strength is opened,
+dilated by 1% of the width and feathered, and those areas take the reference only. Not
+detected: motion where the reference is clipped (the darker frame alone fills it).
+
+**Tone mapping and editing.** A merged photo is a new photo (`DSC09501-HDR`); the merge is
+fixed and only its rendering is edited, non-destructively. RAW merges get an HDR section:
+Highlight compression 0–100 (the rolloff knee from 0.9 to 0.1; 50 is the RAW knee, 0.5)
+and Shadow lift 0–100 (up to 2× in the deepest tones, monotonic), with Natural and
+Stronger looks; global and per pixel, so no halos and GPU = CPU. Exposure, RAW white
+balance, tone, colour, curves, HSL, LUTs, presets (which never change HDR controls),
+undo and before/after all work; Original shows the merge with default tone mapping. No
+local contrast operator (see [Detail adjustments](#detail-adjustments-carried-forward)).
+HDR GPU preview vs CPU: at most 1 code value (9 cases; 0 in Chromium).
+
+**Saving and export.** Edit documents (version 4) store `format: "hdr"` with the mode, the
+three inputs by role (name, size, SHA-256) and the merge settings; restoring asks for
+those files and the merge picks up its saved roles, settings and edits. Export decodes
+the three sources again at the chosen size (RAW: half-size sensor data when enough, else
+the full demosaic), merges them one at a time into the accumulators (never three decoded
+frames at once) and renders bands; PNG export equals the Node reference within 1. Names:
+`DSC09501-HDR-quangedit.jpg`, `-HDR` never doubled, a second merge of the same reference
+`DSC09501-HDR-2`. Cancelling ends every worker; a cancelled merge adds nothing. When the
+estimated memory exceeds the device budget (40% of `deviceMemory`, else 900 MB on phones,
+3 GB on desktops), export is blocked with the largest long edge that fits; nothing is
+downscaled silently.
+
+**Measurements** (Windows, i7-9700; three 6024×4024 DNGs made from genuine A7 III sensor
+data with simulated −2/0/+2 EV and motion; whole browser incl. GPU and workers):
+
+| Browser | Preview merge (decode · analyse · merge) | Full-size JPEG export | Memory: baseline → merge peak → export peak |
+| --- | --- | --- | --- |
+| Chromium 141 | 5.7 s (1.6 · 2.2 · 1.1) | 14.1 s, 6016×4016 | 531 → 801 → 2117 MB |
+| Firefox 142 | 10.8–14.9 s (6.1–9.2 · 2.6–3.6 · 1.8–1.9) | 48.5 s, 6016×4016 | 797 → 1166–1526 → 2444 MB |
+
+After a second merge of the same files Chromium settled at 1.05–1.12 GB and Firefox at
+1.15–1.28 GB (the first merge stays in the workspace, so some growth is expected); after
+export both returned to about their post-merge level. Phones are **not verified** (full-size
+HDR export there is blocked by the memory budget; previews use the 2048–3072 px proxy).
+Playwright's Windows WebKit crashes in about half of the HDR exports from RAW, always
+while a new LibRaw worker starts decoding (the Interval 5 issue; nine LibRaw jobs per
+export make it likely); not reproduced with HDR code alone, nor in Chromium or Firefox.
+Safari on macOS and iOS is not verified.
+
+**Real-world validation.** The only genuine bracket available, `_DSC9015–9017` (A7 III,
+2026-10-05), is a DRO bracket: identical exposure (1/30 s, f/3.5, ISO 100), identical
+sensor data. It is refused, as it should be, both from metadata and from the measured
+data. No genuine exposure bracket was available (962 RAW files scanned), so **merge
+quality on real hand-held brackets (alignment of real motion, real ghosts, real colour
+across exposures) is not validated**; the evidence is synthetic brackets and genuine
+sensor data with simulated exposure and motion.
+
 ## Rendering, preview and export
 
 - **Decode** (worker): `createImageBitmap` with EXIF orientation applied,
@@ -241,6 +341,8 @@ canvas's premultiplied storage, so very low alpha loses precision.
 - Values are relative to neutral (LUT intensity defaults to 100). The ten
   Interval 3 controls are always written; other controls, curves and the LUT
   only when they change something. Missing keys are neutral.
+- Version 4 added merged HDR sources (see [Merge HDR](#merge-hdr)) and the HDR tone
+  controls `hdrHighlights`, `hdrShadows`.
 - Version 2 added curves, HSL and LUTs; version 3 RAW sources (`"format": "arw"`
   or `"dng"`) and RAW white balance (`"raw": { "whiteBalance": "custom" }`,
   `rawTemperature`, `rawTint`). Older files still open; an older editor rejects a
@@ -445,4 +547,21 @@ at render time), local and exportable at full resolution. Not built yet:
 | Faster export | Split bands across several workers (the band loop in `imageTasks.mjs` is already independent per band). |
 | Sharpening, noise reduction, 1:1 preview | Tiled full-resolution decode around the viewport, a spatial stage after the per-pixel ones, band overlap in export. |
 | Batch export, ZIP, preset sync | Queue over the export worker (and the RAW queue); names from `exportFileName()`; presets already apply per group to any photo. |
-| HDR | Float source path plus the RAW base rendering. |
+| Detail: Texture, Clarity, Dehaze | Carried forward; see below. |
+
+### Detail adjustments (carried forward)
+
+Requested in Interval 6 and **not built**: Texture, Clarity and Dehaze (±100, 0 neutral) in
+a Detail section that will also hold sharpening and noise reduction (neither exists yet).
+All three are spatial, unlike every stage above, so they need, in this order:
+
+1. A resolution-independent definition: filter radii as fractions of the image, so the
+   2048–4096 px proxy and a 24 MP export agree (or a tiled 1:1 preview).
+2. Edge-aware base/detail decomposition (guided filter or bilateral grid) on linear
+   luminance; Texture = small-scale detail gain, Clarity = mid-scale (about 1–3% of the
+   long edge) local contrast with highlight and shadow protection, Dehaze = dark-channel
+   transmission estimate with a floor, applied before tone so colour stays natural.
+3. Export bands with overlap equal to the largest radius (edge handling: mirror), and a
+   multi-pass WebGL2 path with float render targets; CPU/GPU tolerance justified per filter.
+4. Tests: neutral at 0 bit for bit, edge and band-seam regressions, halo bounds at step
+   edges, alpha preserved, RAW/raster/HDR, presets and documents (new version).
