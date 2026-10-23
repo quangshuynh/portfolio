@@ -138,6 +138,14 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5.5px; border: 2px solid var(--pe-bg); border-radius: 50%; background: var(--pe-text); }
 .pe-range::-moz-range-thumb { width: 12px; height: 12px; border: 2px solid var(--pe-bg); border-radius: 50%; background: var(--pe-text); }
 .pe-range:focus-visible { outline-offset: 0; }
+/* Touch screens: about 44 px buttons and a larger slider thumb (layout unchanged otherwise). */
+@media (pointer: coarse) {
+  .pe-button, .pe-text-button, .pe-icon-button, .pe-compare button, .pe-tabs button { min-height: 2.75rem; }
+  .pe-icon-button { width: 2.75rem; }
+  .pe-range { height: 2.25rem; }
+  .pe-range::-webkit-slider-thumb { width: 22px; height: 22px; margin-top: -9.5px; }
+  .pe-range::-moz-range-thumb { width: 20px; height: 20px; }
+}
 .pe-range[data-track='temperature']::-webkit-slider-runnable-track { background: linear-gradient(to right, #4f7fd1, #8a8a8a 50%, #d9a441); }
 .pe-range[data-track='temperature']::-moz-range-track { background: linear-gradient(to right, #4f7fd1, #8a8a8a 50%, #d9a441); }
 .pe-range[data-track='tint']::-webkit-slider-runnable-track { background: linear-gradient(to right, #4fa35a, #8a8a8a 50%, #c35bb8); }
