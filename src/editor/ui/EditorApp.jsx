@@ -168,6 +168,7 @@ function EditorWorkspace() {
   const hdrProxyJob = useRef(null);
   const [hdrOpen, setHdrOpen] = useState(false);
   const hdrOpenRef = useRef(false);
+  const bracketInspections = useRef(Promise.resolve());
   hdrOpenRef.current = hdrOpen;
   const fileInputRef = useRef(null);
   const editsInputRef = useRef(null);
@@ -500,7 +501,11 @@ function EditorWorkspace() {
       const { header, sha256, thumbnail, raw } = await raws().run('inspect', { file, thumbnailEdge: THUMBNAIL_EDGE }).promise;
       return bracketInput({ file, header, sha256, thumbnail, raw });
     }
-    const { header, sha256, thumbnail } = await worker('import').call('inspect', { file, thumbnailEdge: THUMBNAIL_EDGE });
+    // One at a time, as imports do: where workers cannot decode, the first call switches
+    // the client to the main thread, which would cancel calls already in flight.
+    const run = bracketInspections.current.then(() => worker('import').call('inspect', { file, thumbnailEdge: THUMBNAIL_EDGE }));
+    bracketInspections.current = run.catch(() => {});
+    const { header, sha256, thumbnail } = await run;
     return bracketInput({ file, header, sha256, thumbnail, exposure: await rasterExposure(file) });
   }, [raws, worker]);
   const describeWorkspacePhoto = useCallback(async (id) => {
