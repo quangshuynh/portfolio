@@ -3,8 +3,8 @@ import { adjustmentSpec } from '../model/adjustments.mjs';
 import { DAYLIGHT_KELVIN, multipliersToKelvinTint } from '../raw/rawColor.mjs';
 import { RAW_FORMATS } from '../raw/rawFormat.mjs';
 import { AdjustmentRow } from './AdjustmentRow';
+import { formatShutter } from '../hdr/hdrMetadata.mjs';
 
-const formatShutter = (seconds) => (seconds >= 1 ? `${Number(seconds.toFixed(1))} s` : `1/${Math.round(1 / seconds)} s`);
 const signed = (value) => (value > 0 ? `+${value}` : String(value));
 
 /** Exposure line from whatever the file recorded, e.g. "1/250 s · f/8 · ISO 100 · 50 mm". */

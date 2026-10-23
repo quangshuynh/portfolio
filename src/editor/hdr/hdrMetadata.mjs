@@ -125,8 +125,11 @@ export const hasExposure = (exposure) => Boolean(exposure?.shutter && exposure.a
  */
 export const exposureStops = (exposure) => (hasExposure(exposure) ? Math.log2((exposure.shutter * exposure.iso) / (exposure.aperture ** 2)) : null);
 
+/** Shutter speed as cameras show it: 1/N below 0.3 s (where N is a round number), else decimal seconds. */
+export const formatShutter = (seconds) => (seconds >= 0.3 ? `${Number(seconds.toFixed(1))} s` : `1/${Math.round(1 / seconds)} s`);
+
 const describe = ({ shutter, aperture, iso }) => [
-  shutter && (shutter >= 1 ? `${Number(shutter.toFixed(1))} s` : `1/${Math.round(1 / shutter)} s`),
+  shutter && formatShutter(shutter),
   aperture && `f/${Number(aperture.toFixed(1))}`,
   iso && `ISO ${Math.round(iso)}`,
 ].filter(Boolean).join(', ');

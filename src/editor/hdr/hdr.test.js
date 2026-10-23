@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
 import { SYNTHETIC_RAW_INFO, pixelRadiance as sceneRadiance, syntheticRasterFrame, syntheticRawFrame } from '../dev/hdrFixtures.mjs';
 import {
-  BRACKET_SIZE, exposureStops, parseExifDate, readRasterExposure, rolesComplete, suggestRolesFromBrightness, suggestRolesFromMetadata, validateBracket,
+  BRACKET_SIZE, exposureLabel, exposureStops, formatShutter, parseExifDate, readRasterExposure, rolesComplete, suggestRolesFromBrightness, suggestRolesFromMetadata, validateBracket,
 } from './hdrMetadata.mjs';
 import { ALIGN, alignmentStatus, commonCrop, cropAt, estimateTransform } from './hdrAlign.mjs';
 import { HdrError, analyzeBracket, createFusionMerge, createRadianceMerge, framePlanes, medianBrightness, whiteBalanceToReference } from './hdrMerge.mjs';
@@ -140,6 +140,11 @@ describe('import and metadata', () => {
     expect(validateBracket(same).errors.join(' ')).toMatch(/same exposure \(1\/30 s, f\/3.5, ISO 100\).*not an exposure bracket/);
     const noIso = same.map((item) => ({ ...item, exposure: { ...item.exposure, iso: null } }));
     expect(validateBracket(noIso).warnings.join(' ')).toMatch(/same shutter speed and aperture \(1\/30 s, f\/3.5\) and no ISO/);
+  });
+
+  test('shutter speeds read as the camera shows them: fractions below 0.3 s, decimal seconds above', () => {
+    expect([1 / 4000, 1 / 160, 1 / 4, 0.3, 0.8, 1, 3.2, 13].map(formatShutter)).toEqual(['1/4000 s', '1/160 s', '1/4 s', '0.3 s', '0.8 s', '1 s', '3.2 s', '13 s']);
+    expect(exposureLabel(exposure(0.8, { aperture: 8 }))).toBe('0.8 s, f/8, ISO 100');
   });
 
   test('two frames with the same exposure are refused, naming them (Auto ISO at its limit, 2026-10-23)', () => {
