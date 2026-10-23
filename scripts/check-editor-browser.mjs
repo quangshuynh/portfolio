@@ -244,7 +244,9 @@ async function main() {
       assert.ok(worst <= 1, `max difference ${worst}`);
       assert.ok(parity.results[0].max === 0, 'neutral is not exact');
       assert.ok(parity.splitSourceExact, 'split left half is not the exact source');
-      return { gpu: parity.gpu, cases: parity.results.length, worstMax: worst, worstMean: Number(mean.toFixed(4)) };
+      const rawWorst = Math.max(...parity.rawResults.map(({ max }) => max));
+      assert.ok(rawWorst <= 1 && parity.rawSplitMax <= 1, `RAW max difference ${rawWorst}, split ${parity.rawSplitMax}`);
+      return { gpu: parity.gpu, cases: parity.results.length, worstMax: worst, worstMean: Number(mean.toFixed(4)), rawCases: parity.rawResults.length, rawWorstMax: rawWorst };
     });
 
     // ---------- page load ----------
@@ -295,7 +297,7 @@ async function main() {
       assert.match(by['chart-copy.png'].detail, /Already in the workspace as chart\.png/);
       assert.match(by['damaged.png'].detail, /could not decode|damaged/i);
       assert.match(by['broken.jpg'].detail, /damaged or incomplete/);
-      assert.match(by['animation.jpg'].detail, /Only JPEG, PNG and WebP/);
+      assert.match(by['animation.jpg'].detail, /Only JPEG, PNG, WebP and RAW/);
       assert.match(by['empty.jpg'].detail, /empty/);
       assert.match(by['rotated-exif6.jpg'].detail, /^400×600/);
       return rows.filter((row) => row.status === 'error').map((row) => `${row.name}: ${row.detail}`);

@@ -1,7 +1,7 @@
 // Compares the WebGL2 shader with the CPU reference on a synthetic chart for a set
 // of edits. Results land on window.parityResult for scripts/check-editor-browser.mjs.
-import { ADJUSTMENTS } from '../model/adjustments.mjs';
-import { renderRgba8 } from '../pipeline/cpuRenderer.mjs';
+import { ADJUSTMENTS, neutralAdjustments } from '../model/adjustments.mjs';
+import { renderRawRgba8, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
 import { GlRenderer, createEditorContext } from '../pipeline/glRenderer.mjs';
 import { identityLut } from '../pipeline/lut.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
@@ -17,6 +17,24 @@ function chart() {
   }
   return { width: 64, height: 64, data };
 }
+
+// RAW: 64×64 camera RGB covering the 16-bit range, with saturated and clipped values,
+// developed with the Sony ILCE-7M3 matrix and as-shot balance LibRaw reports.
+function rawChart() {
+  const data = new Uint16Array(64 * 64 * 3);
+  for (let i = 0; i < 64 * 64; i += 1) {
+    const r = i % 16;
+    const g = (i >> 4) % 16;
+    const b = i >> 8;
+    data.set([r, g, b].map((v) => Math.round(((v / 15) ** 2.2) * 65535)), i * 3);
+  }
+  return { kind: 'raw', width: 64, height: 64, data };
+}
+const RAW_INFO = {
+  asShot: [2.33984375, 1, 1.53515625],
+  rgbCam: [1.635386, -0.421962, -0.213424, -0.131072, 1.542707, -0.411635, 0.01143, -0.419593, 1.408163],
+  camXyz: [0.7374, -0.2389, -0.0551, -0.5435, 1.3162, 0.2519, -0.1006, 0.1795, 0.6552],
+};
 
 const ref = (name) => ({ sha256: name.padEnd(64, '0').replace(/[^0-9a-f]/g, '0').slice(0, 64), name });
 const LUTS = { identity: identityLut(33), look17: lookLut(17), look33: lookLut(33), look65: lookLut(65) };
@@ -39,6 +57,32 @@ const EDITS = [
   ['everything', { ...COMBINED, curves: CURVES, orangeHue: -20, blueLuminance: -40, greenSaturation: -50, lut: ref('look33'), lutIntensity: 70 }, 'look33'],
 ];
 
+const RAW_EDITS = [
+  ['RAW neutral', {}],
+  ['RAW exposure -2', { exposure: -2 }],
+  ['RAW exposure +2 (rolloff)', { exposure: 2 }],
+  ['RAW daylight', { raw: { whiteBalance: 'daylight' } }],
+  ['RAW custom 3200 K +40', { raw: { whiteBalance: 'custom' }, rawTemperature: 3200, rawTint: 40 }],
+  ['RAW combined', { ...COMBINED, raw: { whiteBalance: 'custom' }, rawTemperature: 7500, rawTint: -30 }],
+  ['RAW everything', { ...COMBINED, exposure: 1.2, curves: CURVES, orangeHue: -20, blueLuminance: -40, lut: ref('look33'), lutIntensity: 70 }, 'look33'],
+];
+
+function compare(gpu, cpu) {
+  let max = 0;
+  let sum = 0;
+  let over1 = 0;
+  for (let i = 0; i < cpu.length; i += 4) {
+    for (let c = 0; c < 3; c += 1) {
+      const diff = Math.abs(gpu[i + c] - cpu[i + c]);
+      max = Math.max(max, diff);
+      sum += diff;
+      if (diff > 1) over1 += 1;
+    }
+    if (gpu[i + 3] !== cpu[i + 3]) over1 += 1;
+  }
+  return { max, mean: sum / (cpu.length * 0.75), over1 };
+}
+
 function run() {
   const canvas = document.createElement('canvas');
   const gl = createEditorContext(canvas);
@@ -49,21 +93,7 @@ function run() {
   renderer.setSource(source);
   const results = EDITS.map(([name, adjustments, lutKey]) => {
     const params = deriveParams(adjustments, { lut: lutKey ? LUTS[lutKey] : null });
-    const gpu = renderer.readPixels(params);
-    const cpu = renderRgba8(source.data, params);
-    let max = 0;
-    let sum = 0;
-    let over1 = 0;
-    for (let i = 0; i < cpu.length; i += 4) {
-      for (let c = 0; c < 3; c += 1) {
-        const diff = Math.abs(gpu[i + c] - cpu[i + c]);
-        max = Math.max(max, diff);
-        sum += diff;
-        if (diff > 1) over1 += 1;
-      }
-      if (gpu[i + 3] !== cpu[i + 3]) over1 += 1;
-    }
-    return { name, max, mean: sum / (cpu.length * 0.75), over1 };
+    return { name, ...compare(renderer.readPixels(params), renderRgba8(source.data, params)) };
   });
   // Split comparison: the left half must be the untouched source.
   const split = renderer.readPixels(deriveParams(EDITS.at(-1)[1], { lut: LUTS.look33 }), { split: 0.5 });
@@ -72,6 +102,23 @@ function run() {
     const i = (y * 64 + x) * 4;
     for (let c = 0; c < 4; c += 1) if (split[i + c] !== source.data[i + c]) splitSourceExact = false;
   }
+  // RAW sources: 16-bit integer texture, developed in the shader.
+  const raw = rawChart();
+  renderer.setSource(raw);
+  const rawResults = RAW_EDITS.map(([name, adjustments, lutKey]) => {
+    const params = deriveParams(adjustments, { lut: lutKey ? LUTS[lutKey] : null, raw: RAW_INFO });
+    return { name, ...compare(renderer.readPixels(params), renderRawRgba8(raw.data, params)) };
+  });
+  // RAW split: the left half is the neutral development, not undeveloped sensor data.
+  const before = deriveParams(neutralAdjustments(), { raw: RAW_INFO });
+  const rawSplit = renderer.readPixels(deriveParams(RAW_EDITS.at(-1)[1], { lut: LUTS.look33, raw: RAW_INFO }), { split: 0.5, before });
+  const neutralCpu = renderRawRgba8(raw.data, before);
+  let rawSplitMax = 0;
+  for (let y = 0; y < 64; y += 1) for (let x = 0; x < 32; x += 1) {
+    const i = (y * 64 + x) * 4;
+    for (let c = 0; c < 3; c += 1) rawSplitMax = Math.max(rawSplitMax, Math.abs(rawSplit[i + c] - neutralCpu[i + c]));
+  }
+  renderer.setSource(source);
   // Rendering many frames back to back with changing curves and LUTs (texture reuse).
   const started = performance.now();
   for (let frame = 0; frame < 30; frame += 1) renderer.render(deriveParams({ ...EDITS.at(-1)[1], lutIntensity: frame * 3 }, { lut: LUTS.look33 }));
@@ -83,6 +130,8 @@ function run() {
     gpu: (debug && gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER),
     results,
     splitSourceExact,
+    rawResults,
+    rawSplitMax,
     frameMs64: Number(frameMs.toFixed(3)),
   };
 }
