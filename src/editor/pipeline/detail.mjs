@@ -53,7 +53,7 @@ export const DETAIL = Object.freeze({
   clarityGain: Object.freeze({ negative: 0.9, positive: 1 }),
   clarityLimit: 0.15,
   /** Detail below this amplitude (encoded) is boosted less, so positive Clarity does not amplify grain. */
-  clarityThreshold: 0.01,
+  clarityThreshold: 0.02,
   /**
    * Dehaze: dark-channel patch for choosing the airlight, and the refinement radius of the
    * per-pixel transmission (fractions of the long edge). He et al. also take the
