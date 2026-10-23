@@ -271,24 +271,18 @@ while a new LibRaw worker starts decoding (the Interval 5 issue; nine LibRaw job
 export make it likely); not reproduced with HDR code alone, nor in Chromium or Firefox.
 Safari on macOS and iOS is not verified.
 
-**Real-world validation.** The only genuine bracket available, `_DSC9015–9017` (A7 III,
-2026-10-05), is a DRO bracket: identical exposure (1/30 s, f/3.5, ISO 100), identical
-sensor data. It is refused, as it should be, both from metadata and from the measured
-data. No genuine exposure bracket was available (962 RAW files scanned), so **merge
-quality on real hand-held brackets (alignment of real motion, real ghosts, real colour
-across exposures) is not validated**; the evidence is synthetic brackets and genuine
-sensor data with simulated exposure and motion.
+**Real-world validation** (A7 III, Windows i7-9700; genuine-file tests and the browser step
+run only with the folder variables set):
 
-`DSC09636–09638` (A7 III, 2026-10-23, `HDR_AUTO_ISO_DIR`) is a −2/0/+2 compensation bracket in
-M mode with Auto ISO: 1/160 s, f/6.3 at ISO 4000, 6400, 6400. ISO hit its limit, so the 0 and
-+2 frames hold the same exposure (measured 0.005 EV apart; independent noise, so not copies)
-and only 0.69 EV of range exists. Earlier versions accepted it when the duplicate was given
-the "over" role; it is now refused from metadata and from the measured data. Forced through
-the merge for evaluation only: real hand-held alignment converged (bitmap mismatch 2.6% → 1.3%
-and 1.8% → 1.3%, up to 0.14° rotation), ghost mask 0.15%, no doubled edges at 100%, flat-area
-noise σ 5.5 → 4.0 codes from averaging; no highlight recovery to speak of. `DSC09633–09635` is
-the same situation with all three at ISO 6400 and is refused. Merge quality on a real
-shutter-speed bracket remains unvalidated.
+| Set | What it is | Result |
+| --- | --- | --- |
+| `DSC09640–09642` (2026-10-23, `HDR_BRACKET_DIR`) | Genuine shutter bracket: 0.8, 3.2, 13 s at f/8, ISO 100, A mode, 15 s apart; indoor, window in frame | Measured −1.99 / +2.00 EV (EXIF −2 / +2); shifts of 9–10 px removed (edge mismatch 1.3% → 0.0%, 1.1% → 0.2%); ghost mask 0%; merged white 3.98. The normal frame clips 0.76% of pixels, the Natural merge 0.55% (the curtain pattern blown in the normal frame is back, but flat under the global rolloff), Stronger 0.41%; mean brightness equal to the normal frame (62.6 vs 62.5); shadows visibly cleaner; no doubled edges at 100%. Chromium: merge 5.5 s (decode 1.6, analyse 2.5, merge 1.1), full-size JPEG export 14.8 s at 6002×4018 as `DSC09641-HDR-quangedit.jpg`, browser memory 506 → 801 (merge) → 1849 MB (export), equal to the Node reference within JPEG re-encoding (mean 0.53) |
+| `DSC09636–09638` (`HDR_AUTO_ISO_DIR`) | −2/0/+2 compensation bracket in M mode with Auto ISO: 1/160 s, f/6.3 at ISO 4000, 6400, 6400 | ISO hit its limit, so 0 and +2 hold the same exposure (0.005 EV apart; independent noise). Earlier versions merged it when the duplicate got the "over" role; now refused from metadata and measured data. Forced merge: hand-held alignment 2.6% → 1.3%, ghost mask 0.15%, noise σ 5.5 → 4.0 codes; 0.69 EV is too little range to judge highlights |
+| `DSC09633–09635` | Same, all at ISO 6400 | Refused (same exposure) |
+| `_DSC9015–9017` (2026-10-05, `HDR_FIXTURE_DIR`) | Sony DRO bracket: one exposure, identical sensor data | Refused; used for simulated brackets on genuine sensor data |
+
+Not validated on real files: hand-held brackets with large motion, moving subjects (real
+ghosts), outdoor scenes, Firefox and WebKit timings for genuine files.
 
 ## Rendering, preview and export
 
