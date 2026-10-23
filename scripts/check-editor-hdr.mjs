@@ -202,8 +202,10 @@ async function runOne(run, files, reference, genuine) {
       const parity = await page.waitForFunction(() => window.parityResult, null, { timeout: 60_000 }).then((h) => h.jsonValue());
       if (!parity.available) { result.parity = 'no WebGL2'; return; }
       const worst = (list) => Math.max(...list.map(({ max }) => max));
-      result.parity = { hdrCases: parity.hdrResults.length, hdrWorstMax: worst(parity.hdrResults), hdrMeanMax: Math.max(...parity.hdrResults.map(({ mean }) => mean)).toFixed(3), hdrSplitMax: parity.hdrSplitMax, rawWorstMax: worst(parity.rawResults), rasterWorstMax: worst(parity.results) };
+      result.parity = { hdrCases: parity.hdrResults.length, hdrWorstMax: worst(parity.hdrResults), hdrMeanMax: Math.max(...parity.hdrResults.map(({ mean }) => mean)).toFixed(3), hdrSplitMax: parity.hdrSplitMax, rawWorstMax: worst(parity.rawResults), rasterWorstMax: worst(parity.results), detailFrameMax: parity.detailFrameMax, detailSplitMax: parity.detailSplitMax };
       assert.ok(result.parity.hdrWorstMax <= 1 && parity.hdrSplitMax <= 1 && result.parity.rawWorstMax <= 1 && result.parity.rasterWorstMax <= 1, JSON.stringify(result.parity));
+      // The Detail frame is drawn as is; its split side is the shader's neutral development.
+      assert.ok(parity.detailFrameMax === 0 && parity.detailSplitMax <= 1, JSON.stringify(result.parity));
     });
     await step('load', async () => {
       await page.goto(URL_EDITOR, { waitUntil: 'load' });

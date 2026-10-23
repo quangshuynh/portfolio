@@ -228,8 +228,11 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         if (current.generation !== job.generation) current = null;
         if (!current || job.pending || proxyRef.current !== image) continue; // eslint-disable-line no-continue
         Object.assign(job, { frame, key: current.key, image });
-        setDetailQuality(final || !needsFinal(current) ? { width: frame.width, height: frame.height } : 'draft');
+        const quality = final || !needsFinal(current) ? 'final' : 'draft';
+        setDetailQuality(quality === 'final' ? { width: frame.width, height: frame.height } : 'draft');
         await paintDetail(frame, current);
+        // Local timing marks for the browser checks (never sent anywhere).
+        performance.mark?.(`pe-detail-${quality}`, { detail: { width: frame.width, height: frame.height } });
       }
     } catch (error) {
       if (error.code !== 'cancelled') setStatus({ state: 'error', message: error.message });
@@ -462,7 +465,12 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         {beyondProxy && <span className="pe-readout-note">Preview at {proxy.width}×{proxy.height}; export uses full resolution</span>}
         {engineKind === 'cpu' && <span className="pe-readout-note">CPU preview (WebGL2 unavailable)</span>}
         {proxy && detailQuality && (
-          <span className="pe-readout-note" data-detail-preview={typeof detailQuality === 'string' ? detailQuality : 'final'} aria-live="polite">
+          <span
+            className="pe-readout-note"
+            data-detail-preview={typeof detailQuality === 'string' ? detailQuality : 'final'}
+            aria-live="polite"
+            title={typeof detailQuality === 'object' ? 'Detail is rendered on the CPU; the export renders it at full resolution.' : undefined}
+          >
             {detailQuality === 'rendering' ? 'Rendering Detail…' : detailQuality === 'draft' ? 'Detail: draft preview' : `Detail preview at ${detailQuality.width}×${detailQuality.height}; export renders it at full resolution`}
           </span>
         )}
