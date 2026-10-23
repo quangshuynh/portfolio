@@ -61,8 +61,9 @@ export const handlers = {
     });
     const image = merge.finish();
     const thumbSize = proxyDimensions(image, thumbnailEdge);
-    const thumbnail = downscale(image, thumbSize.width, thumbSize.height);
-    if (thumbnail === image) throw new HdrError('size', 'The merged image is too small.');
+    const scaled = downscale(image, thumbSize.width, thumbSize.height);
+    // A merge no larger than a thumbnail is its own thumbnail; copied, since both buffers are transferred.
+    const thumbnail = scaled === image ? { ...image, data: image.data.slice() } : scaled;
     return {
       result: { analysis, image, thumbnail, timings: { analyse: analysedAt - started, merge: performance.now() - analysedAt } },
       transfer: [image.data.buffer, thumbnail.data.buffer, ...transfers(analysis)],

@@ -216,6 +216,8 @@ export function validateBracket(inputs) {
     if (isos.size > 1) warnings.push('ISO differs between the exposures; the brighter frames carry more noise than a shutter-speed bracket.');
     const apertures = new Set(inputs.map(({ exposure }) => exposure.aperture.toFixed(1)));
     if (apertures.size > 1) warnings.push('The aperture changes between exposures, so depth of field differs; use a shutter-speed bracket where possible.');
+  } else if (inputs.every(({ exposure }) => exposure?.shutter && exposure.aperture && exposure.shutter === first.exposure.shutter && exposure.aperture === first.exposure.aperture)) {
+    warnings.push(`All three photos record the same shutter speed and aperture (${describe(first.exposure)}) and no ISO; unless ISO was bracketed, they hold the same exposure.`);
   } else if (mode === 'radiance') {
     warnings.push('Some RAW files do not record shutter, aperture and ISO; the exposure difference is measured from the images.');
   } else if (mode === 'fusion') {

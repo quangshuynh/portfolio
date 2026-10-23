@@ -239,6 +239,7 @@ export function analyzeBracket(frames, { mode, reference, settings = DEFAULT_MER
   const failed = alignments.filter(({ status }) => status === 'failed');
   if (failed.length) warnings.push('Automatic alignment failed for at least one photo (large movement, rotation or perspective change). It was merged without alignment; expect doubled edges.');
   else if (alignments.some(({ status }) => status === 'uncertain')) warnings.push('Alignment is uncertain for at least one photo; check edges at 100%.');
+  if (alignments.some(({ status }) => status === 'flat')) warnings.push('The photos have too little detail to align automatically; they were merged as shot.');
   const transforms = alignments.map(({ transform, status }) => (status === 'failed' ? IDENTITY : transform));
   const crop = commonCrop(transforms, width, height);
   if (!crop || crop.width < 0.7 || crop.height < 0.7) {

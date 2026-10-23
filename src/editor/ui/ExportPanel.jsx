@@ -106,7 +106,7 @@ export default function ExportPanel({ settings, photo, dispatch, onExport, onCan
       {running ? (
         <div className="pe-export-progress">
           <progress max="1" value={status.fraction ?? 0} aria-label="Export progress" />
-          <span role="status">{status.stage === 'decoding' ? (photo?.raw ? 'Decoding RAW sensor data…' : 'Decoding original…') : status.stage === 'encoding' ? 'Encoding…' : `Rendering ${Math.round((status.fraction ?? 0) * 100)}%`}</span>
+          <span role="status">{status.stage === 'decoding' ? (Number.isInteger(status.index) ? `Decoding photo ${status.index + 1} of 3…` : photo?.raw ? 'Decoding RAW sensor data…' : 'Decoding original…') : status.stage === 'merging' ? 'Merging exposures…' : status.stage === 'encoding' ? 'Encoding…' : `Rendering ${Math.round((status.fraction ?? 0) * 100)}%`}</span>
           <button type="button" className="pe-text-button" onClick={onCancel}>Cancel</button>
         </div>
       ) : (
@@ -115,10 +115,10 @@ export default function ExportPanel({ settings, photo, dispatch, onExport, onCan
         </button>
       )}
       {blockedReason && <p className="pe-note pe-note--error" role="alert">{blockedReason}</p>}
-      {status.state === 'done' && <p className="pe-note" role="status">Saved {status.fileName} ({status.width} × {status.height}{status.raw ? ', developed from the RAW sensor data' : ''}).</p>}
+      {status.state === 'done' && <p className="pe-note" role="status">Saved {status.fileName} ({status.width} × {status.height}{status.hdr ? ', merged again from the three source files' : status.raw ? ', developed from the RAW sensor data' : ''}).</p>}
       {status.state === 'error' && <p className="pe-note pe-note--error" role="alert">{status.message}</p>}
       {status.state === 'cancelled' && <p className="pe-note" role="status">Export cancelled.</p>}
-      <p className="pe-note">8-bit sRGB. The original file is never changed. EXIF, GPS and other metadata are not copied into exports.{photo?.raw ? ' RAW exports are developed again from the sensor data at the chosen size, never from the preview or the embedded camera JPEG.' : ''}</p>
+      <p className="pe-note">8-bit sRGB. The original file is never changed. EXIF, GPS and other metadata are not copied into exports.{photo?.hdr ? ' HDR exports decode and merge the three source files again at the chosen size (cropped to the area all three cover), never upscaling the preview.' : photo?.raw ? ' RAW exports are developed again from the sensor data at the chosen size, never from the preview or the embedded camera JPEG.' : ''}</p>
     </section>
   );
 }

@@ -109,15 +109,16 @@ export function hdrExportGeometry(inputs, analysis, resize) {
 }
 
 /**
- * Peak memory of an HDR export in MB (measured coefficients; see docs): the merge
- * accumulators or fusion pyramids, one decoded frame in flight, the output canvas,
- * and the RAW decoder's heap.
+ * Peak memory of an HDR export in MB: the merge accumulators or fusion pyramids, one
+ * decoded frame in flight, the output canvas, and the RAW decoder's heap. Calibrated on
+ * Chromium: a 6024×4024 RAW merge exported at full size peaked about 1.6 GB above the
+ * page's baseline (docs/photography-editor.md).
  */
 export function hdrExportMegabytes(mode, { frame, output, fullDecode }) {
   const framePixels = frame.width * frame.height;
   const outPixels = output.width * output.height;
   const mb = (bytes) => bytes / (1024 * 1024);
-  if (mode === 'radiance') return Math.round(mb(outPixels * (16 + 4) + framePixels * 6 * 2) + (fullDecode ? 550 : 200));
+  if (mode === 'radiance') return Math.round(mb(outPixels * (16 + 4) + framePixels * 6 * 2) + (fullDecode ? 850 : 200));
   return Math.round(mb(outPixels * 50 + framePixels * 4 * 2));
 }
 

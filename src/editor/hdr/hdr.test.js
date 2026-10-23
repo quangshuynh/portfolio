@@ -138,6 +138,8 @@ describe('import and metadata', () => {
   test('identical exposure settings are not a bracket (Sony DRO bracketing)', () => {
     const same = [1, 2, 3].map((i) => input({ name: `${i}.ARW`, kind: 'raw', format: 'arw', exposure: exposure(1 / 30, { aperture: 3.5 }) }));
     expect(validateBracket(same).errors.join(' ')).toMatch(/same exposure \(1\/30 s, f\/3.5, ISO 100\).*not an exposure bracket/);
+    const noIso = same.map((item) => ({ ...item, exposure: { ...item.exposure, iso: null } }));
+    expect(validateBracket(noIso).warnings.join(' ')).toMatch(/same shutter speed and aperture \(1\/30 s, f\/3.5\) and no ISO/);
   });
 
   test('suggests roles from exposure metadata in any input order, never from file names', () => {
@@ -301,6 +303,8 @@ describe('alignment', () => {
     expect(analysis.crop.width).toBeLessThan(1);
     for (let i = 0; i < image.width * image.height; i += 1) expect(image.data[i * 3 + 1]).toBeGreaterThan(0);
     expect(commonCrop([{ tx: 0, ty: 0, angle: 0 }], W, H)).toEqual({ x: 0, y: 0, width: 1, height: 1 });
+    const moves = [{ tx: 2.4, ty: -1.2, angle: -0.3 }, { tx: 0, ty: 0, angle: 0 }, { tx: -1.1, ty: 3.2, angle: 0.4 }];
+    expect(commonCrop([...moves].reverse(), W, H)).toEqual(commonCrop(moves, W, H));
     expect(cropAt({ x: 0.1, y: 0.1, width: 0.8, height: 0.8 }, 6024, 4024)).toEqual({ x: 603, y: 403, width: 4818, height: 3218 });
   });
 
@@ -317,6 +321,14 @@ describe('alignment', () => {
     expect(alignmentStatus({ before: 0.3, after: 0.05, transform: { tx: 40, ty: 0, angle: 0 } }, 300)).toBe('failed');
     expect(alignmentStatus({ before: 0.2, after: 0.15, transform: { tx: 1, ty: 0, angle: 0 } }, 300)).toBe('uncertain');
     expect(alignmentStatus({ before: 0.2, after: ALIGN.usable + 0.01, transform: { tx: 1, ty: 0, angle: 0 } }, 300)).toBe('failed');
+  });
+
+  test('featureless photos are merged unaligned with a warning, not called unrelated', () => {
+    const flat = (exposure) => ({ kind: 'raw', width: 64, height: 48, data: new Uint16Array(64 * 48 * 3).fill(Math.round(0.1 * exposure * 65535 / D)) });
+    const frames = [0.25, 1, 4].map((e, i) => ({ image: flat(e), asShot: SYNTHETIC_RAW_INFO.asShot, stops: Math.log2(e), role: ['under', 'normal', 'over'][i] }));
+    const analysis = analyzeBracket(frames, { mode: 'radiance', reference: 1 });
+    expect(analysis.alignment[0].status).toBe('flat');
+    expect(analysis.warnings.join(' ')).toMatch(/too little detail to align/);
   });
 
   test('works on 8-bit frames of different exposure', () => {

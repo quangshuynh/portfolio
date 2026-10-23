@@ -11,6 +11,8 @@ export const ALIGN = Object.freeze({
   /** Coarsest pyramid level has at least this many pixels on its short side. */
   minLevelSide: 24,
   coarseSearch: 4,
+  /** Registration runs on the first pyramid level whose long side is at most this. */
+  workEdge: 1600,
   /** Rotation is searched on the first level whose long side is at most this. */
   rotationLevelEdge: 640,
   angles: Object.freeze([-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1]),
@@ -23,6 +25,8 @@ export const ALIGN = Object.freeze({
   unrelated: 0.3,
   /** Largest shift accepted, as a fraction of the width. */
   maxShift: 0.06,
+  /** Below this fraction of usable (non-flat) pixels there is too little detail to align. */
+  minSupport: 0.02,
 });
 
 export const IDENTITY = Object.freeze({ tx: 0, ty: 0, angle: 0 });
@@ -128,7 +132,9 @@ function pyramid(plane, width, height) {
     const last = levels.at(-1);
     levels.push(halve(last.plane, last.width, last.height));
   }
-  return levels.map((level) => ({ ...level, bitmap: thresholdBitmap(level.plane) }));
+  // Registration works from the first level no larger than ALIGN.workEdge down.
+  const work = Math.max(0, levels.findIndex(({ width: w, height: h }) => Math.max(w, h) <= ALIGN.workEdge));
+  return { work, levels: levels.map((level, index) => (index >= work ? { ...level, bitmap: thresholdBitmap(level.plane) } : level)) };
 }
 
 function search(level, refLevel, start, radius, angles = [start.angle]) {
@@ -149,41 +155,39 @@ function search(level, refLevel, start, radius, angles = [start.angle]) {
 }
 
 /**
- * Finds the transform from the reference to a frame: bitmap search down to half size,
- * then Lucas–Kanade on rank-equalised luminance (blurred, then sharp) at half size and
- * a short polish at full size.
+ * Finds the transform from the reference to a frame: bitmap search over the pyramid,
+ * then Lucas–Kanade on rank-equalised luminance (blurred, then sharp), all on the
+ * largest level no wider than ALIGN.workEdge; the result is scaled to full size.
  * :param ref, frame: { plane: Float32Array, width, height } luminance (any monotone scale)
  * :param options: { rotation } search rotation too (default true)
  * :returns: { transform: { tx, ty, angle } in pixels at this size, before, after }
- *   `before`/`after` are the bitmap mismatch without and with the transform
+ *   `before`/`after` are the bitmap mismatch (at the working level) without and with it
  */
 export function estimateTransform(ref, frame, { rotation = true } = {}) {
-  const refLevels = pyramid(ref.plane, ref.width, ref.height);
-  const levels = pyramid(frame.plane, frame.width, frame.height);
-  const stop = levels.length > 1 ? 1 : 0;
+  const { levels: refLevels } = pyramid(ref.plane, ref.width, ref.height);
+  const { levels, work } = pyramid(frame.plane, frame.width, frame.height);
+  const support = (bitmap) => bitmap.valid.reduce((sum, v) => sum + v, 0) / bitmap.valid.length;
+  if (support(refLevels[work].bitmap) < ALIGN.minSupport || support(levels[work].bitmap) < ALIGN.minSupport) {
+    return { transform: IDENTITY, before: null, after: null, flat: true };
+  }
   let current = { tx: 0, ty: 0, angle: 0 };
-  for (let index = levels.length - 1; index >= stop; index -= 1) {
+  for (let index = levels.length - 1; index >= work; index -= 1) {
     const coarsest = index === levels.length - 1;
     const level = levels[index];
     if (!coarsest) current = { ...current, tx: current.tx * 2, ty: current.ty * 2 };
     const rotate = rotation && level.width <= ALIGN.rotationLevelEdge && level.height <= ALIGN.rotationLevelEdge
-      && (index === stop || levels[index - 1].width > ALIGN.rotationLevelEdge || levels[index - 1].height > ALIGN.rotationLevelEdge);
+      && (index === work || levels[index - 1].width > ALIGN.rotationLevelEdge || levels[index - 1].height > ALIGN.rotationLevelEdge);
     current = search(level, refLevels[index], current, coarsest ? ALIGN.coarseSearch : 1, rotate ? ALIGN.angles : undefined);
   }
   // Coarse to fine: blurred planes widen the basin beyond the ±0.5 px of sharp edges.
-  const { width: w, height: h } = levels[stop];
-  const refEq = equalize(refLevels[stop].plane);
-  const frameEq = equalize(levels[stop].plane);
-  const options = { rotation };
-  current = refineTransform(boxBlur(refEq, w, h, 2), boxBlur(frameEq, w, h, 2), w, h, current, options) ?? current;
-  current = refineTransform(refEq, frameEq, w, h, current, options) ?? current;
-  if (stop === 1) {
-    current = { ...current, tx: current.tx * 2, ty: current.ty * 2 };
-    current = refineTransform(equalize(ref.plane), equalize(frame.plane), ref.width, ref.height, current, { ...options, iterations: 2 }) ?? current;
-  }
-  const finest = levels[0];
-  const mismatch = (t) => bitmapMismatch(refLevels[0].bitmap, finest.bitmap, finest.width, finest.height, t);
-  return { transform: current, before: mismatch(IDENTITY), after: mismatch(current) };
+  const { width: w, height: h } = levels[work];
+  const refEq = equalize(refLevels[work].plane);
+  const frameEq = equalize(levels[work].plane);
+  current = refineTransform(boxBlur(refEq, w, h, 2), boxBlur(frameEq, w, h, 2), w, h, current, { rotation }) ?? current;
+  current = refineTransform(refEq, frameEq, w, h, current, { rotation }) ?? current;
+  const mismatch = (t) => bitmapMismatch(refLevels[work].bitmap, levels[work].bitmap, w, h, t);
+  const scale = 2 ** work;
+  return { transform: { ...current, tx: current.tx * scale, ty: current.ty * scale }, before: mismatch(IDENTITY), after: mismatch(current) };
 }
 
 /** Rank transform (histogram equalisation, 4096 bins on log values): removes exposure differences. */
@@ -272,9 +276,10 @@ export function refineTransform(ref, frame, width, height, start, { rotation = t
 
 /**
  * Classifies a measured alignment.
- * :returns: 'aligned' | 'uncertain' | 'failed' | 'unrelated'
+ * :returns: 'aligned' | 'uncertain' | 'failed' | 'unrelated' | 'flat' (too little detail)
  */
-export function alignmentStatus({ before, after, transform }, width) {
+export function alignmentStatus({ before, after, transform, flat = false }, width) {
+  if (flat) return 'flat';
   if (after > ALIGN.unrelated && before > ALIGN.unrelated) return 'unrelated';
   if (Math.hypot(transform.tx, transform.ty) > ALIGN.maxShift * width) return 'failed';
   if (after <= ALIGN.good) return 'aligned';
@@ -289,34 +294,38 @@ export const transformAt = ({ tx, ty, angle }, width) => ({ tx: tx * width, ty: 
 
 /**
  * Largest crop of the reference (as fractions of its size) in which every frame has
- * data, so alignment never leaves empty borders. Shrinks each side until the crop's
- * corners map inside every frame.
+ * data, so alignment never leaves empty borders. Each pass moves every side inward to
+ * the largest position any frame needs (all frames at once, so the result does not
+ * depend on their order) until all corners map inside every frame.
  */
 export function commonCrop(transforms, width, height) {
-  let x0 = 0;
-  let y0 = 0;
-  let x1 = width - 1;
-  let y1 = height - 1;
+  let rect = { x0: 0, y0: 0, x1: width - 1, y1: height - 1 };
   const cx = (width - 1) / 2;
   const cy = (height - 1) / 2;
+  // Bilinear sampling needs the next pixel too, hence the limits 0 and size - 1.
+  const below = (q) => (q < 0 ? Math.ceil(-q) : 0);
+  const above = (q, max) => (q > max - 1 ? Math.ceil(q - (max - 1)) : 0);
   for (let pass = 0; pass < 50; pass += 1) {
-    let changed = false;
+    const next = { ...rect };
     for (const t of transforms) {
       const cos = Math.cos((t.angle * Math.PI) / 180);
       const sin = Math.sin((t.angle * Math.PI) / 180);
-      for (const [px, py] of [[x0, y0], [x1, y0], [x0, y1], [x1, y1]]) {
+      for (const [left, top] of [[true, true], [false, true], [true, false], [false, false]]) {
+        const px = left ? rect.x0 : rect.x1;
+        const py = top ? rect.y0 : rect.y1;
         const qx = cos * (px - cx) - sin * (py - cy) + cx + t.tx;
         const qy = sin * (px - cx) + cos * (py - cy) + cy + t.ty;
-        // Bilinear sampling needs the next pixel too.
-        const fix = (q, max) => (q < 0 ? -q : q > max - 1 ? q - (max - 1) : 0);
-        const ox = fix(qx, width);
-        const oy = fix(qy, height);
-        if (ox > 0) { if (px === x0) x0 += Math.ceil(ox); else x1 -= Math.ceil(ox); changed = true; }
-        if (oy > 0) { if (py === y0) y0 += Math.ceil(oy); else y1 -= Math.ceil(oy); changed = true; }
+        const ox = Math.max(below(qx), above(qx, width));
+        const oy = Math.max(below(qy), above(qy, height));
+        if (left) next.x0 = Math.max(next.x0, rect.x0 + ox); else next.x1 = Math.min(next.x1, rect.x1 - ox);
+        if (top) next.y0 = Math.max(next.y0, rect.y0 + oy); else next.y1 = Math.min(next.y1, rect.y1 - oy);
       }
     }
-    if (!changed || x1 <= x0 || y1 <= y0) break;
+    const changed = next.x0 !== rect.x0 || next.x1 !== rect.x1 || next.y0 !== rect.y0 || next.y1 !== rect.y1;
+    rect = next;
+    if (!changed || rect.x1 <= rect.x0 || rect.y1 <= rect.y0) break;
   }
+  const { x0, y0, x1, y1 } = rect;
   if (x1 <= x0 || y1 <= y0) return null;
   return { x: x0 / width, y: y0 / height, width: (x1 - x0 + 1) / width, height: (y1 - y0 + 1) / height };
 }

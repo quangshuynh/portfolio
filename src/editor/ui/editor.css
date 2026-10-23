@@ -325,6 +325,50 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-preset-form__groups legend { margin-bottom: .3rem; color: var(--pe-text-3); font-size: .6875rem; letter-spacing: .08em; text-transform: uppercase; }
 .pe-preset-form__groups label { display: flex; align-items: center; gap: .4rem; min-height: 1.75rem; }
 
+/* ---------- Merge HDR ---------- */
+.pe-library > .pe-panel__head { flex-wrap: wrap; row-gap: .4rem; }
+.pe-library__actions { display: flex; flex-wrap: wrap; gap: .35rem; }
+.pe-dialog-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 1rem; background: rgb(0 0 0 / .6); }
+.pe-dialog { display: flex; flex-direction: column; width: min(40rem, 100%); max-height: min(46rem, calc(100dvh - 2rem)); border: 1px solid var(--pe-line-strong); border-radius: var(--radius-md, 8px); background: var(--pe-panel); box-shadow: 0 1rem 3rem rgb(0 0 0 / .5); }
+.pe-dialog__head, .pe-dialog__foot { display: flex; align-items: center; gap: .6rem; padding: .7rem 1rem; }
+.pe-dialog__head { justify-content: space-between; border-bottom: 1px solid var(--pe-line); }
+.pe-dialog__foot { justify-content: flex-end; border-top: 1px solid var(--pe-line); }
+.pe-dialog__foot progress { flex: 1; min-width: 4rem; }
+.pe-dialog__body { overflow-y: auto; padding: .25rem 1rem 1rem; overscroll-behavior: contain; }
+.pe-steps { display: flex; flex-wrap: wrap; gap: .25rem .9rem; margin: 0; padding: .55rem 1rem; list-style: none; counter-reset: step; border-bottom: 1px solid var(--pe-line); color: var(--pe-text-3); font-size: .75rem; }
+.pe-steps li { counter-increment: step; }
+.pe-steps li::before { content: counter(step) ". "; }
+.pe-steps li[data-done] { color: var(--pe-text-2); }
+.pe-steps li[aria-current='step'] { color: var(--pe-text); font-weight: 600; }
+.pe-bracket { display: grid; gap: .5rem; margin: .75rem 0 0; padding: 0; list-style: none; }
+.pe-bracket__item { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding: .5rem; border: 1px solid var(--pe-line); border-radius: var(--radius-sm, 4px); background: var(--pe-panel-2); }
+.pe-bracket__frame { display: grid; place-items: center; width: 4.5rem; height: 3.4rem; overflow: hidden; background: var(--pe-stage); }
+.pe-bracket__frame .pe-thumb { max-width: 100%; max-height: 100%; }
+.pe-bracket__meta { display: grid; gap: .2rem; min-width: 0; }
+.pe-bracket .pe-photo__detail { white-space: normal; overflow-wrap: anywhere; }
+.pe-bracket__role { margin-top: .2rem; }
+.pe-bracket__actions { display: flex; flex-direction: column; align-items: flex-end; gap: .2rem; }
+.pe-bracket__add { display: grid; gap: .75rem; margin-top: .75rem; justify-items: start; }
+.pe-bracket__workspace { display: flex; flex-wrap: wrap; gap: .25rem .75rem; }
+.pe-bracket__workspace legend { margin-bottom: .25rem; color: var(--pe-text-2); }
+.pe-dialog .pe-group { margin-top: .9rem; }
+.pe-check { display: flex; align-items: center; gap: .5rem; margin-top: .5rem; color: var(--pe-text); }
+.pe-note--warning { color: #e3b36e; }
+.pe-hdr { display: grid; gap: .6rem; }
+.pe-hdr .pe-raw__meta div { display: grid; grid-template-columns: auto minmax(0, 1fr); }
+.pe-hdr .pe-raw__meta dd { white-space: normal; overflow-wrap: anywhere; }
+.pe-hdr__looks { grid-template-columns: repeat(2, 1fr); }
+.pe-hdr__looks button { min-height: 2rem; border: 0; background: none; }
+.pe-hdr__looks button[aria-pressed='true'] { background: var(--pe-panel-2); color: var(--pe-text); }
+@media (max-width: 620px) {
+  .pe-dialog-backdrop { padding: 0; place-items: stretch; }
+  .pe-dialog { width: 100%; max-height: 100dvh; border-radius: 0; }
+  .pe-bracket__item { grid-template-columns: 3.5rem minmax(0, 1fr); }
+  .pe-bracket__frame { width: 3.5rem; height: 2.8rem; }
+  .pe-bracket__actions { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; }
+  .pe-dialog__foot .pe-button { min-height: 2.75rem; }
+}
+
 @media (max-width: 1180px) {
   .pe { --pe-left: 12.5rem; --pe-right: 17rem; }
   .pe-privacy { display: none; }
