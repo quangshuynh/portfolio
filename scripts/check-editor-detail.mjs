@@ -5,8 +5,9 @@
 // export compared with the Node reference (same renderer), a full-size 24 MP JPEG export
 // with Detail (timed, browser memory sampled on Windows), and on phones that the Detail
 // section is reachable and the page does not scroll sideways.
+// 1:1 Detail inspection is compared pixel by pixel with the Node reference of the same region.
 // With DETAIL_FIXTURE_DIR (a folder with one .ARW) it also times a genuine RAW: Detail
-// preview and full-size export. Usage: npm run check:editor:detail
+// preview, 1:1 inspection and full-size export. Usage: npm run check:editor:detail
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -154,6 +155,20 @@ async function runOne(run, files) {
     const found = await poll(marks, (m) => m.final !== null, 'final Detail frame', timeout);
     return { draftMs: found.draft === null ? null : Math.round(found.draft - since), finalMs: Math.round(found.final - since) };
   };
+  // Opens 1:1 Detail and waits for its frame; returns its region and pixels.
+  const inspectFrame = async (timeout = 120_000) => {
+    const since = await page.evaluate(() => performance.now());
+    await page.click('.pe-zoom__inspect');
+    await poll(() => page.evaluate((t) => performance.getEntriesByName('pe-inspect-frame').some((m) => m.startTime > t), since), Boolean, '1:1 frame', timeout);
+    const frame = await page.evaluate((t) => {
+      const mark = performance.getEntriesByName('pe-inspect-frame').find((m) => m.startTime > t);
+      const canvas = document.querySelector('.pe-inspect__canvas');
+      const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+      return { region: mark.detail, ms: Math.round(mark.startTime - t), data: Array.from(data) };
+    }, since);
+    await page.click('.pe-zoom__inspect');
+    return frame;
+  };
   const exportFile = async (format) => {
     await tab(3);
     await page.check(`input[name=pe-format][value=${format}]`);
@@ -202,6 +217,22 @@ async function runOne(run, files) {
       assert.equal(info.width, 600);
       assert.ok(max <= 1, `PNG differs from the reference by ${max}`);
     });
+    await step('1:1 Detail equals the Node reference of the region', async () => {
+      if (run.device) return;
+      const { region, data } = await inspectFrame();
+      const reference = renderDetailImage(files.small, deriveParams(SETTINGS));
+      let max = 0;
+      for (let y = 0; y < region.height; y += 1) {
+        for (let x = 0; x < region.width; x += 1) {
+          const r = ((region.y + y) * files.small.width + region.x + x) * 4;
+          const o = (y * region.width + x) * 4;
+          if (reference[r + 3] === 0) continue;
+          for (let c = 0; c < 4; c += 1) max = Math.max(max, Math.abs(reference[r + c] - data[o + c]));
+        }
+      }
+      result.inspect = { region: `${region.width}×${region.height}+${region.x}+${region.y}`, maxDifference: max };
+      assert.ok(max === 0, `1:1 frame differs from the reference by ${max}`);
+    });
     await step('reset Detail returns the GPU preview', async () => {
       await openDetail();
       await page.click('.pe-section[data-section-id=detail] .pe-section__reset');
@@ -249,6 +280,9 @@ async function runOne(run, files) {
           await setValue('Luminance noise reduction', 30);
         });
         measures.sharpening = await timeFrames(() => setValue('Sharpening', 40));
+        const stopInspect = sampler(profile);
+        const inspected = await inspectFrame(300_000);
+        measures.inspect = { region: `${inspected.region.width}×${inspected.region.height}`, firstFrameMs: inspected.ms, peakMb: stopInspect() };
         const stop = sampler(profile);
         const exportStarted = Date.now();
         const download = await exportFile('jpeg');

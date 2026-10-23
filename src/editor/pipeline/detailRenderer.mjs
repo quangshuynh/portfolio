@@ -82,19 +82,21 @@ export function guideSource(image) {
 
 /**
  * Writes the base stage (encoded, 0–1 nominal) of a rectangle into float planes.
- * :param image: { kind, width, data, y0 } where `data` starts at image row `y0` (default 0)
+ * :param image: { kind, width, data, y0, x0 } where `data` starts at image row `y0` and
+ *   column `x0` (default 0), `width` columns per row
  */
 function fillBase(image, prepared, x0, y0, w, h, planes) {
   const { params: p, tone } = prepared;
   const channels = channelsOf(image);
   const firstRow = image.y0 ?? 0;
+  const firstColumn = image.x0 ?? 0;
   const rgb = [0, 0, 0];
   const raw = image.kind === 'raw' || image.kind === 'hdr';
   const scale = image.data instanceof Float32Array ? 1 : 1 / 65535;
   const { r, g, b, alpha } = planes;
   for (let y = 0; y < h; y += 1) {
     for (let x = 0; x < w; x += 1) {
-      const i = ((y0 + y - firstRow) * image.width + x0 + x) * channels;
+      const i = ((y0 + y - firstRow) * image.width + x0 - firstColumn + x) * channels;
       const o = y * w + x;
       const s = image.data;
       if (raw) {
@@ -168,21 +170,28 @@ export function prepareDetailRender(params, { width, height, nativeWidth = width
 /**
  * Renders rows [y0, y1) of an image with Detail settings into RGBA8 `target` (which
  * holds exactly those rows). The image data must cover rows [y0 − halo, y1 + halo]
- * clamped to the image (see `image.y0`).
+ * clamped to the image (see `image.y0`), and the columns likewise.
+ * :param options: { columns: [x0, x1] } renders only those columns (a 1:1 crop); `target`
+ *   then holds x1 − x0 pixels per row and `image` may be a crop (see `image.x0`)
  */
-export function renderDetailRows(image, context, y0, y1, target, { flattenAlpha = false, tileWidth = DETAIL_TILE } = {}) {
+export function renderDetailRows(image, context, y0, y1, target, { flattenAlpha = false, tileWidth = DETAIL_TILE, columns = null } = {}) {
   const { prepared, detail, scale, guide, halo, pool, width, height, transparent } = context;
   const p = prepared.params;
   const channels = channelsOf(image);
   const firstRow = image.y0 ?? 0;
+  const firstColumn = image.x0 ?? 0;
   const rowsHeld = image.data.length / (image.width * channels);
+  const [xStart, xEnd] = columns ?? [0, width];
+  const outWidth = xEnd - xStart;
   const top = Math.max(0, y0 - halo);
   const bottom = Math.min(height, y1 + halo);
-  if (image.width !== width || top < firstRow || bottom > firstRow + rowsHeld) throw new Error('The image rows do not cover the band and its halo.');
+  const coveredLeft = Math.max(0, xStart - halo) >= firstColumn;
+  const coveredRight = Math.min(width, xEnd + halo) <= firstColumn + image.width;
+  if (!coveredLeft || !coveredRight || top < firstRow || bottom > firstRow + rowsHeld) throw new Error('The image rows do not cover the band and its halo.');
   const hasAlpha = channels === 4 && transparent;
   const rgb = [0, 0, 0];
-  for (let x0 = 0; x0 < width; x0 += tileWidth) {
-    const x1 = Math.min(width, x0 + tileWidth);
+  for (let x0 = xStart; x0 < xEnd; x0 += tileWidth) {
+    const x1 = Math.min(xEnd, x0 + tileWidth);
     const left = Math.max(0, x0 - halo);
     const right = Math.min(width, x1 + halo);
     const w = right - left;
@@ -194,13 +203,13 @@ export function renderDetailRows(image, context, y0, y1, target, { flattenAlpha 
     for (let y = y0; y < y1; y += 1) {
       for (let x = x0; x < x1; x += 1) {
         const o = (y - top) * w + (x - left);
-        const t = ((y - y0) * width + x) * 4;
+        const t = ((y - y0) * outWidth + x - xStart) * 4;
         rgb[0] = planes.r[o]; rgb[1] = planes.g[o]; rgb[2] = planes.b[o];
         if (p.postActive) processDisplay(rgb, p, fastTransfer);
         target[t] = Math.round(rgb[0] * 255);
         target[t + 1] = Math.round(rgb[1] * 255);
         target[t + 2] = Math.round(rgb[2] * 255);
-        const alpha = channels === 4 ? image.data[((y - firstRow) * width + x) * 4 + 3] : 255;
+        const alpha = channels === 4 ? image.data[((y - firstRow) * image.width + x - firstColumn) * 4 + 3] : 255;
         if (flattenAlpha && alpha < 255) {
           const coverage = alpha / 255;
           for (let c = 0; c < 3; c += 1) target[t + c] = encodeSrgb8(SRGB_TO_LINEAR_8BIT[target[t + c]] * coverage + (1 - coverage));

@@ -182,6 +182,10 @@ function EditorWorkspace() {
   const [clipboard, setClipboard] = useState(null);
   // Touch selection mode: taps add or remove photos instead of opening them.
   const [selecting, setSelecting] = useState(false);
+  // 1:1 inspection of the visible region (InspectView), and the crop decode in flight.
+  const [inspecting, setInspecting] = useState(false);
+  const inspectJob = useRef(null);
+  const regionSent = useRef(null);
   // A merged HDR's preview is re-merged from its sources when it left the proxy cache.
   const hdrProxyJob = useRef(null);
   const [hdrOpen, setHdrOpen] = useState(false);
@@ -406,6 +410,43 @@ function EditorWorkspace() {
     return result;
   }, [worker]);
   const onEngine = useCallback((info) => setEngine(info), []);
+
+  // 1:1 inspection: a full-size decode keeps only a crop around the region (RAW in the RAW
+  // queue, others in a fresh image worker that is ended afterwards); renders reuse it.
+  const loadRegionSource = useCallback(async (target, rect) => {
+    inspectJob.current?.cancel();
+    const resource = resources.current.get(target.id);
+    if (!resource?.header) throw new Error('The original file is no longer available.');
+    if (resource.hdr) throw Object.assign(new Error('1:1 inspection is not available for merged HDR photos: it would decode and merge the three files at full size. Export to inspect them.'), { code: 'unsupported' });
+    if (resource.raw) {
+      if (rawConcurrency() === 1) throw Object.assign(new Error('1:1 inspection of RAW files needs a full-size decode (several hundred MB), more than this device can safely use.'), { code: 'memory' });
+      const job = raws().run('region', { file: resource.file, raw: resource.raw, rect });
+      inspectJob.current = job;
+      return job.promise;
+    }
+    const client = createImageWorker();
+    inspectJob.current = { cancel: () => client.terminate() };
+    try {
+      return await client.call('regionSource', { file: resource.file, header: resource.header, rect });
+    } finally {
+      client.terminate();
+    }
+  }, [raws]);
+  const renderRegion = useCallback(async (kept, region, settings) => {
+    const client = worker('render');
+    const call = (full) => client.call('renderRegion', { key: kept.key, ...(full ? { kept: kept.source } : {}), region, ...settings });
+    let result;
+    try {
+      result = await call(regionSent.current !== kept.key);
+    } catch (error) {
+      if (error.code !== 'stale-region') throw error;
+      result = await call(true);
+    }
+    regionSent.current = kept.key;
+    return result;
+  }, [worker]);
+  const closeInspect = useCallback(() => { inspectJob.current?.cancel(); setInspecting(false); }, []);
+  const inspect = useMemo(() => (inspecting ? { loadSource: loadRegionSource, render: renderRegion, onClose: closeInspect } : null), [inspecting, loadRegionSource, renderRegion, closeInspect]);
   const lutsRef = useRef(luts);
   lutsRef.current = luts;
 
@@ -415,6 +456,7 @@ function EditorWorkspace() {
     resources.current.delete(id);
     [...proxyCache.current.keys()].filter((key) => key.startsWith(`${id}:`)).forEach((key) => proxyCache.current.delete(key));
     if (exportJob.current?.id === id) exportJob.current.cancel();
+    if (stateRef.current.activeId === id) inspectJob.current?.cancel();
     batchRef.current?.remove(id);
     dispatch({ type: 'remove', id });
     // With the workspace empty, end the idle workers so their heaps (decode buffers,
@@ -1000,6 +1042,7 @@ function EditorWorkspace() {
           renderInWorker={renderInWorker}
           onEngine={onEngine}
           zoomCommand={zoomCommand}
+          inspect={inspect}
         />
         {!state.photos.length && (
           <div className="pe-empty">
@@ -1014,6 +1057,16 @@ function EditorWorkspace() {
           <button type="button" className="pe-text-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'fit', at: Date.now() })} title="Fit to screen (0)">Fit</button>
           <button type="button" className="pe-text-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'actual', at: Date.now() })} title="Actual pixels (1)">100%</button>
           <button type="button" className="pe-icon-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'in', at: Date.now() })} aria-label="Zoom in" title="Zoom in (+)">+</button>
+          <button
+            type="button"
+            className="pe-text-button pe-zoom__inspect"
+            disabled={!ready || Boolean(photo?.hdr)}
+            aria-pressed={inspecting}
+            onClick={() => (inspecting ? closeInspect() : setInspecting(true))}
+            title={photo?.hdr ? '1:1 inspection is not available for merged HDR photos' : 'Render the visible area at full resolution, as the export does (Detail at 1:1)'}
+          >
+            1:1 Detail
+          </button>
         </div>
       </main>
 

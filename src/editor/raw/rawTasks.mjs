@@ -5,6 +5,7 @@
 
 import { prepareRender, renderRawRgba8 } from '../pipeline/cpuRenderer.mjs';
 import { guideSource, prepareDetailRender, renderDetailRows } from '../pipeline/detailRenderer.mjs';
+import { extractRect } from '../pipeline/detailRegion.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { exportDimensions, LIMITS, proxyDimensions } from '../io/files.mjs';
 import { contentHash } from '../io/hash.mjs';
@@ -46,6 +47,23 @@ export function createRawHandlers(loadModule) {
       const thumbnail = downsampleRaw(image, size.width, size.height);
       const header = { format, width: info.width, height: info.height, displayWidth: info.width, displayHeight: info.height, orientation: 1 };
       return { result: { header, sha256, raw: info, thumbnail }, transfer: [thumbnail.data.buffer] };
+    },
+
+    /**
+     * 1:1 inspection source: the full demosaic (as an export at original size), its guide
+     * source, and only `rect` of the pixels.
+     */
+    async region({ file, raw, rect }) {
+      const { bytes, format } = await readRaw(file);
+      const decoded = decodeRaw(await loadModule(), bytes, { format, halfSize: false });
+      if (decoded.info.width !== raw.width || decoded.info.height !== raw.height) {
+        throw new RawDecodeError('corrupt', 'The file changed since it was imported. Import it again.');
+      }
+      const image = downsampleRaw(decoded.image, raw.width, raw.height);
+      decoded.image = null;
+      const guideImage = guideSource(image);
+      const source = extractRect(image, rect);
+      return { result: { source, guideImage, transparent: false, native: { width: raw.width, height: raw.height } }, transfer: [source.data.buffer] };
     },
 
     /** Preview proxy: half-size sensor data, downscaled to `maxEdge` if larger. */

@@ -278,6 +278,15 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-readout-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pe-zoom { position: absolute; right: .5rem; bottom: 0; display: flex; align-items: center; height: 2rem; }
 .pe-zoom .pe-icon-button, .pe-zoom .pe-text-button { min-height: 1.75rem; }
+.pe-zoom__inspect[aria-pressed='true'] { color: var(--pe-text); box-shadow: inset 0 -2px 0 var(--pe-accent); }
+/* 1:1 inspection covers the stage; its canvas is sized in device pixels (no CSS scaling). */
+.pe-inspect { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; overflow: hidden; background: var(--pe-stage); cursor: grab; touch-action: none; }
+.pe-inspect:active { cursor: grabbing; }
+.pe-inspect__canvas { display: block; max-width: none; image-rendering: pixelated; }
+.pe-inspect[data-state='rendering'] .pe-inspect__canvas, .pe-inspect[data-state='decoding'] .pe-inspect__canvas { opacity: .75; }
+.pe-inspect__label { position: absolute; top: .5rem; left: .5rem; right: .5rem; display: flex; flex-wrap: wrap; gap: .25rem .75rem; margin: 0; pointer-events: none; color: #fff; font-size: .6875rem; }
+.pe-inspect__label span { padding: .15rem .45rem; border-radius: 3px; background: rgba(0, 0, 0, .65); }
+.pe-inspect__label span:empty { display: none; }
 
 .pe-empty { position: absolute; inset: 0 0 2rem; display: grid; place-content: center; justify-items: center; gap: .6rem; padding: 1.5rem; text-align: center; color: var(--pe-text-2); }
 .pe-empty::before { content: ''; position: absolute; inset: 1.25rem; border: 1px dashed var(--pe-line-strong); border-radius: var(--radius-md, 10px); pointer-events: none; }
@@ -406,6 +415,8 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
   .pe-bracket__frame { width: 3.5rem; height: 2.8rem; }
   .pe-bracket__actions { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; }
   .pe-dialog__foot .pe-button { min-height: 2.75rem; }
+  /* The selected count is in the Photos panel; the strip keeps its width for photos. */
+  .pe-filmstrip__status { display: none; }
 }
 
 @media (max-width: 1180px) {

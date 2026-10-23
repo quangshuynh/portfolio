@@ -4,6 +4,7 @@ import { neutralAdjustments } from '../model/adjustments.mjs';
 import { GlRenderer, probeEditorContext } from '../pipeline/glRenderer.mjs';
 import { debugFlag, recordDiagnostic } from '../io/diagnostics.mjs';
 import { previewEdgeLimit } from '../io/files.mjs';
+import InspectView from './InspectView';
 
 const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 8;
@@ -46,7 +47,7 @@ const clampZoom = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
  * Centre workspace: the processed preview with zoom, pan and before/after.
  * Zoom is expressed in source pixels per CSS pixel (1 = 100%).
  */
-export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, zoomCommand }) {
+export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, zoomCommand, inspect = null }) {
   const stageRef = useRef(null);
   const canvasHostRef = useRef(null);
   const engineRef = useRef(null);
@@ -457,6 +458,20 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         {engineError && <p className="pe-stage-message pe-stage-message--error" role="alert">{engineError}</p>}
         {!engineError && status.state === 'error' && <p className="pe-stage-message pe-stage-message--error" role="alert">{status.message || 'This photograph could not be shown.'}</p>}
         {photo && photo.status === 'importing' && <p className="pe-stage-message" role="status"><span className="pe-spinner" aria-hidden="true" />{{ waiting: 'Waiting for the RAW decoder:', decoding: 'Decoding RAW sensor data:' }[photo.progress] ?? 'Reading'} {photo.name}…</p>}
+        {inspect && proxy && proxy.id === photo?.id && (
+          <InspectView
+            photo={photo}
+            adjustments={adjustments}
+            lut={lut}
+            raw={raw}
+            compare={compare}
+            split={split}
+            center={{ x: (stageSize.width / 2 - offsetX) / zoom, y: (stageSize.height / 2 - offsetY) / zoom }}
+            loadSource={inspect.loadSource}
+            render={inspect.render}
+            onClose={inspect.onClose}
+          />
+        )}
         {compare === 'original' && proxy && <span className="pe-stage-badge" aria-live="polite">Original</span>}
         {previewing && compare !== 'original' && proxy && <span className="pe-stage-badge" aria-live="polite">Preview: {previewing}</span>}
       </div>
