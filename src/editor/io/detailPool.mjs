@@ -74,12 +74,14 @@ export async function renderDetailParallel(image, settings, { workers, onBand, o
   const options = { width: image.width, height: image.height, nativeWidth, nativeHeight, guide, transparent };
   const channels = channelsOf(image);
   const job = `${Date.now()}-${Math.random()}`;
-  const clients = Array.from({ length: Math.max(1, workers) }, () => createWorkerClient(spawn()));
+  const clients = [];
   const stop = () => clients.forEach((client) => client.terminate());
   const bands = [];
   for (let row = 0; row < image.height; row += DETAIL_POOL_BAND_ROWS) bands.push(row);
   let done = 0;
   try {
+    // Spawned inside the try: if a later spawn throws, the earlier workers are still ended.
+    for (let i = 0; i < Math.max(1, workers); i += 1) clients.push(createWorkerClient(spawn()));
     await Promise.all(clients.map((client) => client.call('detailBegin', { job, adjustments, lut, raw, options })));
     const lane = async (client) => {
       while (bands.length) {

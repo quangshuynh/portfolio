@@ -98,6 +98,18 @@ describe('parallel Detail rendering', () => {
     expect(log.filter((type) => type === 'terminate')).toHaveLength(2);
   });
 
+  test('ends the workers already started when a later one cannot start', async () => {
+    const log = [];
+    let spawned = 0;
+    const spawn = () => {
+      spawned += 1;
+      if (spawned === 3) throw new Error('Worker blocked');
+      return fakeWorker(log);
+    };
+    await expect(renderDetailParallel(rgbaImage(16, 8), { adjustments: { ...SETTINGS } }, { workers: 3, onBand: () => {}, spawn })).rejects.toThrow('Worker blocked');
+    expect(log.filter((entry) => entry === 'terminate')).toHaveLength(2);
+  });
+
   test('phones, low-memory devices and few cores keep the one-thread export', () => {
     const desktop = { navigator: { hardwareConcurrency: 8, deviceMemory: 8 }, Worker: function Worker() {}, matchMedia: () => ({ matches: false }), screen: { width: 1920, height: 1080 } };
     expect(detailWorkerCount(desktop)).toBe(4);
