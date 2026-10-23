@@ -1,0 +1,106 @@
+Photo editor (quanghuynh.com/photography/editor): third-party notices
+=====================================================================
+
+The editor decodes RAW files with LibRaw compiled to WebAssembly. The compiled
+module (libraw-*.wasm) and its loader are served as separate, replaceable files
+and are loaded only by the editor's RAW worker. Nothing below was modified.
+
+1. libraw-wasm 1.6.0 (JavaScript loader and WebAssembly build)
+   https://github.com/ybouane/LibRaw-Wasm  (npm: libraw-wasm@1.6.0)
+   Licence declared in the package: ISC. Copyright (c) ybouane and contributors.
+   The repository has no LICENSE file (ybouane/LibRaw-Wasm#31); the standard
+   ISC terms are reproduced here:
+
+   Permission to use, copy, modify, and/or distribute this software for any
+   purpose with or without fee is hereby granted, provided that the above
+   copyright notice and this permission notice appear in all copies.
+
+   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+   SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER
+   RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF
+   CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+2. LibRaw 0.22.1
+   Copyright (C) 2008-2025 LibRaw LLC (http://www.libraw.org, info@libraw.org)
+   LibRaw is dual-licensed (LGPL-2.1 or CDDL-1.0, at the distributor's choice).
+   This site distributes it under the COMMON DEVELOPMENT AND DISTRIBUTION
+   LICENSE (CDDL) Version 1.0:
+     https://github.com/LibRaw/LibRaw/blob/0.22.1/LICENSE.CDDL
+   Source code (unmodified, tag 0.22.1): https://github.com/LibRaw/LibRaw/tree/0.22.1
+   Build script used for the WebAssembly module:
+     https://github.com/ybouane/LibRaw-Wasm/blob/main/compileLibraw.sh
+   Covered code is provided under the CDDL on an "AS IS" basis, without
+   warranty of any kind.
+
+   LibRaw includes code from:
+   - dcraw.c, copyright 1997-2018 Dave Coffin (no RESTRICTED code is used).
+   - Adobe DNG SDK 1.4, copyright (c) 2005 Adobe Systems Incorporated, MIT licence.
+   - DCB demosaic and FBDD denoise, and the X3F library, under the BSD licences below.
+   Full notices: https://github.com/LibRaw/LibRaw/blob/0.22.1/COPYRIGHT
+   Camera colour matrices are LibRaw's Adobe-derived tables.
+
+   DCB demosaic and FBDD denoise:
+   Copyright (C) 2010, Jacek Gozdz (cuniek@kft.umcs.lublin.pl)
+   (FBDD also by Luis Sanz Rodríguez)
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are met:
+   * Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+   * Neither the name of the author nor the names of its contributors may be
+     used to endorse or promote products derived from this software without
+     specific prior written permission.
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+   POSSIBILITY OF SUCH DAMAGE.
+
+   X3F library (compiled only when LibRaw is built with X3F support):
+   Copyright (c) 2010, Roland Karlsson (roland@proxel.se). All rights reserved.
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are met:
+   * Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+   * Neither the name of the organization nor the names of its contributors
+     may be used to endorse or promote products derived from this software
+     without specific prior written permission.
+   THIS SOFTWARE IS PROVIDED BY ROLAND KARLSSON ''AS IS'' AND ANY EXPRESS OR
+   IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+   MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
+   EVENT SHALL ROLAND KARLSSON BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+   PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+   OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+   WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+   OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+   ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+3. Little CMS 2.19.1
+   Copyright (c) 1998-2024 Marti Maria Saguer. MIT licence:
+   https://github.com/mm2/Little-CMS/blob/lcms2.19.1/LICENSE
+
+4. libjpeg (Independent JPEG Group), via the Emscripten libjpeg port
+   This software is based in part on the work of the Independent JPEG Group.
+
+5. zlib, via the Emscripten zlib port
+   Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler. zlib licence:
+   https://zlib.net/zlib_license.html
+
+6. Emscripten runtime (generated loader code)
+   Copyright Emscripten authors. MIT or University of Illinois/NCSA licence:
+   https://github.com/emscripten-core/emscripten/blob/main/LICENSE

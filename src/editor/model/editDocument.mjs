@@ -7,10 +7,13 @@
 import { compactAdjustments, normalizeAdjustments } from './adjustments.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { DEFAULT_EXPORT_SUFFIX, safeSuffix } from '../io/files.mjs';
+import { RAW_FORMATS } from '../raw/rawFormat.mjs';
 
 export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
-// Version 2 added curves, HSL and LUT references; version 1 files read unchanged.
-export const DOCUMENT_VERSION = 2;
+// Version 2 added curves, HSL and LUT references; version 3 RAW sources and their white
+// balance (`raw`). Older versions read unchanged; older editors reject newer files
+// instead of silently dropping settings they do not know.
+export const DOCUMENT_VERSION = 3;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).
@@ -22,6 +25,9 @@ export const DEFAULT_EXPORT_SETTINGS = Object.freeze({
   resize: Object.freeze({ mode: 'original', longEdge: 3840, maxWidth: 3840, maxHeight: 3840 }),
   suffix: DEFAULT_EXPORT_SUFFIX,
 });
+
+/** Source formats a document may describe: the export formats plus RAW. */
+const isSourceFormat = (format) => Object.hasOwn(FORMATS, format) || Object.hasOwn(RAW_FORMATS, format);
 
 export class EditDocumentError extends Error {}
 
@@ -88,7 +94,7 @@ function parseSource(source, index) {
     size,
     sha256,
     lastModified: Number.isSafeInteger(source.lastModified) ? source.lastModified : null,
-    format: Object.hasOwn(FORMATS, source.format) ? source.format : null,
+    format: isSourceFormat(source.format) ? source.format : null,
     width: positiveInteger(source.width),
     height: positiveInteger(source.height),
   };
@@ -98,7 +104,7 @@ function parseSource(source, index) {
 export function parseAdjustments(input) {
   const values = isObject(input) ? input : {};
   const numeric = Object.fromEntries(Object.entries(values).filter(([, value]) => typeof value === 'number' && Number.isFinite(value)));
-  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut });
+  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw });
 }
 
 /**

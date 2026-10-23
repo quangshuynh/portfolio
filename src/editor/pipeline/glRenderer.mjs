@@ -1,16 +1,33 @@
 // WebGL2 preview renderer. Draws the preview proxy into a canvas of the same size,
 // one texel per pixel, so CSS zoom and pan never resample inside the pipeline.
+// Sources are RGBA8 (JPEG, PNG, WebP) or 16-bit camera RGB from a RAW decode, kept
+// as an integer texture so no precision is lost before the shader develops it.
 
 import { CURVE_TABLE_SIZE } from './curves.mjs';
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './shader.mjs';
 
 const UNIFORMS = ['uSource', 'uWhiteBalanceActive', 'uWhiteBalance', 'uExposureGain', 'uToneActive', 'uContrast',
-  'uHighlights', 'uShadows', 'uWhites', 'uBlacks', 'uVibrance', 'uSaturation', 'uNeutral', 'uSplit',
+  'uHighlights', 'uShadows', 'uWhites', 'uBlacks', 'uVibrance', 'uSaturation', 'uNeutral',
+  'uRaw', 'uRawSource', 'uRawGain', 'uRawMatrix', 'uRolloffWhite',
   'uBaseNeutral', 'uCurvesActive', 'uCurveActive', 'uCurves', 'uHslActive', 'uHslHue', 'uHslSat', 'uHslLum',
   'uLutActive', 'uLut', 'uLutSize', 'uLutDomainMin', 'uLutDomainMax', 'uLutIntensity'];
 
-// Texture units: the photo, the curve table, the 3D LUT.
-const UNIT = { source: 0, curves: 1, lut: 2 };
+// Texture units: the photo, the curve table, the 3D LUT, a RAW photo.
+const UNIT = { source: 0, curves: 1, lut: 2, raw: 3 };
+
+const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+/** An RGB16UI texture; integer textures are only read with texelFetch, so NEAREST. */
+function rawTexture(gl, width, height, data) {
+  const texture = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0 + UNIT.raw);
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB16UI, width, height, 0, gl.RGB_INTEGER, gl.UNSIGNED_SHORT, data);
+  [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER].forEach((name) => gl.texParameteri(gl.TEXTURE_2D, name, gl.NEAREST));
+  [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T].forEach((name) => gl.texParameteri(gl.TEXTURE_2D, name, gl.CLAMP_TO_EDGE));
+  return texture;
+}
 
 /** A float texture read only with texelFetch: NEAREST, so no filtering extension is needed. */
 function floatTexture(gl, target) {
@@ -100,6 +117,13 @@ export class GlRenderer {
     this.lutTexture = floatTexture(gl, gl.TEXTURE_3D);
     gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGB32F, 1, 1, 1, 0, gl.RGB, gl.FLOAT, new Float32Array(3));
     this.lutData = null;
+    // Placeholders keep both photo samplers complete whichever kind of source is shown.
+    this.rawPlaceholder = rawTexture(gl, 1, 1, new Uint16Array(3));
+    gl.activeTexture(gl.TEXTURE0);
+    this.sourcePlaceholder = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.sourcePlaceholder);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+    this.raw = false;
   }
 
   /** Uploads the curve table when it changed (tables are cached per curve set). */
@@ -129,8 +153,8 @@ export class GlRenderer {
   }
 
   /**
-   * Uploads the source pixels: an ImageBitmap (decoded with premultiplyAlpha 'none')
-   * or { width, height, data } RGBA8.
+   * Uploads the source pixels: an ImageBitmap (decoded with premultiplyAlpha 'none'),
+   * { width, height, data } RGBA8, or { kind: 'raw', width, height, data } RGB16.
    */
   setSource(source) {
     const { gl } = this;
@@ -138,6 +162,15 @@ export class GlRenderer {
     const { width, height } = source;
     if (width > this.maxTextureSize || height > this.maxTextureSize) {
       throw new Error(`Preview ${width}×${height} exceeds this GPU's ${this.maxTextureSize}px texture limit.`);
+    }
+    this.raw = source.kind === 'raw';
+    if (this.raw) {
+      this.texture = rawTexture(gl, width, height, source.data);
+      this.width = width;
+      this.height = height;
+      this.canvas.width = width;
+      this.canvas.height = height;
+      return;
     }
     this.texture = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0);
@@ -164,17 +197,40 @@ export class GlRenderer {
   /**
    * Draws the source through the pipeline.
    * :param params: deriveParams() result
-   * :param split: fraction of the width (from the left) that shows the source; 0 = all edited
+   * :param options: { split, before } `split` is the fraction of the width (from the
+   *   left) drawn with `before` instead: the untouched source by default, which a RAW
+   *   photo does not have, so it passes its neutral development (deriveParams of neutral
+   *   settings with the same RAW info)
    */
-  render(params, { split = 0 } = {}) {
-    const { gl, uniforms: u } = this;
+  render(params, { split = 0, before = null } = {}) {
+    const { gl } = this;
     if (!this.texture) return;
     gl.viewport(0, 0, this.width, this.height);
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
+    this.draw(params);
+    // Pixel x is "before" when its centre lies left of the split, (x + 0.5) / width < split.
+    const columns = Math.min(this.width, Math.max(0, Math.ceil(split * this.width - 0.5)));
+    if (columns > 0) {
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(0, 0, columns, this.height);
+      this.draw(before ?? { ...params, neutral: true });
+      gl.disable(gl.SCISSOR_TEST);
+    }
+  }
+
+  draw(params) {
+    const { gl, uniforms: u } = this;
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    gl.bindTexture(gl.TEXTURE_2D, this.raw ? this.sourcePlaceholder : this.texture);
     gl.uniform1i(u.uSource, 0);
+    gl.activeTexture(gl.TEXTURE0 + UNIT.raw);
+    gl.bindTexture(gl.TEXTURE_2D, this.raw ? this.texture : this.rawPlaceholder);
+    gl.uniform1i(u.uRawSource, UNIT.raw);
+    gl.uniform1i(u.uRaw, this.raw ? 1 : 0);
+    gl.uniform3fv(u.uRawGain, params.raw?.gain ?? [1, 1, 1]);
+    gl.uniformMatrix3fv(u.uRawMatrix, true, new Float32Array(params.raw?.matrix ?? IDENTITY));
+    gl.uniform1f(u.uRolloffWhite, params.rolloffWhite ?? 0);
     gl.uniform1i(u.uNeutral, params.neutral ? 1 : 0);
     gl.uniform1i(u.uWhiteBalanceActive, params.whiteBalanceActive ? 1 : 0);
     // GLSL matrices are column-major; ours are row-major.
@@ -210,7 +266,6 @@ export class GlRenderer {
     gl.activeTexture(gl.TEXTURE0 + UNIT.lut);
     gl.bindTexture(gl.TEXTURE_3D, this.lutTexture);
     gl.uniform1i(u.uLut, UNIT.lut);
-    gl.uniform1f(u.uSplit, split);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
@@ -230,6 +285,7 @@ export class GlRenderer {
   releaseSource() {
     if (this.texture) this.gl.deleteTexture(this.texture);
     this.texture = null;
+    this.raw = false;
   }
 
   /** Frees the texture and shrinks the drawing buffer while no photo is shown. */
@@ -244,6 +300,8 @@ export class GlRenderer {
     this.releaseSource();
     gl.deleteTexture(this.curveTexture);
     gl.deleteTexture(this.lutTexture);
+    gl.deleteTexture(this.rawPlaceholder);
+    gl.deleteTexture(this.sourcePlaceholder);
     gl.deleteBuffer(this.buffer);
     gl.deleteVertexArray(this.vao);
     gl.deleteProgram(this.program);

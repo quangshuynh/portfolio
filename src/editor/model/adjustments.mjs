@@ -3,12 +3,14 @@
 // exist in one place and not another. Every value is relative to neutral (its
 // `default`), so a missing key in a saved document means "no change".
 //
-// A photo's settings are these numbers plus two structured values: `curves` (tone
-// curve control points, see pipeline/curves.mjs) and `lut` (a reference to an
-// imported .cube LUT by content hash, or null).
+// A photo's settings are these numbers plus three structured values: `curves` (tone
+// curve control points, see pipeline/curves.mjs), `lut` (a reference to an
+// imported .cube LUT by content hash, or null) and `raw` (white balance of a RAW
+// photo's development; ignored for JPEG, PNG and WebP).
 
 import { CURVE_CHANNELS, curvesEqual, curvesNeutral, isNeutralCurve, neutralCurves, normalizeCurves } from '../pipeline/curves.mjs';
 import { MAX_LUT_SIZE, MIN_LUT_SIZE } from '../pipeline/lut.mjs';
+import { DAYLIGHT_KELVIN, RAW_KELVIN, RAW_TINT, WHITE_BALANCE_MODES } from '../raw/rawColor.mjs';
 
 /** Colour ranges for HSL, with their hue centres in degrees (HSV hue of sRGB values). */
 export const HSL_RANGES = Object.freeze([
@@ -52,6 +54,8 @@ export const ADJUSTMENTS = Object.freeze([
     max: 100,
     step: 1,
   }))),
+  { key: 'rawTemperature', group: 'raw', label: 'RAW temperature', ...RAW_KELVIN, unit: 'K', default: DAYLIGHT_KELVIN, signed: false, track: 'temperature' },
+  { key: 'rawTint', group: 'raw', label: 'RAW tint', ...RAW_TINT, track: 'tint' },
   { key: 'lutIntensity', group: 'lut', label: 'Intensity', min: 0, max: 100, step: 1, unit: '%', default: 100, signed: false },
 ].map((entry) => Object.freeze({ digits: 0, unit: '', default: 0, signed: true, ...entry })));
 
@@ -62,6 +66,7 @@ export const ADJUSTMENT_GROUPS = Object.freeze([
   { id: 'hsl', label: 'HSL' },
   { id: 'curves', label: 'Tone Curve' },
   { id: 'lut', label: 'LUT' },
+  { id: 'raw', label: 'RAW' },
 ].map(Object.freeze));
 
 export const ADJUSTMENT_KEYS = Object.freeze(ADJUSTMENTS.map(({ key }) => key));
@@ -97,12 +102,26 @@ export function normalizeLutRef(input) {
   };
 }
 
+export const RAW_DEFAULTS = Object.freeze({ whiteBalance: 'as-shot' });
+
+/**
+ * RAW development settings beyond the numeric controls: the white balance mode (as
+ * shot, daylight, or custom from rawTemperature and rawTint).
+ */
+export function normalizeRawSettings(input) {
+  const mode = input !== null && typeof input === 'object' && WHITE_BALANCE_MODES.includes(input.whiteBalance) ? input.whiteBalance : 'as-shot';
+  return { whiteBalance: mode };
+}
+
+const rawEqual = (a, b) => a.whiteBalance === b.whiteBalance;
+
 /** A fresh all-neutral settings object. */
 export function neutralAdjustments() {
   return {
     ...Object.fromEntries(ADJUSTMENTS.map(({ key, default: value }) => [key, value])),
     curves: neutralCurves(),
     lut: null,
+    raw: { ...RAW_DEFAULTS },
   };
 }
 
@@ -116,13 +135,14 @@ export function normalizeAdjustments(input = {}) {
     ])),
     curves: normalizeCurves(source.curves),
     lut: normalizeLutRef(source.lut),
+    raw: normalizeRawSettings(source.raw),
   };
 }
 
 const lutRefsEqual = (a, b) => (a === null || b === null ? a === b : a.sha256 === b.sha256);
 
 export const adjustmentsEqual = (a, b) => ADJUSTMENT_KEYS.every((key) => a[key] === b[key])
-  && curvesEqual(a.curves, b.curves) && lutRefsEqual(a.lut, b.lut);
+  && curvesEqual(a.curves, b.curves) && lutRefsEqual(a.lut, b.lut) && rawEqual(a.raw ?? RAW_DEFAULTS, b.raw ?? RAW_DEFAULTS);
 
 const numericNeutral = (adjustments, keys) => keys.every((key) => (adjustments[key] ?? byKey.get(key).default) === byKey.get(key).default);
 
@@ -133,6 +153,7 @@ export const groupKeys = (group) => ADJUSTMENTS.filter((spec) => spec.group === 
 export function groupIsNeutral(adjustments, group) {
   if (group === 'curves') return curvesNeutral(adjustments.curves);
   if (group === 'lut') return !adjustments.lut;
+  if (group === 'raw') return rawEqual(normalizeRawSettings(adjustments.raw), RAW_DEFAULTS) && numericNeutral(adjustments, groupKeys('raw'));
   return numericNeutral(adjustments, groupKeys(group));
 }
 
@@ -145,6 +166,7 @@ export function neutralGroup(group) {
   const patch = Object.fromEntries(groupKeys(group).map((key) => [key, neutral[key]]));
   if (group === 'curves') patch.curves = neutral.curves;
   if (group === 'lut') patch.lut = null;
+  if (group === 'raw') patch.raw = neutral.raw;
   return patch;
 }
 
@@ -169,5 +191,6 @@ export function compactAdjustments(adjustments) {
   });
   if (!curvesNeutral(a.curves)) out.curves = Object.fromEntries(CURVE_CHANNELS.filter((c) => !isNeutralCurve(a.curves[c])).map((c) => [c, a.curves[c].map((point) => [...point])]));
   if (a.lut) out.lut = a.lut;
+  if (!rawEqual(a.raw, RAW_DEFAULTS)) out.raw = a.raw;
   return out;
 }

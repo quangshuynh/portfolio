@@ -10,11 +10,18 @@
 // Then on the sRGB-encoded values (display-referred, 0–1):
 //   tone curves (master, then per channel) -> HSL -> 3D LUT (mixed by intensity).
 // Each later stage is skipped when neutral, so earlier edits render unchanged.
+//
+// RAW photos start before that from 16-bit linear camera RGB (see raw/rawColor.mjs):
+//   per-channel white balance gain, clip at the sensor white -> camera matrix to
+//   linear sRGB -> the steps above, with a highlight rolloff right after exposure.
+// Their "decode" step is this development, never the sRGB EOTF, and nothing is
+// rounded to 8 bits before the final quantisation.
 
 import { LUMA, linearToSrgb, srgbToLinear, whiteBalanceMatrix } from './colorMath.mjs';
 import { HSL_RANGES, hslKey, normalizeAdjustments } from '../model/adjustments.mjs';
 import { curveTables, sampleCurve } from './curves.mjs';
 import { sampleLut } from './lut.mjs';
+import { rawDevelopParams } from '../raw/rawColor.mjs';
 
 // Middle grey (18% linear) in the sRGB-encoded tone domain: the contrast pivot.
 export const TONE_PIVOT = linearToSrgb(0.18);
@@ -34,6 +41,21 @@ export const TONE_LIMITS = Object.freeze({
 /** Luminance below which a pixel is treated as black for ratio-based tone mapping. */
 export const BLACK_EPSILON = 1e-7;
 
+/**
+ * RAW highlight rolloff: luminance below the knee is untouched; above it a rational
+ * shoulder (slope 1 at the knee) maps the sensor white, after positive exposure, to
+ * display white instead of clipping. It only compresses data that exists in the file.
+ */
+export const ROLLOFF_KNEE = 0.5;
+
+/** Highlight rolloff of linear luminance `y` for a sensor white at `white` (> 1). */
+export function highlightRolloff(y, white) {
+  if (y <= ROLLOFF_KNEE) return y;
+  const excess = y - ROLLOFF_KNEE;
+  const a = (white - 1) / ((1 - ROLLOFF_KNEE) * (white - ROLLOFF_KNEE));
+  return ROLLOFF_KNEE + excess / (1 + excess * a);
+}
+
 /** HSL hue sliders at ±100 move hues by this many degrees. */
 export const HUE_SHIFT_MAX = 30;
 /** HSL luminance sliders at ±100 change fully saturated colours by this many stops. */
@@ -43,11 +65,12 @@ export const HSL_CENTERS = Object.freeze(HSL_RANGES.map(({ center }) => center))
 /**
  * Slider values -> renderer parameters.
  * :param adjustments: settings (normalised here)
- * :param options: { lut } the parsed LUT that `adjustments.lut` refers to, if loaded;
- *   a referenced LUT that is not loaded is skipped (the UI reports it as missing)
+ * :param options: { lut, raw } `lut` is the parsed LUT that `adjustments.lut` refers
+ *   to, if loaded (a referenced LUT that is not loaded is skipped; the UI reports it as
+ *   missing); `raw` is the photo's decoder colour info for a RAW source, else null
  * :returns: plain object; `neutral` is true when the pipeline is the identity
  */
-export function deriveParams(adjustments, { lut = null } = {}) {
+export function deriveParams(adjustments, { lut = null, raw = null } = {}) {
   const a = normalizeAdjustments(adjustments);
   const highlights = a.highlights / 100;
   const shadows = a.shadows / 100;
@@ -69,7 +92,11 @@ export function deriveParams(adjustments, { lut = null } = {}) {
     vibrance: a.vibrance / 100,
     saturation: 1 + a.saturation / 100,
   };
-  params.baseNeutral = !whiteBalanceActive && params.exposureGain === 1 && !toneActive
+  params.raw = raw ? rawDevelopParams(raw, { ...a.raw, temperature: a.rawTemperature, tint: a.rawTint }) : null;
+  // The rolloff keeps the sensor white at display white when exposure is raised.
+  params.rolloffWhite = params.raw && params.exposureGain > 1 ? params.exposureGain : 0;
+  // A RAW source always needs developing, so its base stage is never the identity.
+  params.baseNeutral = !params.raw && !whiteBalanceActive && params.exposureGain === 1 && !toneActive
     && params.vibrance === 0 && params.saturation === 1;
 
   params.curves = curveTables(a.curves);
@@ -136,6 +163,11 @@ export function processLinear(rgb, params, toneLuminance = exactToneLuminance) {
   r *= gain; g *= gain; b *= gain;
 
   let y = LUMA[0] * r + LUMA[1] * g + LUMA[2] * b;
+  if (params.rolloffWhite && y > ROLLOFF_KNEE) {
+    const ratio = highlightRolloff(y, params.rolloffWhite) / y;
+    r *= ratio; g *= ratio; b *= ratio;
+    y *= ratio;
+  }
   if (params.toneActive) {
     if (y > BLACK_EPSILON) {
       const ratio = toneLuminance(y, params.tone) / y;
@@ -183,6 +215,22 @@ export function processLinear(rgb, params, toneLuminance = exactToneLuminance) {
   rgb[1] = Math.min(1, Math.max(0, g));
   rgb[2] = Math.min(1, Math.max(0, b));
   return rgb;
+}
+
+/**
+ * RAW development of one pixel: decoded camera RGB (0–1, as-shot white balance,
+ * normalised by the largest multiplier) -> linear sRGB. Writes into and returns `out`;
+ * values may be negative or above 1 (out of gamut) until processLinear fits them.
+ */
+export function developRaw(r, g, b, raw, out) {
+  const { gain, matrix: m } = raw;
+  const cr = Math.min(1, r * gain[0]);
+  const cg = Math.min(1, g * gain[1]);
+  const cb = Math.min(1, b * gain[2]);
+  out[0] = m[0] * cr + m[1] * cg + m[2] * cb;
+  out[1] = m[3] * cr + m[4] * cg + m[5] * cb;
+  out[2] = m[6] * cr + m[7] * cg + m[8] * cb;
+  return out;
 }
 
 /**
