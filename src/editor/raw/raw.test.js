@@ -15,7 +15,7 @@ import {
 import { decodeRaw, downsampleRaw } from './rawDecoder.mjs';
 import { isTiff, sniffRaw } from './rawFormat.mjs';
 import { createRawHandlers, needsFullDecode } from './rawTasks.mjs';
-import { createRawQueue } from './rawClient.mjs';
+import { constrainedDevice, createRawQueue } from './rawClient.mjs';
 import { ROLLOFF_KNEE, deriveParams, developRaw, highlightRolloff } from '../pipeline/spec.mjs';
 import { encodeSrgb8, renderRawRgba8, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
 import { neutralAdjustments, normalizeAdjustments } from '../model/adjustments.mjs';
@@ -361,6 +361,23 @@ describe('RAW job queue', () => {
     await second.promise;
     await flush();
     expect(queue.running).toBe(0);
+  });
+
+  test('runs one decoder at a time by default, on every device', async () => {
+    const { spawn, started } = fakeWorkers();
+    const queue = createRawQueue({ spawn });
+    queue.run('inspect', {});
+    queue.run('decode', {});
+    queue.run('develop', {});
+    expect(started).toHaveLength(1);
+    expect(queue.waiting).toBe(2);
+  });
+
+  test('phones and low-memory devices are constrained (no full-size decode for 1:1)', () => {
+    const desktop = { navigator: { deviceMemory: 8 }, matchMedia: () => ({ matches: false }), screen: { width: 1920, height: 1080 } };
+    expect(constrainedDevice(desktop)).toBe(false);
+    expect(constrainedDevice({ ...desktop, navigator: { deviceMemory: 4 } })).toBe(true);
+    expect(constrainedDevice({ ...desktop, matchMedia: () => ({ matches: true }), screen: { width: 390, height: 844 } })).toBe(true);
   });
 
   test('cancel removes a waiting job or ends a running worker', async () => {

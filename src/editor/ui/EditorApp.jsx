@@ -11,7 +11,7 @@ import { createImageWorker, usingMainThread } from '../io/workerClient.mjs';
 import { detailWorkerCount, exportImageInBands } from '../io/detailPool.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { RAW_FORMATS, RAW_SNIFF_BYTES, isTiff } from '../raw/rawFormat.mjs';
-import { createRawQueue, exportRaw, rawConcurrency } from '../raw/rawClient.mjs';
+import { constrainedDevice, createRawQueue, exportRaw } from '../raw/rawClient.mjs';
 import { browserCapabilities, diagnosticReport } from '../io/diagnostics.mjs';
 import { readRasterExposure } from '../hdr/hdrMetadata.mjs';
 import { cropAt } from '../hdr/hdrAlign.mjs';
@@ -165,7 +165,7 @@ function EditorWorkspace() {
   const proxyCache = useRef(new Map());
   const workers = useRef({});
   const proxyJob = useRef({ busy: false, generation: 0 });
-  // RAW work runs in short-lived workers through one bounded queue.
+  // RAW work runs in short-lived workers through one queue, one decoder at a time.
   const rawQueue = useRef(null);
   const rawProxyJob = useRef(null);
   const raws = useCallback(() => {
@@ -419,7 +419,7 @@ function EditorWorkspace() {
     if (!resource?.header) throw new Error('The original file is no longer available.');
     if (resource.hdr) throw Object.assign(new Error('1:1 inspection is not available for merged HDR photos: it would decode and merge the three files at full size. Export to inspect them.'), { code: 'unsupported' });
     if (resource.raw) {
-      if (rawConcurrency() === 1) throw Object.assign(new Error('1:1 inspection of RAW files needs a full-size decode (several hundred MB), more than this device can safely use.'), { code: 'memory' });
+      if (constrainedDevice()) throw Object.assign(new Error('1:1 inspection of RAW files needs a full-size decode (several hundred MB), more than this device can safely use.'), { code: 'memory' });
       const job = raws().run('region', { file: resource.file, raw: resource.raw, rect });
       inspectJob.current = job;
       return job.promise;
@@ -1159,7 +1159,7 @@ function EditorWorkspace() {
           blockerFor={(item) => exportBlocker(item, state.exportSettings)}
           outputOf={outputOf}
           run={batchRun}
-          constrained={rawConcurrency() === 1}
+          constrained={constrainedDevice()}
           onStart={(options) => startBatchExport(selected.map(({ id }) => id), options)}
           onCancel={() => batchRef.current?.cancel()}
           onCancelItem={(id) => batchRef.current?.cancelItem(id)}

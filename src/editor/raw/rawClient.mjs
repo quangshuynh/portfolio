@@ -1,7 +1,7 @@
 // Page side of RAW processing. Every job gets a fresh RAW worker that is terminated when
-// the job ends or is cancelled, so the decoder's wasm heap is always returned. Jobs
-// wait in one queue that runs at most `rawConcurrency()` decoders at once (one on
-// phones and low-memory devices): previews first, then exports, then imports.
+// the job ends or is cancelled, so the decoder's wasm heap is always returned. Jobs wait
+// in one queue that runs one decoder at a time (each needs 300–800 MB while it runs, so
+// the peak is one LibRaw heap): previews first, then exports, then imports.
 
 import { WorkerCancelled, createWorkerClient } from '../io/workerClient.mjs';
 import { assertCanvasWorks, createCanvas, encodeCanvas } from '../io/decode.mjs';
@@ -13,14 +13,14 @@ import { deriveParams } from '../pipeline/spec.mjs';
 
 const PRIORITY = { decode: 0, region: 0, export: 1, develop: 1, inspect: 2 };
 
-/** Concurrent RAW decoders for this device: each can need 300–800 MB while it runs. */
-export function rawConcurrency(win = globalThis) {
+/** Phones and devices reporting ≤ 4 GB: no full-size RAW decode for 1:1, smaller ZIP parts. */
+export function constrainedDevice(win = globalThis) {
   const memory = win.navigator?.deviceMemory;
   let phone = false;
   try {
     phone = Boolean(win.matchMedia?.('(pointer: coarse)').matches) && Math.max(win.screen?.width ?? 0, win.screen?.height ?? 0) <= 1024;
   } catch { /* treat as a desktop */ }
-  return phone || (typeof memory === 'number' && memory <= 4) ? 1 : 2;
+  return phone || (typeof memory === 'number' && memory <= 4);
 }
 
 const spawnRawWorker = () => new Worker(new URL('./rawWorker.mjs', import.meta.url), { type: 'module' });
@@ -42,7 +42,7 @@ function rawError(error) {
  * Creates a RAW job queue.
  * :param options: { spawn, limit } worker factory and concurrency (tests pass fakes)
  */
-export function createRawQueue({ spawn = spawnRawWorker, limit = rawConcurrency() } = {}) {
+export function createRawQueue({ spawn = spawnRawWorker, limit = 1 } = {}) {
   const waiting = [];
   let running = 0;
 
