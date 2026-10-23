@@ -207,6 +207,45 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-photo--strip .pe-photo__frame { width: 4.25rem; height: 4.25rem; }
 .pe-photo--strip[data-active] .pe-photo__select { border-color: var(--pe-accent); }
 .pe-filmstrip__status { flex: none; margin: 0; color: var(--pe-text-3); }
+.pe-filmstrip__select { flex: none; }
+
+/* Selection and batch states: active (border), selected (accent ring), edited and not
+   exported (dot), exporting (pulsing dot), failed export (red dot). */
+.pe-photo__check { flex: none; width: 1rem; height: 1rem; margin: 0 .1rem 0 .15rem; accent-color: var(--pe-accent); }
+.pe-photo[data-selected] .pe-photo__select { background: color-mix(in srgb, var(--pe-accent) 14%, transparent); }
+.pe-photo[data-selected] .pe-photo__frame { box-shadow: 0 0 0 2px var(--pe-accent); }
+.pe-photo[data-active][data-selected] .pe-photo__select { border-color: var(--pe-accent); }
+.pe-photo__frame { position: relative; }
+.pe-photo__flag { position: absolute; top: 3px; right: 3px; z-index: 1; width: .5rem; height: .5rem; border: 1px solid var(--pe-stage); border-radius: 50%; background: var(--pe-text-2); }
+.pe-photo__flag[data-flag='export'] { background: var(--pe-focus); animation: pe-pulse 1.2s ease-in-out infinite; }
+.pe-photo__flag[data-flag='error'] { background: var(--pe-danger); }
+@keyframes pe-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .pe-photo__flag[data-flag='export'] { animation: none; } }
+
+.pe-batch { display: grid; gap: .4rem; margin: 0 0 .75rem; padding: .55rem; border: 1px solid var(--pe-line); border-radius: var(--radius-sm, 4px); background: var(--pe-bg); }
+.pe-batch__row { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; min-width: 0; }
+.pe-batch__count { flex: 1 1 100%; margin: 0; font-size: .8125rem; color: var(--pe-text-2); }
+.pe-batch__count strong { color: var(--pe-text); }
+.pe-batch__actions .pe-button { flex: 1 1 auto; min-width: 0; }
+.pe-batch__history { justify-content: space-between; }
+.pe-batch__history .pe-note { flex: 1 1 100%; margin: 0; }
+.pe-batch__mode[aria-pressed='true'] { color: var(--pe-text); box-shadow: inset 0 -2px 0 var(--pe-accent); }
+.pe-segmented--two { grid-template-columns: repeat(2, 1fr); }
+.pe-batch-settings { margin: 0; padding: 0; border: 0; min-width: 0; }
+.pe-batch-groups label { display: flex; align-items: baseline; gap: .45rem; min-height: 1.9rem; }
+.pe-batch-groups .pe-note { margin: 0; }
+.pe-batch-plan { display: grid; gap: 2px; margin: .9rem 0 0; padding: 0; list-style: none; }
+.pe-batch-plan__item { display: flex; align-items: center; gap: .6rem; min-width: 0; padding: .35rem; border-radius: 2px; background: var(--pe-panel-2); }
+.pe-batch-plan__item:not([data-changed]):not([data-export]) { opacity: .75; }
+.pe-batch-plan__item[data-export='error'], .pe-batch-plan__item[data-blocked] { box-shadow: inset 3px 0 0 var(--pe-danger); }
+.pe-batch-plan__item[data-export='done'] { box-shadow: inset 3px 0 0 var(--pe-accent); }
+.pe-batch-plan__thumbs { display: flex; flex: none; gap: 2px; }
+.pe-batch-plan__thumbs .pe-thumb { width: 3.25rem; height: 3.25rem; object-fit: cover; background: var(--pe-stage); }
+.pe-batch-plan__meta { display: grid; flex: 1; gap: .15rem; min-width: 0; }
+.pe-batch-plan__meta .pe-photo__detail { white-space: normal; overflow-wrap: anywhere; font-size: .75rem; }
+.pe-batch-plan__meta progress { width: 100%; height: .35rem; }
+.pe-batch-plan__actions { display: flex; flex: none; gap: .2rem; }
+.pe-dialog__summary { flex: 1; margin: 0; min-width: 0; }
 
 /* ---------- stage ---------- */
 .pe-stage { grid-area: stage; position: relative; min-height: 0; background: var(--pe-stage); outline: none; }
@@ -239,6 +278,15 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-readout-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pe-zoom { position: absolute; right: .5rem; bottom: 0; display: flex; align-items: center; height: 2rem; }
 .pe-zoom .pe-icon-button, .pe-zoom .pe-text-button { min-height: 1.75rem; }
+.pe-zoom__inspect[aria-pressed='true'] { color: var(--pe-text); box-shadow: inset 0 -2px 0 var(--pe-accent); }
+/* 1:1 inspection covers the stage; its canvas is sized in device pixels (no CSS scaling). */
+.pe-inspect { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; overflow: hidden; background: var(--pe-stage); cursor: grab; touch-action: none; }
+.pe-inspect:active { cursor: grabbing; }
+.pe-inspect__canvas { display: block; max-width: none; image-rendering: pixelated; }
+.pe-inspect[data-state='rendering'] .pe-inspect__canvas, .pe-inspect[data-state='decoding'] .pe-inspect__canvas { opacity: .75; }
+.pe-inspect__label { position: absolute; top: .5rem; left: .5rem; right: .5rem; display: flex; flex-wrap: wrap; gap: .25rem .75rem; margin: 0; pointer-events: none; color: #fff; font-size: .6875rem; }
+.pe-inspect__label span { padding: .15rem .45rem; border-radius: 3px; background: rgba(0, 0, 0, .65); }
+.pe-inspect__label span:empty { display: none; }
 
 .pe-empty { position: absolute; inset: 0 0 2rem; display: grid; place-content: center; justify-items: center; gap: .6rem; padding: 1.5rem; text-align: center; color: var(--pe-text-2); }
 .pe-empty::before { content: ''; position: absolute; inset: 1.25rem; border: 1px dashed var(--pe-line-strong); border-radius: var(--radius-md, 10px); pointer-events: none; }
@@ -367,6 +415,8 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
   .pe-bracket__frame { width: 3.5rem; height: 2.8rem; }
   .pe-bracket__actions { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; }
   .pe-dialog__foot .pe-button { min-height: 2.75rem; }
+  /* The selected count is in the Photos panel; the strip keeps its width for photos. */
+  .pe-filmstrip__status { display: none; }
 }
 
 @media (max-width: 1180px) {

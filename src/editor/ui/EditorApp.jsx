@@ -1,21 +1,30 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { activePhoto, editorReducer, initialEditorState } from '../model/editorState.mjs';
+import { activePhoto, editorReducer, initialEditorState, selectedPhotos } from '../model/editorState.mjs';
 import { canRedo, canUndo } from '../model/history.mjs';
 import { createEditDocument, parseEditDocument, serializeEditDocument } from '../model/editDocument.mjs';
-import { neutralAdjustments } from '../model/adjustments.mjs';
+import { adjustmentsEqual, isNeutral, neutralAdjustments } from '../model/adjustments.mjs';
+import { DEFAULT_SYNC_GROUPS, planSync, sourceKind } from '../model/sync.mjs';
 import { PRESETS_STORAGE_KEY, applyPreset, parsePresetFile, serializePresets } from '../model/presets.mjs';
-import { LIMITS, exportFileName, formatBytes, previewEdgeLimit, proxyDimensions } from '../io/files.mjs';
+import { LIMITS, exportDimensions, exportFileName, formatBytes, previewEdgeLimit, proxyDimensions } from '../io/files.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { createImageWorker, usingMainThread } from '../io/workerClient.mjs';
+import { detailWorkerCount, exportImageWithDetail } from '../io/detailPool.mjs';
+import { deriveParams } from '../pipeline/spec.mjs';
 import { RAW_FORMATS, RAW_SNIFF_BYTES, isTiff } from '../raw/rawFormat.mjs';
-import { createRawQueue, exportRaw } from '../raw/rawClient.mjs';
+import { createRawQueue, exportRaw, rawConcurrency } from '../raw/rawClient.mjs';
 import { browserCapabilities, diagnosticReport } from '../io/diagnostics.mjs';
 import { readRasterExposure } from '../hdr/hdrMetadata.mjs';
 import { cropAt } from '../hdr/hdrAlign.mjs';
-import { bracketSize, checkHdrExport, createHdrJob, exportHdr, mergePreview } from '../hdr/hdrClient.mjs';
+import { bracketSize, checkHdrExport, createHdrJob, exportHdr, hdrExportGeometry, mergePreview } from '../hdr/hdrClient.mjs';
+import { batchFileNames, zipFileName } from '../batch/batchNames.mjs';
+import { createExportBatch } from '../batch/exportBatch.mjs';
+import { createZipArchive } from '../batch/zipArchive.mjs';
 import { hdrIdentity, hdrPhotoName } from '../hdr/hdrSource.mjs';
 import { appHref } from '../../util/navigation';
 import AdjustPanel from './AdjustPanel';
+import BatchDialog from './BatchDialog';
+import BatchExportDialog from './BatchExportDialog';
+import BatchPanel from './BatchPanel';
 import ExportPanel from './ExportPanel';
 import HdrMergeDialog from './HdrMergeDialog';
 import PhotoThumb from './PhotoThumb';
@@ -164,6 +173,19 @@ function EditorWorkspace() {
     return rawQueue.current;
   }, []);
   const exportJob = useRef(null);
+  // The running batch export (exportBatch.mjs), if any; one export path runs at a time.
+  const batchRef = useRef(null);
+  const [batchRun, setBatchRun] = useState(null);
+  const [batchDialog, setBatchDialog] = useState(null);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  // Copied settings (Copy edits): parameters only, with what kind of photo they came from.
+  const [clipboard, setClipboard] = useState(null);
+  // Touch selection mode: taps add or remove photos instead of opening them.
+  const [selecting, setSelecting] = useState(false);
+  // 1:1 inspection of the visible region (InspectView), and the crop decode in flight.
+  const [inspecting, setInspecting] = useState(false);
+  const inspectJob = useRef(null);
+  const regionSent = useRef(null);
   // A merged HDR's preview is re-merged from its sources when it left the proxy cache.
   const hdrProxyJob = useRef(null);
   const [hdrOpen, setHdrOpen] = useState(false);
@@ -216,7 +238,8 @@ function EditorWorkspace() {
       if (previous) meta?.setAttribute('content', previous);
       document.documentElement.classList.remove('pe-document');
       Object.values(pool).forEach((client) => client?.terminate());
-      exportJob.current?.client.terminate();
+      exportJob.current?.cancel();
+      batchRef.current?.cancel();
     };
   }, []);
 
@@ -387,6 +410,43 @@ function EditorWorkspace() {
     return result;
   }, [worker]);
   const onEngine = useCallback((info) => setEngine(info), []);
+
+  // 1:1 inspection: a full-size decode keeps only a crop around the region (RAW in the RAW
+  // queue, others in a fresh image worker that is ended afterwards); renders reuse it.
+  const loadRegionSource = useCallback(async (target, rect) => {
+    inspectJob.current?.cancel();
+    const resource = resources.current.get(target.id);
+    if (!resource?.header) throw new Error('The original file is no longer available.');
+    if (resource.hdr) throw Object.assign(new Error('1:1 inspection is not available for merged HDR photos: it would decode and merge the three files at full size. Export to inspect them.'), { code: 'unsupported' });
+    if (resource.raw) {
+      if (rawConcurrency() === 1) throw Object.assign(new Error('1:1 inspection of RAW files needs a full-size decode (several hundred MB), more than this device can safely use.'), { code: 'memory' });
+      const job = raws().run('region', { file: resource.file, raw: resource.raw, rect });
+      inspectJob.current = job;
+      return job.promise;
+    }
+    const client = createImageWorker();
+    inspectJob.current = { cancel: () => client.terminate() };
+    try {
+      return await client.call('regionSource', { file: resource.file, header: resource.header, rect });
+    } finally {
+      client.terminate();
+    }
+  }, [raws]);
+  const renderRegion = useCallback(async (kept, region, settings) => {
+    const client = worker('render');
+    const call = (full) => client.call('renderRegion', { key: kept.key, ...(full ? { kept: kept.source } : {}), region, ...settings });
+    let result;
+    try {
+      result = await call(regionSent.current !== kept.key);
+    } catch (error) {
+      if (error.code !== 'stale-region') throw error;
+      result = await call(true);
+    }
+    regionSent.current = kept.key;
+    return result;
+  }, [worker]);
+  const closeInspect = useCallback(() => { inspectJob.current?.cancel(); setInspecting(false); }, []);
+  const inspect = useMemo(() => (inspecting ? { loadSource: loadRegionSource, render: renderRegion, onClose: closeInspect } : null), [inspecting, loadRegionSource, renderRegion, closeInspect]);
   const lutsRef = useRef(luts);
   lutsRef.current = luts;
 
@@ -395,7 +455,9 @@ function EditorWorkspace() {
     if (resources.current.get(id)?.hdr) hdrProxyJob.current?.cancel();
     resources.current.delete(id);
     [...proxyCache.current.keys()].filter((key) => key.startsWith(`${id}:`)).forEach((key) => proxyCache.current.delete(key));
-    if (exportJob.current?.id === id) exportJob.current.client.terminate();
+    if (exportJob.current?.id === id) exportJob.current.cancel();
+    if (stateRef.current.activeId === id) inspectJob.current?.cancel();
+    batchRef.current?.remove(id);
     dispatch({ type: 'remove', id });
     // With the workspace empty, end the idle workers so their heaps (decode buffers,
     // the cached CPU-preview proxy) are freed now rather than at the next collection.
@@ -409,75 +471,197 @@ function EditorWorkspace() {
     }
   }, []);
 
-  const exportActive = useCallback(async () => {
-    const target = activePhoto(stateRef.current);
-    const resource = target && resources.current.get(target.id);
-    if (!resource?.header || exportJob.current) return;
+  /** Why a photo cannot be exported with these settings now, or null. */
+  const exportBlocker = useCallback((target, settings) => {
+    const values = target.history.present;
+    if (unsupportedFormats.includes(settings.format)) return `This browser cannot encode ${FORMATS[settings.format].label}.`;
+    if (values.lut && !lutsRef.current.has(values.lut.sha256)) return `Import the LUT "${values.lut.name}" again, or remove it, before exporting.`;
+    const resource = resources.current.get(target.id);
+    if (!resource?.header) return 'The original file is no longer available.';
+    if (resource.hdr) {
+      const check = checkHdrExport(resource.hdr.mode, resource.hdr.inputs, resource.hdr.analysis, settings.resize);
+      if (!check.fits) return hdrMemoryMessage(check);
+    }
+    return null;
+  }, [unsupportedFormats]);
+
+  /**
+   * Exports one photo from its original file with its own settings: the single-photo
+   * export and every batch item go through here.
+   * :param hooks: { onProgress, onCancel(cancel) } receives the function that cancels it
+   * :returns: { blob, width, height, timings, raw?, hdr? }
+   */
+  const exportPhoto = useCallback(async (target, settings, { onProgress, onCancel }) => {
+    const blocker = exportBlocker(target, settings);
+    if (blocker) throw Object.assign(new Error(blocker), { code: 'blocked' });
+    const resource = resources.current.get(target.id);
     const values = target.history.present;
     const lut = values.lut ? lutsRef.current.get(values.lut.sha256) : null;
-    if (values.lut && !lut) {
-      dispatch({ type: 'exportStatus', id: target.id, status: { state: 'error', message: `Import the LUT "${values.lut.name}" again, or remove it, before exporting.` } });
-      return;
-    }
-    const settings = stateRef.current.exportSettings;
-    const onProgress = (progress) => dispatch({ type: 'exportStatus', id: target.id, status: { state: 'running', ...progress } });
     if (resource.hdr) {
-      const { inputs, analysis, mode } = resource.hdr;
-      const check = checkHdrExport(mode, inputs, analysis, settings.resize);
-      if (!check.fits) {
-        dispatch({ type: 'exportStatus', id: target.id, status: { state: 'error', message: hdrMemoryMessage(check) } });
-        return;
-      }
+      const { inputs, analysis } = resource.hdr;
       const job = createHdrJob();
-      exportJob.current = { id: target.id, client: { terminate: () => job.cancel() } };
-      dispatch({ type: 'exportStatus', id: target.id, status: { state: 'running', stage: 'decoding', index: 0, fraction: 0 } });
-      performance.mark('pe-export-start');
+      onCancel(() => job.cancel());
       try {
-        const result = await exportHdr(inputs, analysis, { adjustments: values, raw: target.raw, lut, settings }, { rawQueue: raws(), job, onProgress });
-        performance.measure('pe-export', 'pe-export-start');
-        const fileName = exportFileName(target.name, settings.format, settings.suffix);
-        downloadBlob(result.blob, fileName);
-        dispatch({ type: 'exportStatus', id: target.id, status: { state: 'done', fileName, width: result.width, height: result.height, bytes: result.blob.size, timings: result.timings, hdr: true } });
-      } catch (error) {
-        dispatch({ type: 'exportStatus', id: target.id, status: error.code === 'cancelled' ? { state: 'cancelled' } : { state: 'error', message: error.message } });
+        return { ...await exportHdr(inputs, analysis, { adjustments: values, raw: target.raw, lut, settings }, { rawQueue: raws(), job, onProgress }), hdr: true };
       } finally {
         job.cancel();
-        exportJob.current = null;
       }
+    }
+    if (resource.raw) {
+      // A RAW export runs in the RAW queue; cancelling ends its worker.
+      const rawJob = { job: null, cancelled: false };
+      onCancel(() => { rawJob.cancelled = true; rawJob.job?.cancel(); });
+      const result = await exportRaw(raws(), { file: resource.file, raw: resource.raw, adjustments: values, lut, settings }, {
+        onProgress,
+        detailWorkers: detailWorkerCount(),
+        onStart: (job) => {
+          rawJob.job = job;
+          if (rawJob.cancelled) job.cancel();
+        },
+      });
+      if (rawJob.cancelled) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
+      return { ...result, raw: true };
+    }
+    const client = createImageWorker();
+    const signal = { cancelled: false };
+    onCancel(() => { signal.cancelled = true; client.terminate(); });
+    const workers = detailWorkerCount();
+    try {
+      if (workers > 0 && deriveParams(values, { lut }).detailActive) {
+        return await exportImageWithDetail(client, { file: resource.file, header: resource.header, adjustments: values, lut, settings }, { workers, onProgress, signal });
+      }
+      return await client.call('export', { file: resource.file, header: resource.header, adjustments: values, lut, settings }, { onProgress });
+    } finally {
+      client.terminate();
+    }
+  }, [raws, exportBlocker]);
+
+  const exportActive = useCallback(async () => {
+    const target = activePhoto(stateRef.current);
+    if (!target || target.status !== 'ready' || exportJob.current || batchRef.current) return;
+    const settings = stateRef.current.exportSettings;
+    const blocker = exportBlocker(target, settings);
+    if (blocker) {
+      dispatch({ type: 'exportStatus', id: target.id, status: { state: 'error', message: blocker } });
       return;
     }
-    // A RAW export runs in the RAW queue; cancelling ends its worker.
-    const rawJob = { job: null, cancelled: false };
-    const client = resource.raw
-      ? { terminate: () => { rawJob.cancelled = true; rawJob.job?.cancel(); } }
-      : createImageWorker();
-    exportJob.current = { id: target.id, client };
-    dispatch({ type: 'exportStatus', id: target.id, status: { state: 'running', stage: 'decoding', fraction: 0 } });
+    const running = { id: target.id, cancel: () => {} };
+    exportJob.current = running;
+    dispatch({ type: 'exportStatus', id: target.id, status: { state: 'running', stage: 'decoding', fraction: 0, ...(target.hdr ? { index: 0 } : {}) } });
     performance.mark('pe-export-start');
     try {
-      const result = resource.raw
-        ? await exportRaw(raws(), { file: resource.file, raw: resource.raw, adjustments: values, lut, settings }, {
-          onProgress,
-          onStart: (job) => {
-            rawJob.job = job;
-            if (rawJob.cancelled) job.cancel();
-          },
-        })
-        : await client.call('export', { file: resource.file, header: resource.header, adjustments: values, lut, settings }, { onProgress });
-      if (rawJob.cancelled) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
+      const result = await exportPhoto(target, settings, {
+        onProgress: (progress) => dispatch({ type: 'exportStatus', id: target.id, status: { state: 'running', ...progress } }),
+        onCancel: (cancel) => { running.cancel = cancel; },
+      });
       performance.measure('pe-export', 'pe-export-start');
       const fileName = exportFileName(target.name, settings.format, settings.suffix);
       downloadBlob(result.blob, fileName);
-      dispatch({ type: 'exportStatus', id: target.id, status: { state: 'done', fileName, width: result.width, height: result.height, bytes: result.blob.size, timings: result.timings, raw: Boolean(resource.raw) } });
+      dispatch({ type: 'exportStatus', id: target.id, status: { state: 'done', fileName, width: result.width, height: result.height, bytes: result.blob.size, timings: result.timings, hdr: Boolean(result.hdr), raw: Boolean(result.raw), adjustments: target.history.present } });
     } catch (error) {
       dispatch({ type: 'exportStatus', id: target.id, status: error.code === 'cancelled' ? { state: 'cancelled' } : { state: 'error', message: error.message } });
     } finally {
-      client.terminate();
       exportJob.current = null;
     }
-  }, [raws]);
+  }, [exportPhoto, exportBlocker]);
 
-  const cancelExport = useCallback(() => exportJob.current?.client.terminate(), []);
+  /**
+   * Batch export of photos by id: names from batchFileNames (ZIP entries and downloads
+   * alike), one export at a time from the originals, each delivered as it finishes.
+   * :param options: { mode: 'zip' | 'files', customNames: { id: name } }
+   */
+  const startBatchExport = useCallback(async (ids, { mode, customNames = {} }) => {
+    if (batchRef.current || exportJob.current) return;
+    const current = stateRef.current;
+    const settings = current.exportSettings;
+    const photos = current.photos.filter((photo) => photo.status === 'ready' && ids.includes(photo.id));
+    const names = batchFileNames(selectedPhotos(current).concat(photos.filter((photo) => !current.selectedIds.includes(photo.id)))
+      .map(({ id, name }) => ({ id, name, customName: customNames[id] })), settings);
+    const items = photos.filter((photo) => !exportBlocker(photo, settings)).map(({ id }) => ({ id, fileName: names.get(id) }));
+    if (!items.length) return;
+    const date = new Date();
+    const inZip = new Set();
+    let parts = 0;
+    const zip = mode === 'zip' ? createZipArchive({
+      date,
+      onPart: async (blob, { part, names: entries, split }) => {
+        downloadBlob(blob, zipFileName({ date, part, split, suffix: settings.suffix }));
+        entries.forEach((name) => inZip.delete(name));
+        parts = part;
+      },
+    }) : null;
+    const exported = new Map();
+    const batch = createExportBatch({
+      items,
+      exportOne: (item, hooks) => {
+        const photo = stateRef.current.photos.find(({ id }) => id === item.id);
+        if (!photo) throw Object.assign(new Error('Removed from the workspace.'), { code: 'cancelled' });
+        exported.set(item.id, photo.history.present);
+        return exportPhoto(photo, settings, hooks);
+      },
+      deliver: async (item, result) => {
+        if (!zip) { downloadBlob(result.blob, item.fileName); return; }
+        inZip.add(item.fileName);
+        await zip.add(item.fileName, result.blob);
+      },
+      onUpdate: (id, status) => {
+        if (status.state === 'removed') return;
+        const item = items.find((entry) => entry.id === id);
+        dispatch({ type: 'exportStatus', id, status: status.state === 'done' ? { ...status, fileName: item.fileName, batch: true, adjustments: exported.get(id) } : status });
+      },
+    });
+    batchRef.current = batch;
+    items.forEach(({ id }) => dispatch({ type: 'exportStatus', id, status: { state: 'queued' } }));
+    setBatchRun({ running: true, mode, outcome: null });
+    performance.mark('pe-batch-start');
+    let outcome;
+    try {
+      const result = await batch.start();
+      let zipError = null;
+      if (zip) {
+        try { parts = await zip.finish(); } catch (error) { zipError = error; }
+      }
+      // Photos whose ZIP part could not be written were not saved after all.
+      if (zipError) {
+        items.filter(({ fileName }) => inZip.has(fileName)).forEach(({ id }) => {
+          dispatch({ type: 'exportStatus', id, status: { state: 'error', message: `The ZIP could not be written: ${zipError.message}` } });
+        });
+      }
+      performance.measure('pe-batch', 'pe-batch-start');
+      const saved = result.done.length - (zipError ? items.filter(({ fileName }) => inZip.has(fileName)).length : 0);
+      const where = zip ? (parts > 1 ? ` in ${parts} ZIP files` : parts ? ' in one ZIP' : '') : ' as separate files';
+      outcome = [
+        `Saved ${saved} of ${items.length}${saved ? where : ''}.`,
+        result.failed.length ? `${result.failed.length} failed.` : '',
+        result.cancelled.length ? `${result.cancelled.length} cancelled${zip && saved ? '; the ZIP holds the photos finished before' : ''}.` : '',
+      ].filter(Boolean).join(' ');
+    } finally {
+      batchRef.current = null;
+      setBatchRun({ running: false, mode, outcome });
+    }
+  }, [exportPhoto, exportBlocker]);
+
+  const cancelExport = useCallback(() => exportJob.current?.cancel(), []);
+
+  // Batch edits. Copy and paste carry parameters only; paste replaces the default groups.
+  const copyEdits = useCallback(() => {
+    const target = activePhoto(stateRef.current);
+    if (target?.status !== 'ready') return;
+    setClipboard({ adjustments: target.history.present, name: target.name, ...sourceKind(target) });
+    setNotice({ tone: 'info', text: `Copied the settings of ${target.name}. Select photos and choose Paste.` });
+  }, []);
+  const pasteEdits = useCallback(() => {
+    if (!clipboard) return;
+    const targets = selectedPhotos(stateRef.current);
+    const plan = planSync(clipboard.adjustments, targets, { groups: DEFAULT_SYNC_GROUPS, hasLut: (sha256) => lutsRef.current.has(sha256), kind: clipboard });
+    if (plan.errors.length) { setNotice({ tone: 'error', text: plan.errors[0] }); return; }
+    dispatch({ type: 'applyBatch', label: `paste from ${clipboard.name}`, changes: plan.items.map(({ id, after }) => ({ id, after })) });
+  }, [clipboard]);
+  const applyPlan = useCallback((plan, label) => {
+    dispatch({ type: 'applyBatch', label, changes: plan.items.filter(({ changed }) => changed.length).map(({ id, after }) => ({ id, after })) });
+    setBatchDialog(null);
+  }, []);
+
 
   // Merge HDR inputs: new files are inspected like imports (hash, header, thumbnail,
   // exposure) without joining the workspace; workspace photos reuse what is known.
@@ -614,6 +798,12 @@ function EditorWorkspace() {
     try { localStorage.removeItem(AUTOSAVE_KEY); } catch { /* ignore */ }
   };
 
+  const copyRef = useRef(copyEdits);
+  copyRef.current = copyEdits;
+  const pasteRef = useRef(pasteEdits);
+  pasteRef.current = pasteEdits;
+  const dialogOpenRef = useRef(false);
+  dialogOpenRef.current = Boolean(batchDialog || exportDialogOpen);
   // Keyboard shortcuts. Text fields keep their own undo and arrow keys.
   useEffect(() => {
     const onKey = (event) => {
@@ -626,7 +816,13 @@ function EditorWorkspace() {
         dispatch({ type: (key === 'y' || event.shiftKey) ? 'redo' : 'undo' });
         return;
       }
+      if (mod && !event.altKey && !isTextField(event.target) && !hdrOpenRef.current && !dialogOpenRef.current) {
+        if (key === 'a' && !event.shiftKey) { event.preventDefault(); dispatch({ type: 'selectAll' }); return; }
+        if (key === 'c' && event.shiftKey) { event.preventDefault(); copyRef.current(); return; }
+        if (key === 'v' && event.shiftKey) { event.preventDefault(); pasteRef.current(); return; }
+      }
       if (mod || event.altKey || isControl(event.target) || hdrOpenRef.current) return;
+      if (event.key === 'Escape' && !dialogOpenRef.current) { dispatch({ type: 'clearSelection' }); setSelecting(false); return; }
       if (event.key === '\\') setCompare((value) => (value === 'original' ? 'edited' : 'original'));
       else if (key === 'y') setCompare((value) => (value === 'split' ? 'edited' : 'split'));
       else if (event.key === 'ArrowLeft') dispatch({ type: 'selectOffset', offset: -1 });
@@ -659,25 +855,68 @@ function EditorWorkspace() {
   );
   const history = photo?.history;
   const readyCount = state.photos.filter(({ status }) => status === 'ready').length;
+  const selected = selectedPhotos(state);
+  const thumbnailOf = (id) => resources.current.get(id)?.thumbnail ?? null;
+  const outputOf = (item) => {
+    const hdr = resources.current.get(item.id)?.hdr;
+    return hdr ? hdrExportGeometry(hdr.inputs, hdr.analysis, state.exportSettings.resize).output : exportDimensions({ width: item.width, height: item.height }, state.exportSettings.resize);
+  };
   const pendingHdr = state.pendingEdits.filter(({ source }) => source.hdr);
   const activeResource = photo ? resources.current.get(photo.id) : null;
   const hdrExportCheck = useMemo(() => (ready && activeResource?.hdr
     ? checkHdrExport(activeResource.hdr.mode, activeResource.hdr.inputs, activeResource.hdr.analysis, state.exportSettings.resize)
     : null), [ready, activeResource, state.exportSettings.resize]);
 
+  const multiple = state.selectedIds.length > 1;
+  // Plain click opens one photo; Ctrl/Cmd-click (or a tap in selection mode) adds or removes
+  // it; Shift-click selects a range, adding to the selection with Ctrl/Cmd.
+  const onPhotoClick = (event, id) => {
+    const mod = event.ctrlKey || event.metaKey;
+    if (event.shiftKey) dispatch({ type: 'selectRange', id, add: mod });
+    else if (mod || selecting) dispatch({ type: 'toggleSelection', id });
+    else dispatch({ type: 'select', id });
+  };
   const photoList = (variant) => state.photos.map((item, index) => {
     const resource = resources.current.get(item.id);
     const active = item.id === state.activeId;
+    const selected = state.selectedIds.includes(item.id);
+    const exportState = item.exportStatus?.state;
+    // Edited and not exported since (with these settings).
+    const pending = item.status === 'ready' && !isNeutral(item.history.present)
+      && !(exportState === 'done' && item.exportStatus.adjustments && adjustmentsEqual(item.exportStatus.adjustments, item.history.present));
+    const states = [
+      selected && multiple ? 'selected' : '',
+      pending ? 'edited, not exported' : '',
+      exportState === 'running' ? 'exporting' : exportState === 'queued' ? 'waiting to export' : exportState === 'error' ? 'export failed' : '',
+    ].filter(Boolean);
     return (
-      <li key={item.id} className={`pe-photo pe-photo--${variant}`} data-active={active || undefined} data-status={item.status}>
+      <li
+        key={item.id}
+        className={`pe-photo pe-photo--${variant}`}
+        data-active={active || undefined}
+        data-selected={(selected && (multiple || selecting)) || undefined}
+        data-pending={pending || undefined}
+        data-export={['queued', 'running', 'error'].includes(exportState) ? exportState : undefined}
+        data-status={item.status}
+      >
+        {variant === 'list' && item.status === 'ready' && (
+          <input
+            type="checkbox"
+            className="pe-photo__check"
+            checked={selected}
+            onChange={() => dispatch({ type: 'toggleSelection', id: item.id })}
+            aria-label={`Select ${item.name}`}
+          />
+        )}
         <button
           type="button"
           className="pe-photo__select"
           aria-pressed={active}
-          aria-label={`${item.name}${item.status === 'error' ? ' (failed)' : item.status === 'importing' ? ' (importing)' : ''}, photo ${index + 1} of ${state.photos.length}`}
-          onClick={() => dispatch({ type: 'select', id: item.id })}
+          aria-label={`${item.name}${item.status === 'error' ? ' (failed)' : item.status === 'importing' ? ' (importing)' : ''}, photo ${index + 1} of ${state.photos.length}${states.length ? `, ${states.join(', ')}` : ''}`}
+          onClick={(event) => onPhotoClick(event, item.id)}
         >
           <span className="pe-photo__frame">
+            {(pending || exportState === 'running' || exportState === 'queued' || exportState === 'error') && <span className="pe-photo__flag" data-flag={exportState === 'error' ? 'error' : exportState === 'running' || exportState === 'queued' ? 'export' : 'pending'} aria-hidden="true" />}
             {resource?.thumbnail ? <PhotoThumb thumbnail={resource.thumbnail} adjustments={item.history.present} lut={lutFor(item.history.present)} raw={item.raw} /> : <span className="pe-photo__placeholder" aria-hidden="true">{item.status === 'error' ? '!' : <span className="pe-spinner" />}</span>}
           </span>
           {variant === 'list' && (
@@ -689,6 +928,7 @@ function EditorWorkspace() {
                 {item.status === 'error' && item.error}
               </span>
               {item.restored && <span className="pe-photo__badge">Saved edits applied</span>}
+              {exportState === 'error' && <span className="pe-photo__badge pe-note--error">Export failed</span>}
             </span>
           )}
         </button>
@@ -762,6 +1002,25 @@ function EditorWorkspace() {
           </span>
         </div>
         <input ref={fileInputRef} type="file" accept={ACCEPT} multiple hidden onChange={(event) => { importFiles(event.target.files); event.target.value = ''; }} />
+        {readyCount > 0 && (
+          <BatchPanel
+            selectedCount={selected.length}
+            readyCount={readyCount}
+            selecting={selecting}
+            onToggleSelecting={() => setSelecting((value) => !value)}
+            onSelectAll={() => dispatch({ type: 'selectAll' })}
+            onClear={() => { dispatch({ type: 'clearSelection' }); setSelecting(false); }}
+            clipboard={clipboard}
+            onCopy={copyEdits}
+            onPaste={pasteEdits}
+            onOpen={setBatchDialog}
+            onExport={() => setExportDialogOpen(true)}
+            batches={state.batches}
+            dispatch={dispatch}
+            canEdit={ready}
+            busy={Boolean(batchRun?.running)}
+          />
+        )}
         {state.photos.length ? (
           <ul className="pe-photo-list">{photoList('list')}</ul>
         ) : (
@@ -783,6 +1042,7 @@ function EditorWorkspace() {
           renderInWorker={renderInWorker}
           onEngine={onEngine}
           zoomCommand={zoomCommand}
+          inspect={inspect}
         />
         {!state.photos.length && (
           <div className="pe-empty">
@@ -797,6 +1057,16 @@ function EditorWorkspace() {
           <button type="button" className="pe-text-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'fit', at: Date.now() })} title="Fit to screen (0)">Fit</button>
           <button type="button" className="pe-text-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'actual', at: Date.now() })} title="Actual pixels (1)">100%</button>
           <button type="button" className="pe-icon-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'in', at: Date.now() })} aria-label="Zoom in" title="Zoom in (+)">+</button>
+          <button
+            type="button"
+            className="pe-text-button pe-zoom__inspect"
+            disabled={!ready || Boolean(photo?.hdr)}
+            aria-pressed={inspecting}
+            onClick={() => (inspecting ? closeInspect() : setInspecting(true))}
+            title={photo?.hdr ? '1:1 inspection is not available for merged HDR photos' : 'Render the visible area at full resolution, as the export does (Detail at 1:1)'}
+          >
+            1:1 Detail
+          </button>
         </div>
       </main>
 
@@ -821,7 +1091,7 @@ function EditorWorkspace() {
             onExport={exportActive}
             onCancel={cancelExport}
             unsupportedFormats={unsupportedFormats}
-            busy={exporting}
+            busy={exporting || Boolean(batchRun?.running)}
           />
           {sessionButtons('pe-session pe-session--panel')}
         </div>
@@ -832,6 +1102,9 @@ function EditorWorkspace() {
             <div><dt>\</dt><dd>Show original</dd></div>
             <div><dt>Y</dt><dd>Split before/after</dd></div>
             <div><dt>← →</dt><dd>Previous, next photo</dd></div>
+            <div><dt>Ctrl/⌘ click, Shift click</dt><dd>Add to selection, select a range</dd></div>
+            <div><dt>Ctrl/⌘ A, Esc</dt><dd>Select all, clear selection</dd></div>
+            <div><dt>Ctrl/⌘ Shift C, V</dt><dd>Copy edits, paste to selected</dd></div>
             <div><dt>+ − 0 1</dt><dd>Zoom in, out, fit, 100%</dd></div>
             <div><dt>Double-click a label</dt><dd>Reset that adjustment</dd></div>
           </dl>
@@ -846,8 +1119,13 @@ function EditorWorkspace() {
       <nav className="pe-filmstrip" aria-label="Filmstrip">
         <ul className="pe-filmstrip__list">{photoList('strip')}</ul>
         <p className="pe-filmstrip__status mono" role="status">
-          {importing ? `Importing ${importing} file${importing === 1 ? '' : 's'}…` : readyCount ? `${state.photos.findIndex(({ id }) => id === state.activeId) + 1} / ${state.photos.length}` : ''}
+          {importing ? `Importing ${importing} file${importing === 1 ? '' : 's'}…` : readyCount ? `${state.photos.findIndex(({ id }) => id === state.activeId) + 1} / ${state.photos.length}${multiple ? ` · ${selected.length} selected` : ''}` : ''}
         </p>
+        {readyCount > 1 && (
+          <button type="button" className="pe-text-button pe-filmstrip__select" aria-pressed={selecting} onClick={() => setSelecting((value) => !value)} title="Tap photos to add or remove them">
+            {selecting ? 'Done' : 'Select'}
+          </button>
+        )}
         <button type="button" className="pe-icon-button pe-filmstrip__add" onClick={openPicker} aria-label="Import photos">+</button>
       </nav>
 
@@ -858,6 +1136,36 @@ function EditorWorkspace() {
       </nav>
 
       {dragDepth > 0 && <div className="pe-drop" aria-hidden="true"><p>Drop to import. Files stay on this device.</p></div>}
+      {batchDialog && photo?.status === 'ready' && (
+        <BatchDialog
+          mode={batchDialog}
+          source={photo}
+          targets={batchDialog === 'sync' ? selected.filter(({ id }) => id !== photo.id) : selected}
+          presets={userPresets}
+          luts={[...luts.values()]}
+          thumbnailOf={thumbnailOf}
+          lutFor={lutFor}
+          onApply={applyPlan}
+          onClose={() => setBatchDialog(null)}
+        />
+      )}
+      {exportDialogOpen && (
+        <BatchExportDialog
+          photos={selected}
+          settings={state.exportSettings}
+          dispatch={dispatch}
+          unsupportedFormats={unsupportedFormats}
+          blockerFor={(item) => exportBlocker(item, state.exportSettings)}
+          outputOf={outputOf}
+          run={batchRun}
+          constrained={rawConcurrency() === 1}
+          onStart={(options) => startBatchExport(selected.map(({ id }) => id), options)}
+          onCancel={() => batchRef.current?.cancel()}
+          onCancelItem={(id) => batchRef.current?.cancelItem(id)}
+          onRetry={(ids, options) => startBatchExport(ids, options)}
+          onClose={() => { if (!batchRun?.running) { setExportDialogOpen(false); setBatchRun(null); } }}
+        />
+      )}
       {hdrOpen && (
         <HdrMergeDialog
           accept={ACCEPT}

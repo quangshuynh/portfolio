@@ -4,8 +4,10 @@ A public, local-first editor for JPEG, PNG, WebP and RAW (Sony ARW, DNG). No
 account, no upload, no server: files are decoded, edited and exported in the
 visitor's browser. Built in Interval 3 (light and colour), extended in Interval 4
 (tone curves, HSL, `.cube` LUTs, presets), Interval 5 (RAW, see [RAW](#raw)) and
-Interval 6 (three-exposure HDR, see [Merge HDR](#merge-hdr)) and Interval 7 (Texture,
-Clarity, Dehaze, sharpening and noise reduction, see [Detail](#detail));
+Interval 6 (three-exposure HDR, see [Merge HDR](#merge-hdr)), Interval 7 (Texture,
+Clarity, Dehaze, sharpening and noise reduction, see [Detail](#detail)) and Interval 8
+(multi-photo selection, sync, batch export and ZIP, 1:1 Detail inspection, see
+[Batch editing](#batch-editing));
 the original proposal is in
 [photography-platform/editor-hdr-architecture.md](photography-platform/editor-hdr-architecture.md).
 `/photography` links to it with a small "Edit a photo" text link (in-app
@@ -21,6 +23,11 @@ navigation).
 | `src/editor/pipeline/colorMath.mjs` | sRGB transfer, matrices, daylight locus, Bradford white balance. |
 | `src/editor/pipeline/cpuRenderer.mjs` | Deterministic CPU renderer: tests, export, no-WebGL2 preview. |
 | `src/editor/pipeline/detail.mjs`, `detailRenderer.mjs` | Detail stage (spatial filters, guide) and the tiled renderer used by the Detail preview and every export with Detail. |
+| `src/editor/pipeline/detailRegion.mjs`, `ui/InspectView.jsx` | 1:1 Detail inspection: crop and region maths, region render equal to the export. |
+| `src/editor/io/detailPool.mjs` | Detail exports rendered in bands on several render workers. |
+| `src/editor/model/sync.mjs` | Batch plans: sync groups and compatibility, paste, presets, LUTs and reset on several photos. Selection and batch undo are in `editorState.mjs`. |
+| `src/editor/batch/` | Batch export: queue (`exportBatch`), names (`batchNames`), ZIP parts (`zipArchive`, client-zip). |
+| `scripts/check-editor-batch.mjs`, `check-editor-raw-stability.mjs` | `npm run check:editor:batch` (batch flow, ZIP integrity, genuine ARW with `BATCH_FIXTURE_DIR`); `npm run check:editor:raw-stability` (WebKit LibRaw crash reproduction). |
 | `src/editor/pipeline/shader.mjs`, `glRenderer.mjs` | WebGL2 preview: GLSL mirror of `spec.mjs`, constants injected from it. |
 | `src/editor/model/` | Adjustment registry, bounded undo history, reducer, edit document. |
 | `src/editor/io/` | Header parsing, limits and filenames, decoding, the image worker. |
@@ -32,7 +39,7 @@ navigation).
 | `src/editor/raw/` | RAW: format sniffing, LibRaw wrapper (`rawDecoder`), colour math (`rawColor`), worker tasks, job queue and export (`rawClient`). |
 | `src/editor/hdr/` | Merge HDR: bracket metadata and validation, registration (`hdrAlign`), radiance merge, ghost masks and exposure fusion (`hdrMerge`), worker tasks, page orchestration and export (`hdrClient`), document form (`hdrSource`). |
 | `scripts/check-editor-hdr.mjs` | `npm run check:editor:hdr`: HDR parity, Merge HDR flow and exports in Chromium, Firefox and WebKit; genuine A7 III files with `HDR_FIXTURE_DIR`. |
-| `scripts/check-editor-detail.mjs` | `npm run check:editor:detail`: Detail controls, preview, PNG export against the Node reference, 24 MP export timing, iPhone emulation; a genuine ARW with `DETAIL_FIXTURE_DIR`. |
+| `scripts/check-editor-detail.mjs` | `npm run check:editor:detail`: Detail controls, preview, PNG export and 1:1 inspection against the Node reference, 24 MP export timing, iPhone emulation; a genuine ARW with `DETAIL_FIXTURE_DIR`. |
 | `scripts/check-editor-raw.mjs` | `npm run check:editor:raw`: RAW parity, import, white balance, exports in Chromium, Firefox and WebKit; genuine ARW with `RAW_FIXTURE_DIR`. |
 | `public/photography/third-party-notices.txt` | Licence notices for the RAW decoder, linked from the inspector. |
 
@@ -170,10 +177,9 @@ and workers (`npm run check:editor:raw`):
 | Firefox 142 | 2.3 s | 2.1 s | 17.8 s | 930 → 1740 MB |
 | WebKit 26 (Playwright, Windows) | 1.0 s | 1.0 s | 6.1 s | 690 → 1555 MB |
 
-Playwright's Windows WebKit intermittently crashes the page when a RAW worker grows
-its shared wasm heap ("mprotect failed: 487"; about half of the runs that import
-the ARW after another RAW). Not seen in Chromium or Firefox; not caused by WebGL or
-by starting fresh workers. Safari on macOS and iOS is **not verified**; test on a
+Playwright's Windows WebKit intermittently crashes the page when a LibRaw worker starts
+after another was ended ("mprotect failed: 487"); reproduction and measurements in
+[Known issues](#known-issues). Not seen in Chromium or Firefox; not caused by WebGL. Safari on macOS and iOS is **not verified**; test on a
 real iPhone before relying on it. iOS canvases cap at about 16.7 MP, so a 24 MP
 export fails there with the existing message (choose a smaller size). Not measured
 on an M1 MacBook Air.
@@ -271,7 +277,7 @@ After a second merge of the same files Chromium settled at 1.05–1.12 GB and Fi
 export both returned to about their post-merge level. Phones are **not verified** (full-size
 HDR export there is blocked by the memory budget; previews use the 2048–3072 px proxy).
 Playwright's Windows WebKit crashes in about half of the HDR exports from RAW, always
-while a new LibRaw worker starts decoding (the Interval 5 issue; nine LibRaw jobs per
+while a new LibRaw worker starts (see [Known issues](#known-issues); nine LibRaw jobs per
 export make it likely); not reproduced with HDR code alone, nor in Chromium or Firefox.
 Safari on macOS and iOS is not verified.
 
@@ -382,19 +388,48 @@ GPU path runs as before, bit for bit. A multi-pass WebGL2 version was not built:
 float render targets (several 64–128 MB textures at a 4096 px proxy, a risk on phones) and
 its own parity checks; the CPU frame is exact.
 
-**Export.** JPEG/PNG/WebP render in place in the decode canvas, band by band, each band
-keeping a copy of the rows above it before they are overwritten (tested equal to a whole
-render); RAW and merged HDR exports render from the decoded image in memory. Cancelling
-works between bands.
+**Export.** On desktops (at least 4 logical cores, more than 4 GB reported, not a phone)
+Detail exports render in 256-row bands on `min(4, cores − 2)` render workers
+(`io/detailPool.mjs`): the original is decoded at the export size (RAW: developed by LibRaw,
+whose worker then ends), the page computes the guide while yielding, and each worker
+receives only its band plus the halo. Bit for bit equal to the one-thread render (tested
+with transparency, JPEG flattening and RAW). This holds the decoded image and the output
+canvas at once, about 300 MB more at 24 MP. Elsewhere, and for merged HDR, the one-thread
+export stays: JPEG/PNG/WebP render in place in the decode canvas, each band keeping a copy of
+the rows above it (tested equal to a whole render); RAW and HDR render from the decoded
+image. Cancelling works between bands.
+
+Profile before the change (Node, 24 MP, all six controls, 11.2 s): the per-pixel Detail
+loops 42%, box blurs 23%, transfer functions 10%. Unclamped blur loops and larger tiles gained
+0–8% (V8 already optimises the clamped loops), so the filters are unchanged and the speed-up
+comes from the band workers.
+
+**1:1 inspection** (**1:1 Detail** next to the zoom buttons): the visible area rendered at
+one source pixel per device pixel by the export's renderer, so Sharpening and noise
+reduction show what a full-size export shows; this is not CSS zoom of the preview. The
+original is decoded once at full size in a worker (RAW: the full demosaic) and only a crop is
+kept: the region (at most 2048×1536), half its size again on each side to pan, and the
+largest Detail halo, plus the guide source (≤ 768 px, independent of the settings). Edits and
+pans inside that crop re-render only the region in the render worker; leaving it decodes
+again. Equal to the same pixels of a full-size export (unit tests, and 0 difference in
+Chromium against the Node reference). Original and Split compare with the source or the
+neutral RAW development; drag or arrow keys pan, Escape closes. Not available for merged HDR
+(it would merge three full-size files) or for RAW on phones and devices reporting ≤ 4 GB.
+Genuine A7 III ARW (Chromium): first frame 3.6 s (full development), browser peak 1652 MB.
 
 **Measurements** (`npm run check:editor:detail`, Windows i7-9700, headless Playwright,
 whole browser incl. GPU and workers; draft / final frame after a value is committed):
 
-| Browser | 24 MP JPEG (4096 px proxy): first Detail value · Sharpening change · Exposure change · four more controls | Full-size JPEG export, all six controls | Memory: baseline → export peak |
+| Browser | 24 MP JPEG (4096 px proxy): first Detail value · Sharpening change · Exposure change · four more controls | Full-size JPEG export, all six controls: Interval 7 → 8 (4 band workers) | Memory: baseline → export peak (Interval 8) |
 | --- | --- | --- | --- |
-| Chromium 141 | 1.1/2.3 s · 0.18/1.3 s · 0.28/1.8 s · 0.85/2.8 s | 16.2 s (6000×4000) | 444 → 1120 MB |
-| Firefox 142 | 0.53/1.1 s · 0.21/0.78 s · 0.36/1.1 s · 1.0/2.9 s | 24.8 s | 810 → 1428 MB |
-| WebKit 26 (2 runs) | 1.4–1.8/2.2–2.7 s · 0.47–0.60/1.1–1.5 s · 0.61–0.70/1.7–2.1 s · 0.64/2.0–4.7 s | 18.4–18.6 s | 421–465 → 1070–1185 MB |
+| Chromium 141 | 1.1/2.3 s · 0.18/1.3 s · 0.28/1.8 s · 0.85/2.8 s | 16.2 → 6.1 s (6000×4000) | 469–485 → 1419–1452 MB |
+| Firefox 142 | 0.53/1.1 s · 0.21/0.78 s · 0.36/1.1 s · 1.0/2.9 s | 24.8 → 7.0 s | 858 → 1717 MB |
+| WebKit 26 | 1.4–1.8/2.2–2.7 s · 0.47–0.60/1.1–1.5 s · 0.61–0.70/1.7–2.1 s · 0.64/2.0–4.7 s | 18.5 → 9.0 s | 446 → 1373 MB |
+
+Genuine A7 III ARW (`DSC09640`, Texture 40, luminance NR 30, Sharpening 40), full-size JPEG
+export with band workers: 5.6–5.8 s at 1403–1493 MB peak (Chromium), 17.0 s at 1859 MB
+(Firefox). Previews are unchanged (still one worker; the timings in the second column are
+Interval 7's).
 
 Genuine ISO 6400 ARW (`DSC09356`, Texture and luminance NR): first value 1.1/2.3 s
 (Chromium), 1.1/2.5 s (Firefox); full-size export 11.8 s at 1689 MB peak (Chromium), 25.8 s
@@ -406,6 +441,107 @@ worker canvas, so decoding runs on the main thread there, but Detail rendering s
 worker; the iPhone 13 emulation (WebKit) has
 the Detail section reachable in the Adjust tab with no sideways scrolling. Not measured on
 a physical phone.
+
+## Batch editing
+
+**Selection** (library list and filmstrip). The active photo is the one shown and edited,
+and the source of a sync; it is always selected. Click opens one photo and selects only it;
+Ctrl/⌘-click adds or removes a photo without changing the active one; Shift-click selects
+the range from the anchor (Ctrl/⌘-Shift adds it); as in file managers, a Ctrl/⌘-click moves
+the anchor. Each list row has a checkbox; Ctrl/⌘ A selects every ready photo, Esc clears.
+On touch screens **Select…** (Photos panel) or **Select** (filmstrip) turns taps into
+add/remove until **Done**. Rows show: active (border), selected (accent ring), edited and
+not exported with these settings (dot), exporting (pulsing dot), export failed (red dot and
+"Export failed"); the same states are in each button's accessible name. Edits always change
+the active photo only; nothing changes the other selected photos until a batch action is
+applied.
+
+**Copy, paste, sync** (`model/sync.mjs`). Copy edits (Ctrl/⌘ Shift C) keeps the active
+photo's settings (parameters, never pixels). Paste (Ctrl/⌘ Shift V) applies them to the
+selected photos: Light, Color, HSL, Detail, Tone curve and LUT. **Sync…** copies chosen
+groups from the active photo to the other selected photos and lists, per photo, which
+groups change, with before/after thumbnails (first 12; thumbnails do not show Detail),
+before anything is applied. Chosen groups are **replaced exactly** (a neutral source group
+resets it on the target, a source without LUT removes the target's LUT); other groups keep
+each photo's values. Source-specific data is not a setting and is never copied: a RAW
+file's as-shot multipliers, camera matrix and exposure data (`photo.raw`), a merge's files,
+roles and merge settings (`photo.hdr`). Two groups are off by default and copy only where
+they apply: **RAW white balance** (mode, kelvin and tint; RAW source to RAW and merged RAW
+targets, each developed through its own camera matrix) and **HDR tone mapping** (between
+merged RAW HDR photos). A LUT that is not loaded blocks the sync until it is imported or LUT
+is left out. Settings move freely between JPEG, PNG, WebP, RAW and merged photos.
+
+**Presets, LUTs, reset.** **Preset…** applies a built-in or saved preset to every selected
+photo exactly as to one (only the groups it contains). **LUT…** sets a loaded `.cube` (or
+none) and its intensity on every selected photo; the colour assumptions are those of
+[Pipeline](#pipeline). **Reset…** returns them to neutral (RAW as shot, merges kept). All
+three preview the plan like Sync; Cancel changes nothing.
+
+**Undo.** A batch change adds one history entry per changed photo (so Ctrl/⌘ Z on a photo
+undoes its part) and one batch entry holding that photo's settings before and after (a few
+hundred bytes each; never pixels; the last 20 batches). **Undo/Redo <batch>** restores
+every photo still at the value the batch left, and skips (and counts) photos edited since
+or removed.
+
+**Export selected.** One format (JPEG, PNG, WebP where the browser encodes it), quality,
+size (original, long edge, fit within; aspect ratio always kept, never upscaled) and suffix
+for all; each photo rendered from its original file with its own settings by the same code
+as a single export (RAW from sensor data, merged HDR from its three files, Detail at full
+resolution). Saved as **one ZIP** or **separate files**. Photos that cannot be exported now
+(missing LUT, HDR memory budget, unsupported format) are listed with the reason and left
+out. Per-photo progress, Cancel for one photo or the batch, and **Retry** for failed or
+cancelled photos (as separate files with the same names). File sizes are not estimated
+(they depend on content); the dialog states the largest canvas (exact: width × height × 4)
+and adds the RAW decoder for RAW photos. Phones and devices reporting ≤ 4 GB get a warning
+for full-size RAW/HDR outputs above 16.7 MP (iOS canvas cap).
+
+**Queue** (`batch/exportBatch.mjs`): one export at a time. RAW and HDR exports need several
+hundred MB to 1.5 GB each, and one at a time keeps the peak at the largest photo rather than
+the sum; Detail already uses up to four render workers per photo, and RAW decoding still
+goes through the RAW queue. Each item gets its own workers, ended afterwards or on cancel. A
+photo is queued once; removing a photo drops it from the queue or stops it, and its result
+is never delivered; a failure ends that photo only, and finished photos are delivered as
+they finish. A single export and a batch never run together.
+
+**Names** (`batch/batchNames.mjs`): `exportFileName()` for each photo (`DSC09640.ARW` →
+`DSC09640-quangedit.jpg`, `DSC09641-HDR-quangedit.jpg`, Unicode kept, unsafe characters
+replaced, suffix never doubled), then collisions numbered in workspace order ignoring case
+(`DSC0001-quangedit.jpg`, `DSC0001-quangedit-2.jpg`). A custom name typed in the dialog
+(Rename) is kept, sanitised, with the format's extension. Names never contain a path, so
+ZIP entries cannot escape the folder; ZIP entries and separate downloads have the same
+names. The ZIP is `photos-quangedit-YYYY-MM-DD.zip`.
+
+**ZIP** (`batch/zipArchive.mjs`, [client-zip](https://github.com/Touffy/client-zip) 2.5.1,
+MIT, 2.6 kB, no compression or wasm, ZIP64): each encoded photo is streamed into the
+archive as it finishes and then released; decoded images are never kept. The archive is
+collected as Blob chunks. Parts are limited to 1 GB (256 MB on phones and ≤ 4 GB devices);
+a larger batch is split into complete `…-part1.zip`, `…-part2.zip`. A part is downloaded
+only after its central directory is written: a ZIP failure discards that part (its photos
+are marked failed), and Cancel finishes the ZIP with the photos already done, so no
+half-written archive is ever delivered. Entries are stored with one modification time
+(the batch start). Integrity is checked by an independent reader (`dev/zipVerify.mjs`:
+central directory, local headers, CRC-32) in unit tests and the browser check.
+
+**Validation** (`npm run check:editor:batch`, Windows i7-9700, headless Playwright):
+selection, copy/paste with batch undo and redo, Sync without Light, a preset on four photos,
+a ZIP and separate files (names, CRC, sizes), a custom name, cancel after one photo then
+retry, in Chromium 141, Firefox 142 and WebKit 26 (desktop), and selection mode plus a ZIP
+export without sideways scrolling in iPhone 13 (WebKit) and Pixel 7 (Chromium) emulation.
+Three batches of four PNGs at full size in a row: Chromium peak 630–642 MB on a 574–587 MB
+baseline (no growth between batches).
+
+Genuine A7 III ARWs (`DSC09640–09642`, `BATCH_FIXTURE_DIR`, Chromium): import of three
+2.6 s; one photo edited (Exposure, Shadows, Texture), pasted to the other two, Natural preset
+on two, then three full-size JPEGs (6024×4024, names `DSC0964x-quangedit.jpg`):
+
+| Batch | Time | Browser memory peak (baseline 641 MB) |
+| --- | --- | --- |
+| Three separate files | 18.6 s (32.5 s before the Detail band workers) | 1660 MB |
+| The same three as one ZIP | 17.6 s (32.0 s); entries byte-identical to the separate files | 1559 MB, 1008 MB after |
+| Merge of the bracket (`DSC09641-HDR`), then the three RAWs and the merge (6002×4018) as one ZIP | 32.0 s (47.2 s) | 2140 MB |
+
+Not verified: physical phones (iPhone, Android), Safari on macOS, batches of 50 full-size
+RAWs, ZIP parts above 1 GB.
 
 ## Edit documents and persistence
 
@@ -473,8 +609,8 @@ a physical phone.
 
 ## Export filenames
 
-`exportFileName()` in `io/files.mjs` names every export (later batch or ZIP
-exports must use it too): the source's base name with its last extension removed
+`exportFileName()` in `io/files.mjs` names every export (batch exports and ZIP entries
+through `batchFileNames()`, see [Batch editing](#batch-editing)): the source's base name with its last extension removed
 (1–5 letters or digits, any case), sanitised, then the suffix, then the chosen
 format's extension. The default suffix is `-quangedit`: `DSC09420.ARW` →
 `DSC09420-quangedit.jpg`, `portrait.png` → `portrait-quangedit.webp`. A name that
@@ -605,21 +741,44 @@ Safari cannot encode WebP (the option is disabled when the browser cannot).
 - Zoom past the proxy (about 170% of the source width for 24 MP) is upscaled.
 - Thumbnails re-render on the main thread (about 7 ms each, throttled).
 - Main-thread image tasks (no worker canvas) pause the page briefly while decoding.
-- Exports with every advanced stage on are slow on one CPU thread (about 10 s
-  at 24 MP on a desktop; phones several times longer). Rendering bands on
-  several workers is the next step.
+- Exports with every per-pixel stage on (curves, HSL, LUT, no Detail) still run on one CPU
+  thread (about 10 s at 24 MP on a desktop; phones several times longer); only Detail
+  exports use band workers.
 - Pinch-zoom works with two pointers on the preview; it has not been tried on a
   physical phone.
 
-- Playwright's Windows WebKit (not Safari) crashes the page now and then while LibRaw
-  decodes the RAW bracket in `check:editor:hdr` (Merge HDR step, mostly the iPhone 13
-  emulation): 0 of 18 runs before Interval 7, 7 of 40 since its first commit, which only
-  adds pure Detail code to the bundles the RAW worker loads. No Detail code runs in that
-  step; the crash is the Interval 5 LibRaw/WebKit one, apparently sensitive to the worker
-  bundle. Chromium, Firefox and the Detail check are unaffected. Not seen on real Safari
-  (not tested).
-- Detail renders on one CPU thread: see the measurements in [Detail](#detail). A
-  multi-pass WebGL2 Detail preview and a 1:1 Detail preview of the visible area are not built.
+- **Playwright's Windows WebKit crashes when a LibRaw worker starts after the first one was
+  ended** (Interval 5–7 "mprotect failed"). Reproduced without the editor UI by
+  `npm run check:editor:raw-stability` (production RAW worker, genuine A7 III ARWs,
+  WebKit 26 on Windows, trials of 9 decodes in a fresh browser):
+
+  | Pattern | Trials crashed |
+  | --- | --- |
+  | Fresh worker per job, as the editor (half-size decodes) | 6/10, 8/10 (two runs) |
+  | … two at once · full decodes · two full at once · iPhone 13 emulation | 7/10 · 5/10 · 7/10 · 6/10 |
+  | … 1 s / 5 s between ending a worker and starting the next | 4/10 / 6/10 |
+  | … plus an idle worker that only instantiated LibRaw · with two full decodes | 7/10 · 8/10 |
+  | One reused worker (half · full decodes, 180 in total) | 0/10 · 0/10 |
+  | First worker kept alive after its decode, the other 8 fresh | 0/10 |
+  | One job per browser | 0/10 |
+
+  Every failure is the web content process dying (Playwright `crash`; workers run in that
+  process): no worker `error` event, no error reply from LibRaw, no page exception, no
+  harness timeout. Logged steps put it at the start of a new worker right after another was
+  ended, nearly always the second worker of the process, never during a decode. So it is
+  not caused by Detail, concurrency, decode size, memory growth, emulation or timing (the
+  Interval 7 "bundle" correlation was chance at these rates). It looks like the WebKit
+  Windows port's handling of a released wasm memory reservation; the evidence points
+  upstream (WebKit/Playwright's Windows build), not at LibRaw or editor code. Chromium and
+  Firefox never crash in the same harness (0 of 40 trials, including two full decodes at once). Not changed in the product: reusing RAW workers
+  avoids it here, but would keep each worker's grown LibRaw heap (up to about 700 MB) alive,
+  which is a real risk on iPhones, and real Safari is not known to be affected (not tested).
+  Limits that stay: one RAW decoder at a time on phones and ≤ 4 GB devices, batch exports one
+  at a time, Detail band workers never run LibRaw. Browser checks that decode several RAWs in
+  Playwright WebKit can still fail this way; such a failure shows as `page crashed`.
+- Detail previews render on one CPU thread (exports use band workers): see
+  [Detail](#detail). A multi-pass WebGL2 Detail preview is not built. 1:1 inspection is not
+  available for merged HDR photos.
 
 ## Extension points
 
@@ -634,6 +793,6 @@ at render time), local and exportable at full resolution. Not built yet:
 | Text, layers, blend modes | A layer list in the document composited after the photo pipeline, by the same engine in preview and banded export. |
 | Brushes, masks, gradients, local adjustments | Per-layer masks evaluated per pixel; brush masks need a stored raster or stroke list. |
 | Retouching, healing | Spatial; the tiled renderer and halo bands in `detailRenderer.mjs`. |
-| Faster export | Split bands across several workers (the band loop in `imageTasks.mjs` is already independent per band). |
-| 1:1 Detail preview, GPU Detail | A full-resolution decode of the visible tiles rendered by `renderDetailRows`; a multi-pass WebGL2 version needs float render targets and parity checks. |
-| Batch export, ZIP, preset sync | Queue over the export worker (and the RAW queue); names from `exportFileName()`; presets already apply per group to any photo. |
+| Faster export | Band workers (`detailPool.mjs`) for non-Detail exports and Detail previews; per-pixel stages are independent per band too. |
+| GPU Detail | A multi-pass WebGL2 version needs float render targets and parity checks against the CPU renderer. |
+| 1:1 for merged HDR | The HDR worker would merge the three full-size files once and keep a crop, as `regionSource` does for one file. |

@@ -5,6 +5,7 @@
   "dependencies": {
     "@fontsource-variable/schibsted-grotesk": "^5.3.0",
     "@fontsource/martian-mono": "^5.3.0",
+    "client-zip": "2.5.1",
     "libraw-wasm": "1.6.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
@@ -26,6 +27,8 @@
     "check:editor:raw": "node scripts/check-editor-raw.mjs",
     "check:editor:hdr": "node scripts/check-editor-hdr.mjs",
     "check:editor:detail": "node scripts/check-editor-detail.mjs",
+    "check:editor:batch": "node scripts/check-editor-batch.mjs",
+    "check:editor:raw-stability": "node scripts/check-editor-raw-stability.mjs",
     "cms": "node cms/server.mjs",
     "assets:refresh": "node scripts/refresh-project-assets.mjs",
     "test:hero:browser": "node scripts/check-hero-browser.mjs",

@@ -1,0 +1,137 @@
+// Detail exports rendered on several workers. Detail is the slow part of an export (about
+// 1 s per megapixel per thread with every control on), and its bands are independent once
+// the guide is known: each band needs only its rows plus the halo. The page holds the
+// decoded image, computes the guide (yielding between bands), and hands bands to a small
+// pool of render workers; each band comes back as RGBA8 and is written into the output
+// canvas. Every band is rendered by the same code from the same rows as in the one-thread
+// export, so the result is bit for bit the same (tested). Phones and devices with little
+// memory or few cores keep the one-thread export.
+
+import { createWorkerClient, WorkerCancelled } from './workerClient.mjs';
+import { prepareRender } from '../pipeline/cpuRenderer.mjs';
+import { computeImageGuide, createAreaAccumulator, guideSize, rowsHaveAlpha } from '../pipeline/detailRenderer.mjs';
+import { detailHalo } from '../pipeline/detail.mjs';
+import { deriveParams } from '../pipeline/spec.mjs';
+import { assertCanvasWorks, createCanvas, encodeCanvas } from './decode.mjs';
+import { exportDimensions } from './files.mjs';
+import { FORMATS } from './imageHeader.mjs';
+
+export const DETAIL_POOL_BAND_ROWS = 256;
+const MAX_DETAIL_WORKERS = 4;
+
+/**
+ * Render workers for a Detail export on this device: 0 means the one-thread export.
+ * Each holds one band and its scratch planes (about 20 MB at 6000 px wide).
+ */
+export function detailWorkerCount(win = globalThis) {
+  const memory = win.navigator?.deviceMemory;
+  const cores = win.navigator?.hardwareConcurrency ?? 2;
+  let phone = false;
+  try {
+    phone = Boolean(win.matchMedia?.('(pointer: coarse)').matches) && Math.max(win.screen?.width ?? 0, win.screen?.height ?? 0) <= 1024;
+  } catch { /* treat as a desktop */ }
+  if (phone || (typeof memory === 'number' && memory <= 4) || typeof win.Worker !== 'function') return 0;
+  const count = Math.min(MAX_DETAIL_WORKERS, cores - 2);
+  return count >= 2 ? count : 0;
+}
+
+const spawnRenderWorker = () => new Worker(new URL('./imageWorker.mjs', import.meta.url), { type: 'module' });
+const channelsOf = (image) => (image.kind === 'raw' || image.kind === 'hdr' ? 3 : 4);
+const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** Guide and transparency of a whole image, read in bands so the page keeps painting. */
+async function analyse(image, prepared, signal) {
+  const small = guideSize(image);
+  const accumulator = createAreaAccumulator(image.kind, image.width, image.height, small.width, small.height);
+  const channels = channelsOf(image);
+  let transparent = false;
+  for (let row = 0; row < image.height; row += DETAIL_POOL_BAND_ROWS) {
+    if (signal.cancelled) throw new WorkerCancelled();
+    const rows = Math.min(DETAIL_POOL_BAND_ROWS, image.height - row);
+    const data = image.data.subarray(row * image.width * channels, (row + rows) * image.width * channels);
+    accumulator.add(data, row, rows);
+    if (channels === 4) transparent ||= rowsHaveAlpha({ width: image.width, data }, 0, rows);
+    await nextTick();
+  }
+  const source = accumulator.finish();
+  const guideImage = small.width === image.width && small.height === image.height && !transparent ? image : source;
+  return { guide: computeImageGuide(prepared, guideImage), transparent };
+}
+
+/**
+ * Renders an in-memory image with Detail settings on `workers` helpers.
+ * :param image: { kind?, width, height, data } (RGBA8, or RAW/HDR linear RGB)
+ * :param settings: { adjustments, lut, raw, nativeWidth, nativeHeight, flattenAlpha }
+ * :param options: { workers, onBand({ row, rows, data }), onProgress(fraction), signal: { cancelled }, spawn }
+ * :returns: when every band has been delivered
+ */
+export async function renderDetailParallel(image, settings, { workers, onBand, onProgress = () => {}, signal = { cancelled: false }, spawn = spawnRenderWorker }) {
+  const { adjustments, lut = null, raw = null, nativeWidth = image.width, nativeHeight = image.height, flattenAlpha = false } = settings;
+  const prepared = prepareRender(deriveParams(adjustments, { lut, raw }));
+  const { guide, transparent } = await analyse(image, prepared, signal);
+  const scale = Math.min(1, Math.max(image.width, image.height) / Math.max(nativeWidth, nativeHeight));
+  const halo = detailHalo(prepared.params.detail, scale);
+  const options = { width: image.width, height: image.height, nativeWidth, nativeHeight, guide, transparent };
+  const channels = channelsOf(image);
+  const job = `${Date.now()}-${Math.random()}`;
+  const clients = Array.from({ length: Math.max(1, workers) }, () => createWorkerClient(spawn()));
+  const stop = () => clients.forEach((client) => client.terminate());
+  const bands = [];
+  for (let row = 0; row < image.height; row += DETAIL_POOL_BAND_ROWS) bands.push(row);
+  let done = 0;
+  try {
+    await Promise.all(clients.map((client) => client.call('detailBegin', { job, adjustments, lut, raw, options })));
+    const lane = async (client) => {
+      while (bands.length) {
+        if (signal.cancelled) throw new WorkerCancelled();
+        const row = bands.shift();
+        const rows = Math.min(DETAIL_POOL_BAND_ROWS, image.height - row);
+        const top = Math.max(0, row - halo);
+        const bottom = Math.min(image.height, row + rows + halo);
+        // A copy of just these rows: posting a view would clone its whole buffer.
+        const data = image.data.slice(top * image.width * channels, bottom * image.width * channels);
+        const source = { kind: image.kind, width: image.width, height: bottom - top, y0: top, data };
+        const band = await client.call('detailRows', { job, source, y0: row, y1: row + rows, flattenAlpha }, { transfer: [data.buffer] });
+        if (signal.cancelled) throw new WorkerCancelled();
+        onBand({ row, rows, data: band });
+        done += rows;
+        onProgress(done / image.height);
+      }
+    };
+    await Promise.all(clients.map(lane));
+  } finally {
+    stop();
+  }
+}
+
+/**
+ * A JPEG, PNG or WebP export with Detail on several workers: `decoder` (an image worker
+ * client) decodes the original at the export size, the bands are rendered in parallel
+ * into a page canvas, which is encoded. The one-thread export renders in place in the
+ * decode canvas instead; this holds the decoded pixels and the canvas (8 bytes per pixel).
+ * :returns: { blob, width, height, timings }
+ */
+export async function exportImageWithDetail(decoder, { file, header, adjustments, lut = null, settings }, { workers, onProgress = () => {}, signal, spawn }) {
+  const started = performance.now();
+  const format = FORMATS[settings.format];
+  const size = exportDimensions({ width: header.displayWidth, height: header.displayHeight }, settings.resize);
+  const canvas = createCanvas(size.width, size.height);
+  const context = canvas.getContext('2d', { colorSpace: 'srgb' });
+  assertCanvasWorks(context, size.width, size.height);
+  onProgress({ stage: 'decoding', fraction: 0 });
+  const image = await decoder.call('decode', { file, header, width: size.width, height: size.height });
+  const decodedAt = performance.now();
+  await renderDetailParallel(image, { adjustments, lut, nativeWidth: header.displayWidth, nativeHeight: header.displayHeight, flattenAlpha: settings.format === 'jpeg' }, {
+    workers,
+    signal,
+    spawn,
+    onBand: ({ row, rows, data }) => context.putImageData(new ImageData(data, size.width, rows), 0, row),
+    onProgress: (fraction) => onProgress({ stage: 'rendering', fraction }),
+  });
+  onProgress({ stage: 'encoding', fraction: 1 });
+  const renderedAt = performance.now();
+  const blob = await encodeCanvas(canvas, format.mime, settings.format === 'png' ? undefined : settings.quality);
+  if (signal.cancelled) throw new WorkerCancelled();
+  if (blob.type !== format.mime) throw Object.assign(new Error(`This browser cannot encode ${format.label}. Choose another format.`), { code: 'encoder' });
+  return { blob, width: size.width, height: size.height, timings: { decode: decodedAt - started, render: renderedAt - decodedAt, encode: performance.now() - renderedAt, detailWorkers: workers } };
+}

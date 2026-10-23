@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { exportDimensions, exportFileName } from '../io/files.mjs';
 
@@ -26,17 +26,16 @@ function NumberField({ label, value, onChange }) {
   );
 }
 
-export default function ExportPanel({ settings, photo, dispatch, onExport, onCancel, unsupportedFormats, busy, blockedReason = null }) {
+/**
+ * Format, quality, size and filename suffix: the export settings shared by single and
+ * batch exports. `name` keeps the radio groups of two instances apart.
+ */
+export function ExportSettingsFields({ settings, dispatch, unsupportedFormats, name = 'pe-format' }) {
   const set = (changes) => dispatch({ type: 'setExportSettings', settings: changes });
   const setResize = (changes) => set({ resize: { ...settings.resize, ...changes } });
-  const ready = photo?.status === 'ready';
-  const output = ready ? exportDimensions({ width: photo.width, height: photo.height }, settings.resize) : null;
-  const status = photo?.exportStatus ?? { state: 'idle' };
-  const running = status.state === 'running';
-
+  const qualityId = useId();
   return (
-    <section className="pe-panel" aria-labelledby="pe-export-title">
-      <div className="pe-panel__head"><h2 id="pe-export-title">Export</h2></div>
+    <>
       <fieldset className="pe-group pe-segmented-field">
         <legend>Format</legend>
         <div className="pe-segmented" role="radiogroup" aria-label="Output format">
@@ -44,7 +43,7 @@ export default function ExportPanel({ settings, photo, dispatch, onExport, onCan
             <label key={key} className="pe-segmented__option">
               <input
                 type="radio"
-                name="pe-format"
+                name={name}
                 value={key}
                 checked={settings.format === key}
                 disabled={unsupportedFormats.includes(key)}
@@ -60,11 +59,11 @@ export default function ExportPanel({ settings, photo, dispatch, onExport, onCan
       {settings.format !== 'png' && (
         <div className="pe-field">
           <div className="pe-adjust__head">
-            <label htmlFor="pe-quality">Quality</label>
-            <output htmlFor="pe-quality" className="pe-adjust__value mono">{Math.round(settings.quality * 100)}</output>
+            <label htmlFor={qualityId}>Quality</label>
+            <output htmlFor={qualityId} className="pe-adjust__value mono">{Math.round(settings.quality * 100)}</output>
           </div>
           <input
-            id="pe-quality"
+            id={qualityId}
             className="pe-range"
             type="range"
             min="50"
@@ -95,6 +94,21 @@ export default function ExportPanel({ settings, photo, dispatch, onExport, onCan
         <span>Filename suffix</span>
         <input type="text" value={settings.suffix} maxLength={40} spellCheck="false" onChange={(event) => set({ suffix: event.target.value })} />
       </label>
+
+    </>
+  );
+}
+
+export default function ExportPanel({ settings, photo, dispatch, onExport, onCancel, unsupportedFormats, busy, blockedReason = null }) {
+  const ready = photo?.status === 'ready';
+  const output = ready ? exportDimensions({ width: photo.width, height: photo.height }, settings.resize) : null;
+  const status = photo?.exportStatus ?? { state: 'idle' };
+  const running = status.state === 'running';
+
+  return (
+    <section className="pe-panel" aria-labelledby="pe-export-title">
+      <div className="pe-panel__head"><h2 id="pe-export-title">Export</h2></div>
+      <ExportSettingsFields settings={settings} dispatch={dispatch} unsupportedFormats={unsupportedFormats} />
 
       {ready && (
         <dl className="pe-export-summary">

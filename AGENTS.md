@@ -22,6 +22,7 @@ read it before changing projects or project assets.
 | `docs/photography-platform/` | Interval 0 audit and architecture for the photography CMS and editor (planning only). |
 | `src/editor/raw/` | Editor RAW support (Interval 5): content sniffing, LibRaw wrapper, colour math, worker tasks, queue. Behaviour, limits and measurements in `docs/photography-editor.md` (RAW); notices in `public/photography/third-party-notices.txt`. |
 | `src/editor/hdr/` | Merge HDR (Interval 6): bracket validation, registration, radiance merge, exposure fusion, ghost masks, staged export. Behaviour, limits and measurements in `docs/photography-editor.md` (Merge HDR). Genuine-file tests need `HDR_FIXTURE_DIR`. |
+| `src/editor/batch/` | Batch export (Interval 8): queue, collision-safe `-quangedit` names, ZIP parts with client-zip. Selection, sync and batch undo are in `src/editor/model/`; behaviour and limits in `docs/photography-editor.md` (Batch editing). |
 | `experiments/raw-decode-poc/` | Isolated RAW decoding proof of concept with its own `package.json`; not part of the site build or root `npm test`. |
 
 ## Project metadata

@@ -12,6 +12,7 @@ import { exportDimensions, proxyDimensions } from './files.mjs';
 import { FORMATS } from './imageHeader.mjs';
 import { LutError, MAX_CUBE_BYTES, parseCube } from '../pipeline/lut.mjs';
 import { contentHash } from './hash.mjs';
+import { renderRegion } from '../pipeline/detailRegion.mjs';
 
 export const EXPORT_BAND_ROWS = 256;
 
@@ -98,7 +99,60 @@ export async function exportDetailBands(context, size, prepared, native, setting
   }
 }
 
+// Parallel Detail export (detailPool.mjs): each helper worker keeps the render context of
+// the current job (settings, guide) and renders the bands of rows it is sent.
+const detailJobs = new Map();
+// 1:1 inspection: the crop and guide source of the region being inspected.
+const regionCache = { key: null, kept: null };
+
 export const handlers = {
+  /**
+   * 1:1 inspection source: decodes the original at full size (as an export at original
+   * size does), reads the guide source in bands like exportDetailBands, and keeps only
+   * `rect` (the region, room to pan and the halo).
+   */
+  async regionSource({ file, header, rect }) {
+    const size = { width: header.displayWidth, height: header.displayHeight };
+    const { context } = await decodeToCanvas(file, header, size);
+    const small = guideSize(size);
+    const accumulator = createAreaAccumulator(undefined, size.width, size.height, small.width, small.height);
+    let transparent = false;
+    for (let row = 0; row < size.height; row += EXPORT_BAND_ROWS) {
+      const rows = Math.min(EXPORT_BAND_ROWS, size.height - row);
+      const { data } = context.getImageData(0, row, size.width, rows, { colorSpace: 'srgb' });
+      accumulator.add(data, row, rows);
+      transparent ||= rowsHaveAlpha({ width: size.width, data }, 0, rows);
+    }
+    const guideImage = guideSource(accumulator.finish());
+    const { data } = context.getImageData(rect.x, rect.y, rect.width, rect.height, { colorSpace: 'srgb' });
+    const source = { width: rect.width, height: rect.height, x0: rect.x, y0: rect.y, data };
+    return { result: { source, guideImage, transparent, native: size }, transfer: [data.buffer] };
+  },
+
+  /** Renders a 1:1 region from the kept crop (sent once per key). */
+  async renderRegion({ key, kept, region, adjustments, lut = null, raw = null }) {
+    if (kept) Object.assign(regionCache, { key, kept });
+    else if (!key || regionCache.key !== key) throw stale('region');
+    const result = renderRegion(regionCache.kept, region, { adjustments, lut, raw });
+    return { result, transfer: [result.after.buffer, result.before.buffer] };
+  },
+
+  /** :param options: prepareDetailRender options, with the guide already computed */
+  async detailBegin({ job, adjustments, lut = null, raw = null, options }) {
+    detailJobs.clear();
+    detailJobs.set(job, prepareDetailRender(prepareRender(deriveParams(adjustments, { lut, raw })), options));
+    return { result: true };
+  },
+
+  /** Rows [y0, y1) from `source` (those rows plus the halo, starting at row source.y0). */
+  async detailRows({ job, source, y0, y1, flattenAlpha = false }) {
+    const context = detailJobs.get(job);
+    if (!context) throw stale('detail');
+    const band = new Uint8ClampedArray((y1 - y0) * source.width * 4);
+    renderDetailRows(source, context, y0, y1, band, { flattenAlpha });
+    return { result: band, transfer: [band.buffer] };
+  },
+
   async inspect({ file, thumbnailEdge }) {
     const { header, sha256 } = await inspectFile(file);
     const size = proxyDimensions({ width: header.displayWidth, height: header.displayHeight }, thumbnailEdge);

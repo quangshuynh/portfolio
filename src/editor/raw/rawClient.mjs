@@ -8,8 +8,10 @@ import { assertCanvasWorks, createCanvas, encodeCanvas } from '../io/decode.mjs'
 import { exportDimensions } from '../io/files.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { recordDiagnostic } from '../io/diagnostics.mjs';
+import { renderDetailParallel } from '../io/detailPool.mjs';
+import { deriveParams } from '../pipeline/spec.mjs';
 
-const PRIORITY = { decode: 0, export: 1, develop: 1, inspect: 2 };
+const PRIORITY = { decode: 0, region: 0, export: 1, develop: 1, inspect: 2 };
 
 /** Concurrent RAW decoders for this device: each can need 300–800 MB while it runs. */
 export function rawConcurrency(win = globalThis) {
@@ -102,18 +104,47 @@ export function createRawQueue({ spawn = spawnRawWorker, limit = rawConcurrency(
 
 /**
  * Exports a RAW photo: the worker develops it at the export size and sends 8-bit
- * bands, which are written into one canvas here and encoded.
+ * bands, which are written into one canvas here and encoded. With Detail settings and
+ * `detailWorkers`, the worker returns the developed linear image instead (its LibRaw heap
+ * is freed at once) and the bands are rendered by that many render workers.
  * :param queue: createRawQueue() result
  * :param onStart: receives the job, so the caller can cancel it
  * :returns: { blob, width, height, source: 'full' | 'half', timings }
  */
-export async function exportRaw(queue, { file, raw, adjustments, lut, settings }, { onProgress = () => {}, onStart = () => {} } = {}) {
+export async function exportRaw(queue, { file, raw, adjustments, lut, settings }, { onProgress = () => {}, onStart = () => {}, detailWorkers = 0, spawnRender } = {}) {
   const format = FORMATS[settings.format];
   const size = exportDimensions({ width: raw.width, height: raw.height }, settings.resize);
   // Fail before the decode if this browser cannot hold a canvas of this size.
   const canvas = createCanvas(size.width, size.height);
   const context = canvas.getContext('2d', { colorSpace: 'srgb' });
   assertCanvasWorks(context, size.width, size.height);
+  if (detailWorkers > 0 && deriveParams(adjustments, { lut, raw }).detailActive) {
+    const started = performance.now();
+    const signal = { cancelled: false };
+    const develop = queue.run('develop', { file, raw, width: size.width, height: size.height });
+    onStart({ cancel: () => { signal.cancelled = true; develop.cancel(); } });
+    onProgress({ stage: 'decoding', fraction: 0 });
+    const image = await develop.promise;
+    const decodedAt = performance.now();
+    await renderDetailParallel(image, { adjustments, lut, raw, nativeWidth: raw.width, nativeHeight: raw.height }, {
+      workers: detailWorkers,
+      signal,
+      spawn: spawnRender,
+      onBand: ({ row, rows, data }) => context.putImageData(new ImageData(data, size.width, rows), 0, row),
+      onProgress: (fraction) => onProgress({ stage: 'rendering', fraction }),
+    });
+    onProgress({ stage: 'encoding', fraction: 1 });
+    const renderedAt = performance.now();
+    const blob = await encodeCanvas(canvas, format.mime, settings.format === 'png' ? undefined : settings.quality);
+    if (blob.type !== format.mime) throw Object.assign(new Error(`This browser cannot encode ${format.label}. Choose another format.`), { code: 'encoder' });
+    return {
+      blob,
+      width: size.width,
+      height: size.height,
+      source: image.width === raw.width ? 'full' : 'half',
+      timings: { decode: decodedAt - started, render: renderedAt - decodedAt, encode: performance.now() - renderedAt, detailWorkers },
+    };
+  }
   const job = queue.run('export', { file, raw, adjustments, lut, settings }, {
     onProgress: ({ band, ...progress }) => {
       if (band) context.putImageData(new ImageData(band.data, size.width, band.rows), 0, band.row);

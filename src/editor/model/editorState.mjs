@@ -1,7 +1,15 @@
 // Editor state as a pure reducer: the photo list, per-photo adjustments and history,
-// export settings, and saved edits waiting for their source files to be reimported.
+// the selection, batch changes and their undo, export settings, and saved edits waiting
+// for their source files to be reimported.
+//
+// Selection: the active photo is the one shown and edited (and the source of a sync); it
+// is always selected. A plain click selects one photo; Ctrl/Cmd-click adds or removes one
+// without changing the active photo; Shift-click selects the range from the anchor.
+// A batch change records one history entry per photo it changes and one batch entry
+// (settings before and after per photo, never pixels), so it can be undone per photo or
+// as a whole; undoing a batch skips photos edited since.
 
-import { clampAdjustment, neutralAdjustments, neutralGroup, normalizeAdjustments } from './adjustments.mjs';
+import { adjustmentsEqual, clampAdjustment, neutralAdjustments, neutralGroup, normalizeAdjustments } from './adjustments.mjs';
 import { presetPatch } from './presets.mjs';
 import * as history from './history.mjs';
 import { DEFAULT_EXPORT_SETTINGS, normalizeExportSettings } from './editDocument.mjs';
@@ -11,7 +19,13 @@ export const initialEditorState = () => ({
   activeId: null,
   exportSettings: normalizeExportSettings(DEFAULT_EXPORT_SETTINGS),
   pendingEdits: [],
+  selectedIds: [],
+  anchorId: null,
+  batches: { past: [], future: [], last: null },
 });
+
+/** Batch entries kept for undo (each holds two settings objects per changed photo). */
+export const BATCH_HISTORY_LIMIT = 20;
 
 /** True when a saved entry describes this photo: by content hash when both have one, else name and size. */
 export function matchesSource(source, photo) {
@@ -21,10 +35,36 @@ export function matchesSource(source, photo) {
 
 export const activePhoto = (state) => state.photos.find(({ id }) => id === state.activeId) ?? null;
 
+/** Selected photos that can be edited and exported, in workspace order. */
+export const selectedPhotos = (state) => state.photos.filter(({ id, status }) => status === 'ready' && state.selectedIds.includes(id));
+
+// Keeps the selection in workspace order, the active photo in it, and drops removed photos.
+function withSelection(state, ids, { active = state.activeId, anchor = state.anchorId } = {}) {
+  const wanted = new Set(ids);
+  if (active) wanted.add(active);
+  const selectedIds = state.photos.map(({ id }) => id).filter((id) => wanted.has(id));
+  return { ...state, selectedIds, activeId: active, anchorId: anchor && selectedIds.includes(anchor) ? anchor : active };
+}
+
 const updatePhoto = (state, id, update) => ({
   ...state,
   photos: state.photos.map((photo) => (photo.id === id ? { ...photo, ...update(photo) } : photo)),
 });
+
+// Moves photos from `from` to `to` settings; photos edited since (or removed) are skipped.
+function applyBatch(state, changes, direction) {
+  let next = state;
+  const applied = [];
+  let skipped = 0;
+  changes.forEach((change) => {
+    const photo = next.photos.find(({ id }) => id === change.id);
+    const [from, to] = direction === 'undo' ? [change.after, change.before] : [change.before, change.after];
+    if (!photo || photo.status !== 'ready' || !adjustmentsEqual(history.commit(photo.history).present, from)) { skipped += 1; return; }
+    next = updatePhoto(next, photo.id, (current) => ({ history: history.apply(current.history, to) }));
+    applied.push(change);
+  });
+  return { state: next, applied, skipped };
+}
 
 const updateHistory = (state, change) => {
   if (!state.activeId) return state;
@@ -42,7 +82,9 @@ export function editorReducer(state, action) {
         history: history.createHistory(neutralAdjustments()),
         ...photo,
       }));
-      return { ...state, photos: [...state.photos, ...added], activeId: state.activeId ?? added[0]?.id ?? null };
+      const activeId = state.activeId ?? added[0]?.id ?? null;
+      const next = { ...state, photos: [...state.photos, ...added] };
+      return state.activeId ? next : withSelection(next, [], { active: activeId, anchor: activeId });
     }
     case 'importSucceeded': {
       const photo = state.photos.find(({ id }) => id === action.id);
@@ -66,14 +108,67 @@ export function editorReducer(state, action) {
       if (index === -1) return state;
       const photos = state.photos.filter(({ id }) => id !== action.id);
       const activeId = state.activeId === action.id ? (photos[Math.min(index, photos.length - 1)]?.id ?? null) : state.activeId;
-      return { ...state, photos, activeId };
+      return withSelection({ ...state, photos }, state.selectedIds.filter((id) => id !== action.id), { active: activeId });
     }
     case 'select':
-      return state.photos.some(({ id }) => id === action.id) ? { ...state, activeId: action.id } : state;
+      return state.photos.some(({ id }) => id === action.id) ? withSelection(state, [], { active: action.id, anchor: action.id }) : state;
+    case 'toggleSelection': {
+      if (!state.photos.some(({ id }) => id === action.id)) return state;
+      if (!state.selectedIds.includes(action.id)) return withSelection(state, [...state.selectedIds, action.id], { anchor: action.id });
+      const rest = state.selectedIds.filter((id) => id !== action.id);
+      // The active photo leaves the selection only when another selected photo takes its place.
+      if (!rest.length) return state;
+      const order = state.photos.map(({ id }) => id);
+      const distance = (id) => Math.abs(order.indexOf(id) - order.indexOf(action.id));
+      const active = action.id === state.activeId ? rest.reduce((best, id) => (distance(id) < distance(best) ? id : best)) : state.activeId;
+      return withSelection(state, rest, { active, anchor: action.id === state.anchorId ? active : state.anchorId });
+    }
+    case 'selectRange': {
+      const order = state.photos.map(({ id }) => id);
+      const to = order.indexOf(action.id);
+      if (to === -1) return state;
+      const from = order.indexOf(state.anchorId ?? state.activeId);
+      const [start, end] = from === -1 ? [to, to] : [Math.min(from, to), Math.max(from, to)];
+      const range = order.slice(start, end + 1);
+      const ids = action.add ? [...state.selectedIds, ...range] : range;
+      // The active photo stays when the range includes it; otherwise the clicked one is shown.
+      const active = ids.includes(state.activeId) ? state.activeId : action.id;
+      return withSelection(state, ids, { active, anchor: state.anchorId ?? action.id });
+    }
+    case 'selectAll':
+      return withSelection(state, state.photos.filter(({ status }) => status === 'ready').map(({ id }) => id));
+    case 'clearSelection':
+      return withSelection(state, [], { anchor: state.activeId });
     case 'selectOffset': {
       const index = state.photos.findIndex(({ id }) => id === state.activeId);
       const next = state.photos[index + action.offset];
-      return next ? { ...state, activeId: next.id } : state;
+      return next ? withSelection(state, [], { active: next.id, anchor: next.id }) : state;
+    }
+    // A batch change from a plan (model/sync.mjs): `changes` = [{ id, after }].
+    case 'applyBatch': {
+      const changes = action.changes.map(({ id, after }) => {
+        const photo = state.photos.find((item) => item.id === id && item.status === 'ready');
+        return photo && { id, before: history.commit(photo.history).present, after: normalizeAdjustments(after) };
+      }).filter((change) => change && !adjustmentsEqual(change.before, change.after));
+      const last = { label: action.label, applied: changes.length, skipped: 0, kind: 'apply' };
+      if (!changes.length) return { ...state, batches: { ...state.batches, last } };
+      const result = applyBatch(state, changes, 'redo');
+      return { ...result.state, batches: { past: [...state.batches.past, { label: action.label, changes }].slice(-BATCH_HISTORY_LIMIT), future: [], last } };
+    }
+    case 'undoBatch':
+    case 'redoBatch': {
+      const undoing = action.type === 'undoBatch';
+      const entry = undoing ? state.batches.past.at(-1) : state.batches.future[0];
+      if (!entry) return state;
+      const result = applyBatch(state, entry.changes, undoing ? 'undo' : 'redo');
+      const kept = result.applied.length ? [{ label: entry.label, changes: result.applied }] : [];
+      const last = { label: entry.label, applied: result.applied.length, skipped: result.skipped, kind: undoing ? 'undo' : 'redo' };
+      return {
+        ...result.state,
+        batches: undoing
+          ? { past: state.batches.past.slice(0, -1), future: [...kept, ...state.batches.future], last }
+          : { past: [...state.batches.past, ...kept], future: state.batches.future.slice(1), last },
+      };
     }
     case 'previewAdjustment':
       return updateHistory(state, (h) => history.preview(h, { ...h.present, [action.key]: clampAdjustment(action.key, action.value) }));
