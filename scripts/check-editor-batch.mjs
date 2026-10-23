@@ -348,7 +348,7 @@ async function runOne(run, files) {
           await page.click('.pe-batch button:has-text("Paste to 3")');
           assert.equal(await exposureOf(names[0]), '+0.50 EV');
           await tab(2);
-          assert.equal(await value('Texture'), '20');
+          assert.equal(await value('Texture'), '+20');
           await photoButton(names[1]).click({ modifiers: [mod] });
           await photoButton(names[2]).click({ modifiers: [mod] });
           await page.click('.pe-batch button:has-text("Preset")');
