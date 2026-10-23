@@ -192,7 +192,7 @@ differently processed JPEG previews), so there is nothing to merge; the editor r
 
 **Inputs.** Exactly three files, all RAW (Sony ARW and DNG as in [RAW](#raw)) or all
 JPEG/PNG/WebP. Refused with a reason: mixed kinds, duplicates (hash), different cameras
-or RAW sizes, different orientation or aspect ratio, the same recorded exposure, more
+or RAW sizes, different orientation or aspect ratio, the same recorded exposure (all three, or any two), more
 than 8 EV span, unrelated scenes, motion that would crop more than 30%, roles that
 contradict the measured brightness. Raster inputs of different sizes are merged at the
 smallest. Roles (under, normal, over) are suggested from shutter, aperture and ISO when all
@@ -278,6 +278,17 @@ data. No genuine exposure bracket was available (962 RAW files scanned), so **me
 quality on real hand-held brackets (alignment of real motion, real ghosts, real colour
 across exposures) is not validated**; the evidence is synthetic brackets and genuine
 sensor data with simulated exposure and motion.
+
+`DSC09636–09638` (A7 III, 2026-10-23, `HDR_AUTO_ISO_DIR`) is a −2/0/+2 compensation bracket in
+M mode with Auto ISO: 1/160 s, f/6.3 at ISO 4000, 6400, 6400. ISO hit its limit, so the 0 and
++2 frames hold the same exposure (measured 0.005 EV apart; independent noise, so not copies)
+and only 0.69 EV of range exists. Earlier versions accepted it when the duplicate was given
+the "over" role; it is now refused from metadata and from the measured data. Forced through
+the merge for evaluation only: real hand-held alignment converged (bitmap mismatch 2.6% → 1.3%
+and 1.8% → 1.3%, up to 0.14° rotation), ghost mask 0.15%, no doubled edges at 100%, flat-area
+noise σ 5.5 → 4.0 codes from averaging; no highlight recovery to speak of. `DSC09633–09635` is
+the same situation with all three at ISO 6400 and is refused. Merge quality on a real
+shutter-speed bracket remains unvalidated.
 
 ## Rendering, preview and export
 

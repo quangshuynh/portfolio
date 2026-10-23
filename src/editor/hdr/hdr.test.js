@@ -142,6 +142,14 @@ describe('import and metadata', () => {
     expect(validateBracket(noIso).warnings.join(' ')).toMatch(/same shutter speed and aperture \(1\/30 s, f\/3.5\) and no ISO/);
   });
 
+  test('two frames with the same exposure are refused, naming them (Auto ISO at its limit, 2026-10-23)', () => {
+    // DSC09636–09638: a −2/0/+2 compensation bracket in M mode with Auto ISO; 0 and +2 both hit ISO 6400.
+    const shot = (name, iso) => input({ name, kind: 'raw', format: 'arw', exposure: exposure(1 / 160, { aperture: 6.3, iso }) });
+    const result = validateBracket([shot('DSC09636.ARW', 4000), shot('DSC09637.ARW', 6400), shot('DSC09638.ARW', 6400)]);
+    expect(result.errors.join(' ')).toMatch(/DSC09637\.ARW and DSC09638\.ARW were taken with the same exposure \(1\/160 s, f\/6\.3, ISO 6400\).*Auto ISO/);
+    expect(result.warnings.join(' ')).not.toMatch(/less than 0\.6 EV/);
+  });
+
   test('suggests roles from exposure metadata in any input order, never from file names', () => {
     const inputs = [
       input({ name: 'DSC0001.jpg', exposure: exposure(1 / 30) }),
@@ -251,6 +259,16 @@ describe('radiance merge', () => {
     const frames = rawBracket({ exposures: [1, 1, 1] });
     frames.forEach((frame) => { frame.image = frames[1].image; frame.stops = 0; });
     expect(() => analyzeBracket(frames, { mode: 'radiance', reference: 1 })).toThrow(/contain the same exposure.*Sony DRO bracketing/);
+  });
+
+  test('a frame with the same measured exposure as the reference is refused, whatever its role', () => {
+    // Recorded stops missing or wrong must not let a duplicate exposure pass as "overexposed".
+    const frames = rawBracket({ exposures: [0.25, 1, 1.004] });
+    frames.forEach((frame) => { frame.stops = null; });
+    expect(() => analyzeBracket(frames, { mode: 'radiance', reference: 1 })).toThrow(/overexposed photo has the same exposure as the normal one/);
+    frames[2].role = 'normal';
+    frames[1].role = 'over';
+    expect(() => analyzeBracket(frames, { mode: 'radiance', reference: 2 })).toThrow(/overexposed photo has the same exposure as the normal one/);
   });
 
   test('is deterministic', () => {

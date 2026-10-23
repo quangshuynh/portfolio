@@ -31,7 +31,7 @@ export const MERGE = Object.freeze({
   minRatioSamples: 500,
   /** Measured and recorded exposure differences further apart than this are reported. */
   metadataTolerance: 0.35,
-  /** Below this measured difference between all frames, the files hold the same exposure. */
+  /** Below this measured difference from the reference, a frame holds the same exposure. */
   sameExposure: 0.08,
   ghostRadius: 0.01,
 });
@@ -282,6 +282,11 @@ export function analyzeBracket(frames, { mode, reference, settings = DEFAULT_MER
     if (spread < MERGE.sameExposure) {
       throw new HdrError('same-exposure', 'The three photos contain the same exposure (the measured brightness differs by less than 0.1 EV), so merging adds no highlight or shadow detail. This happens with Sony DRO bracketing, which saves one exposure several times.');
     }
+    exposures.forEach((e, index) => {
+      if (index === reference || Math.abs(Math.log2(e)) >= MERGE.sameExposure) return;
+      const role = frames[index].role === 'under' ? 'underexposed' : 'overexposed';
+      throw new HdrError('same-exposure', `The ${role} photo has the same exposure as the normal one (the measured brightness differs by less than 0.1 EV), so only two different exposures remain. This happens when Auto ISO reaches its limit during a compensation bracket.`);
+    });
     exposures.forEach((e, index) => {
       if (index === reference) return;
       const role = frames[index].role;

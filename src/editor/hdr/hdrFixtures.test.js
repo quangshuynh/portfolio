@@ -115,3 +115,38 @@ describe.skipIf(!available)('genuine Sony A7 III DRO bracket (_DSC9015–9017)',
     expect(merged.width).toBeGreaterThan(image.width * 0.99);
   }, 300_000);
 });
+
+// Genuine A7 III compensation bracket (−2/0/+2) shot in M mode with Auto ISO, 2026-10-23:
+// set HDR_AUTO_ISO_DIR to a folder holding DSC09636.ARW, DSC09637.ARW and DSC09638.ARW.
+// ISO reached its 6400 limit, so the 0 and +2 frames hold the same exposure.
+const autoIsoDir = process.env.HDR_AUTO_ISO_DIR ?? '';
+const AUTO_ISO_NAMES = ['DSC09636.ARW', 'DSC09637.ARW', 'DSC09638.ARW'];
+const autoIsoAvailable = Boolean(autoIsoDir) && AUTO_ISO_NAMES.every((name) => existsSync(path.join(autoIsoDir, name)));
+
+describe.skipIf(!autoIsoAvailable)('genuine Sony A7 III Auto ISO bracket (DSC09636–09638)', () => {
+  let frames;
+  let inputs;
+  beforeAll(async () => {
+    const module = Module ?? await factory({ wasmBinary: await readFile(fileURLToPath(import.meta.resolve('libraw-wasm/dist/libraw.wasm'))) });
+    frames = [];
+    inputs = [];
+    for (const name of AUTO_ISO_NAMES) {
+      const { info, image } = decodeRaw(module, new Uint8Array(await readFile(path.join(autoIsoDir, name))), { format: 'arw', halfSize: true });
+      const exposure = { shutter: info.shutter, aperture: info.aperture, iso: info.iso, model: info.model, captured: info.captured };
+      inputs.push({ name, size: 1, sha256: null, kind: 'raw', format: 'arw', width: info.width, height: info.height, orientation: 1, exposure });
+      frames.push({ image, asShot: info.asShot, stops: null });
+    }
+  }, 120_000);
+
+  test('metadata: 1/160 s, f/6.3 at ISO 4000, 6400, 6400; refused as two equal exposures', () => {
+    expect(inputs.map(({ exposure }) => exposure.iso)).toEqual([4000, 6400, 6400]);
+    expect(validateBracket(inputs).errors.join(' ')).toMatch(/DSC09637\.ARW and DSC09638\.ARW were taken with the same exposure \(1\/160 s, f\/6\.3, ISO 6400\)/);
+  });
+
+  test('sensor data: the duplicate exposure is refused in either role order', () => {
+    for (const [reference, roles] of [[1, ['under', 'normal', 'over']], [2, ['under', 'over', 'normal']]]) {
+      frames.forEach((frame, index) => { frame.role = roles[index]; });
+      expect(() => analyzeBracket(frames, { mode: 'radiance', reference })).toThrow(/same exposure as the normal one/);
+    }
+  }, 120_000);
+});
