@@ -4,15 +4,20 @@ import { canRedo, canUndo } from '../model/history.mjs';
 import { createEditDocument, parseEditDocument, serializeEditDocument } from '../model/editDocument.mjs';
 import { neutralAdjustments } from '../model/adjustments.mjs';
 import { PRESETS_STORAGE_KEY, applyPreset, parsePresetFile, serializePresets } from '../model/presets.mjs';
-import { LIMITS, exportFileName, formatBytes, proxyDimensions } from '../io/files.mjs';
+import { LIMITS, exportFileName, formatBytes, previewEdgeLimit, proxyDimensions } from '../io/files.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { createImageWorker, usingMainThread } from '../io/workerClient.mjs';
 import { RAW_FORMATS, RAW_SNIFF_BYTES, isTiff } from '../raw/rawFormat.mjs';
 import { createRawQueue, exportRaw } from '../raw/rawClient.mjs';
 import { browserCapabilities, diagnosticReport } from '../io/diagnostics.mjs';
+import { readRasterExposure } from '../hdr/hdrMetadata.mjs';
+import { cropAt } from '../hdr/hdrAlign.mjs';
+import { bracketSize, checkHdrExport, createHdrJob, exportHdr, mergePreview } from '../hdr/hdrClient.mjs';
+import { hdrIdentity, hdrPhotoName } from '../hdr/hdrSource.mjs';
 import { appHref } from '../../util/navigation';
 import AdjustPanel from './AdjustPanel';
 import ExportPanel from './ExportPanel';
+import HdrMergeDialog from './HdrMergeDialog';
 import PhotoThumb from './PhotoThumb';
 import Viewer from './Viewer';
 import './editor.css';
@@ -21,7 +26,7 @@ export const AUTOSAVE_KEY = 'photo-editor:edits:v1';
 const THUMBNAIL_EDGE = 320;
 const PROXY_CACHE_SIZE = 2;
 const ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.arw,.dng,image/x-sony-arw,image/x-adobe-dng';
-const formatLabel = (format) => FORMATS[format]?.label ?? RAW_FORMATS[format]?.label ?? format;
+const formatLabel = (format) => (format === 'hdr' ? 'HDR merge' : FORMATS[format]?.label ?? RAW_FORMATS[format]?.label ?? format);
 const IMPORT_PROGRESS = { waiting: 'Waiting for the RAW decoder…', decoding: 'Decoding RAW sensor data…' };
 const EDITOR_THEME_COLOR = '#151515';
 
@@ -125,6 +130,9 @@ function Unsupported({ missing }) {
   );
 }
 
+/** Why an HDR export does not fit this device, with the largest size that does. */
+const hdrMemoryMessage = ({ megabytes, suggestion }) => `An HDR export at this size needs about ${megabytes.toLocaleString('en-US')} MB of memory, more than this device can safely use. ${suggestion ? `Choose Long edge ${suggestion} px or smaller.` : 'Choose a smaller size.'}`;
+
 /** The public photo editor. Everything runs in this browser tab; nothing is uploaded. */
 export default function EditorApp() {
   const [capabilities] = useState(() => browserCapabilities());
@@ -156,6 +164,12 @@ function EditorWorkspace() {
     return rawQueue.current;
   }, []);
   const exportJob = useRef(null);
+  // A merged HDR's preview is re-merged from its sources when it left the proxy cache.
+  const hdrProxyJob = useRef(null);
+  const [hdrOpen, setHdrOpen] = useState(false);
+  const hdrOpenRef = useRef(false);
+  const bracketInspections = useRef(Promise.resolve());
+  hdrOpenRef.current = hdrOpen;
   const fileInputRef = useRef(null);
   const editsInputRef = useRef(null);
   const [compare, setCompare] = useState('edited');
@@ -290,6 +304,22 @@ function EditorWorkspace() {
     }
     const resource = resources.current.get(target.id);
     if (!resource?.header) throw new Error('The original file is no longer available.');
+    if (resource.hdr) {
+      hdrProxyJob.current?.cancel();
+      const job = createHdrJob();
+      hdrProxyJob.current = job;
+      const { inputs, mode, reference, settings } = resource.hdr;
+      try {
+        const { image } = await mergePreview(inputs, { mode, reference, settings, maxEdge, thumbnailEdge: THUMBNAIL_EDGE }, { rawQueue: raws(), job });
+        if (resources.current.has(target.id)) {
+          cache.set(key, image);
+          while (cache.size > PROXY_CACHE_SIZE) cache.delete(cache.keys().next().value);
+        }
+        return image;
+      } finally {
+        if (hdrProxyJob.current === job) hdrProxyJob.current = null;
+      }
+    }
     if (resource.raw) {
       // Half-size sensor data (never the embedded JPEG); a newer request cancels this one.
       rawProxyJob.current?.cancel();
@@ -359,6 +389,7 @@ function EditorWorkspace() {
 
   const removePhoto = useCallback((id) => {
     resources.current.get(id)?.job?.cancel();
+    if (resources.current.get(id)?.hdr) hdrProxyJob.current?.cancel();
     resources.current.delete(id);
     [...proxyCache.current.keys()].filter((key) => key.startsWith(`${id}:`)).forEach((key) => proxyCache.current.delete(key));
     if (exportJob.current?.id === id) exportJob.current.client.terminate();
@@ -387,6 +418,31 @@ function EditorWorkspace() {
     }
     const settings = stateRef.current.exportSettings;
     const onProgress = (progress) => dispatch({ type: 'exportStatus', id: target.id, status: { state: 'running', ...progress } });
+    if (resource.hdr) {
+      const { inputs, analysis, mode } = resource.hdr;
+      const check = checkHdrExport(mode, inputs, analysis, settings.resize);
+      if (!check.fits) {
+        dispatch({ type: 'exportStatus', id: target.id, status: { state: 'error', message: hdrMemoryMessage(check) } });
+        return;
+      }
+      const job = createHdrJob();
+      exportJob.current = { id: target.id, client: { terminate: () => job.cancel() } };
+      dispatch({ type: 'exportStatus', id: target.id, status: { state: 'running', stage: 'decoding', index: 0, fraction: 0 } });
+      performance.mark('pe-export-start');
+      try {
+        const result = await exportHdr(inputs, analysis, { adjustments: values, raw: target.raw, lut, settings }, { rawQueue: raws(), job, onProgress });
+        performance.measure('pe-export', 'pe-export-start');
+        const fileName = exportFileName(target.name, settings.format, settings.suffix);
+        downloadBlob(result.blob, fileName);
+        dispatch({ type: 'exportStatus', id: target.id, status: { state: 'done', fileName, width: result.width, height: result.height, bytes: result.blob.size, timings: result.timings, hdr: true } });
+      } catch (error) {
+        dispatch({ type: 'exportStatus', id: target.id, status: error.code === 'cancelled' ? { state: 'cancelled' } : { state: 'error', message: error.message } });
+      } finally {
+        job.cancel();
+        exportJob.current = null;
+      }
+      return;
+    }
     // A RAW export runs in the RAW queue; cancelling ends its worker.
     const rawJob = { job: null, cancelled: false };
     const client = resource.raw
@@ -419,6 +475,82 @@ function EditorWorkspace() {
   }, [raws]);
 
   const cancelExport = useCallback(() => exportJob.current?.client.terminate(), []);
+
+  // Merge HDR inputs: new files are inspected like imports (hash, header, thumbnail,
+  // exposure) without joining the workspace; workspace photos reuse what is known.
+  const bracketInput = ({ file, header, sha256, thumbnail, raw = null, exposure = null, photoId = null }) => ({
+    file,
+    photoId,
+    name: file.name,
+    size: file.size,
+    sha256: sha256 ?? null,
+    header,
+    raw,
+    thumbnail,
+    kind: raw ? 'raw' : 'raster',
+    format: header.format,
+    width: header.displayWidth,
+    height: header.displayHeight,
+    orientation: header.orientation,
+    exposure: raw ? { shutter: raw.shutter, aperture: raw.aperture, iso: raw.iso, captured: raw.captured, model: raw.model } : exposure,
+  });
+  const rasterExposure = async (file) => readRasterExposure(new Uint8Array(await file.slice(0, 512 * 1024).arrayBuffer()));
+  const inspectBracketFile = useCallback(async (file) => {
+    const head = new Uint8Array(await file.slice(0, RAW_SNIFF_BYTES).arrayBuffer());
+    if (isTiff(head)) {
+      const { header, sha256, thumbnail, raw } = await raws().run('inspect', { file, thumbnailEdge: THUMBNAIL_EDGE }).promise;
+      return bracketInput({ file, header, sha256, thumbnail, raw });
+    }
+    // One at a time, as imports do: where workers cannot decode, the first call switches
+    // the client to the main thread, which would cancel calls already in flight.
+    const run = bracketInspections.current.then(() => worker('import').call('inspect', { file, thumbnailEdge: THUMBNAIL_EDGE }));
+    bracketInspections.current = run.catch(() => {});
+    const { header, sha256, thumbnail } = await run;
+    return bracketInput({ file, header, sha256, thumbnail, exposure: await rasterExposure(file) });
+  }, [raws, worker]);
+  const describeWorkspacePhoto = useCallback(async (id) => {
+    const resource = resources.current.get(id);
+    if (!resource?.header || resource.hdr) throw new Error('This photo is no longer available.');
+    return bracketInput({ ...resource, photoId: id, exposure: resource.raw ? null : await rasterExposure(resource.file) });
+  }, []);
+  const mergeBracket = useCallback((inputs, settings, onProgress) => {
+    const job = createHdrJob();
+    const mode = inputs[0].raw ? 'radiance' : 'fusion';
+    const reference = inputs.findIndex(({ role }) => role === 'normal');
+    const maxEdge = engine?.maxEdge ?? previewEdgeLimit();
+    const promise = mergePreview(inputs, { mode, reference, settings, maxEdge, thumbnailEdge: THUMBNAIL_EDGE }, { rawQueue: raws(), job, onProgress })
+      .then((result) => {
+        // Stage timings for the browser checks (local performance entries only).
+        Object.entries(result.timings).forEach(([stage, duration]) => performance.measure?.(`pe-hdr-${stage}`, { start: 0, duration }));
+        return { ...result, mode, reference, maxEdge };
+      });
+    return { promise, cancel: () => job.cancel() };
+  }, [engine, raws]);
+  // A finished merge becomes a photo of its own; the three inputs stay untouched.
+  const addMergedPhoto = useCallback(async (result, inputs, settings) => {
+    const { analysis, image, thumbnail, mode, reference, maxEdge } = result;
+    const full = bracketSize(inputs);
+    const crop = cropAt(analysis.crop, full.width, full.height);
+    const id = newId();
+    const name = hdrPhotoName(inputs[reference].name, stateRef.current.photos.map((item) => item.name));
+    const sha256 = await hdrIdentity(mode, inputs);
+    const raw = mode === 'radiance' ? { ...inputs[reference].raw, hdrWhite: analysis.white, width: crop.width, height: crop.height } : null;
+    const hdr = {
+      mode,
+      inputs: inputs.map(({ name: inputName, size, sha256: hash, format, role }) => ({ name: inputName, size, sha256: hash, format, role })),
+      settings,
+      summary: { measuredStops: analysis.measuredStops, alignment: analysis.alignment, ghostFraction: analysis.ghost.fraction, warnings: analysis.warnings },
+    };
+    resources.current.set(id, { header: { format: 'hdr' }, sha256, thumbnail, hdr: { inputs, analysis, mode, reference, settings } });
+    proxyCache.current.set(`${id}:${maxEdge}`, image);
+    while (proxyCache.current.size > PROXY_CACHE_SIZE) proxyCache.current.delete(proxyCache.current.keys().next().value);
+    const size = inputs.reduce((total, input) => total + input.size, 0);
+    dispatch({ type: 'photosAdded', photos: [{ id, name, size, lastModified: 0 }] });
+    dispatch({ type: 'importSucceeded', id, info: { format: 'hdr', width: crop.width, height: crop.height, orientation: 1, sha256, raw, hdr } });
+    dispatch({ type: 'select', id });
+    setHdrOpen(false);
+    setNotice({ tone: 'info', text: `Merged ${name} (${crop.width}×${crop.height}${mode === 'fusion' ? ', exposure fusion' : ''}). The three originals are unchanged.` });
+  }, []);
 
   // Parses a .cube off the main thread, adds it to this session's library and applies it
   // to the active photo. Photos waiting for this exact file (same hash) resolve too.
@@ -487,10 +619,11 @@ function EditorWorkspace() {
       if (mod && (key === 'z' || key === 'y')) {
         if (isTextField(event.target)) return;
         event.preventDefault();
+        if (hdrOpenRef.current) return;
         dispatch({ type: (key === 'y' || event.shiftKey) ? 'redo' : 'undo' });
         return;
       }
-      if (mod || event.altKey || isControl(event.target)) return;
+      if (mod || event.altKey || isControl(event.target) || hdrOpenRef.current) return;
       if (event.key === '\\') setCompare((value) => (value === 'original' ? 'edited' : 'original'));
       else if (key === 'y') setCompare((value) => (value === 'split' ? 'edited' : 'split'));
       else if (event.key === 'ArrowLeft') dispatch({ type: 'selectOffset', offset: -1 });
@@ -523,6 +656,11 @@ function EditorWorkspace() {
   );
   const history = photo?.history;
   const readyCount = state.photos.filter(({ status }) => status === 'ready').length;
+  const pendingHdr = state.pendingEdits.filter(({ source }) => source.hdr);
+  const activeResource = photo ? resources.current.get(photo.id) : null;
+  const hdrExportCheck = useMemo(() => (ready && activeResource?.hdr
+    ? checkHdrExport(activeResource.hdr.mode, activeResource.hdr.inputs, activeResource.hdr.analysis, state.exportSettings.resize)
+    : null), [ready, activeResource, state.exportSettings.resize]);
 
   const photoList = (variant) => state.photos.map((item, index) => {
     const resource = resources.current.get(item.id);
@@ -599,11 +737,12 @@ function EditorWorkspace() {
             <div className="pe-notice pe-notice--info" role="status">
               <span>
                 {restoredCount ? 'Edits from your last visit are kept in this browser (settings only, not images). ' : ''}
-                Reimport the original file{state.pendingEdits.length === 1 ? '' : 's'} to continue: {state.pendingEdits.slice(0, 4).map(({ source }) => source.name).join(', ')}
+                Reimport the original file{state.pendingEdits.length === 1 ? '' : 's'} to continue: {state.pendingEdits.slice(0, 4).map(({ source }) => (source.hdr ? `${source.name} (Merge HDR again with ${source.hdr.inputs.map(({ name }) => name).join(', ')})` : source.name)).join(', ')}
                 {state.pendingEdits.length > 4 ? ` and ${state.pendingEdits.length - 4} more` : ''}.
               </span>
               <span className="pe-notice__actions">
                 <button type="button" className="pe-text-button" onClick={openPicker}>Import</button>
+                {pendingHdr.length > 0 && <button type="button" className="pe-text-button" onClick={() => setHdrOpen(true)}>Merge HDR</button>}
                 <button type="button" className="pe-text-button" onClick={discardSaved}>Discard saved edits</button>
               </span>
             </div>
@@ -614,7 +753,10 @@ function EditorWorkspace() {
       <aside className="pe-library" aria-labelledby="pe-library-title">
         <div className="pe-panel__head">
           <h2 id="pe-library-title">Photos <span className="pe-count mono">{readyCount}</span></h2>
-          <button type="button" className="pe-button pe-button--primary" onClick={openPicker}>Import</button>
+          <span className="pe-library__actions">
+            <button type="button" className="pe-button" onClick={() => setHdrOpen(true)} title="Merge three exposures into one photo">Merge HDR</button>
+            <button type="button" className="pe-button pe-button--primary" onClick={openPicker}>Import</button>
+          </span>
         </div>
         <input ref={fileInputRef} type="file" accept={ACCEPT} multiple hidden onChange={(event) => { importFiles(event.target.files); event.target.value = ''; }} />
         {state.photos.length ? (
@@ -664,11 +806,12 @@ function EditorWorkspace() {
             lut={{ library: [...luts.values()], onImport: importLut, status: lutStatus }}
             presets={{ userPresets, onChange: changePresets, onPreview: setPresetPreview, onDownload: downloadBlob, newId }}
             raw={ready ? photo.raw ?? null : null}
+            hdr={ready ? photo.hdr ?? null : null}
           />
         </div>
         <div className="pe-inspector__section" data-section="export">
           <ExportPanel
-            blockedReason={missingLut ? `The LUT "${missingLut.name}" is not loaded. Import it again (LUT section) or remove it to export.` : null}
+            blockedReason={missingLut ? `The LUT "${missingLut.name}" is not loaded. Import it again (LUT section) or remove it to export.` : hdrExportCheck && !hdrExportCheck.fits ? hdrMemoryMessage(hdrExportCheck) : null}
             settings={state.exportSettings}
             photo={photo}
             dispatch={dispatch}
@@ -712,6 +855,18 @@ function EditorWorkspace() {
       </nav>
 
       {dragDepth > 0 && <div className="pe-drop" aria-hidden="true"><p>Drop to import. Files stay on this device.</p></div>}
+      {hdrOpen && (
+        <HdrMergeDialog
+          accept={ACCEPT}
+          onClose={() => setHdrOpen(false)}
+          inspect={inspectBracketFile}
+          describe={describeWorkspacePhoto}
+          merge={mergeBracket}
+          onMerged={addMergedPhoto}
+          pending={pendingHdr}
+          workspace={state.photos.filter((item) => item.status === 'ready' && item.format !== 'hdr')}
+        />
+      )}
     </div>
   );
 }

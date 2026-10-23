@@ -66,9 +66,9 @@ const positiveRowSums = (m) => [0, 1, 2].map((row) => m.slice(row * 3, row * 3 +
 // development clipped at the sensor white), times exposure. Beyond it the table falls
 // back to the exact function, so this only needs to be a sensible range.
 const maxLuminance = (params) => {
-  const source = params.raw ? Math.max(...positiveRowSums(params.raw.matrix)) : 1;
+  const source = params.raw ? Math.max(...positiveRowSums(params.raw.matrix)) * params.raw.white : 1;
   const balance = params.whiteBalanceActive ? Math.max(...positiveRowSums(params.whiteBalance)) : 1;
-  return source * balance * params.exposureGain;
+  return source * balance * params.exposureGain * (1 + params.shadowLift);
 };
 
 /** Per-render state for renderRgba8: build once, reuse across bands. */
@@ -152,7 +152,8 @@ export function renderRgba8InBands(source, params, { width, height, target, flat
 
 /**
  * Renders a RAW development to 8-bit RGBA (opaque).
- * :param source: Uint16Array of RGB camera values (decoder output, 0–65535)
+ * :param source: Uint16Array of RGB camera values (decoder output, 0–65535), or the
+ *   Float32Array of a merged HDR (1 = the reference exposure's sensor white)
  * :param params: deriveParams() result with `raw`, or a prepareRender() result
  * :param options: { target, start, end } with start/end pixel indices
  */
@@ -164,7 +165,7 @@ export function renderRawRgba8(source, params, {
   const prepared = params.tone && params.params ? params : prepareRender(params);
   const { params: p, tone } = prepared;
   const rgb = [0, 0, 0];
-  const scale = 1 / 65535;
+  const scale = source instanceof Float32Array ? 1 : 1 / 65535;
   for (let pixel = start; pixel < end; pixel += 1) {
     const i = pixel * 3;
     const o = pixel * 4;
@@ -187,11 +188,12 @@ export function renderRawRgba8(source, params, {
 }
 
 /**
- * Renders a decoded image of either kind: { kind: 'raw', data: Uint16Array RGB } or
- * RGBA8 { data }. RAW sources need params derived with the photo's RAW colour info.
+ * Renders a decoded image of any kind: { kind: 'raw', data: Uint16Array RGB },
+ * { kind: 'hdr', data: Float32Array RGB } or RGBA8 { data }. RAW and HDR sources need
+ * params derived with the photo's RAW colour info.
  */
 export function renderImage(image, params, options) {
-  if (image.kind === 'raw') {
+  if (image.kind === 'raw' || image.kind === 'hdr') {
     if (!(params.params ?? params).raw) throw new Error('A RAW image needs RAW development parameters.');
     return renderRawRgba8(image.data, params, options);
   }

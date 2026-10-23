@@ -24,6 +24,7 @@
     "check:editor": "node scripts/check-editor-browser.mjs",
     "check:editor:engines": "node scripts/check-editor-engines.mjs",
     "check:editor:raw": "node scripts/check-editor-raw.mjs",
+    "check:editor:hdr": "node scripts/check-editor-hdr.mjs",
     "cms": "node cms/server.mjs",
     "assets:refresh": "node scripts/refresh-project-assets.mjs",
     "test:hero:browser": "node scripts/check-hero-browser.mjs",

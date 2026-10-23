@@ -23,9 +23,11 @@ describe('adjustment registry', () => {
     });
   });
 
-  test('the unsigned controls are RAW temperature in kelvin and LUT intensity, a 0–100% amount that defaults to full', () => {
+  test('the unsigned controls are RAW temperature in kelvin, the HDR tone amounts and LUT intensity, a 0–100% amount that defaults to full', () => {
     expect(ADJUSTMENTS.filter(({ signed }) => !signed)).toEqual([
       expect.objectContaining({ key: 'rawTemperature', unit: 'K', default: 5500 }),
+      expect.objectContaining({ key: 'hdrHighlights', group: 'hdr', min: 0, max: 100, default: 50 }),
+      expect.objectContaining({ key: 'hdrShadows', group: 'hdr', min: 0, max: 100, default: 0 }),
       expect.objectContaining({ key: 'lutIntensity', min: 0, max: 100, default: 100 }),
     ]);
   });
@@ -185,7 +187,7 @@ describe('edit document', () => {
   test('round-trips adjustments and export settings', () => {
     const text = serializeEditDocument(createEditDocument([photo], { format: 'png', suffix: '-v2' }, new Date(0)));
     const parsed = parseEditDocument(text);
-    expect(JSON.parse(text)).toMatchObject({ type: DOCUMENT_TYPE, version: 3, savedAt: '1970-01-01T00:00:00.000Z' });
+    expect(JSON.parse(text)).toMatchObject({ type: DOCUMENT_TYPE, version: 4, savedAt: '1970-01-01T00:00:00.000Z' });
     expect(parsed.photos[0].adjustments).toEqual(normalizeAdjustments(photo.adjustments));
     expect(parsed.photos[0].source).toMatchObject({ name: 'DSC0001.jpg', size: 1234, sha256: photo.sha256 });
     expect(parsed.exportSettings).toMatchObject({ format: 'png', suffix: '-v2' });
@@ -208,7 +210,7 @@ describe('edit document', () => {
     bad('{');
     bad('[]');
     bad(JSON.stringify({ type: 'other', version: 1, photos: [] }));
-    bad(JSON.stringify({ type: DOCUMENT_TYPE, version: 4, photos: [] }));
+    bad(JSON.stringify({ type: DOCUMENT_TYPE, version: 5, photos: [] }));
     bad(JSON.stringify({ type: DOCUMENT_TYPE, version: 1 }));
     bad(JSON.stringify({ type: DOCUMENT_TYPE, version: 1, photos: [{ source: {} }] }));
     bad(' '.repeat(4 * 1024 * 1024 + 1));

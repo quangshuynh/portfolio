@@ -1,19 +1,20 @@
 // WebGL2 preview renderer. Draws the preview proxy into a canvas of the same size,
 // one texel per pixel, so CSS zoom and pan never resample inside the pipeline.
-// Sources are RGBA8 (JPEG, PNG, WebP) or 16-bit camera RGB from a RAW decode, kept
-// as an integer texture so no precision is lost before the shader develops it.
+// Sources are RGBA8 (JPEG, PNG, WebP), 16-bit camera RGB from a RAW decode, kept
+// as an integer texture so no precision is lost before the shader develops it, or
+// float camera RGB of a merged RAW HDR (RGB32F, read with texelFetch).
 
 import { CURVE_TABLE_SIZE } from './curves.mjs';
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './shader.mjs';
 
 const UNIFORMS = ['uSource', 'uWhiteBalanceActive', 'uWhiteBalance', 'uExposureGain', 'uToneActive', 'uContrast',
   'uHighlights', 'uShadows', 'uWhites', 'uBlacks', 'uVibrance', 'uSaturation', 'uNeutral',
-  'uRaw', 'uRawSource', 'uRawGain', 'uRawMatrix', 'uRolloffWhite',
+  'uRaw', 'uRawSource', 'uRawGain', 'uRawMatrix', 'uRawWhite', 'uRolloffWhite', 'uRolloffKnee', 'uShadowLift', 'uHdr', 'uHdrSource',
   'uBaseNeutral', 'uCurvesActive', 'uCurveActive', 'uCurves', 'uHslActive', 'uHslHue', 'uHslSat', 'uHslLum',
   'uLutActive', 'uLut', 'uLutSize', 'uLutDomainMin', 'uLutDomainMax', 'uLutIntensity'];
 
-// Texture units: the photo, the curve table, the 3D LUT, a RAW photo.
-const UNIT = { source: 0, curves: 1, lut: 2, raw: 3 };
+// Texture units: the photo, the curve table, the 3D LUT, a RAW photo, a merged HDR.
+const UNIT = { source: 0, curves: 1, lut: 2, raw: 3, hdr: 4 };
 
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
@@ -26,6 +27,15 @@ function rawTexture(gl, width, height, data) {
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB16UI, width, height, 0, gl.RGB_INTEGER, gl.UNSIGNED_SHORT, data);
   [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER].forEach((name) => gl.texParameteri(gl.TEXTURE_2D, name, gl.NEAREST));
   [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T].forEach((name) => gl.texParameteri(gl.TEXTURE_2D, name, gl.CLAMP_TO_EDGE));
+  return texture;
+}
+
+/** An RGB32F texture of merged HDR camera values (not filterable, so NEAREST and texelFetch). */
+function hdrTexture(gl, width, height, data) {
+  gl.activeTexture(gl.TEXTURE0 + UNIT.hdr);
+  const texture = floatTexture(gl, gl.TEXTURE_2D);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, width, height, 0, gl.RGB, gl.FLOAT, data);
   return texture;
 }
 
@@ -119,11 +129,13 @@ export class GlRenderer {
     this.lutData = null;
     // Placeholders keep both photo samplers complete whichever kind of source is shown.
     this.rawPlaceholder = rawTexture(gl, 1, 1, new Uint16Array(3));
+    this.hdrPlaceholder = hdrTexture(gl, 1, 1, new Float32Array(3));
     gl.activeTexture(gl.TEXTURE0);
     this.sourcePlaceholder = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.sourcePlaceholder);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
     this.raw = false;
+    this.hdr = false;
   }
 
   /** Uploads the curve table when it changed (tables are cached per curve set). */
@@ -154,7 +166,8 @@ export class GlRenderer {
 
   /**
    * Uploads the source pixels: an ImageBitmap (decoded with premultiplyAlpha 'none'),
-   * { width, height, data } RGBA8, or { kind: 'raw', width, height, data } RGB16.
+   * { width, height, data } RGBA8, { kind: 'raw', width, height, data } RGB16, or
+   * { kind: 'hdr', width, height, data } float RGB.
    */
   setSource(source) {
     const { gl } = this;
@@ -164,8 +177,9 @@ export class GlRenderer {
       throw new Error(`Preview ${width}×${height} exceeds this GPU's ${this.maxTextureSize}px texture limit.`);
     }
     this.raw = source.kind === 'raw';
-    if (this.raw) {
-      this.texture = rawTexture(gl, width, height, source.data);
+    this.hdr = source.kind === 'hdr';
+    if (this.raw || this.hdr) {
+      this.texture = this.raw ? rawTexture(gl, width, height, source.data) : hdrTexture(gl, width, height, source.data);
       this.width = width;
       this.height = height;
       this.canvas.width = width;
@@ -222,15 +236,22 @@ export class GlRenderer {
   draw(params) {
     const { gl, uniforms: u } = this;
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.raw ? this.sourcePlaceholder : this.texture);
+    gl.bindTexture(gl.TEXTURE_2D, this.raw || this.hdr ? this.sourcePlaceholder : this.texture);
     gl.uniform1i(u.uSource, 0);
     gl.activeTexture(gl.TEXTURE0 + UNIT.raw);
     gl.bindTexture(gl.TEXTURE_2D, this.raw ? this.texture : this.rawPlaceholder);
     gl.uniform1i(u.uRawSource, UNIT.raw);
     gl.uniform1i(u.uRaw, this.raw ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE0 + UNIT.hdr);
+    gl.bindTexture(gl.TEXTURE_2D, this.hdr ? this.texture : this.hdrPlaceholder);
+    gl.uniform1i(u.uHdrSource, UNIT.hdr);
+    gl.uniform1i(u.uHdr, this.hdr ? 1 : 0);
     gl.uniform3fv(u.uRawGain, params.raw?.gain ?? [1, 1, 1]);
     gl.uniformMatrix3fv(u.uRawMatrix, true, new Float32Array(params.raw?.matrix ?? IDENTITY));
+    gl.uniform1f(u.uRawWhite, params.raw?.white ?? 1);
     gl.uniform1f(u.uRolloffWhite, params.rolloffWhite ?? 0);
+    gl.uniform1f(u.uRolloffKnee, params.rolloffKnee ?? 0.5);
+    gl.uniform1f(u.uShadowLift, params.shadowLift ?? 0);
     gl.uniform1i(u.uNeutral, params.neutral ? 1 : 0);
     gl.uniform1i(u.uWhiteBalanceActive, params.whiteBalanceActive ? 1 : 0);
     // GLSL matrices are column-major; ours are row-major.
@@ -286,6 +307,7 @@ export class GlRenderer {
     if (this.texture) this.gl.deleteTexture(this.texture);
     this.texture = null;
     this.raw = false;
+    this.hdr = false;
   }
 
   /** Frees the texture and shrinks the drawing buffer while no photo is shown. */
@@ -301,6 +323,7 @@ export class GlRenderer {
     gl.deleteTexture(this.curveTexture);
     gl.deleteTexture(this.lutTexture);
     gl.deleteTexture(this.rawPlaceholder);
+    gl.deleteTexture(this.hdrPlaceholder);
     gl.deleteTexture(this.sourcePlaceholder);
     gl.deleteBuffer(this.buffer);
     gl.deleteVertexArray(this.vao);

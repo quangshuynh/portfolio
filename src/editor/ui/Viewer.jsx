@@ -156,9 +156,9 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     try {
       const rendered = params.neutral ? image : await renderInWorker(image, params.adjustments, params.lutData, params.raw);
       const sourceWidth = Math.round(image.width * params.split);
-      // The "before" side: the source itself, or for RAW its neutral development.
+      // The "before" side: the source itself, or for RAW and merged RAW HDR its neutral development.
       let before = image;
-      if (image.kind === 'raw' && sourceWidth > 0) {
+      if ((image.kind === 'raw' || image.kind === 'hdr') && sourceWidth > 0) {
         const cache = cpuBeforeRef.current;
         if (cache.image !== image) Object.assign(cache, { image, data: (await renderInWorker(image, neutralAdjustments(), null, params.raw)).data });
         before = { data: cache.data };
