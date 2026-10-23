@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { deriveParams } from '../pipeline/spec.mjs';
+import { neutralAdjustments } from '../model/adjustments.mjs';
 import { GlRenderer, probeEditorContext } from '../pipeline/glRenderer.mjs';
 import { debugFlag, recordDiagnostic } from '../io/diagnostics.mjs';
 import { previewEdgeLimit } from '../io/files.mjs';
@@ -48,6 +49,8 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   const proxyRef = useRef(null);
   const frameRef = useRef(0);
   const cpuJobRef = useRef({ latest: 0, busy: false, queued: null });
+  // CPU preview of a RAW photo: its neutral development, for Original and Split.
+  const cpuBeforeRef = useRef({ image: null, data: null });
   const [canvas, setCanvas] = useState(null);
   const [engineKind, setEngineKind] = useState(null);
   const [proxy, setProxy] = useState(null);
@@ -151,11 +154,18 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     job.busy = true;
     const id = (job.latest += 1);
     try {
-      const rendered = params.neutral ? image : await renderInWorker(image, params.adjustments, params.lutData);
+      const rendered = params.neutral ? image : await renderInWorker(image, params.adjustments, params.lutData, params.raw);
+      const sourceWidth = Math.round(image.width * params.split);
+      // The "before" side: the source itself, or for RAW its neutral development.
+      let before = image;
+      if (image.kind === 'raw' && sourceWidth > 0) {
+        const cache = cpuBeforeRef.current;
+        if (cache.image !== image) Object.assign(cache, { image, data: (await renderInWorker(image, neutralAdjustments(), null, params.raw)).data });
+        before = { data: cache.data };
+      }
       if (id === job.latest && proxyRef.current === image) {
         engine.context.putImageData(new ImageData(new Uint8ClampedArray(rendered.data), image.width, image.height), 0, 0);
-        const sourceWidth = Math.round(image.width * params.split);
-        if (sourceWidth > 0) engine.context.putImageData(new ImageData(image.data, image.width, image.height), 0, 0, 0, 0, sourceWidth, image.height);
+        if (sourceWidth > 0) engine.context.putImageData(new ImageData(new Uint8ClampedArray(before.data), image.width, image.height), 0, 0, 0, 0, sourceWidth, image.height);
       }
     } catch (error) {
       if (error.code !== 'cancelled') setStatus({ state: 'error', message: error.message });
@@ -170,20 +180,24 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   }, [renderInWorker]);
 
   // Render on the next frame with the latest values; intermediate values are dropped.
+  // Never with another photo's settings: wait until this photo's proxy is loaded.
+  const raw = photo?.raw ?? null;
   useEffect(() => {
     const engine = engineRef.current;
-    if (!engine || !proxy) return undefined;
+    if (!engine || !proxy || proxy.id !== photo?.id) return undefined;
     cancelAnimationFrame(frameRef.current);
     frameRef.current = requestAnimationFrame(() => {
-      const params = deriveParams(adjustments, { lut });
+      const params = deriveParams(adjustments, { lut, raw });
       if (engine.kind === 'webgl2') {
-        if (!engine.renderer.lost) engine.renderer.render(params, { split: splitFraction });
+        // "Before" of a RAW photo is its neutral development, not undeveloped sensor data.
+        const before = raw ? deriveParams(neutralAdjustments(), { raw }) : null;
+        if (!engine.renderer.lost) engine.renderer.render(params, { split: splitFraction, before });
       } else {
-        drawCpu({ ...params, neutral: params.neutral, adjustments, lutData: params.lutActive ? lut : null, split: splitFraction });
+        drawCpu({ ...params, neutral: params.neutral, adjustments, lutData: params.lutActive ? lut : null, split: splitFraction, raw });
       }
     });
     return () => cancelAnimationFrame(frameRef.current);
-  }, [adjustments, lut, splitFraction, proxy, drawCpu]);
+  }, [adjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu]);
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -337,10 +351,10 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
             />
           </div>
         )}
-        {status.state === 'loading' && <p className="pe-stage-message" role="status"><span className="pe-spinner" aria-hidden="true" />Loading preview…</p>}
+        {status.state === 'loading' && <p className="pe-stage-message" role="status"><span className="pe-spinner" aria-hidden="true" />{raw ? 'Developing RAW preview from sensor data…' : 'Loading preview…'}</p>}
         {engineError && <p className="pe-stage-message pe-stage-message--error" role="alert">{engineError}</p>}
         {!engineError && status.state === 'error' && <p className="pe-stage-message pe-stage-message--error" role="alert">{status.message || 'This photograph could not be shown.'}</p>}
-        {photo && photo.status === 'importing' && <p className="pe-stage-message" role="status"><span className="pe-spinner" aria-hidden="true" />Reading {photo.name}…</p>}
+        {photo && photo.status === 'importing' && <p className="pe-stage-message" role="status"><span className="pe-spinner" aria-hidden="true" />{{ waiting: 'Waiting for the RAW decoder:', decoding: 'Decoding RAW sensor data:' }[photo.progress] ?? 'Reading'} {photo.name}…</p>}
         {compare === 'original' && proxy && <span className="pe-stage-badge" aria-live="polite">Original</span>}
         {previewing && compare !== 'original' && proxy && <span className="pe-stage-badge" aria-live="polite">Preview: {previewing}</span>}
       </div>

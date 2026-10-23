@@ -5,9 +5,10 @@ import CurveEditor from './CurveEditor';
 import HslPanel from './HslPanel';
 import LutPanel from './LutPanel';
 import PresetPanel from './PresetPanel';
+import RawPanel from './RawPanel';
 
 const SECTIONS_KEY = 'photo-editor:sections:v1';
-const DEFAULT_OPEN = { light: true, color: true };
+const DEFAULT_OPEN = { raw: true, light: true, color: true };
 
 function readOpenSections() {
   try {
@@ -41,10 +42,12 @@ function Section({ id, title, open, onToggle, edited, onReset, resetDisabled, ch
 }
 
 /**
- * The adjustment inspector: collapsible groups for light, colour, HSL, tone curve,
- * LUT and presets. Only Light and Color start open; the choice is remembered locally.
+ * The adjustment inspector: collapsible groups for RAW development (RAW photos only),
+ * light, colour, HSL, tone curve, LUT and presets. Only RAW, Light and Color start
+ * open; the choice is remembered locally.
+ * :param raw: the active photo's RAW info, or null for JPEG, PNG and WebP
  */
-export default function AdjustPanel({ adjustments, disabled, dispatch, lut, presets }) {
+export default function AdjustPanel({ adjustments, disabled, dispatch, lut, presets, raw = null }) {
   const [open, setOpen] = useState(readOpenSections);
   const toggle = (id) => setOpen((current) => {
     const next = { ...current, [id]: !current[id] };
@@ -80,6 +83,7 @@ export default function AdjustPanel({ adjustments, disabled, dispatch, lut, pres
           Reset all
         </button>
       </div>
+      {raw && section('raw', 'RAW', <RawPanel raw={raw} adjustments={adjustments} disabled={disabled} dispatch={dispatch} />)}
       {section('light', 'Light', rows('light'))}
       {section('color', 'Color', rows('color'))}
       {section('hsl', 'HSL', <HslPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} />)}
