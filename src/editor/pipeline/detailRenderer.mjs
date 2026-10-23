@@ -144,9 +144,11 @@ export function computeImageGuide(prepared, source) {
  * Per-render state: settings, scale, halo and the guide.
  * :param params: deriveParams() result with an active detail stage, or prepareRender() result
  * :param options: { width, height } the render size; { nativeWidth, nativeHeight } the
- *   photo's full size; `guide` from computeImageGuide (or `guideImage` to compute it)
+ *   photo's full size; `guide` from computeImageGuide (or `guideImage` to compute it);
+ *   `transparent`: whether any pixel of the image is not opaque. Blurs are weighted by
+ *   alpha only then, decided for the whole image so the result never depends on tiling.
  */
-export function prepareDetailRender(params, { width, height, nativeWidth = width, nativeHeight = height, guide, guideImage }) {
+export function prepareDetailRender(params, { width, height, nativeWidth = width, nativeHeight = height, guide, guideImage, transparent = false }) {
   const prepared = params.tone && params.params ? params : prepareRender(params);
   const { detail } = prepared.params;
   const scale = Math.min(1, Math.max(width, height) / Math.max(nativeWidth, nativeHeight));
@@ -157,6 +159,7 @@ export function prepareDetailRender(params, { width, height, nativeWidth = width
     width,
     height,
     halo: detailHalo(detail, scale),
+    transparent,
     guide: guide !== undefined ? guide : computeImageGuide(prepared, guideImage),
     pool: createPool(),
   };
@@ -168,7 +171,7 @@ export function prepareDetailRender(params, { width, height, nativeWidth = width
  * clamped to the image (see `image.y0`).
  */
 export function renderDetailRows(image, context, y0, y1, target, { flattenAlpha = false, tileWidth = DETAIL_TILE } = {}) {
-  const { prepared, detail, scale, guide, halo, pool, width, height } = context;
+  const { prepared, detail, scale, guide, halo, pool, width, height, transparent } = context;
   const p = prepared.params;
   const channels = channelsOf(image);
   const firstRow = image.y0 ?? 0;
@@ -176,7 +179,7 @@ export function renderDetailRows(image, context, y0, y1, target, { flattenAlpha 
   const top = Math.max(0, y0 - halo);
   const bottom = Math.min(height, y1 + halo);
   if (image.width !== width || top < firstRow || bottom > firstRow + rowsHeld) throw new Error('The image rows do not cover the band and its halo.');
-  const hasAlpha = channels === 4 && rowsHaveAlpha(image, top - firstRow, bottom - firstRow);
+  const hasAlpha = channels === 4 && transparent;
   const rgb = [0, 0, 0];
   for (let x0 = 0; x0 < width; x0 += tileWidth) {
     const x1 = Math.min(width, x0 + tileWidth);
@@ -211,7 +214,8 @@ export function renderDetailRows(image, context, y0, y1, target, { flattenAlpha 
   return target;
 }
 
-function rowsHaveAlpha(image, startRow, endRow) {
+/** True when any pixel in rows [startRow, endRow) of an RGBA image is not opaque. */
+export function rowsHaveAlpha(image, startRow, endRow) {
   const { data, width } = image;
   for (let i = startRow * width * 4 + 3; i < endRow * width * 4; i += 4) if (data[i] !== 255) return true;
   return false;
@@ -239,6 +243,7 @@ export function renderDetailImage(image, params, {
     height: image.height,
     nativeWidth,
     nativeHeight,
+    transparent: channelsOf(image) === 4 && rowsHaveAlpha(image, 0, image.height),
     guide,
     guideImage: guide === undefined ? (guideImage ?? guideSource(image)) : undefined,
   });

@@ -4,7 +4,7 @@
 // stays in this browser; nothing here performs network requests.
 
 import { prepareRender, renderImage, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
-import { computeImageGuide, createAreaAccumulator, guideSize, guideSource, prepareDetailRender, renderDetailImage, renderDetailRows } from '../pipeline/detailRenderer.mjs';
+import { computeImageGuide, createAreaAccumulator, guideSize, guideSource, prepareDetailRender, renderDetailImage, renderDetailRows, rowsHaveAlpha } from '../pipeline/detailRenderer.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { groupKeys, normalizeAdjustments } from '../model/adjustments.mjs';
 import { decodeToCanvas, decodeToRgba, encodeCanvas, inspectFile } from './decode.mjs';
@@ -71,11 +71,14 @@ export async function exportDetailBands(context, size, prepared, native, setting
   const { width, height } = size;
   const small = guideSize(size);
   const accumulator = createAreaAccumulator(undefined, width, height, small.width, small.height);
+  let transparent = false;
   for (let row = 0; row < height; row += EXPORT_BAND_ROWS) {
     const rows = Math.min(EXPORT_BAND_ROWS, height - row);
-    accumulator.add(context.getImageData(0, row, width, rows, { colorSpace: 'srgb' }).data, row, rows);
+    const { data } = context.getImageData(0, row, width, rows, { colorSpace: 'srgb' });
+    accumulator.add(data, row, rows);
+    transparent ||= rowsHaveAlpha({ width, data }, 0, rows);
   }
-  const detail = prepareDetailRender(prepared, { width, height, nativeWidth: native.width, nativeHeight: native.height, guideImage: guideSource(accumulator.finish()) });
+  const detail = prepareDetailRender(prepared, { width, height, nativeWidth: native.width, nativeHeight: native.height, transparent, guideImage: guideSource(accumulator.finish()) });
   const { halo } = detail;
   let above = null;
   for (let row = 0; row < height; row += EXPORT_BAND_ROWS) {

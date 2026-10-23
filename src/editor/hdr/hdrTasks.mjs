@@ -4,7 +4,7 @@
 // (or to cancel), so its buffers never outlive the job. No network access.
 
 import { prepareRender, renderRawRgba8, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
-import { guideSource, prepareDetailRender, renderDetailRows } from '../pipeline/detailRenderer.mjs';
+import { guideSource, prepareDetailRender, renderDetailRows, rowsHaveAlpha } from '../pipeline/detailRenderer.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { proxyDimensions } from '../io/files.mjs';
 import { HdrError, analyzeBracket, createFusionMerge, createRadianceMerge } from './hdrMerge.mjs';
@@ -104,7 +104,7 @@ export const handlers = {
     const prepared = prepareRender(params);
     const { width, height } = image;
     const detail = params.detailActive
-      ? prepareDetailRender(prepared, { width, height, nativeWidth: native?.width ?? width, nativeHeight: native?.height ?? height, guideImage: guideSource(image) })
+      ? prepareDetailRender(prepared, { width, height, nativeWidth: native?.width ?? width, nativeHeight: native?.height ?? height, transparent: image.kind !== 'hdr' && rowsHaveAlpha(image, 0, height), guideImage: guideSource(image) })
       : null;
     for (let row = 0; row < height; row += HDR_BAND_ROWS) {
       const rows = Math.min(HDR_BAND_ROWS, height - row);

@@ -396,3 +396,15 @@ describe('raster export in place', () => {
     expect(difference(canvas, reference).max).toBe(0);
   });
 });
+
+describe('transparency decided per image', () => {
+  test('a photo transparent in one band only renders the same with any band height', () => {
+    const rand = random(41);
+    const W = 90;
+    const H = 300;
+    const photo = image(W, H, (x, y) => [rand() * 255, 120 + 60 * Math.sin(x / 3), 80, y > 250 && x < 20 ? 0 : 255]);
+    const settings = { texture: 80, sharpening: 90, luminanceNoise: 60, colorNoise: 70, clarity: 30 };
+    const whole = render(photo, settings, { bandRows: H, tileWidth: W });
+    for (const bandRows of [16, 50, 128]) expect(difference(render(photo, settings, { bandRows, tileWidth: 31 }), whole).max).toBe(0);
+  });
+});
