@@ -304,6 +304,15 @@ describe('RAW worker tasks', () => {
     expect(order).toEqual([]);
   });
 
+  test('a decoder that cannot start gives an actionable error, not the raw abort text', async () => {
+    const file = dngFile(createSyntheticDng({ scene }));
+    const failing = (message) => createRawHandlers(async () => { throw new Error(message); });
+    await expect(failing('Aborted(RangeError: Out of memory: Cannot allocate Wasm memory for new instance)').decode({ file, maxEdge: 64 }))
+      .rejects.toMatchObject({ code: 'memory', message: expect.stringMatching(/not enough free memory to start the RAW decoder/) });
+    await expect(failing('Aborted(CompileError: WebAssembly.instantiate())').decode({ file, maxEdge: 64 }))
+      .rejects.toMatchObject({ code: 'decoder', message: expect.stringMatching(/could not start in this browser .*Reload the page/) });
+  });
+
   test('export refuses a file that no longer matches the imported one', async () => {
     const { info } = decodeRaw(Module, createSyntheticDng(), { format: 'dng' });
     await expect(handlers.export({ file: dngFile(createSyntheticDng({ width: 32, height: 32 })), raw: info, adjustments: neutralAdjustments(), settings: { format: 'png', resize: { mode: 'original' } } }, vi.fn()))

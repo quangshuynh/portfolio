@@ -14,6 +14,15 @@ import { RAW_SNIFF_BYTES, sniffRaw } from './rawFormat.mjs';
 
 export const RAW_BAND_ROWS = 256;
 
+/** LibRaw could not be instantiated: usually too little memory for its heap on a phone. */
+function decoderFailure(error) {
+  const detail = String(error?.message ?? error ?? 'unknown error').slice(0, 160);
+  if (/out of memory|cannot allocate|allocation failed|Cannot enlarge memory/i.test(detail)) {
+    return new RawDecodeError('memory', 'There is not enough free memory to start the RAW decoder. Close other tabs or apps and try again. JPEG, PNG and WebP still work.');
+  }
+  return new RawDecodeError('decoder', `The RAW decoder could not start in this browser (${detail}). Reload the page to try again; JPEG, PNG and WebP still work.`);
+}
+
 /**
  * Opens a RAW file: size checks, then its header to identify it, then LibRaw, and only then
  * the whole file. The order matters: creating LibRaw's shared wasm memory after a large
@@ -32,7 +41,12 @@ async function openRaw(file, loadModule) {
     throw new RawDecodeError(error.code ?? 'unsupported', error.message);
   }
   if (!format) throw new RawDecodeError('unsupported', 'This is not a Sony ARW or DNG file.');
-  const Module = await loadModule();
+  let Module;
+  try {
+    Module = await loadModule();
+  } catch (error) {
+    throw decoderFailure(error);
+  }
   const bytes = new Uint8Array(await file.arrayBuffer());
   return { Module, bytes, format };
 }
