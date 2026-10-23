@@ -16,6 +16,11 @@
 //   linear sRGB -> the steps above, with a highlight rolloff right after exposure.
 // Their "decode" step is this development, never the sRGB EOTF, and nothing is
 // rounded to 8 bits before the final quantisation.
+//
+// Merged RAW HDR photos (hdr/) are float camera RGB in the reference exposure's space,
+// unclipped up to `raw.white` (> 1). They develop the same way, clipped at that white
+// instead of 1, then get the HDR tone stage right after exposure: a shadow lift and the
+// highlight rolloff with an adjustable knee, mapping the merged white to display white.
 
 import { LUMA, linearToSrgb, srgbToLinear, whiteBalanceMatrix } from './colorMath.mjs';
 import { HSL_RANGES, hslKey, normalizeAdjustments } from '../model/adjustments.mjs';
@@ -49,12 +54,21 @@ export const BLACK_EPSILON = 1e-7;
 export const ROLLOFF_KNEE = 0.5;
 
 /** Highlight rolloff of linear luminance `y` for a sensor white at `white` (> 1). */
-export function highlightRolloff(y, white) {
-  if (y <= ROLLOFF_KNEE) return y;
-  const excess = y - ROLLOFF_KNEE;
-  const a = (white - 1) / ((1 - ROLLOFF_KNEE) * (white - ROLLOFF_KNEE));
-  return ROLLOFF_KNEE + excess / (1 + excess * a);
+export function highlightRolloff(y, white, knee = ROLLOFF_KNEE) {
+  if (y <= knee) return y;
+  const excess = y - knee;
+  const a = (white - 1) / ((1 - knee) * (white - knee));
+  return knee + excess / (1 + excess * a);
 }
+
+/**
+ * HDR tone stage. Highlight compression 0–100 moves the rolloff knee from 0.9 to 0.1
+ * (50 is the RAW knee, 0.5); shadow lift 0–100 brightens the darkest tones by up to
+ * 2x with a gain that fades above SHADOW_LIFT_SCALE: y + a·c·y / (y + c), monotonic.
+ */
+export const hdrKnee = (compression) => 0.9 - 0.8 * (compression / 100);
+export const SHADOW_LIFT_SCALE = 0.05;
+export const shadowLift = (y, amount) => y + (amount * SHADOW_LIFT_SCALE * y) / (y + SHADOW_LIFT_SCALE);
 
 /** HSL hue sliders at ±100 move hues by this many degrees. */
 export const HUE_SHIFT_MAX = 30;
@@ -93,8 +107,12 @@ export function deriveParams(adjustments, { lut = null, raw = null } = {}) {
     saturation: 1 + a.saturation / 100,
   };
   params.raw = raw ? rawDevelopParams(raw, { ...a.raw, temperature: a.rawTemperature, tint: a.rawTint }) : null;
-  // The rolloff keeps the sensor white at display white when exposure is raised.
-  params.rolloffWhite = params.raw && params.exposureGain > 1 ? params.exposureGain : 0;
+  params.hdr = Boolean(params.raw && params.raw.white > 1);
+  // The rolloff keeps the sensor (or merged) white at display white when it would clip.
+  const white = (params.raw?.white ?? 1) * params.exposureGain;
+  params.rolloffWhite = params.raw && white > 1 ? white : 0;
+  params.rolloffKnee = params.hdr ? hdrKnee(a.hdrHighlights) : ROLLOFF_KNEE;
+  params.shadowLift = params.hdr ? a.hdrShadows / 100 : 0;
   // A RAW source always needs developing, so its base stage is never the identity.
   params.baseNeutral = !params.raw && !whiteBalanceActive && params.exposureGain === 1 && !toneActive
     && params.vibrance === 0 && params.saturation === 1;
@@ -163,8 +181,13 @@ export function processLinear(rgb, params, toneLuminance = exactToneLuminance) {
   r *= gain; g *= gain; b *= gain;
 
   let y = LUMA[0] * r + LUMA[1] * g + LUMA[2] * b;
-  if (params.rolloffWhite && y > ROLLOFF_KNEE) {
-    const ratio = highlightRolloff(y, params.rolloffWhite) / y;
+  if (params.shadowLift && y > BLACK_EPSILON) {
+    const ratio = shadowLift(y, params.shadowLift) / y;
+    r *= ratio; g *= ratio; b *= ratio;
+    y *= ratio;
+  }
+  if (params.rolloffWhite && y > params.rolloffKnee) {
+    const ratio = highlightRolloff(y, params.rolloffWhite, params.rolloffKnee) / y;
     r *= ratio; g *= ratio; b *= ratio;
     y *= ratio;
   }
@@ -219,14 +242,14 @@ export function processLinear(rgb, params, toneLuminance = exactToneLuminance) {
 
 /**
  * RAW development of one pixel: decoded camera RGB (0–1, as-shot white balance,
- * normalised by the largest multiplier) -> linear sRGB. Writes into and returns `out`;
+ * normalised by the largest multiplier; up to `raw.white` for a merged HDR) -> linear sRGB. Writes into and returns `out`;
  * values may be negative or above 1 (out of gamut) until processLinear fits them.
  */
 export function developRaw(r, g, b, raw, out) {
-  const { gain, matrix: m } = raw;
-  const cr = Math.min(1, r * gain[0]);
-  const cg = Math.min(1, g * gain[1]);
-  const cb = Math.min(1, b * gain[2]);
+  const { gain, matrix: m, white } = raw;
+  const cr = Math.min(white, r * gain[0]);
+  const cg = Math.min(white, g * gain[1]);
+  const cb = Math.min(white, b * gain[2]);
   out[0] = m[0] * cr + m[1] * cg + m[2] * cb;
   out[1] = m[3] * cr + m[4] * cg + m[5] * cb;
   out[2] = m[6] * cr + m[7] * cg + m[8] * cb;

@@ -5,7 +5,7 @@
 
 import { LUMA } from './colorMath.mjs';
 import { CURVE_TABLE_SIZE } from './curves.mjs';
-import { BLACK_EPSILON, HSL_CENTERS, HSL_LUMINANCE_EV, ROLLOFF_KNEE, TONE_PIVOT } from './spec.mjs';
+import { BLACK_EPSILON, HSL_CENTERS, HSL_LUMINANCE_EV, SHADOW_LIFT_SCALE, TONE_PIVOT } from './spec.mjs';
 
 const f = (value) => {
   const text = String(value);
@@ -31,7 +31,13 @@ uniform bool uRaw;
 uniform usampler2D uRawSource;
 uniform vec3 uRawGain;
 uniform mat3 uRawMatrix;
+uniform float uRawWhite;
+// Merged RAW HDR: float camera RGB (RGB32F), developed like RAW with a higher white.
+uniform bool uHdr;
+uniform sampler2D uHdrSource;
+uniform float uShadowLift;
 uniform float uRolloffWhite;
+uniform float uRolloffKnee;
 uniform bool uWhiteBalanceActive;
 uniform mat3 uWhiteBalance;
 uniform float uExposureGain;
@@ -69,7 +75,7 @@ const int CURVE_SIZE = ${CURVE_TABLE_SIZE};
 const float HSL_EV = ${f(HSL_LUMINANCE_EV)};
 const float HSL_CENTERS[8] = float[8](${HSL_CENTERS.map(f).join(', ')});
 const float PI = 3.141592653589793;
-const float ROLLOFF_KNEE = ${f(ROLLOFF_KNEE)};
+const float SHADOW_LIFT_SCALE = ${f(SHADOW_LIFT_SCALE)};
 
 float toLinear(float v) {
   return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4);
@@ -110,16 +116,21 @@ vec3 fitRange(vec3 rgb, float y) {
 }
 
 float highlightRolloff(float y) {
-  float excess = y - ROLLOFF_KNEE;
-  float a = (uRolloffWhite - 1.0) / ((1.0 - ROLLOFF_KNEE) * (uRolloffWhite - ROLLOFF_KNEE));
-  return ROLLOFF_KNEE + excess / (1.0 + excess * a);
+  float excess = y - uRolloffKnee;
+  float a = (uRolloffWhite - 1.0) / ((1.0 - uRolloffKnee) * (uRolloffWhite - uRolloffKnee));
+  return uRolloffKnee + excess / (1.0 + excess * a);
 }
 
 vec3 process(vec3 rgb) {
   if (uWhiteBalanceActive) rgb = max(uWhiteBalance * rgb, 0.0);
   rgb *= uExposureGain;
   float y = dot(LUMA, rgb);
-  if (uRolloffWhite > 0.0 && y > ROLLOFF_KNEE) {
+  if (uShadowLift != 0.0 && y > BLACK_EPSILON) {
+    float ratio = 1.0 + uShadowLift * SHADOW_LIFT_SCALE / (y + SHADOW_LIFT_SCALE);
+    rgb *= ratio;
+    y *= ratio;
+  }
+  if (uRolloffWhite > 0.0 && y > uRolloffKnee) {
     float ratio = highlightRolloff(y) / y;
     rgb *= ratio;
     y *= ratio;
@@ -232,7 +243,12 @@ void main() {
   if (uRaw) {
     ivec2 size = textureSize(uRawSource, 0);
     ivec2 at = min(ivec2(vUv * vec2(size)), size - 1);
-    vec3 camera = min(vec3(texelFetch(uRawSource, at, 0).rgb) / 65535.0 * uRawGain, 1.0);
+    vec3 camera = min(vec3(texelFetch(uRawSource, at, 0).rgb) / 65535.0 * uRawGain, uRawWhite);
+    p = toSrgb3(process(uRawMatrix * camera));
+  } else if (uHdr) {
+    ivec2 size = textureSize(uHdrSource, 0);
+    ivec2 at = min(ivec2(vUv * vec2(size)), size - 1);
+    vec3 camera = min(texelFetch(uHdrSource, at, 0).rgb * uRawGain, uRawWhite);
     p = toSrgb3(process(uRawMatrix * camera));
   } else {
     vec4 source = texture(uSource, vUv);

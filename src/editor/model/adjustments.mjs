@@ -6,7 +6,8 @@
 // A photo's settings are these numbers plus three structured values: `curves` (tone
 // curve control points, see pipeline/curves.mjs), `lut` (a reference to an
 // imported .cube LUT by content hash, or null) and `raw` (white balance of a RAW
-// photo's development; ignored for JPEG, PNG and WebP).
+// photo's development; ignored for JPEG, PNG and WebP). The `hdr` controls only act on
+// merged RAW HDR photos.
 
 import { CURVE_CHANNELS, curvesEqual, curvesNeutral, isNeutralCurve, neutralCurves, normalizeCurves } from '../pipeline/curves.mjs';
 import { MAX_LUT_SIZE, MIN_LUT_SIZE } from '../pipeline/lut.mjs';
@@ -56,6 +57,9 @@ export const ADJUSTMENTS = Object.freeze([
   }))),
   { key: 'rawTemperature', group: 'raw', label: 'RAW temperature', ...RAW_KELVIN, unit: 'K', default: DAYLIGHT_KELVIN, signed: false, track: 'temperature' },
   { key: 'rawTint', group: 'raw', label: 'RAW tint', ...RAW_TINT, track: 'tint' },
+  // Merged RAW HDR only: tone mapping of the scene values (spec.hdrKnee, shadowLift).
+  { key: 'hdrHighlights', group: 'hdr', label: 'Highlight compression', min: 0, max: 100, step: 1, default: 50, signed: false },
+  { key: 'hdrShadows', group: 'hdr', label: 'Shadow lift', min: 0, max: 100, step: 1, signed: false },
   { key: 'lutIntensity', group: 'lut', label: 'Intensity', min: 0, max: 100, step: 1, unit: '%', default: 100, signed: false },
 ].map((entry) => Object.freeze({ digits: 0, unit: '', default: 0, signed: true, ...entry })));
 
@@ -67,6 +71,7 @@ export const ADJUSTMENT_GROUPS = Object.freeze([
   { id: 'curves', label: 'Tone Curve' },
   { id: 'lut', label: 'LUT' },
   { id: 'raw', label: 'RAW' },
+  { id: 'hdr', label: 'HDR' },
 ].map(Object.freeze));
 
 export const ADJUSTMENT_KEYS = Object.freeze(ADJUSTMENTS.map(({ key }) => key));

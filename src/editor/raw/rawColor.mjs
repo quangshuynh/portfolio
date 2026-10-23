@@ -126,11 +126,13 @@ export function channelGains(asShot, target) {
 
 /**
  * Renderer parameters for a RAW photo.
- * :returns: { gain: [3], matrix: 9 row-major camera RGB -> linear sRGB, multipliers }
+ * :returns: { gain: [3], matrix: 9 row-major camera RGB -> linear sRGB, multipliers,
+ *   white } where `white` is the clip level after the gain: 1 (the sensor white), or
+ *   for a merged HDR the darkest exposure's sensor white in reference units (`hdrWhite`)
  */
 export function rawDevelopParams(raw, settings) {
   const multipliers = targetMultipliers(raw, settings);
-  return { gain: channelGains(raw.asShot, multipliers), matrix: raw.rgbCam, multipliers };
+  return { gain: channelGains(raw.asShot, multipliers), matrix: raw.rgbCam, multipliers, white: raw.hdrWhite > 1 ? raw.hdrWhite : 1 };
 }
 
 /** Camera-to-linear-sRGB matrix check: real colour data, invertible, rows near 1 (white stays white). */
