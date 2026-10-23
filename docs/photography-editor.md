@@ -394,14 +394,16 @@ whole browser incl. GPU and workers; draft / final frame after a value is commit
 | --- | --- | --- | --- |
 | Chromium 141 | 1.1/2.3 s · 0.18/1.3 s · 0.28/1.8 s · 0.85/2.8 s | 16.2 s (6000×4000) | 444 → 1120 MB |
 | Firefox 142 | 0.53/1.1 s · 0.21/0.78 s · 0.36/1.1 s · 1.0/2.9 s | 24.8 s | 810 → 1428 MB |
-| WebKit 26 | 1.4/2.2 s · 0.47/1.1 s · 0.61/2.1 s · 0.66/2.0 s | 18.4 s | 421 → 1070 MB |
+| WebKit 26 (2 runs) | 1.4–1.8/2.2–2.7 s · 0.47–0.60/1.1–1.5 s · 0.61–0.70/1.7–2.1 s · 0.64/2.0–4.7 s | 18.4–18.6 s | 421–465 → 1070–1185 MB |
 
 Genuine ISO 6400 ARW (`DSC09356`, Texture and luminance NR): first value 1.1/2.3 s
 (Chromium), 1.1/2.5 s (Firefox); full-size export 11.8 s at 1689 MB peak (Chromium), 25.8 s
 at 1994 MB (Firefox). Against Interval 6: photos without Detail are unchanged (GPU preview,
 2.0–2.4 s for a 24 MP JPEG export); Detail costs about 7–10 s more per 24 MP export with
 all six controls, and its preview is not interactive at GPU speed. PNG exports equal the
-Node reference exactly in all five environments; the iPhone 13 emulation (WebKit) has
+Node reference exactly in all five environments. Playwright's Windows WebKit has no
+worker canvas, so decoding runs on the main thread there, but Detail rendering stays in its
+worker; the iPhone 13 emulation (WebKit) has
 the Detail section reachable in the Adjust tab with no sideways scrolling. Not measured on
 a physical phone.
 
