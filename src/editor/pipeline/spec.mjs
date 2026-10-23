@@ -8,7 +8,8 @@
 //   decode sRGB -> white balance -> exposure -> tone (contrast, highlights, shadows,
 //   whites, blacks on luminance) -> vibrance -> saturation -> range fit -> encode sRGB.
 // Then on the sRGB-encoded values (display-referred, 0–1):
-//   tone curves (master, then per channel) -> HSL -> 3D LUT (mixed by intensity).
+//   [detail stage, spatial: pipeline/detail.mjs] -> tone curves (master, then per
+//   channel) -> HSL -> 3D LUT (mixed by intensity).
 // Each later stage is skipped when neutral, so earlier edits render unchanged.
 //
 // RAW photos start before that from 16-bit linear camera RGB (see raw/rawColor.mjs):
@@ -27,6 +28,7 @@ import { HSL_RANGES, hslKey, normalizeAdjustments } from '../model/adjustments.m
 import { curveTables, sampleCurve } from './curves.mjs';
 import { sampleLut } from './lut.mjs';
 import { rawDevelopParams } from '../raw/rawColor.mjs';
+import { detailParams } from './detail.mjs';
 
 // Middle grey (18% linear) in the sRGB-encoded tone domain: the contrast pivot.
 export const TONE_PIVOT = linearToSrgb(0.18);
@@ -132,7 +134,11 @@ export function deriveParams(adjustments, { lut = null, raw = null } = {}) {
   params.lutActive = Boolean(params.lut) && params.lutIntensity > 0;
   params.lutMissing = Boolean(a.lut) && !lut;
   params.postActive = params.curvesActive || params.hslActive || params.lutActive;
-  params.neutral = params.baseNeutral && !params.postActive;
+  // Detail is spatial: renderers that only work per pixel (the GPU preview) must hand
+  // photos with `detailActive` to the detail renderer (detailRenderer.mjs).
+  params.detail = detailParams(a);
+  params.detailActive = params.detail.active;
+  params.neutral = params.baseNeutral && !params.postActive && !params.detailActive;
   return params;
 }
 

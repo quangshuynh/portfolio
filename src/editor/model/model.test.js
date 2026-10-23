@@ -23,8 +23,11 @@ describe('adjustment registry', () => {
     });
   });
 
-  test('the unsigned controls are RAW temperature in kelvin, the HDR tone amounts and LUT intensity, a 0–100% amount that defaults to full', () => {
+  test('the unsigned controls are the Detail amounts, RAW temperature in kelvin, the HDR tone amounts and LUT intensity, a 0–100% amount that defaults to full', () => {
     expect(ADJUSTMENTS.filter(({ signed }) => !signed)).toEqual([
+      expect.objectContaining({ key: 'sharpening', group: 'detail', min: 0, max: 100, default: 0 }),
+      expect.objectContaining({ key: 'luminanceNoise', group: 'detail', min: 0, max: 100, default: 0 }),
+      expect.objectContaining({ key: 'colorNoise', group: 'detail', min: 0, max: 100, default: 0 }),
       expect.objectContaining({ key: 'rawTemperature', unit: 'K', default: 5500 }),
       expect.objectContaining({ key: 'hdrHighlights', group: 'hdr', min: 0, max: 100, default: 50 }),
       expect.objectContaining({ key: 'hdrShadows', group: 'hdr', min: 0, max: 100, default: 0 }),
@@ -39,7 +42,7 @@ describe('adjustment registry', () => {
     expect(clampAdjustment('contrast', '42.4')).toBe(42);
     expect(clampAdjustment('contrast', 'abc')).toBe(0);
     expect(Object.is(clampAdjustment('contrast', -0.2), 0)).toBe(true);
-    expect(() => clampAdjustment('clarity', 1)).toThrow();
+    expect(() => clampAdjustment('sharpen', 1)).toThrow();
   });
 
   test('normalises partial input and drops unknown keys', () => {
