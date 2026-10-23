@@ -274,6 +274,36 @@ describe('RAW worker tasks', () => {
     expect(needsFullDecode(info, { width: 33, height: 25 })).toBe(true);
   });
 
+  // Creating LibRaw's shared wasm memory after the whole file had been read crashed
+  // Playwright's Windows WebKit (docs/photography-editor.md, Known issues).
+  test('every task instantiates LibRaw after reading only the header, before the whole file', async () => {
+    const bytes = createSyntheticDng({ scene });
+    const { info } = decodeRaw(Module, bytes, { format: 'dng' });
+    const order = [];
+    const file = {
+      size: bytes.length,
+      slice: (start, end) => ({ arrayBuffer: async () => { order.push('header'); return bytes.slice(start, end).buffer; } }),
+      arrayBuffer: async () => { order.push('file'); return bytes.slice().buffer; },
+    };
+    const tracked = createRawHandlers(async () => { order.push('libraw'); return Module; });
+    const settings = { format: 'png', resize: { mode: 'original' } };
+    const runs = {
+      inspect: () => tracked.inspect({ file, thumbnailEdge: 16 }, () => {}),
+      decode: () => tracked.decode({ file, maxEdge: 64 }),
+      develop: () => tracked.develop({ file, raw: info, width: 64, height: 48 }),
+      region: () => tracked.region({ file, raw: info, rect: { x: 0, y: 0, width: 16, height: 16 } }),
+      export: () => tracked.export({ file, raw: info, adjustments: neutralAdjustments(), settings }, () => {}),
+    };
+    for (const [name, run] of Object.entries(runs)) {
+      order.length = 0;
+      await run();
+      expect(order, name).toEqual(['header', 'libraw', 'file']);
+    }
+    order.length = 0;
+    await expect(tracked.decode({ file: { ...file, size: 0 }, maxEdge: 64 })).rejects.toMatchObject({ code: 'corrupt' });
+    expect(order).toEqual([]);
+  });
+
   test('export refuses a file that no longer matches the imported one', async () => {
     const { info } = decodeRaw(Module, createSyntheticDng(), { format: 'dng' });
     await expect(handlers.export({ file: dngFile(createSyntheticDng({ width: 32, height: 32 })), raw: info, adjustments: neutralAdjustments(), settings: { format: 'png', resize: { mode: 'original' } } }, vi.fn()))

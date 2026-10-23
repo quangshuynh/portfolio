@@ -14,18 +14,27 @@ import { RAW_SNIFF_BYTES, sniffRaw } from './rawFormat.mjs';
 
 export const RAW_BAND_ROWS = 256;
 
-async function readRaw(file) {
+/**
+ * Opens a RAW file: size checks, then its header to identify it, then LibRaw, and only then
+ * the whole file. The order matters: creating LibRaw's shared wasm memory after a large
+ * ArrayBuffer had been allocated in the worker crashed Playwright's Windows WebKit once an
+ * earlier RAW worker had ended (docs/photography-editor.md, Known issues). Same files and
+ * the same memory either way.
+ * :returns: { Module, bytes, format }
+ */
+async function openRaw(file, loadModule) {
   if (file.size > LIMITS.maxFileBytes) throw new RawDecodeError('too-large', `The file is larger than ${LIMITS.maxFileBytes / (1024 * 1024)} MB.`);
   if (file.size === 0) throw new RawDecodeError('corrupt', 'The file is empty.');
-  const bytes = new Uint8Array(await file.arrayBuffer());
   let format;
   try {
-    format = sniffRaw(bytes.subarray(0, RAW_SNIFF_BYTES));
+    format = sniffRaw(new Uint8Array(await file.slice(0, RAW_SNIFF_BYTES).arrayBuffer()));
   } catch (error) {
     throw new RawDecodeError(error.code ?? 'unsupported', error.message);
   }
   if (!format) throw new RawDecodeError('unsupported', 'This is not a Sony ARW or DNG file.');
-  return { bytes, format };
+  const Module = await loadModule();
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  return { Module, bytes, format };
 }
 
 /**
@@ -39,10 +48,10 @@ export function createRawHandlers(loadModule) {
   return {
     /** Validates, hashes and develops a thumbnail from half-size sensor data. */
     async inspect({ file, thumbnailEdge }, progress) {
-      const { bytes, format } = await readRaw(file);
+      const { Module, bytes, format } = await openRaw(file, loadModule);
       const sha256 = await contentHash(bytes);
       progress({ stage: 'decoding' });
-      const { info, image } = decodeRaw(await loadModule(), bytes, { format, halfSize: true });
+      const { info, image } = decodeRaw(Module, bytes, { format, halfSize: true });
       const size = proxyDimensions(image, thumbnailEdge);
       const thumbnail = downsampleRaw(image, size.width, size.height);
       const header = { format, width: info.width, height: info.height, displayWidth: info.width, displayHeight: info.height, orientation: 1 };
@@ -54,8 +63,8 @@ export function createRawHandlers(loadModule) {
      * source, and only `rect` of the pixels.
      */
     async region({ file, raw, rect }) {
-      const { bytes, format } = await readRaw(file);
-      const decoded = decodeRaw(await loadModule(), bytes, { format, halfSize: false });
+      const { Module, bytes, format } = await openRaw(file, loadModule);
+      const decoded = decodeRaw(Module, bytes, { format, halfSize: false });
       if (decoded.info.width !== raw.width || decoded.info.height !== raw.height) {
         throw new RawDecodeError('corrupt', 'The file changed since it was imported. Import it again.');
       }
@@ -68,8 +77,8 @@ export function createRawHandlers(loadModule) {
 
     /** Preview proxy: half-size sensor data, downscaled to `maxEdge` if larger. */
     async decode({ file, maxEdge }) {
-      const { bytes, format } = await readRaw(file);
-      const { image } = decodeRaw(await loadModule(), bytes, { format, halfSize: true });
+      const { Module, bytes, format } = await openRaw(file, loadModule);
+      const { image } = decodeRaw(Module, bytes, { format, halfSize: true });
       const size = proxyDimensions(image, maxEdge);
       const proxy = downsampleRaw(image, size.width, size.height);
       return { result: proxy, transfer: [proxy.data.buffer] };
@@ -80,8 +89,8 @@ export function createRawHandlers(loadModule) {
      * sensor data when it is enough, else the full demosaic, area-averaged to the size.
      */
     async develop({ file, raw, width, height }) {
-      const { bytes, format } = await readRaw(file);
-      const decoded = decodeRaw(await loadModule(), bytes, { format, halfSize: !needsFullDecode(raw, { width, height }) });
+      const { Module, bytes, format } = await openRaw(file, loadModule);
+      const decoded = decodeRaw(Module, bytes, { format, halfSize: !needsFullDecode(raw, { width, height }) });
       if (decoded.info.width !== raw.width || decoded.info.height !== raw.height) {
         throw new RawDecodeError('corrupt', 'The file changed since it was imported. Import it again.');
       }
@@ -102,8 +111,8 @@ export function createRawHandlers(loadModule) {
       const started = performance.now();
       const size = exportDimensions({ width: raw.width, height: raw.height }, settings.resize);
       progress({ stage: 'decoding', fraction: 0 });
-      const { bytes, format } = await readRaw(file);
-      const decoded = decodeRaw(await loadModule(), bytes, { format, halfSize: !needsFullDecode(raw, size) });
+      const { Module, bytes, format } = await openRaw(file, loadModule);
+      const decoded = decodeRaw(Module, bytes, { format, halfSize: !needsFullDecode(raw, size) });
       if (decoded.info.width !== raw.width || decoded.info.height !== raw.height) {
         throw new RawDecodeError('corrupt', 'The file changed since it was imported. Import it again.');
       }
