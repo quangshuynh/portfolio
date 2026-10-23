@@ -210,7 +210,7 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 
 /* ---------- stage ---------- */
 .pe-stage { grid-area: stage; position: relative; min-height: 0; background: var(--pe-stage); outline: none; }
-.pe-viewer { position: absolute; inset: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; }
+.pe-viewer { position: absolute; inset: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); }
 .pe-stage-area { position: relative; overflow: hidden; touch-action: none; cursor: default; }
 .pe-stage-area[data-zoomed] { cursor: grab; }
 .pe-stage-area[data-zoomed]:active { cursor: grabbing; }
@@ -234,9 +234,9 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-stage-badge { position: absolute; top: .75rem; left: .75rem; padding: .2rem .55rem; border-radius: 3px; background: rgba(0, 0, 0, .65); color: #fff; font-size: .6875rem; letter-spacing: .06em; text-transform: uppercase; }
 .pe-stage-message { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: .6rem; max-width: min(28rem, 90%); margin: 0; padding: .7rem 1rem; border-radius: var(--radius-sm, 4px); background: rgba(28, 28, 28, .92); color: var(--pe-text-2); text-align: center; }
 .pe-stage-message--error { color: var(--pe-danger); }
-.pe-viewer-bar { display: flex; align-items: center; gap: .75rem; min-height: 2rem; padding: 0 .75rem; padding-right: 13rem; color: var(--pe-text-3); font-size: .75rem; }
+.pe-viewer-bar { display: flex; align-items: center; gap: .75rem; min-width: 0; min-height: 2rem; padding: 0 .75rem; padding-right: 13rem; color: var(--pe-text-3); font-size: .75rem; }
 .pe-readout { color: var(--pe-text-2); min-width: 3rem; }
-.pe-readout-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pe-readout-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pe-zoom { position: absolute; right: .5rem; bottom: 0; display: flex; align-items: center; height: 2rem; }
 .pe-zoom .pe-icon-button, .pe-zoom .pe-text-button { min-height: 1.75rem; }
 
