@@ -176,7 +176,7 @@ decoding; LibRaw's reported dimensions are checked before pixels are allocated;
 damaged files and decoder errors become per-file messages. The decoder (ISC
 wrapper, LibRaw under CDDL-1.0, Little CMS, IJG libjpeg, zlib) is a separate
 1.4 MB wasm loaded only by the RAW worker; notices are in
-`public/photography/third-party-notices.txt`. Open items:
+`public/photography/third-party-notices.txt`. Licence decisions:
 [dependencies-licensing.md](photography-platform/dependencies-licensing.md).
 
 ## Rendering, preview and export
