@@ -14,6 +14,7 @@ import { HdrError, analyzeBracket, createFusionMerge, createRadianceMerge, frame
 import { describeHdrSource, hdrIdentity, hdrPhotoName, hdrSourceMatches, parseHdrSource } from './hdrSource.mjs';
 import { checkHdrExport, hdrExportGeometry } from './hdrClient.mjs';
 import { downscale, handlers } from './hdrTasks.mjs';
+import { renderDetailImage } from '../pipeline/detailRenderer.mjs';
 import { deriveParams, hdrKnee, highlightRolloff, processLinear, shadowLift } from '../pipeline/spec.mjs';
 import { renderImage } from '../pipeline/cpuRenderer.mjs';
 import { neutralAdjustments } from '../model/adjustments.mjs';
@@ -480,6 +481,23 @@ describe('worker tasks, export geometry and naming', () => {
     expect(result).toMatchObject(size);
     expect(bands.reduce((rows, band) => rows + band.rows, 0)).toBe(size.height);
     await expect(handlers.add({ index: 0, image: frames[0].image })).rejects.toThrow(/No HDR export/);
+  });
+
+  test('an export with Detail settings renders the merge like the Detail renderer, band for band', async () => {
+    const frames = rawBracket({ motion: MOTION });
+    const analysis = analyzeBracket(frames, { mode: 'radiance', reference: 1 });
+    await handlers.begin({ analysis, frames: frames.map(({ asShot }) => ({ asShot })), size: { width: W, height: H } });
+    for (const [index, frame] of frames.entries()) await handlers.add({ index, image: frame.image });
+    const raw = { ...SYNTHETIC_RAW_INFO, hdrWhite: analysis.white };
+    const adjustments = { ...neutralAdjustments(), clarity: 40, sharpening: 60, dehaze: 20, luminanceNoise: 30 };
+    const native = { width: W * 2, height: H * 2 };
+    const bands = [];
+    await handlers.render({ adjustments, raw, native }, ({ band }) => band && bands.push(band));
+    const merged = merge(frames).image;
+    const reference = renderDetailImage(merged, deriveParams(adjustments, { raw }), { nativeWidth: native.width, nativeHeight: native.height });
+    const out = new Uint8ClampedArray(reference.length);
+    bands.forEach(({ row, data }) => out.set(data, row * merged.width * 4));
+    expect(out.every((value, i) => value === reference[i])).toBe(true);
   });
 
   test('export geometry scales from the source size and never upscales the preview', () => {

@@ -374,3 +374,25 @@ describe('alpha, tiles and resolution', () => {
     expect(context.pool.bytes()).toBeLessThan(photo.data.length * 2);
   });
 });
+
+describe('raster export in place', () => {
+  test('bands written back into the canvas equal a whole-image render (saved halo rows, no seams)', async () => {
+    const { exportDetailBands, EXPORT_BAND_ROWS } = await import('../io/imageTasks.mjs');
+    globalThis.ImageData ??= class { constructor(width, height) { Object.assign(this, { width, height, data: new Uint8ClampedArray(width * height * 4) }); } };
+    const rand = random(31);
+    const W = 300;
+    const H = EXPORT_BAND_ROWS * 2 + 77;
+    const photo = image(W, H, (x, y) => [rand() * 255, 100 + 80 * Math.sin(x / 4) * Math.cos(y / 7), (x + y) % 256, y > 400 && x < 40 ? 0 : 255]);
+    const canvas = Uint8ClampedArray.from(photo.data);
+    const context = {
+      getImageData: (x, y, w, h) => ({ data: canvas.slice(y * W * 4, (y + h) * W * 4) }),
+      putImageData: (band, x, y) => canvas.set(band.data, y * W * 4),
+    };
+    const settings = { texture: 70, clarity: 50, dehaze: 20, sharpening: 80, luminanceNoise: 50, colorNoise: 60 };
+    const prepared = { params: deriveParams(settings), tone: null };
+    const { prepareRender } = await import('./cpuRenderer.mjs');
+    await exportDetailBands(context, { width: W, height: H }, prepareRender(prepared.params), { width: W * 2, height: H * 2 }, { format: 'png' }, () => {}, {});
+    const reference = renderDetailImage(photo, deriveParams(settings), { nativeWidth: W * 2, nativeHeight: H * 2 });
+    expect(difference(canvas, reference).max).toBe(0);
+  });
+});

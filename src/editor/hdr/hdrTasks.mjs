@@ -4,6 +4,7 @@
 // (or to cancel), so its buffers never outlive the job. No network access.
 
 import { prepareRender, renderRawRgba8, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
+import { guideSource, prepareDetailRender, renderDetailRows } from '../pipeline/detailRenderer.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { proxyDimensions } from '../io/files.mjs';
 import { HdrError, analyzeBracket, createFusionMerge, createRadianceMerge } from './hdrMerge.mjs';
@@ -90,20 +91,28 @@ export const handlers = {
   /**
    * Finishes the merge and renders it with the photo's settings in 8-bit bands
    * (progress messages carry the bands; the page writes them into its canvas).
-   * :param payload: { adjustments, raw (radiance: reference RAW info with hdrWhite), lut, flattenAlpha }
+   * :param payload: { adjustments, raw (radiance: reference RAW info with hdrWhite), lut,
+   *   flattenAlpha, native } where `native` is the merged photo's full size (Detail scale)
    */
-  async render({ adjustments, raw = null, lut = null, flattenAlpha = false }, progress) {
+  async render({ adjustments, raw = null, lut = null, flattenAlpha = false, native = null }, progress) {
     if (!session) throw new HdrError('state', 'No HDR export is in progress.');
     const mergedAt = performance.now();
     const image = session.merge.finish();
     session.merge = null;
     const merged = performance.now();
-    const prepared = prepareRender(deriveParams(adjustments, { lut, raw: session.analysis.mode === 'radiance' ? raw : null }));
+    const params = deriveParams(adjustments, { lut, raw: session.analysis.mode === 'radiance' ? raw : null });
+    const prepared = prepareRender(params);
     const { width, height } = image;
+    const detail = params.detailActive
+      ? prepareDetailRender(prepared, { width, height, nativeWidth: native?.width ?? width, nativeHeight: native?.height ?? height, guideImage: guideSource(image) })
+      : null;
     for (let row = 0; row < height; row += HDR_BAND_ROWS) {
       const rows = Math.min(HDR_BAND_ROWS, height - row);
       let data;
-      if (image.kind === 'hdr') {
+      if (detail) {
+        data = new Uint8ClampedArray(width * rows * 4);
+        renderDetailRows(image, detail, row, row + rows, data, { flattenAlpha });
+      } else if (image.kind === 'hdr') {
         data = new Uint8ClampedArray(width * rows * 4);
         renderRawRgba8(image.data.subarray(row * width * 3, (row + rows) * width * 3), prepared, { target: data });
       } else {
