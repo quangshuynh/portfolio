@@ -200,7 +200,8 @@ function EditorWorkspace() {
   const exporting = state.photos.some(({ exportStatus }) => exportStatus.state === 'running');
 
   const worker = useCallback((name) => {
-    workers.current[name] ??= createImageWorker();
+    // The render worker only computes (CPU and Detail previews), so it needs no worker canvas.
+    workers.current[name] ??= createImageWorker(undefined, { canvas: name !== 'render' });
     return workers.current[name];
   }, []);
 

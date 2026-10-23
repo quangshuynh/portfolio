@@ -4,6 +4,8 @@
 // Where module workers cannot start, or cannot decode images (no OffscreenCanvas in
 // workers: Safari before 16.4), the same tasks run on the main thread instead. The
 // switch is made once, recorded in the diagnostics, and the failed call is retried.
+// Clients for canvas-free tasks (CPU and Detail rendering) keep their worker unless
+// workers cannot start at all, so long renders never block the page needlessly.
 
 import { recordDiagnostic } from './diagnostics.mjs';
 
@@ -17,6 +19,7 @@ export class WorkerCancelled extends Error {
 // Errors that mean "this browser's workers cannot do the job", not "this file is bad".
 const FALLBACK_CODES = new Set(['worker-canvas', 'worker-failed']);
 let mainThreadOnly = false;
+let workersUnavailable = false;
 
 /** True once the editor has switched to main-thread image processing. */
 export const usingMainThread = () => mainThreadOnly;
@@ -29,6 +32,7 @@ export function switchToMainThread(reason) {
 /** Test hook: forget an earlier switch to the main thread. */
 export function resetWorkerFallback() {
   mainThreadOnly = false;
+  workersUnavailable = false;
 }
 
 function spawnWorker() {
@@ -38,17 +42,20 @@ function spawnWorker() {
 /**
  * A client for image tasks: a module worker when possible, else the main thread.
  * :param spawn: worker factory (tests pass a fake)
+ * :param options: { canvas } false for clients whose tasks never decode or encode images
  */
-export function createImageWorker(spawn = spawnWorker) {
+export function createImageWorker(spawn = spawnWorker, { canvas = true } = {}) {
   let delegate = null;
+  const blocked = () => workersUnavailable || (canvas && mainThreadOnly);
   const choose = () => {
-    if (delegate && !(mainThreadOnly && delegate.kind === 'worker')) return delegate;
+    if (delegate && !(blocked() && delegate.kind === 'worker')) return delegate;
     delegate?.terminate();
-    if (!mainThreadOnly) {
+    if (!blocked()) {
       try {
         delegate = createWorkerClient(spawn());
         return delegate;
       } catch (error) {
+        workersUnavailable = true;
         switchToMainThread(`Module workers are unavailable: ${error.message}`);
       }
     }
@@ -62,6 +69,7 @@ export function createImageWorker(spawn = spawnWorker) {
         return await client.call(type, payload, options);
       } catch (error) {
         if (client.kind !== 'worker' || !FALLBACK_CODES.has(error.code)) throw error;
+        if (error.code === 'worker-failed') workersUnavailable = true;
         switchToMainThread(error.message);
         return choose().call(type, payload, { ...options, transfer: [] });
       }
