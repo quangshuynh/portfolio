@@ -3,6 +3,10 @@
 Interval 0, 2026-10-22. The proof of concept, tests and benchmark scripts are in
 [experiments/raw-decode-poc](../../experiments/raw-decode-poc/README.md).
 
+**Interval 5:** the editor now ships this decoder (pinned `libraw-wasm` 1.6.0). What is
+supported, measured and still unverified is in
+[photography-editor.md](../photography-editor.md#raw); this file stays the Interval 0 record.
+
 ## Verdict
 
 Genuine in-browser decoding is **validated** in Chromium and Node, using

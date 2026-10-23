@@ -5,6 +5,23 @@ Interval 0: `libraw-wasm` is installed only in
 `experiments/raw-decode-poc/`. The portfolio repository is public with no
 licence file (all rights reserved), and that shapes what can be bundled.
 
+## Interval 5 decisions (RAW in the editor)
+
+`libraw-wasm` 1.6.0 is now a runtime dependency (exact pin, lockfile integrity). It
+is loaded only by the editor's RAW worker; the 1.4 MB wasm is a separate,
+replaceable file, never inlined, and the gallery never loads it.
+
+| Component | Decision | Status |
+| --- | --- | --- |
+| LibRaw 0.22.1 (unmodified) | Distributed under **CDDL-1.0** (LibRaw lets the distributor choose CDDL-1.0 or LGPL-2.1). Notice, licence link, source tag and build script link in the notices file | Compatible with this all-rights-reserved site: CDDL is file-level copyleft and nothing in LibRaw is modified |
+| dcraw-derived code, DCB/FBDD, X3F, DNG SDK parts | Covered by LibRaw's COPYRIGHT; the BSD texts (DCB/FBDD, X3F) are reproduced verbatim in the notices, as binary redistribution requires | Done |
+| Little CMS (MIT), IJG libjpeg, zlib, Emscripten runtime | Notices and licence links | Done |
+| libraw-wasm wrapper (ISC per `package.json`) | ISC terms reproduced in the notices with the author's name | **Open:** the repository still has no LICENSE file ([#31](https://github.com/ybouane/LibRaw-Wasm/issues/31)). The grant is stated only in the published package metadata. The owner should accept that before deploying, or wait for the file |
+
+Notices: `public/photography/third-party-notices.txt`, linked from the editor's
+inspector ("Open-source notices"). Before production: owner sign-off on the
+wrapper's licence (above). Nothing has been deployed.
+
 ## Proposed runtime dependencies
 
 | Component | Version | Licence | Ships to | Size | Risk | Mitigation |

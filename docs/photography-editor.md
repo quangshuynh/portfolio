@@ -1,9 +1,10 @@
 # Photo editor (`/photography/editor`)
 
-A public, local-first editor for JPEG, PNG and WebP. No account, no upload, no
-server: files are decoded, edited and exported in the visitor's browser.
-Built in Interval 3 (light and colour), extended in Interval 4 (tone curves,
-HSL, `.cube` LUTs, presets); the original proposal is in
+A public, local-first editor for JPEG, PNG, WebP and RAW (Sony ARW, DNG). No
+account, no upload, no server: files are decoded, edited and exported in the
+visitor's browser. Built in Interval 3 (light and colour), extended in Interval 4
+(tone curves, HSL, `.cube` LUTs, presets) and Interval 5 (RAW, see [RAW](#raw));
+the original proposal is in
 [photography-platform/editor-hdr-architecture.md](photography-platform/editor-hdr-architecture.md).
 `/photography` links to it with a small "Edit a photo" text link (in-app
 navigation).
@@ -25,6 +26,9 @@ navigation).
 | `scripts/check-editor-browser.mjs` | `npm run check:editor`: end-to-end check in Chromium. |
 | `scripts/check-editor-engines.mjs` | `npm run check:editor:engines`: the same flow in WebKit, mobile Chromium and Firefox, with forced fallbacks. |
 | `src/editor/io/diagnostics.mjs` | Local capability report and startup failures (Diagnostics panel, `window.__photoEditorDiagnostics`). |
+| `src/editor/raw/` | RAW: format sniffing, LibRaw wrapper (`rawDecoder`), colour math (`rawColor`), worker tasks, job queue and export (`rawClient`). |
+| `scripts/check-editor-raw.mjs` | `npm run check:editor:raw`: RAW parity, import, white balance, exports in Chromium, Firefox and WebKit; genuine ARW with `RAW_FIXTURE_DIR`. |
+| `public/photography/third-party-notices.txt` | Licence notices for the RAW decoder, linked from the inspector. |
 
 The route is `EDITOR_ROUTE` in `src/seo/site.mjs`: its own static HTML,
 `noindex`, kept out of `ROUTES` and the sitemap until the owner decides to
@@ -71,6 +75,110 @@ can compress bright tones that still hold detail, but clipped areas stay
 clipped: there is nothing to recover in a JPEG. Strong pushes can show banding
 that was hidden in the source. Shadows lift noise and JPEG artefacts.
 
+## RAW
+
+Sony ARW and DNG files are developed from their sensor data with LibRaw 0.22.1
+(`libraw-wasm` 1.6.0, pinned). The embedded camera JPEG is never used: not as the
+preview, thumbnail, "before" image or export. Nothing is uploaded.
+
+**Supported, with evidence:** Sony A7 III uncompressed 14-bit and 12-bit ARW
+(genuine files: `rawFixtures.test.js` with `RAW_FIXTURE_DIR`, and the browser
+check); uncompressed 16-bit Bayer DNG (synthetic DNGs written by the tests, decoded
+by the real LibRaw build). Validated in Interval 0 only: A6400 lossy ARW.
+**Not verified:** A7 III compressed ARW, lossless-compressed ARW, camera or Adobe
+DNG Converter DNGs (lossless JPEG, lossy, deflate or float), any other maker.
+Other TIFF-based RAWs are refused by content; a file without colour data is
+refused rather than developed with wrong colour.
+
+**Order of operations**
+
+| # | Stage | Where |
+| --- | --- | --- |
+| 1–5 | Sensor decode, black-level subtraction, white-level normalisation, AHD demosaic (previews: half size, each 2×2 block one pixel), as-shot white balance normalised by the largest multiplier so nothing clips | LibRaw in a worker; 16-bit linear camera RGB (`DECODE_SETTINGS`) |
+| 6 | White balance: per-channel gain from as shot to the chosen multipliers, then LibRaw's clip at the sensor white | `developRaw`, both renderers |
+| 7 | Camera RGB → linear sRGB (Rec.709, D65) with LibRaw's `rgb_cam` (the camera's Adobe-derived D65 matrix, or a DNG's own ColorMatrix) | `developRaw` |
+| 8 | Relative white balance, exposure, RAW highlight rolloff (only when exposure is raised), tone, vibrance, saturation, range fit | `processLinear` |
+| 9 | sRGB encode, tone curves, HSL, LUT | `processDisplay` |
+| 10–11 | 8-bit quantisation; canvas encoding | renderer; page |
+
+Re-applying white balance after LibRaw equals decoding with those multipliers:
+within 4–6/65535 on half-size decodes of both A7 III files and on synthetic DNG
+interiors. With the full AHD demosaic it differs only near hard edges, because AHD
+interpolates with the balance it is given. Preview and export use the same method.
+
+**White balance** (RAW section): As shot (shown as the equivalent kelvin and tint),
+Daylight (5500 K, CIE D55), or Custom temperature 2000–12000 K and tint ±150
+(0.0002 Duv per unit; positive is magenta). Kelvin to multipliers goes through the
+camera's XYZ→camera matrix and the Planckian locus, and reproduces LibRaw's own
+daylight multipliers to three decimals. No Auto: grey-world averaging is not
+accurate enough to offer. The Color panel's Temperature and Tint remain a relative
+shift after development, as for JPEGs, so presets behave the same on every format;
+presets never change RAW white balance.
+
+**Default rendering** is colorimetric: sensor white maps to display white, with no
+added contrast, saturation or curve. Against the camera's embedded JPEG of both
+A7 III frames the median L* differs by about 0.7 (test bound: 4). The camera JPEG
+(Sony "Standard") has about 1.4× the chroma and compresses highlights; that look is
+not imitated (use Vibrance or a preset). Not compared with Lightroom or another
+converter (none available here), so no equivalence is claimed. Limits: one D65
+matrix for every illuminant (tungsten colour less accurate than dual-illuminant
+profiles), no DCP or camera profiles, no lens corrections.
+
+**Highlights.** Clipped sensor channels stay clipped, as in LibRaw mode 0; there is
+no reconstruction and so no "highlight recovery" control. Raising Exposure on a RAW
+rolls luminance above 50% off toward the sensor white instead of clipping it
+(`highlightRolloff`). Lowering it reveals nothing hidden: the default already shows
+everything up to the sensor white.
+
+**Precision.** LibRaw output is 16-bit linear; the GPU reads it as an `RGB16UI`
+integer texture, the CPU as float64. Nothing is reduced to 8 bits before the final
+quantisation (test: a +5 EV push of a 16-bit shadow ramp keeps over 3× the levels
+of the same ramp from an 8-bit file). Output is 8-bit sRGB.
+
+**Preview, before/after, export.** Previews and thumbnails come from half-size
+sensor data (3012×2012 for an A7 III, downscaled in linear light where the device
+limit is smaller), so zooming past about 50% is upscaled. Original and Split show
+the neutral development (as shot, no edits). Export decodes the RAW again: half
+size when the output fits, else the full AHD demosaic, area-averaged to the output
+size, rendered in 256-row bands that the page writes into its canvas and encodes.
+GPU preview vs CPU: ≤ 1 code value (7 RAW cases; Chromium, Firefox, WebKit). PNG
+export vs the Node reference with the same LibRaw build: 0.
+
+**Memory and isolation.** LibRaw runs only in RAW workers, never on the page. Each
+job gets a fresh worker, ended afterwards or on cancel, which is what frees the
+wasm heap. At most two run at once (one on phones and devices reporting ≤ 4 GB);
+previews go before exports, exports before imports, and a newer preview cancels the
+older one. Imports decode half size only; nothing is decoded at full size before
+an export. Removing a photo cancels its import. A worker that dies mid-job is
+reported as out of memory. The full decode cannot be tiled with this wrapper
+(LibRaw holds the whole image); the stages after it are banded and seam-free
+because they are per-pixel.
+
+Genuine A7 III 14-bit ARW (49 MB) on Windows (i7-9700), whole browser incl. GPU
+and workers (`npm run check:editor:raw`):
+
+| Browser | Import | Preview | Full-size JPEG export (4024×6024) | Memory: with preview → export peak |
+| --- | --- | --- | --- | --- |
+| Chromium 141 | 0.9 s | 1.0 s | 5.5 s | 645 → 1358 MB |
+| Firefox 142 | 2.3 s | 2.1 s | 17.8 s | 930 → 1740 MB |
+| WebKit 26 (Playwright, Windows) | 1.0 s | 1.0 s | 6.1 s | 690 → 1555 MB |
+
+Playwright's Windows WebKit intermittently crashes the page when a RAW worker grows
+its shared wasm heap ("mprotect failed: 487"; about half of the runs that import
+the ARW after another RAW). Not seen in Chromium or Firefox; not caused by WebGL or
+by starting fresh workers. Safari on macOS and iOS is **not verified**; test on a
+real iPhone before relying on it. iOS canvases cap at about 16.7 MP, so a 24 MP
+export fails there with the existing message (choose a smaller size). Not measured
+on an M1 MacBook Air.
+
+**Security and licences.** Files are identified by content and size-checked before
+decoding; LibRaw's reported dimensions are checked before pixels are allocated;
+damaged files and decoder errors become per-file messages. The decoder (ISC
+wrapper, LibRaw under CDDL-1.0, Little CMS, IJG libjpeg, zlib) is a separate
+1.4 MB wasm loaded only by the RAW worker; notices are in
+`public/photography/third-party-notices.txt`. Open items:
+[dependencies-licensing.md](photography-platform/dependencies-licensing.md).
+
 ## Rendering, preview and export
 
 - **Decode** (worker): `createImageBitmap` with EXIF orientation applied,
@@ -115,9 +223,9 @@ canvas's premultiplied storage, so very low alpha loses precision.
 ```json
 {
   "type": "quanghuynh.photo-editor.edits",
-  "version": 2,
+  "version": 3,
   "savedAt": "2026-10-22T12:00:00.000Z",
-  "exportSettings": { "format": "jpeg", "quality": 0.92, "resize": { "mode": "original", "longEdge": 3840, "maxWidth": 3840, "maxHeight": 3840 }, "suffix": "-edited" },
+  "exportSettings": { "format": "jpeg", "quality": 0.92, "resize": { "mode": "original", "longEdge": 3840, "maxWidth": 3840, "maxHeight": 3840 }, "suffix": "-quangedit" },
   "photos": [{
     "source": { "name": "DSC0001.jpg", "size": 1234567, "lastModified": 0, "sha256": "…", "format": "jpeg", "width": 6000, "height": 4000, "orientation": 1 },
     "adjustments": {
@@ -133,8 +241,10 @@ canvas's premultiplied storage, so very low alpha loses precision.
 - Values are relative to neutral (LUT intensity defaults to 100). The ten
   Interval 3 controls are always written; other controls, curves and the LUT
   only when they change something. Missing keys are neutral.
-- Version 2 added curves, HSL and LUTs; version 1 files still open. An older
-  editor rejects version 2 instead of silently dropping the new settings.
+- Version 2 added curves, HSL and LUTs; version 3 RAW sources (`"format": "arw"`
+  or `"dng"`) and RAW white balance (`"raw": { "whiteBalance": "custom" }`,
+  `rawTemperature`, `rawTint`). Older files still open; an older editor rejects a
+  newer version instead of silently dropping settings.
 - **LUTs are referenced, not embedded**: by SHA-256 of the `.cube` file, with its
   name and size. After a reload or on another machine the LUT section and the
   export panel say which LUT is missing; export is blocked until the same file
@@ -168,9 +278,24 @@ canvas's premultiplied storage, so very low alpha loses precision.
   single preset, at most 1 MB, validated like edit documents. A preset with a
   LUT stores the LUT reference only.
 
+## Export filenames
+
+`exportFileName()` in `io/files.mjs` names every export (later batch or ZIP
+exports must use it too): the source's base name with its last extension removed
+(1–5 letters or digits, any case), sanitised, then the suffix, then the chosen
+format's extension. The default suffix is `-quangedit`: `DSC09420.ARW` →
+`DSC09420-quangedit.jpg`, `portrait.png` → `portrait-quangedit.webp`. A name that
+already ends with the suffix gets no second one; Unicode names, extra dots and
+names without an extension are kept. A custom suffix typed in the Export panel is
+kept (empty is allowed); saved settings that still hold the old default `-edited`
+switch to `-quangedit`.
+
 ## Import limits
 
-Files are identified by content (magic bytes), never by name or MIME type.
+Files are identified by content (magic bytes), never by name or MIME type. A TIFF
+structure goes to the RAW decoder, which accepts it only as DNG (DNGVersion tag)
+or Sony ARW (maker "SONY") and names anything else ("RAW or TIFF files from Canon
+are not supported").
 Limits are checked from the header before decoding: 200 MB per file, 16 384 px
 per side, 100 MP, and 50 photos per workspace. Duplicates (same SHA-256) are
 reported against the original. Errors are per file: unsupported, empty,
@@ -306,10 +431,18 @@ low-quality approximation the brief rules out.
 
 ## Extension points
 
+Every future feature stays non-destructive (settings in the edit document, applied
+at render time), local and exportable at full resolution. Not built yet:
+
 | Feature | Where it goes |
 | --- | --- |
-| RAW (ARW, DNG) | New decoder in the worker producing linear data; skip the sRGB decode step and add a filmic base rendering stage in `spec.mjs` and the shader. Needs float textures. LUTs and curves then act on its display-referred output, unchanged. |
+| More RAW formats (NEF, then CR2/CR3, RAF, ORF) | LibRaw decodes them already; add the maker to `sniffRaw`, then genuine fixtures and `rawFixtures.test.js` cases before claiming support. X-Trans (RAF) needs checking against `checkDecodable`. |
+| Crop, rotate, straighten, perspective, resize | A geometry stage before the per-pixel pipeline: proxy and export sample through one transform; a `geometry` object in the settings (new document version). |
+| Creative filters (bleach bypass, grain, halation, bloom) | Per-pixel looks fit after the LUT; grain, halation and bloom are spatial (see sharpening above). |
+| Text, layers, blend modes | A layer list in the document composited after the photo pipeline, by the same engine in preview and banded export. |
+| Brushes, masks, gradients, local adjustments | Per-layer masks evaluated per pixel; brush masks need a stored raster or stroke list. |
+| Retouching, healing, noise reduction | Spatial; need the tiled full-resolution path below. |
 | Faster export | Split bands across several workers (the band loop in `imageTasks.mjs` is already independent per band). |
 | Sharpening, noise reduction, 1:1 preview | Tiled full-resolution decode around the viewport, a spatial stage after the per-pixel ones, band overlap in export. |
-| Batch export, preset sync | Queue over the export worker; presets already apply per group to any photo. |
+| Batch export, ZIP, preset sync | Queue over the export worker (and the RAW queue); names from `exportFileName()`; presets already apply per group to any photo. |
 | HDR | Float source path plus the RAW base rendering. |
