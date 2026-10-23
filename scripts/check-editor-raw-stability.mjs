@@ -1,5 +1,6 @@
 // Controlled reproduction of the Playwright WebKit (Windows) crash during LibRaw decoding,
-// fixed in Interval 9 by instantiating LibRaw before the file is read (rawTasks.mjs); it now
+// fixed for one decoder at a time in Interval 9 by instantiating LibRaw before the file is read
+// (rawTasks.mjs; busy workers elsewhere can still trigger it, see docs); it now
 // fails when any trial does not finish. Drives the production RAW worker bundle directly, without the editor
 // UI, so one factor changes at a time: fresh worker per job (the editor) or one reused
 // worker, one or two decoders at once, half-size or full decodes, desktop or iPhone
