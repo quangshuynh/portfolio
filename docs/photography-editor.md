@@ -611,6 +611,13 @@ Safari cannot encode WebP (the option is disabled when the browser cannot).
 - Pinch-zoom works with two pointers on the preview; it has not been tried on a
   physical phone.
 
+- Playwright's Windows WebKit (not Safari) crashes the page now and then while LibRaw
+  decodes the RAW bracket in `check:editor:hdr` (Merge HDR step, mostly the iPhone 13
+  emulation): 0 of 18 runs before Interval 7, 7 of 40 since its first commit, which only
+  adds pure Detail code to the bundles the RAW worker loads. No Detail code runs in that
+  step; the crash is the Interval 5 LibRaw/WebKit one, apparently sensitive to the worker
+  bundle. Chromium, Firefox and the Detail check are unaffected. Not seen on real Safari
+  (not tested).
 - Detail renders on one CPU thread: see the measurements in [Detail](#detail). A
   multi-pass WebGL2 Detail preview and a 1:1 Detail preview of the visible area are not built.
 
