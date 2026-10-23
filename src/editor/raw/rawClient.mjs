@@ -9,7 +9,7 @@ import { exportDimensions } from '../io/files.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { recordDiagnostic } from '../io/diagnostics.mjs';
 
-const PRIORITY = { decode: 0, export: 1, inspect: 2 };
+const PRIORITY = { decode: 0, export: 1, develop: 1, inspect: 2 };
 
 /** Concurrent RAW decoders for this device: each can need 300–800 MB while it runs. */
 export function rawConcurrency(win = globalThis) {

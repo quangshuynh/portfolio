@@ -57,6 +57,24 @@ export function createRawHandlers(loadModule) {
     },
 
     /**
+     * Linear camera RGB at a given size for an HDR export (no rendering): half-size
+     * sensor data when it is enough, else the full demosaic, area-averaged to the size.
+     */
+    async develop({ file, raw, width, height }) {
+      const { bytes, format } = await readRaw(file);
+      const decoded = decodeRaw(await loadModule(), bytes, { format, halfSize: !needsFullDecode(raw, { width, height }) });
+      if (decoded.info.width !== raw.width || decoded.info.height !== raw.height) {
+        throw new RawDecodeError('corrupt', 'The file changed since it was imported. Import it again.');
+      }
+      const image = downsampleRaw(decoded.image, width, height);
+      decoded.image = null;
+      if (image.width !== width || image.height !== height) {
+        throw new RawDecodeError('corrupt', `LibRaw returned ${image.width}×${image.height} instead of ${width}×${height}.`);
+      }
+      return { result: image, transfer: [image.data.buffer] };
+    },
+
+    /**
      * Develops the RAW at the export size and sends 8-bit RGBA bands to the page,
      * which writes them into its canvas and encodes it. Only the decoded image and one
      * band are held here.

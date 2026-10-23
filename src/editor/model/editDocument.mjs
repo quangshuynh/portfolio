@@ -8,12 +8,14 @@ import { compactAdjustments, normalizeAdjustments } from './adjustments.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { DEFAULT_EXPORT_SUFFIX, safeSuffix } from '../io/files.mjs';
 import { RAW_FORMATS } from '../raw/rawFormat.mjs';
+import { describeHdrSource, parseHdrSource } from '../hdr/hdrSource.mjs';
 
 export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // Version 2 added curves, HSL and LUT references; version 3 RAW sources and their white
-// balance (`raw`). Older versions read unchanged; older editors reject newer files
-// instead of silently dropping settings they do not know.
-export const DOCUMENT_VERSION = 3;
+// balance (`raw`); version 4 merged HDR sources (`format: 'hdr'` with `hdr`: mode,
+// the three inputs by role, merge settings) and the HDR tone controls. Older versions
+// read unchanged; older editors reject newer files instead of silently dropping settings.
+export const DOCUMENT_VERSION = 4;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).
@@ -26,8 +28,8 @@ export const DEFAULT_EXPORT_SETTINGS = Object.freeze({
   suffix: DEFAULT_EXPORT_SUFFIX,
 });
 
-/** Source formats a document may describe: the export formats plus RAW. */
-const isSourceFormat = (format) => Object.hasOwn(FORMATS, format) || Object.hasOwn(RAW_FORMATS, format);
+/** Source formats a document may describe: the export formats, RAW, and merged HDR. */
+const isSourceFormat = (format) => Object.hasOwn(FORMATS, format) || Object.hasOwn(RAW_FORMATS, format) || format === 'hdr';
 
 export class EditDocumentError extends Error {}
 
@@ -74,6 +76,7 @@ export function createEditDocument(photos, exportSettings, now = new Date()) {
         width: photo.width,
         height: photo.height,
         orientation: photo.orientation ?? 1,
+        ...(photo.hdr ? { hdr: describeHdrSource(photo.hdr) } : {}),
       },
       adjustments: compactAdjustments(photo.adjustments),
     })),
@@ -89,7 +92,10 @@ function parseSource(source, index) {
   const size = Number.isSafeInteger(source.size) && source.size >= 0 ? source.size : null;
   const sha256 = typeof source.sha256 === 'string' && /^[0-9a-f]{64}$/.test(source.sha256) ? source.sha256 : null;
   if (!sha256 && (!name || size === null)) throw new EditDocumentError(`Photo ${index + 1} cannot be matched to a file (no hash, name or size).`);
+  const hdr = source.format === 'hdr' ? parseHdrSource(source.hdr) : null;
+  if (source.format === 'hdr' && !hdr) throw new EditDocumentError(`Photo ${index + 1} is a merged HDR without a valid description of its three source files.`);
   return {
+    ...(hdr ? { hdr } : {}),
     name,
     size,
     sha256,

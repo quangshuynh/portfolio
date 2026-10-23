@@ -85,7 +85,7 @@ describe('RAW panel', () => {
     expect(present().raw).toEqual({ whiteBalance: 'daylight' });
     const photo = { ...state.photos[0], adjustments: present() };
     const document = JSON.parse(serializeEditDocument(createEditDocument([photo], state.exportSettings)));
-    expect(document).toMatchObject({ version: 3, photos: [{ source: { format: 'arw', name: 'DSC09420.ARW' }, adjustments: { raw: { whiteBalance: 'daylight' } } }] });
+    expect(document).toMatchObject({ version: 4, photos: [{ source: { format: 'arw', name: 'DSC09420.ARW' }, adjustments: { raw: { whiteBalance: 'daylight' } } }] });
     expect(parseEditDocument(JSON.stringify(document)).photos[0]).toMatchObject({ source: { format: 'arw' }, adjustments: { raw: { whiteBalance: 'daylight' } } });
   });
 });

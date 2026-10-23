@@ -80,6 +80,8 @@ export function summarizeMetadata(meta, format) {
     shutter: number(meta.shutter),
     aperture: number(meta.aperture),
     focalLength: number(meta.focal_len),
+    // Capture time (seconds since 1970, camera clock), used only to compare brackets.
+    captured: number(meta.timestamp) ? meta.timestamp * 1000 : null,
     blackLevel: Number.isFinite(color.black) ? color.black : null,
     whiteLevel: number(color.maximum),
     flip: meta.flip ?? 0,
