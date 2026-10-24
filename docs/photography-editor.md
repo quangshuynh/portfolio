@@ -8,7 +8,8 @@ Interval 6 (three-exposure HDR, see [Merge HDR](#merge-hdr)), Interval 7 (Textur
 Clarity, Dehaze, sharpening and noise reduction, see [Detail](#detail)) and Interval 8
 (multi-photo selection, sync, batch export and ZIP, 1:1 Detail inspection, see
 [Batch editing](#batch-editing)) and Interval 10 (crop, rotation, flips, perspective, stretch
-and resize, see [Geometry](#geometry-crop--transform));
+and resize, see [Geometry](#geometry-crop--transform)) and Interval 11 (creative effects, looks and
+text overlays, see [Creative and text](#creative-and-text));
 the original proposal is in
 [photography-platform/editor-hdr-architecture.md](photography-platform/editor-hdr-architecture.md).
 `/photography` links to it with a small "Edit a photo" text link (in-app
@@ -24,6 +25,9 @@ navigation).
 | `src/editor/pipeline/colorMath.mjs` | sRGB transfer, matrices, daylight locus, Bradford white balance. |
 | `src/editor/pipeline/cpuRenderer.mjs` | Deterministic CPU renderer: tests, export, no-WebGL2 preview. |
 | `src/editor/pipeline/geometry.mjs`, `warp.mjs` | Geometry: model, validation, transform order, crop constraints (`geometry.mjs`); inverse-mapped Catmull-Rom resampling and edge coverage (`warp.mjs`). UI: `ui/GeometryPanel.jsx`, `ui/CropOverlay.jsx`. |
+| `src/editor/pipeline/creative.mjs`, `model/looks.mjs` | Creative stage (parameters, per-pixel reference, glow map, grain hash) and built-in looks. UI: `ui/CreativePanel.jsx`. |
+| `src/editor/model/overlays.mjs`, `src/editor/text/` | Text objects (schema, validation) and their fonts, layout, drawing and export sprites. UI: `ui/TextPanel.jsx`, `ui/TextLayer.jsx`. |
+| `scripts/check-editor-creative.mjs` | `npm run check:editor:creative`: looks and effects, PNG exports against the Node reference, text placement in preview and exports, paste and ZIP, phones, CPU preview, 24 MP; genuine ARW and merged HDR with `CREATIVE_FIXTURE_DIR`. |
 | `scripts/check-editor-geometry.mjs` | `npm run check:editor:geometry`: crop tool (pointer, touch, keyboard), PNG exports against the Node reference, batch resize, 24 MP timing; genuine ARW and merged HDR with `GEOMETRY_FIXTURE_DIR`. |
 | `src/editor/pipeline/detail.mjs`, `detailRenderer.mjs` | Detail stage (spatial filters, guide) and the tiled renderer used by the Detail preview and every export with Detail. |
 | `src/editor/pipeline/detailRegion.mjs`, `ui/InspectView.jsx` | 1:1 Detail inspection: crop and region maths, region render equal to the export. |
@@ -79,6 +83,7 @@ the GPU, in this fixed order:
 | Tone curves | Master RGB, then Red, Green, Blue: 2–16 integer points on 0–255 | On encoded values. Monotone cubic (Fritsch–Carlson/PCHIP slopes): passes through every point, never overshoots, flat beyond the first and last point. Points stay ordered and distinct. Both renderers sample the same 1024-entry table linearly. |
 | HSL | Hue, Saturation, Luminance (±100) for Red 0°, Orange 30°, Yellow 60°, Green 120°, Aqua 180°, Blue 240°, Purple 270°, Magenta 300° | Range weights from the HSV hue of the encoded pixel, blended between neighbouring centres with a raised cosine (sums to 1, no hard edges). Hue turns ±30° on the HSV wheel at constant luminance; saturation scales chroma about luminance in linear light; luminance is up to ±1 EV × the pixel's HSV saturation. Greys and untouched ranges are returned exactly. Then range fit. |
 | 3D LUT | Intensity 0–100% | Encoded RGB mapped through `DOMAIN_MIN`…`DOMAIN_MAX` to the grid, tetrahedral interpolation, output clamped to 0–1, mixed with the input by intensity. |
+| Creative | Looks, bleach bypass, film, grain, glow, vignette, colour grading | See [Creative and text](#creative-and-text). Glow, vignette and grain depend on the position in the output frame. |
 | Quantise | – | Rounded to 8 bits. |
 
 Each stage after Encode runs only when it changes something, so neutral
@@ -527,6 +532,87 @@ worker; the iPhone 13 emulation (WebKit) has
 the Detail section reachable in the Adjust tab with no sideways scrolling. Not measured on
 a physical phone.
 
+## Creative and text
+
+**Creative** (section after LUT; `pipeline/creative.mjs`) holds looks and five parts, each
+with its own reset. All are settings applied at render time, neutral at their defaults
+(character settings such as hue, radius or threshold change nothing until their amount is
+set), undoable, saved in edit documents, and in presets and sync as the **Creative** group.
+
+| Part | Controls | Method (an approximation, not a simulation of a chemical process or another app) |
+| --- | --- | --- |
+| Bleach Bypass | Amount, Contrast, Desaturation, Highlight protection | A black-and-white "silver" copy (S-curve on luma) laid over the colour in soft-light mode (on greys 3p² − 2p³: denser shadows), mixed by amount with highlight protection, then desaturated toward luma; skin hues (around 25°) are spared up to 60% of moderate desaturation; 100/100 is monochrome. |
+| Film | Fade, Highlight roll-off, Black and White tint (hue + strength) | Lifted blacks (up to code 56), rational shoulder `v / (1 + a·v⁴)^¼`, tints colouring only the lifted black and the lowered white. Monotonic (tested). |
+| Grain | Amount, Size, Roughness, New grain pattern | Cubic B-spline value noise on a lattice of 1–4 native output px, normalised to unit variance at every position (no grid pattern), two octaves mixed by roughness, from an integer hash of the lattice point and the photo's `grainSeed` (saved; changes only with New grain pattern). Weaker in deep shadows and highlights. At smaller renders the amplitude is scaled as a downscale averages it (tested statistically), so previews look like the export downscaled; at 100% and in 1:1 Detail it is the export's grain. |
+| Glow | Bloom amount, radius, threshold; Halation amount, radius, threshold, hue (red–orange) | Soft-threshold bright pass of the finished colours on the guide grid (≤ 768 px, as Clarity), Gaussian blur (bloom σ 1–8%, halation 0.2–2% of the long edge), sampled bilinearly and screen-added in linear light: bloom in the image's colour, halation as a tinted, tighter bleed. Small specular highlights below one guide pixel glow less than large ones. Dehaze and Clarity do not change which areas glow. |
+| Vignette | Amount ±, Midpoint, Roundness ±, Feather | Elliptical falloff on the output frame (after crop, rotation, perspective), toward a circle (+) or rectangle (−); negative darkens in linear light (up to −2.3 EV), positive lightens toward white. Always centred on the exported frame. |
+| Color Grading | Shadows, Midtones, Highlights, Global: hue, saturation, luminance; Balance, Blending | Weights `(1 − L)^q`, `L^q` and the rest (sum 1, smooth; balance bends L, blending sets q 3.5–1.2). Zero-luma tint offsets that fade out toward pure black, luminance offsets ±0.07 (monotonic for any combination, tested). Colour wheel by pointer; the Hue/Saturation/Luminance sliders are its keyboard and screen-reader alternative. |
+
+**Looks**: Bleach Bypass, Soft Print, Vintage Fade, Cinematic Cool, Warm Analog, Black &
+White Film, Dreamy Glow (`model/looks.mjs`), made only of these controls. Hover or focus
+previews; applying **replaces the whole Creative group** (keeps the grain seed and every other
+section) in one undo step; Intensity scales the amounts from neutral while hues, radii and
+thresholds stay. Save a modified look as a preset with Creative ticked.
+
+**Order and colour space.** After the LUT, on display-referred sRGB values: glow → bleach
+bypass → fade → grading → vignette → grain, then quantisation; geometry is applied before
+any colour (the photo is warped first), so position-dependent effects use output pixels;
+text is drawn last, over the finished photo. Colour-only effects run per pixel on the CPU
+and in the shader; glow, vignette and grain need the pixel's position, so CPU renders of
+photos with them use the spatial renderer of [Detail](#detail) (bands, 1:1 regions, band
+workers; no halo is needed). The WebGL2 preview runs all of it in the shader, with the glow
+map computed in the render worker from the guide grid and kept while unrelated values
+change. Neutral Creative settings leave every earlier path bit for bit unchanged.
+
+**Text** (section Text, **Text** under the preview or T): Add text, then edit the wording,
+font (Schibsted Grotesk or Martian Mono, SIL OFL, bundled), bold, italic (Grotesk), size
+(% of the short edge), colour, opacity, alignment, outline, shadow, position, rotation and
+scale; Duplicate, Bring forward / Send backward and Delete. With the tool on, drag a text to
+move it (the photo does not pan), the corner handle scales, the round handle rotates (Shift:
+15° steps); focused text moves with the arrow keys (Shift: larger), Delete removes it, Enter
+or a double-click edits the wording; handles are 44 px on touch screens. Each object
+(`model/overlays.mjs`) is `{ id, type: 'text', text, font, weight, italic, size, x, y,
+rotation, scale, color, opacity, align, outline, shadow }` in `adjustments.overlays`; the
+array order is the z-order. Coordinates are relative to the output frame (centre at x, y),
+so text keeps its place and proportions after a crop, a turn or any export size. Text is
+plain data drawn with `fillText`; on import, control and bidi-override characters are
+removed, 500 characters, 20 lines and 30 objects per photo at most, values clamped.
+
+**Text rendering.** Preview and export use the same layout (in output pixels) and drawing
+code (`text/textRender.mjs`): each object is drawn as a layer (outline, then fill) and
+composited with its opacity and shadow. Exports rasterise every object at the export's
+resolution on the page into a sprite cut to its ink, outline and shadow, and draw the
+sprites over the finished canvas just before encoding (raster, band-worker, RAW and HDR
+exports alike). Fonts load from the site's own assets (about 300 kB, only once text is used;
+no font service); characters outside their Latin, Latin Extended (and Cyrillic for Martian
+Mono) subsets are drawn with a system font, and the Text panel says so. Placement measured
+in the check: preview, full-size and 300 px exports agree to 0.4% of the frame in Chromium,
+Firefox, WebKit and both phone emulations; glyph rasterisation differs slightly between
+browsers. Text is not shown in Original, sits on the edited side of Split, is hidden while
+cropping and in 1:1 Detail, and is not drawn in thumbnails.
+
+**Presets, sync, reset.** Presets contain Creative, never text. Paste copies Creative, never
+text; **Sync…** copies text only when Text overlays is ticked (it then replaces the target's
+text). Reset all clears text too (one undo step).
+
+**Measurements** (`npm run check:editor:creative`, Windows i7-9700, headless Playwright,
+whole browser memory). PNG exports with a look and every effect, with geometry + vignette,
+and a pasted photo equal the Node reference exactly (0) in all six environments (Chromium,
+Firefox, WebKit, iPhone 13 and Pixel 7 emulation, no WebGL2); ZIP entries equal the single
+exports byte for byte. Shader vs CPU: 26 creative parity cases within one code value.
+
+| | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- |
+| Slider to painted frame, 600×400 · 24 MP (4096 px proxy) | 185–200 ms · 2.7 s (SwiftShader); 52–89 ms on the RTX 3070 (`CHECK_GPU=1`), 52 ms without creative | 230–250 ms · 244 ms | 152–155 ms · 221 ms |
+| Glow map after a radius change (preview) | 0.9 s; merged HDR 4.1 s | 1.2 s | 1.0 s |
+| 24 MP JPEG, Warm Analog + bloom + bleach + text: export, peak | 5.9 s, 1536 MB (baseline 596) | 11.4 s, 1697 MB | 7.1 s, 1449 MB |
+| Genuine A7 III ARW, bleach + grain: export, peak | 6.3 s, 1468 MB | 20.7 s, 2242 MB | not run |
+| Merged RAW HDR (DSC09640–42), bloom + halation | 21.4 s, 2276 MB | not run | not run |
+
+Three exports of the ARW cancelled after 1.5 s: 1299, 1291, 1290 MB (no growth). Headless
+Chromium renders WebGL2 with SwiftShader, so its preview timings for grain are CPU-bound;
+the creative shader is per pixel (grain reads 32 lattice values) and meant for a GPU.
+
 ## Batch editing
 
 **Selection** (library list and filmstrip). The active photo is the one shown and edited,
@@ -543,7 +629,7 @@ applied.
 
 **Copy, paste, sync** (`model/sync.mjs`). Copy edits (Ctrl/⌘ Shift C) keeps the active
 photo's settings (parameters, never pixels). Paste (Ctrl/⌘ Shift V) applies them to the
-selected photos: Light, Color, HSL, Detail, Tone curve and LUT. **Sync…** copies chosen
+selected photos: Light, Color, HSL, Detail, Tone curve, LUT and Creative (never text). **Sync…** copies chosen
 groups from the active photo to the other selected photos and lists, per photo, which
 groups change, with before/after thumbnails (first 12; thumbnails do not show Detail),
 before anything is applied. Chosen groups are **replaced exactly** (a neutral source group
@@ -653,6 +739,9 @@ RAWs, ZIP parts above 1 GB.
 - Values are relative to neutral (LUT intensity defaults to 100). The ten
   Interval 3 controls are always written; other controls, curves and the LUT
   only when they change something. Missing keys are neutral.
+- Version 7 added the creative controls (`bleachAmount` … `gradeBlending`, `grainSeed`) and
+  `overlays` (text objects, see [Creative and text](#creative-and-text)); older files open with
+  them neutral and no text. Malformed objects are dropped, values clamped.
 - Version 6 added `geometry` (only parts that differ from neutral are written, for example
   `{ "angle": 3.5, "crop": { "x": 0.1, "y": 0.1, "width": 0.5, "height": 0.5 } }`); values
   are clamped and degenerate quads dropped on reading; older files open with none.
@@ -688,7 +777,7 @@ RAWs, ZIP parts above 1 GB.
   …"); nothing is recorded until it is clicked.
 - Saving preselects the groups that are edited, except Exposure and White
   balance (usually per-photo corrections); any group can be ticked.
-- Presets never contain or change geometry (crops and perspective belong to one photo).
+- Presets never contain or change geometry or text (they belong to one photo); Creative is a group.
 - Built-ins (Natural, Warm Portrait, Cool Landscape, Soft Film, High Contrast,
   Black & White) are ordinary presets run through the same engine; none
   touches exposure or white balance.
@@ -894,8 +983,7 @@ at render time), local and exportable at full resolution. Not built yet:
 | Feature | Where it goes |
 | --- | --- |
 | More RAW formats (NEF, then CR2/CR3, RAF, ORF) | LibRaw decodes them already; add the maker to `sniffRaw`, then genuine fixtures and `rawFixtures.test.js` cases before claiming support. X-Trans (RAF) needs checking against `checkDecodable`. |
-| Creative filters (bleach bypass, grain, halation, bloom) | Per-pixel looks fit after the LUT; grain, halation and bloom are spatial: the tiled renderer in `detailRenderer.mjs`. |
-| Text, layers, blend modes | A layer list in the document composited after the photo pipeline, by the same engine in preview and banded export. |
+| Layers, blend modes | Text objects already have layer-shaped records (`id`, `type`, transform, content) in `overlays`; image and adjustment layers would join that list, composited after the photo pipeline by the same engine in preview and export. |
 | Brushes, masks, gradients, local adjustments | Per-layer masks evaluated per pixel; brush masks need a stored raster or stroke list. |
 | Retouching, healing | Spatial; the tiled renderer and halo bands in `detailRenderer.mjs`. |
 | Faster export | Band workers (`detailPool.mjs`) for non-Detail exports and Detail previews; per-pixel stages are independent per band too. |
