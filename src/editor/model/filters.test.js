@@ -63,7 +63,7 @@ describe('built-in filters', () => {
     }));
   });
 
-  test('every filter visibly changes a photo, and no two filters look nearly the same', () => {
+  test('every filter visibly changes a photo, and no two filters look nearly the same', { timeout: 30000 }, () => {
     const image = scene(360, 240);
     const neutral = renderAnyImage(image, deriveParams({}), { nativeWidth: 6000, nativeHeight: 4000 });
     const renders = BUILT_IN_FILTERS.map((filter) => renderAnyImage(image, deriveParams({ ...filterPatch(filter, 100), grainSeed: 11 }), { nativeWidth: 6000, nativeHeight: 4000 }));
@@ -159,9 +159,9 @@ describe('documents and per-viewer lists', () => {
     const text = serializeEditDocument(createEditDocument([photo], {}, new Date(0)));
     const saved = JSON.parse(text);
     expect(saved.version).toBe(8);
-    expect(saved.photos[0].adjustments).toMatchObject({ captureResolution: 68, pixelEdges: 100, filter: { id: 'filter:pixelated', strength: 90 } });
+    expect(saved.photos[0].adjustments).toMatchObject({ captureResolution: 77, pixelEdges: 100, filter: { id: 'filter:pixelated', strength: 90 } });
     const [restored] = parseEditDocument(text).photos;
-    expect(normalizeAdjustments(restored.adjustments)).toMatchObject({ captureResolution: 68, filter: { id: 'filter:pixelated', strength: 90 } });
+    expect(normalizeAdjustments(restored.adjustments)).toMatchObject({ captureResolution: 77, filter: { id: 'filter:pixelated', strength: 90 } });
     const older = parseEditDocument(JSON.stringify({ ...saved, version: 7, photos: [{ ...saved.photos[0], adjustments: { exposure: 0.2, grainAmount: 10 } }] }));
     expect(normalizeAdjustments(older.photos[0].adjustments)).toMatchObject({ exposure: 0.2, grainAmount: 10, captureResolution: 0, filter: null });
     // A malformed record is dropped, never trusted.

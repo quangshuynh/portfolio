@@ -190,7 +190,7 @@ const NEW_FILTERS = [
   {
     id: 'filter:pixelated', name: 'Pixelated', category: 'experimental',
     description: 'A very low-resolution capture shown with hard square pixels.',
-    settings: { captureResolution: 75, pixelEdges: 100 },
+    settings: { captureResolution: 85, pixelEdges: 100 },
   },
   {
     id: 'filter:color-quantization', name: 'Color Quantization', category: 'experimental',

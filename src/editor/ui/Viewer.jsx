@@ -324,6 +324,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         if (target.width !== out.width || target.height !== out.height) Object.assign(target, { width: out.width, height: out.height });
         engine.context.putImageData(new ImageData(new Uint8ClampedArray(rendered.data), out.width, out.height), 0, 0);
         if (sourceWidth > 0) engine.context.putImageData(new ImageData(new Uint8ClampedArray(before.data), out.width, out.height), 0, 0, 0, 0, sourceWidth, out.height);
+        performance.mark?.('pe-cpu-frame');
       }
     } catch (error) {
       if (error.code !== 'cancelled') setStatus({ state: 'error', message: error.message });
@@ -623,7 +624,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
             aria-live="polite"
             title={typeof detailQuality === 'object' ? 'Detail is rendered on the CPU; the export renders it at full resolution.' : undefined}
           >
-            {detailQuality === 'rendering' ? 'Rendering Detail…' : detailQuality === 'draft' ? 'Detail: draft preview' : `Detail preview at ${detailQuality.width}×${detailQuality.height}; export renders it at full resolution`}
+            {detailQuality === 'rendering' ? 'Rendering on the CPU…' : detailQuality === 'draft' ? 'CPU preview: draft' : `CPU preview at ${detailQuality.width}×${detailQuality.height}; export renders at full resolution`}
           </span>
         )}
       </div>

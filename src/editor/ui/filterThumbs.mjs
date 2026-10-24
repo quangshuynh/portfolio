@@ -1,5 +1,7 @@
 // Filter Library thumbnails: one small source per photo (the shown proxy, area-averaged and
 // warped to the photo's crop and transform), rendered in a worker with each filter's patch.
+// A thumbnail is its own guide source, so a capture (low resolution, JPEG) is never finer than
+// the thumbnail: JPEG blocks look coarser, and fine pixel grids softer, than in the photo.
 // Thumbnails are a few kB each and kept only for the current photo and settings; work for
 // filters that are no longer shown, or for older settings, is dropped between batches.
 

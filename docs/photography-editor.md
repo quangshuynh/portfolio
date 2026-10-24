@@ -26,6 +26,8 @@ navigation).
 | `src/editor/pipeline/cpuRenderer.mjs` | Deterministic CPU renderer: tests, export, no-WebGL2 preview. |
 | `src/editor/pipeline/geometry.mjs`, `warp.mjs` | Geometry: model, validation, transform order, crop constraints (`geometry.mjs`); inverse-mapped Catmull-Rom resampling and edge coverage (`warp.mjs`). UI: `ui/GeometryPanel.jsx`, `ui/CropOverlay.jsx`. |
 | `src/editor/pipeline/creative.mjs`, `model/looks.mjs` | Creative stage (parameters, per-pixel reference, glow map, grain hash) and built-in looks. UI: `ui/CreativePanel.jsx`. |
+| `src/editor/pipeline/digital.mjs`, `model/filters.mjs` | Digital effects (sensor colour, response, clipping, quantisation, noise, capture and JPEG, channel shift, soft focus) and the Filter Library catalogue, search and filter record. UI: `ui/FilterLibrary.jsx`, thumbnails `ui/filterThumbs.mjs`. |
+| `scripts/check-editor-filters.mjs` | `npm run check:editor:filters`: library, thumbnails, search, switching latency, strength, compare, undo, PNG exports of digital filters against the Node reference, batch filter and ZIP, phones, CPU preview, 24 MP; genuine JPEG, ARW and merged HDR with `FILTER_FIXTURE_DIR`. |
 | `src/editor/model/overlays.mjs`, `src/editor/text/` | Text objects (schema, validation) and their fonts, layout, drawing and export sprites. UI: `ui/TextPanel.jsx`, `ui/TextLayer.jsx`. |
 | `scripts/check-editor-creative.mjs` | `npm run check:editor:creative`: looks and effects, PNG exports against the Node reference, text placement in preview and exports, paste and ZIP, phones, CPU preview, 24 MP; genuine ARW and merged HDR with `CREATIVE_FIXTURE_DIR`. |
 | `scripts/check-editor-geometry.mjs` | `npm run check:editor:geometry`: crop tool (pointer, touch, keyboard), PNG exports against the Node reference, batch resize, 24 MP timing; genuine ARW and merged HDR with `GEOMETRY_FIXTURE_DIR`. |
@@ -471,7 +473,7 @@ never reach visible ones; alpha is copied.
 **Preview.** The GPU shader is not used for Detail: with any Detail value set, the worker
 renders the frame with the export's renderer (same code, so the same result), first a
 1024 px draft, then a 2048 px frame when values stop changing; the viewer says which one is
-shown ("Detail: draft preview", "Detail preview at W×H"). The guide is cached while only
+shown ("CPU preview: draft", "CPU preview at W×H"). The guide is cached while only
 fine filters change. WebGL2 draws the frame (scaled to the canvas) and still renders the
 "before" side; the CPU fallback draws it on its 2D canvas. With all Detail values at 0 the
 GPU path runs as before, bit for bit. A multi-pass WebGL2 version was not built: it needs
@@ -548,21 +550,72 @@ set), undoable, saved in edit documents, and in presets and sync as the **Creati
 | Vignette | Amount ±, Midpoint, Roundness ±, Feather | Elliptical falloff on the output frame (after crop, rotation, perspective), toward a circle (+) or rectangle (−); negative darkens in linear light (up to −2.3 EV), positive lightens toward white. Always centred on the exported frame. |
 | Color Grading | Shadows, Midtones, Highlights, Global: hue, saturation, luminance; Balance, Blending | Weights `(1 − L)^q`, `L^q` and the rest (sum 1, smooth; balance bends L, blending sets q 3.5–1.2). Zero-luma tint offsets that fade out toward pure black, luminance offsets ±0.07 (monotonic for any combination, tested). Colour wheel by pointer; the Hue/Saturation/Luminance sliders are its keyboard and screen-reader alternative. |
 
-**Looks**: Bleach Bypass, Soft Print, Vintage Fade, Cinematic Cool, Warm Analog, Black &
-White Film, Dreamy Glow (`model/looks.mjs`), made only of these controls. Hover or focus
-previews; applying **replaces the whole Creative group** (keeps the grain seed and every other
-section) in one undo step; Intensity scales the amounts from neutral while hues, radii and
-thresholds stay. Save a modified look as a preset with Creative ticked.
+Three more parts (`pipeline/digital.mjs`, Interval 11.5), approximations chosen by eye, not
+measured from any camera or codec:
 
-**Order and colour space.** After the LUT, on display-referred sRGB values: glow → bleach
-bypass → fade → grading → vignette → grain, then quantisation; geometry is applied before
-any colour (the photo is warped first), so position-dependent effects use output pixels;
-text is drawn last, over the finished photo. Colour-only effects run per pixel on the CPU
-and in the shader; glow, vignette and grain need the pixel's position, so CPU renders of
+| Part | Controls | Method |
+| --- | --- | --- |
+| Digital Camera | Sensor color ± (cool CCD-like / warm), Response, Highlight clipping, Noise, Noise color | A channel-crosstalk matrix (rows sum to 1, greys stay grey); a symmetric power S-curve per channel (0, ½, 1 fixed) with up to +50% saturation; each channel scaled and hard-clipped on its own (up to 35% of the range), so clipped colours shift hue; white noise per pixel of a virtual ~2 MP sensor (1600 px long edge, or per capture pixel), luma plus per-channel chroma (blue noisiest), stronger in shadows, from the photo's `grainSeed`. |
+| Low Resolution & JPEG | Low resolution, Pixel edges, JPEG compression, Quantization, Dither | A capture grid of at most 768 px (the guide grid) down to 48 px on the long edge (geometric), area-averaged from the guide source and rendered with every earlier stage; JPEG: full-range YCbCr, 4:2:0 averaged chroma, 8 × 8 DCT with the ITU-T T.81 example tables scaled by IJG quality 92 → 2; the output is resampled from the grid (Pixel edges 0 bilinear … 100 nearest neighbour, alpha-weighted). Quantization: 256 → 2 levels per channel; ordered 8 × 8 Bayer dither only inside a capture. |
+| Lens & Diffusion | Chromatic aberration, Channel shift, Shift angle, Soft focus, Radius | Red scaled out and blue in from the centre (0.6% at 100) and/or moved apart along an angle (0.8% of the long edge), sampled bilinearly from the base image before the display stages (a lens effect; the spatial renderer's halo grows by the displacement); soft focus: the image blurred on the guide grid (σ 0.4–3% of the long edge) mixed in linear light, fully where brighter, half where darker. |
+
+**Resolution semantics.** The capture grid and the channel displacement are fractions of the
+frame, so pixel blocks, 8 × 8 JPEG blocks and fringes cover the same part of the photo in the
+preview, at 100%, in 1:1 Detail and in a full-size export; noise follows grain's rule (a smaller
+render shows the deviation a downscale would leave). JPEG alone uses the 768 px grid, so it
+always softens a large photo to that size: it is a degradation effect, not an encoder setting.
+Thumbnails are their own guide, so captures there are never finer than the thumbnail.
+
+**Filter Library** (`model/filters.mjs`, `ui/FilterLibrary.jsx`): 48 original filters in four
+categories (Digicam & early digital 12, Vintage & nostalgic 11, Cinematic & dramatic 13,
+Experimental 12; the seven Interval 11 looks keep their names and ids), plus Custom. Search
+(every word, accents and case ignored), category tabs, Favorites and Recent (this browser only,
+`localStorage`), a 3-column grid of thumbnails of the shown photo with its edits. One click
+applies a filter: it **replaces the Creative group** (keeps the grain seed and every other
+section: Light, Color, HSL, Detail, curves, LUT, geometry, RAW, HDR, text) in one undo step and
+records `filter: { id, strength }`. Strength 0–100 scales the amounts from neutral (0 is the
+photo without Creative effects; hues, radii and thresholds stay); a second filter replaces the
+first. Changing a Creative control afterwards marks the filter **Modified** and locks strength
+until **Revert changes** or **Save as custom** (a preset with only the Creative group, listed
+under Custom and usable with a strength). **Compare** shows the photo without the filter;
+**Remove filter** sets Creative to neutral. Hover or focus previews a filter. Every filter is
+labelled an approximation; a test renders all of them and fails if two differ by less than 2.5
+codes on average.
+
+**Thumbnails.** One 144 px source per photo, proxy and geometry: the shown proxy area-averaged
+(to 288 px and warped when there is geometry) on the page, then rendered in a worker of its own
+(`filterThumbs` task, four filters per call) with each filter's patch over the photo's other
+settings. Only filters in the shown list are rendered; a change of photo, settings or list drops
+older work between calls, and old thumbnails stay until replaced (a settings change waits
+300 ms). About 55 kB each, kept for the current photo only.
+
+**Order and colour space.** After the LUT, on display-referred sRGB values: [channel shift,
+before the display stages] → glow and soft focus → sensor colour → response → clipping →
+bleach bypass → fade → grading → quantisation → vignette → sensor noise → [capture: low
+resolution, JPEG, reconstruction] → grain, then 8-bit quantisation; geometry is applied before
+any colour (the photo is warped first), so position-dependent effects use output pixels; text
+is drawn last, over the finished photo. Colour-only effects run per pixel on the CPU and in the
+shader; glow, soft focus, vignette, grain and noise need the pixel's position, so CPU renders of
 photos with them use the spatial renderer of [Detail](#detail) (bands, 1:1 regions, band
-workers; no halo is needed). The WebGL2 preview runs all of it in the shader, with the glow
-map computed in the render worker from the guide grid and kept while unrelated values
-change. Neutral Creative settings leave every earlier path bit for bit unchanged.
+workers). Capture and channel shift are **CPU only** (`params.cpuOnly`): the preview renders
+them on the CPU like Detail (draft at 1024 px, final at 2048 px), and while cropping they are
+left out. The WebGL2 preview runs everything else in the shader, with the glow and soft-focus
+maps computed in the render worker from the guide grid. Neutral Creative settings leave every
+earlier path bit for bit unchanged.
+
+**Reference audit (DigiCamFX, 24 Oct 2026).** Inspected in a browser without uploading a photo,
+so controls and names were verified, results were not: tools JPEG (quality presets, resolution,
+JPEG quality, noise, sharpen, 2× pixelate), Filters (two groups of preset buttons, among them
+Nashville, Sepia, 2014, Bleach Bypass, B&W, B&W Clamped, Desat; Intensity, Vignette and an
+iPhone6 grain slider), Collage, Blur/Pixelate (uniform, vignette or drawn; Gaussian or pixel
+size), CCD (blur, bloom amount and tint, lens reflection, noise with blend mode, JPEG quality,
+resolution, sharpen, pixelate), and fully automatic Nokia, 1/4", iPhone3gs and one emoji-named
+effect. Effects are applied destructively with Apply; filter buttons are labelled swatches,
+not photo thumbnails. Already possible here before: bleach bypass, desaturation and
+monochrome, sepia-like grading, vignette, grain, bloom. New here: JPEG blocks, low resolution
+and pixelation, chromatic aberration and channel displacement, quantisation and dither,
+sensor noise, per-channel clipping and early-camera response, soft focus. No code, artwork or
+preset values were taken; every filter here is an original approximation.
 
 **Text** (section Text, **Text** under the preview or T): Add text, then edit the wording,
 font (Schibsted Grotesk or Martian Mono, SIL OFL, bundled), bold, italic (Grotesk), size
@@ -594,6 +647,31 @@ cropping and in 1:1 Detail, and is not drawn in thumbnails.
 **Presets, sync, reset.** Presets contain Creative, never text. Paste copies Creative, never
 text; **Sync…** copies text only when Text overlays is ticked (it then replaces the target's
 text). Reset all clears text too (one undo step).
+
+**Filter Library measurements** (`npm run check:editor:filters`, Windows i7-9700, headless
+Playwright, whole browser memory; Chromium with `CHECK_GPU=1` on the RTX 3070, as headless
+Chromium otherwise draws WebGL2 with SwiftShader). PNG exports of nine digital filters (every new
+operation), with geometry and transparency, and batch ZIP entries equal the Node reference
+(max 0; WebKit 1 for Classic CCD) in Chromium, Firefox, WebKit, iPhone 13 and Pixel 7 emulation
+and without WebGL2. Shader vs CPU: 69 creative parity cases, new effects and GPU-capable
+filters included, within one code value (posterize: at most 4 pixels one level apart).
+
+| | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- |
+| Library open · 48 thumbnails (600×400 photo) | 69 ms · 0.7 s | 68 ms · 0.9 s | 1.4 s · 1.5 s |
+| 48 thumbnails: 24 MP · genuine JPEG · genuine ARW | 1.2 · 0.9 · 1.4 s | 1.0 · 1.0 · 1.2 s | 0.6 s · not run |
+| Filter switch to painted frame, 600×400: GPU · CPU-only (median) | 153 · 255 ms | 190 · 323 ms | 350 · 575 ms |
+| 24 MP switch: Soft Focus (GPU) · Early Smartphone · Chromatic Fringing (final CPU frame) | 128 ms · 0.8 s · 2.6 s | 157 ms · 1.1 s · 2.8 s | 237 ms · 0.9 s · 2.0 s |
+| 24 MP JPEG export: none · Early Smartphone · Soft Focus · Chromatic Fringing; peak | 0.7 · 1.9 · 3.4 · 3.8 s; 1794 MB (baseline 601) | 0.7 · 2.1 · 4.2 · 4.8 s; 2093 MB | 1.5 · 2.1 · 3.7 · 4.9 s; 1637 MB |
+| Genuine A7 III JPEG, Classic CCD: switch · export (none); peak | 0.7 s · 2.0 s (0.6); 1726 MB | 1.1 s · 2.0 s (0.8); 2189 MB | not run |
+| Genuine ARW, Early Smartphone: switch · export (none); peak | 0.7 s · 4.4 s (3.5); 2132 MB | 1.0 s · 20.5 s (14.8); 2342 MB | not run |
+| Merged RAW HDR (DSC09640–42), Soft CCD Glow export | 15.4 s, 2731 MB | not run | not run |
+
+The first CPU-only filter on a photo also sends the proxy to the render worker (24 MP: about
+1.4–1.6 s instead of 0.7 s). Phones (emulation, not devices): thumbnails 0.9 s (iPhone 13) and
+0.7 s (Pixel 7), GPU switch about 200 ms; without WebGL2 the median switch is 247 ms. Node,
+one thread, final 2048 px CPU preview frame from a 4096 px proxy: 135 ms (Pixelated) to 850 ms
+(Chromatic Fringing), drafts 60–330 ms. No physical iPhone was tested.
 
 **Measurements** (`npm run check:editor:creative`, Windows i7-9700, headless Playwright,
 whole browser memory). PNG exports with a look and every effect, with geometry + vignette,
@@ -644,11 +722,14 @@ is left out. Geometry is copied only when ticked (paste never copies it): **Outp
 (resize)** copies the resize box to any photo; **Crop & transform** (crop, ratio, turns,
 flips, straighten, perspective, stretch) only to photos with the same proportions. Settings move freely between JPEG, PNG, WebP, RAW and merged photos.
 
-**Presets, LUTs, reset.** **Preset…** applies a built-in or saved preset to every selected
-photo exactly as to one (only the groups it contains). **LUT…** sets a loaded `.cube` (or
+**Presets, filters, LUTs, reset.** **Preset…** applies a built-in or saved preset to every selected
+photo exactly as to one (only the groups it contains); a preset's Creative values replace a
+photo's filter record. **Filter…** applies a Filter Library filter (built-in or custom) at a
+strength: each photo's Creative group is replaced and its grain pattern, text, geometry and
+other groups are kept; paste and Sync copy the filter record with the Creative group. **LUT…** sets a loaded `.cube` (or
 none) and its intensity on every selected photo; the colour assumptions are those of
 [Pipeline](#pipeline). **Reset…** returns them to neutral (RAW as shot, merges kept). All
-three preview the plan like Sync; Cancel changes nothing.
+four preview the plan like Sync; Cancel changes nothing.
 
 **Undo.** A batch change adds one history entry per changed photo (so Ctrl/⌘ Z on a photo
 undoes its part) and one batch entry holding that photo's settings before and after (a few
@@ -739,6 +820,10 @@ RAWs, ZIP parts above 1 GB.
 - Values are relative to neutral (LUT intensity defaults to 100). The ten
   Interval 3 controls are always written; other controls, curves and the LUT
   only when they change something. Missing keys are neutral.
+- Version 8 added the digital creative controls (`sensorColor` … `diffusionRadius`, see
+  [Creative and text](#creative-and-text)) and `filter` (`{ "id": "filter:classic-ccd",
+  "strength": 70 }`, the Filter Library record; an unknown id is kept and shown as modified,
+  a malformed one dropped). Older files open with them neutral and no filter.
 - Version 7 added the creative controls (`bleachAmount` … `gradeBlending`, `grainSeed`) and
   `overlays` (text objects, see [Creative and text](#creative-and-text)); older files open with
   them neutral and no text. Malformed objects are dropped, values clamped.
@@ -935,6 +1020,11 @@ Safari cannot encode WebP (the option is disabled when the browser cannot).
   (no band workers), so heavy edits take several times longer there.
 - Pinch-zoom works with two pointers on the preview; it has not been tried on a
   physical phone.
+- Filter Library (Interval 11.5): capture and channel-shift filters preview on the CPU (0.7–2.6 s
+  to the final frame on 24 MP, a draft sooner) and are left out while cropping; capture
+  thumbnails are coarser than the photo; JPEG compression always works at the 768 px capture
+  grid, so it softens large photos; DigiCamFX's results were not compared visually (no photo
+  was uploaded there).
 
 - **Playwright Windows WebKit LibRaw crash: mitigated in Interval 9, not gone.** The web content process
   died (Playwright `crash`, "mprotect failed: 487" in Interval 5–7) when a RAW worker created

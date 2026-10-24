@@ -57,6 +57,7 @@ function useThumbnails(thumbnails, adjustments, shown) {
           if (cancelled || c.key !== key) return;
           results.forEach((result) => { c.images.set(result.id, result); c.previous.delete(result.id); });
           setVersion((value) => value + 1);
+          performance.mark?.('pe-filter-thumbs', { detail: { count: c.images.size } });
         }
         if (!cancelled) c.previous.clear();
       } catch {

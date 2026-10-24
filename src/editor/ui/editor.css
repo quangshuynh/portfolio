@@ -484,8 +484,8 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-filter__apply[aria-pressed='true'] { color: var(--pe-text); border-color: var(--pe-accent); box-shadow: 0 0 0 1px var(--pe-accent); }
 .pe-filter__thumb { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 3px 3px 0 0; background: var(--pe-panel-2); }
 .pe-filter__thumb--empty { background: linear-gradient(135deg, var(--pe-panel-2), var(--pe-line)); }
-.pe-filter__name { padding: 0 .3rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pe-filter__star { position: absolute; top: 2px; right: 2px; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; padding: 0; border: 0; border-radius: 50%; background: rgb(0 0 0 / .45); color: var(--pe-text-2); cursor: pointer; }
+.pe-filter__name { display: -webkit-box; min-height: 2.4em; padding: 0 .3rem; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.pe-filter__star { position: absolute; top: 1px; right: 1px; display: grid; place-items: center; width: 1.6rem; height: 1.6rem; padding: 0; border: 0; border-radius: 50%; background: rgb(0 0 0 / .45); color: var(--pe-text-2); cursor: pointer; }
 .pe-filter__star svg { width: .9rem; height: .9rem; }
 .pe-filter__star[aria-pressed='true'] { color: var(--pe-focus); }
 .pe-filter__star:hover { color: var(--pe-text); }
@@ -497,6 +497,11 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-filters__save { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .4rem; }
 .pe-filters__save label { flex: 1 1 8rem; }
 .pe-filters__save input { width: 100%; min-height: 2.25rem; padding: 0 .5rem; border: 1px solid var(--pe-line-strong); border-radius: var(--radius-sm, 4px); background: var(--pe-stage); color: var(--pe-text); font: inherit; }
+/* Touch: a 44 px target around the same small star. */
+@media (pointer: coarse) {
+  .pe-filter__star { top: 0; right: 0; width: 2.75rem; height: 2.75rem; background: none; }
+  .pe-filter__star svg { box-sizing: content-box; width: .9rem; height: .9rem; padding: .35rem; border-radius: 50%; background: rgb(0 0 0 / .45); }
+}
 @media (max-width: 620px) {
   .pe-filters__grid { grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr)); max-height: 18rem; }
 }

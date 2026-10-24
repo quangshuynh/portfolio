@@ -25,6 +25,7 @@ read it before changing projects or project assets.
 | `src/editor/batch/` | Batch export (Interval 8): queue, collision-safe `-quangedit` names, ZIP parts with client-zip. Selection, sync and batch undo are in `src/editor/model/`; behaviour and limits in `docs/photography-editor.md` (Batch editing). |
 | `src/editor/pipeline/geometry.mjs`, `warp.mjs` | Crop & Transform (Interval 10): geometry model and transform order, inverse-mapped resampling shared by preview (shader mirror) and export. Behaviour and limits in `docs/photography-editor.md` (Geometry). |
 | `src/editor/pipeline/creative.mjs`, `src/editor/model/overlays.mjs`, `src/editor/text/` | Creative stage and looks (Interval 11), text overlays (schema, bundled OFL fonts, layout, export sprites). Behaviour and limits in `docs/photography-editor.md` (Creative and text). |
+| `src/editor/pipeline/digital.mjs`, `src/editor/model/filters.mjs` | Digital effects and the Filter Library (Interval 11.5): capture, JPEG, channel shift, noise; original filters, filter record, thumbnails (`ui/filterThumbs.mjs`). Behaviour, resolution semantics and limits in `docs/photography-editor.md` (Creative and text). |
 | `experiments/raw-decode-poc/` | Isolated RAW decoding proof of concept with its own `package.json`; not part of the site build or root `npm test`. |
 
 ## Project metadata

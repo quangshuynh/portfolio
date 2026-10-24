@@ -124,7 +124,7 @@ describe('Creative section', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Custom filter name' }), { target: { value: 'My blocks' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     const [[saved]] = onChange.mock.calls;
-    expect(saved[0]).toMatchObject({ name: 'My blocks', groups: ['creative'], settings: { captureResolution: 75, pixelEdges: 100 } });
+    expect(saved[0]).toMatchObject({ name: 'My blocks', groups: ['creative'], settings: { captureResolution: 85, pixelEdges: 100 } });
     expect(present().filter).toEqual({ id: 'preset:My blocks', strength: 100 });
   }, 20000);
 

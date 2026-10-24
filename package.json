@@ -32,6 +32,7 @@
     "check:editor:memory": "node scripts/check-editor-memory.mjs",
     "check:editor:geometry": "node scripts/check-editor-geometry.mjs",
     "check:editor:creative": "node scripts/check-editor-creative.mjs",
+    "check:editor:filters": "node scripts/check-editor-filters.mjs",
     "cms": "node cms/server.mjs",
     "assets:refresh": "node scripts/refresh-project-assets.mjs",
     "test:hero:browser": "node scripts/check-hero-browser.mjs",
