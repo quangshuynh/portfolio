@@ -9,6 +9,7 @@ import { GlRenderer, probeEditorContext } from '../pipeline/glRenderer.mjs';
 import { debugFlag, recordDiagnostic } from '../io/diagnostics.mjs';
 import { previewEdgeLimit } from '../io/files.mjs';
 import InspectView from './InspectView';
+import TextLayer from './TextLayer';
 
 const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 8;
@@ -72,7 +73,7 @@ export function viewGeometry(geometry, mode, native) {
  * :param transform: Crop & Transform mode ({ mode: 'crop' | 'corners', guide, onPreview,
  *   onCommit, onSet, onApply, onCancel }) or null
  */
-export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, zoomCommand, inspect = null, transform = null }) {
+export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, zoomCommand, inspect = null, transform = null, text = null }) {
   const stageRef = useRef(null);
   const canvasHostRef = useRef(null);
   const engineRef = useRef(null);
@@ -530,6 +531,22 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
           hidden={!proxy}
           style={{ width: displayWidth, height: displayHeight, transform: `translate(${offsetX}px, ${offsetY}px)` }}
         />
+        {text && proxy && proxy.id === photo?.id && !transform && !inspect && compare !== 'original' && (adjustments.overlays.length > 0 || text.interactive) && (
+          <TextLayer
+            overlays={adjustments.overlays}
+            box={{ x: offsetX, y: offsetY, width: displayWidth, height: displayHeight }}
+            output={{ width: sourceWidth, height: sourceHeight }}
+            stage={stageSize}
+            clip={compare === 'split' ? split : 0}
+            interactive={text.interactive}
+            selectedId={text.selectedId}
+            onSelect={text.onSelect}
+            onPreview={text.onPreview}
+            onCommit={text.onCommit}
+            onApply={text.onApply}
+            onEdit={text.onEdit}
+          />
+        )}
         {proxy && compare === 'split' && (
           <div className="pe-split" style={{ left: splitX, top: Math.max(0, offsetY), height: Math.min(displayHeight, stageSize.height) }}>
             <span className="pe-split__label pe-split__label--before" aria-hidden="true">Before</span>

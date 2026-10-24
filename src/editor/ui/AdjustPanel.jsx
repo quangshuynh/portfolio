@@ -1,6 +1,7 @@
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { ADJUSTMENTS, groupIsNeutral, isNeutral } from '../model/adjustments.mjs';
 import { AdjustmentRow, ResetIcon } from './AdjustmentRow';
+import CreativePanel from './CreativePanel';
 import CurveEditor from './CurveEditor';
 import GeometryPanel from './GeometryPanel';
 import HdrPanel from './HdrPanel';
@@ -8,6 +9,7 @@ import HslPanel from './HslPanel';
 import LutPanel from './LutPanel';
 import PresetPanel from './PresetPanel';
 import RawPanel from './RawPanel';
+import TextPanel from './TextPanel';
 
 const SECTIONS_KEY = 'photo-editor:sections:v1';
 const DEFAULT_OPEN = { hdr: true, raw: true, light: true, color: true };
@@ -51,14 +53,17 @@ function Section({ id, title, open, onToggle, edited, onReset, resetDisabled, ch
  * :param hdr: the active photo's merge description when it is a merged HDR, else null
  * :param geometry: Crop & Transform handlers (GeometryPanel props), or null without a photo
  */
-export default function AdjustPanel({ adjustments, disabled, dispatch, lut, presets, raw = null, hdr = null, geometry = null }) {
+export default function AdjustPanel({ adjustments, disabled, dispatch, lut, presets, raw = null, hdr = null, geometry = null, text = null }) {
   const [open, setOpen] = useState(readOpenSections);
+  // Editing a text's wording from the photo opens the Text section.
+  useEffect(() => { if (text?.focusRequest) setOpen((current) => ({ ...current, text: true })); }, [text?.focusRequest]);
   const toggle = (id) => setOpen((current) => {
     const next = { ...current, [id]: !current[id] };
     try { localStorage.setItem(SECTIONS_KEY, JSON.stringify(next)); } catch { /* per-viewer convenience only */ }
     return next;
   });
-  const section = (id, title, children, { reset = true, edited } = {}) => {
+  // `lazy` sections (many controls) render their body only while open.
+  const section = (id, title, children, { reset = true, edited, lazy = false } = {}) => {
     const neutral = groupIsNeutral(adjustments, id);
     return (
       <Section
@@ -71,7 +76,7 @@ export default function AdjustPanel({ adjustments, disabled, dispatch, lut, pres
         onReset={reset ? () => dispatch({ type: 'resetGroup', group: id }) : null}
         resetDisabled={disabled || neutral}
       >
-        {children}
+        {lazy && !open[id] ? null : children}
       </Section>
     );
   };
@@ -103,6 +108,8 @@ export default function AdjustPanel({ adjustments, disabled, dispatch, lut, pres
       ))}
       {section('curves', 'Tone Curve', <CurveEditor curves={adjustments.curves} disabled={disabled} dispatch={dispatch} />)}
       {section('lut', 'LUT', <LutPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} {...lut} />, { edited: Boolean(adjustments.lut) })}
+      {section('creative', 'Creative', <CreativePanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} onPreview={presets?.onPreview} />, { lazy: true })}
+      {text && section('text', 'Text', <TextPanel overlays={adjustments.overlays} disabled={disabled} dispatch={dispatch} {...text} />, { lazy: true })}
       {section('presets', 'Presets', <PresetPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} {...presets} />, { reset: false, edited: false })}
     </section>
   );

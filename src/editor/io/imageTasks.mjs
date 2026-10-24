@@ -16,6 +16,7 @@ import { LutError, MAX_CUBE_BYTES, parseCube } from '../pipeline/lut.mjs';
 import { contentHash } from './hash.mjs';
 import { renderRegion, warpedRegionSource } from '../pipeline/detailRegion.mjs';
 import { decodeSize, geometryPlan, normalizeGeometry } from '../pipeline/geometry.mjs';
+import { compositeSprites } from '../text/sprites.mjs';
 
 export const EXPORT_BAND_ROWS = 256;
 
@@ -294,7 +295,7 @@ export const handlers = {
    * the decode canvas, then encode that canvas. Only one band of pixels is held besides
    * the canvas, instead of a full-resolution copy and a second canvas.
    */
-  async export({ file, header, adjustments, lut = null, settings }, progress, signal = {}) {
+  async export({ file, header, adjustments, lut = null, settings, sprites = null }, progress, signal = {}) {
     const started = performance.now();
     const format = FORMATS[settings.format];
     const native = { width: header.displayWidth, height: header.displayHeight };
@@ -343,6 +344,8 @@ export const handlers = {
       // Lets a main-thread run paint progress and see a cancel between bands.
       if (signal.yield) await signal.yield();
     }
+    // Text overlays, rasterised on the page at this size, over the finished photo.
+    compositeSprites(context, sprites);
     const renderedAt = performance.now();
     progress({ stage: 'encoding', fraction: 1 });
     const blob = await encodeCanvas(canvas, format.mime, settings.format === 'png' ? undefined : settings.quality);

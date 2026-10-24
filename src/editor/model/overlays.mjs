@@ -58,6 +58,12 @@ export const DEFAULT_SHADOW = Object.freeze({ color: '#000000', opacity: 0.6, bl
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const number = (value, [min, max], fallback) => (typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback);
 const round = (value, digits = 4) => Number(value.toFixed(digits)) + 0;
+/** An angle in degrees wrapped into (−180, 180]. */
+const angle = (value, fallback) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  const wrapped = ((value % 360) + 360) % 360;
+  return wrapped > 180 ? wrapped - 360 : wrapped;
+};
 const color = (value, fallback) => (typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : fallback);
 
 /** Splits into user-perceived characters where the browser can, else code points. */
@@ -97,9 +103,8 @@ export function normalizeTextOverlay(input) {
     opacity: round(number(input.shadow.opacity, [0, 1], DEFAULT_SHADOW.opacity), 3),
     blur: round(number(input.shadow.blur, TEXT_LIMITS.shadowBlur, DEFAULT_SHADOW.blur)),
     distance: round(number(input.shadow.distance, TEXT_LIMITS.shadowDistance, DEFAULT_SHADOW.distance)),
-    angle: round(number(input.shadow.angle, [-360, 360], DEFAULT_SHADOW.angle), 2),
+    angle: round(angle(input.shadow.angle, DEFAULT_SHADOW.angle), 2),
   } : null;
-  const rotation = number(input.rotation, [-360, 360], 0);
   return {
     id: input.id,
     type: 'text',
@@ -110,8 +115,7 @@ export function normalizeTextOverlay(input) {
     size: round(number(input.size, TEXT_LIMITS.size, TEXT_DEFAULTS.size), 5),
     x: round(number(input.x, [-1, 2], TEXT_DEFAULTS.x), 5),
     y: round(number(input.y, [-1, 2], TEXT_DEFAULTS.y), 5),
-    // Kept in (−180, 180].
-    rotation: round(rotation > 180 ? rotation - 360 : rotation <= -180 ? rotation + 360 : rotation, 2),
+    rotation: round(angle(input.rotation, 0), 2),
     scale: round(number(input.scale, TEXT_LIMITS.scale, 1)),
     color: color(input.color, TEXT_DEFAULTS.color),
     opacity: round(number(input.opacity, [0, 1], 1), 3),

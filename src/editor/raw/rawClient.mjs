@@ -7,6 +7,7 @@ import { WorkerCancelled, createWorkerClient } from '../io/workerClient.mjs';
 import { assertCanvasWorks, createCanvas, encodeCanvas } from '../io/decode.mjs';
 import { exportGeometry } from '../io/files.mjs';
 import { finishRows, warpSpec } from '../pipeline/warp.mjs';
+import { compositeSprites } from '../text/sprites.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { recordDiagnostic } from '../io/diagnostics.mjs';
 import { renderDetailParallel, renderPixelsParallel, warpParallel } from '../io/detailPool.mjs';
@@ -113,7 +114,7 @@ export function createRawQueue({ spawn = spawnRawWorker, limit = 1 } = {}) {
  * :param onStart: receives the job, so the caller can cancel it
  * :returns: { blob, width, height, source: 'full' | 'half', timings }
  */
-export async function exportRaw(queue, { file, raw, adjustments, lut, settings }, { onProgress = () => {}, onStart = () => {}, detailWorkers = 0, spawnRender } = {}) {
+export async function exportRaw(queue, { file, raw, adjustments, lut, settings, sprites = null }, { onProgress = () => {}, onStart = () => {}, detailWorkers = 0, spawnRender } = {}) {
   const format = FORMATS[settings.format];
   const geometry = exportGeometry(adjustments.geometry, { width: raw.width, height: raw.height }, settings.resize);
   const size = geometry.output;
@@ -145,6 +146,7 @@ export async function exportRaw(queue, { file, raw, adjustments, lut, settings }
       onBand: ({ row, rows, data }) => context.putImageData(new ImageData(finishRows(spec, data, row, rows, settings.format === 'jpeg'), size.width, rows), 0, row),
       onProgress: (fraction) => onProgress({ stage: 'rendering', fraction }),
     });
+    compositeSprites(context, sprites);
     onProgress({ stage: 'encoding', fraction: 1 });
     const renderedAt = performance.now();
     const blob = await encodeCanvas(canvas, format.mime, settings.format === 'png' ? undefined : settings.quality);
@@ -165,6 +167,7 @@ export async function exportRaw(queue, { file, raw, adjustments, lut, settings }
   });
   onStart(job);
   const result = await job.promise;
+  compositeSprites(context, sprites);
   onProgress({ stage: 'encoding', fraction: 1 });
   const encodeStarted = performance.now();
   const blob = await encodeCanvas(canvas, format.mime, settings.format === 'png' ? undefined : settings.quality);

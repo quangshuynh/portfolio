@@ -17,6 +17,7 @@ import { assertCanvasWorks, createCanvas, encodeCanvas } from './decode.mjs';
 import { exportGeometry } from './files.mjs';
 import { FORMATS } from './imageHeader.mjs';
 import { finishRows, hasAlpha, sourceRows, warpSpec } from '../pipeline/warp.mjs';
+import { compositeSprites } from '../text/sprites.mjs';
 
 export const DETAIL_POOL_BAND_ROWS = 256;
 const MAX_DETAIL_WORKERS = 4;
@@ -177,7 +178,7 @@ export function renderPixelsParallel(image, { adjustments, lut = null, raw = nul
  * (8 bytes per pixel).
  * :returns: { blob, width, height, timings }
  */
-export async function exportImageInBands(decoder, { file, header, adjustments, lut = null, settings }, { workers, onProgress = () => {}, signal, spawn }) {
+export async function exportImageInBands(decoder, { file, header, adjustments, lut = null, settings, sprites = null }, { workers, onProgress = () => {}, signal, spawn }) {
   const started = performance.now();
   const format = FORMATS[settings.format];
   const native = { width: header.displayWidth, height: header.displayHeight };
@@ -202,6 +203,7 @@ export async function exportImageInBands(decoder, { file, header, adjustments, l
     onBand: ({ row, rows, data }) => context.putImageData(new ImageData(finishRows(spec, data, row, rows, flatten), size.width, rows), 0, row),
     onProgress: (fraction) => onProgress({ stage: 'rendering', fraction }),
   });
+  compositeSprites(context, sprites);
   onProgress({ stage: 'encoding', fraction: 1 });
   const renderedAt = performance.now();
   const blob = await encodeCanvas(canvas, format.mime, settings.format === 'png' ? undefined : settings.quality);
