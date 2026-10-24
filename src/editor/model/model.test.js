@@ -3,6 +3,7 @@ import * as history from './history.mjs';
 import { editorReducer, initialEditorState } from './editorState.mjs';
 import {
   DOCUMENT_TYPE,
+  DOCUMENT_VERSION,
   EditDocumentError,
   createEditDocument,
   normalizeExportSettings,
@@ -24,7 +25,8 @@ describe('adjustment registry', () => {
   });
 
   test('the unsigned controls are the Detail amounts, RAW temperature in kelvin, the HDR tone amounts and LUT intensity, a 0–100% amount that defaults to full', () => {
-    expect(ADJUSTMENTS.filter(({ signed }) => !signed)).toEqual([
+    // Creative controls are checked in creative.test.js: amounts, hues, radii and the like.
+    expect(ADJUSTMENTS.filter(({ signed, group }) => !signed && group !== 'creative')).toEqual([
       expect.objectContaining({ key: 'sharpening', group: 'detail', min: 0, max: 100, default: 0 }),
       expect.objectContaining({ key: 'luminanceNoise', group: 'detail', min: 0, max: 100, default: 0 }),
       expect.objectContaining({ key: 'colorNoise', group: 'detail', min: 0, max: 100, default: 0 }),
@@ -190,7 +192,7 @@ describe('edit document', () => {
   test('round-trips adjustments and export settings', () => {
     const text = serializeEditDocument(createEditDocument([photo], { format: 'png', suffix: '-v2' }, new Date(0)));
     const parsed = parseEditDocument(text);
-    expect(JSON.parse(text)).toMatchObject({ type: DOCUMENT_TYPE, version: 6, savedAt: '1970-01-01T00:00:00.000Z' });
+    expect(JSON.parse(text)).toMatchObject({ type: DOCUMENT_TYPE, version: DOCUMENT_VERSION, savedAt: '1970-01-01T00:00:00.000Z' });
     expect(parsed.photos[0].adjustments).toEqual(normalizeAdjustments(photo.adjustments));
     expect(parsed.photos[0].source).toMatchObject({ name: 'DSC0001.jpg', size: 1234, sha256: photo.sha256 });
     expect(parsed.exportSettings).toMatchObject({ format: 'png', suffix: '-v2' });
@@ -213,7 +215,7 @@ describe('edit document', () => {
     bad('{');
     bad('[]');
     bad(JSON.stringify({ type: 'other', version: 1, photos: [] }));
-    bad(JSON.stringify({ type: DOCUMENT_TYPE, version: 7, photos: [] }));
+    bad(JSON.stringify({ type: DOCUMENT_TYPE, version: DOCUMENT_VERSION + 1, photos: [] }));
     bad(JSON.stringify({ type: DOCUMENT_TYPE, version: 1 }));
     bad(JSON.stringify({ type: DOCUMENT_TYPE, version: 1, photos: [{ source: {} }] }));
     bad(' '.repeat(4 * 1024 * 1024 + 1));

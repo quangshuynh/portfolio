@@ -5,16 +5,22 @@
 // float camera RGB of a merged RAW HDR (RGB32F, read with texelFetch).
 // Photos with Detail settings are rendered on the CPU (detailRenderer.mjs, the export
 // engine) and drawn from that frame here; only the "before" side still runs the shader.
+// The creative stage runs here; it needs the photo's native output size (grain scale) and,
+// for bloom and halation, the glow map computed on the CPU (setCreative).
 
 import { CURVE_TABLE_SIZE } from './curves.mjs';
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './shader.mjs';
+import { FINE_SEED, grainScale } from './creative.mjs';
 
 const UNIFORMS = ['uSource', 'uWhiteBalanceActive', 'uWhiteBalance', 'uExposureGain', 'uToneActive', 'uContrast',
   'uHighlights', 'uShadows', 'uWhites', 'uBlacks', 'uVibrance', 'uSaturation', 'uNeutral',
   'uRaw', 'uRawSource', 'uRawGain', 'uRawMatrix', 'uRawWhite', 'uRolloffWhite', 'uRolloffKnee', 'uShadowLift', 'uHdr', 'uHdrSource',
   'uBaseNeutral', 'uCurvesActive', 'uCurveActive', 'uCurves', 'uHslActive', 'uHslHue', 'uHslSat', 'uHslLum',
   'uLutActive', 'uLut', 'uLutSize', 'uLutDomainMin', 'uLutDomainMax', 'uLutIntensity',
-  'uGeometry', 'uGeometryMatrix', 'uOutputSize', 'uCoverage', 'uCoverageScale', 'uSourceSize', 'uBackground', 'uOpaque'];
+  'uGeometry', 'uGeometryMatrix', 'uOutputSize', 'uCoverage', 'uCoverageScale', 'uSourceSize', 'uBackground', 'uOpaque',
+  'uCreative', 'uBleach', 'uBleachParams', 'uFade', 'uFadeBlack', 'uFadeShoulder', 'uFadeWhite', 'uGrade', 'uGradeTint', 'uGradeLum',
+  'uGradeBalance', 'uGradeExponent', 'uVignette', 'uVignetteParams', 'uVignetteExponent', 'uGrain', 'uGrainParams', 'uGrainSeed',
+  'uGrainFineSeed', 'uBloom', 'uBloomAmount', 'uHalation', 'uHalationAmount', 'uHalationTint', 'uGlow'];
 const BACKGROUND_CODES = { transparent: 0, white: 1, black: 2 };
 
 function opaqueRgba({ kind, data }) {
@@ -23,8 +29,8 @@ function opaqueRgba({ kind, data }) {
   return true;
 }
 
-// Texture units: the photo, the curve table, the 3D LUT, a RAW photo, a merged HDR.
-const UNIT = { source: 0, curves: 1, lut: 2, raw: 3, hdr: 4 };
+// Texture units: the photo, the curve table, the 3D LUT, a RAW photo, a merged HDR, the glow map.
+const UNIT = { source: 0, curves: 1, lut: 2, raw: 3, hdr: 4, glow: 5 };
 
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
@@ -144,10 +150,32 @@ export class GlRenderer {
     this.sourcePlaceholder = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.sourcePlaceholder);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+    gl.activeTexture(gl.TEXTURE0 + UNIT.glow);
+    this.glowTexture = floatTexture(gl, gl.TEXTURE_2D);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 1, 1, 0, gl.RGBA, gl.FLOAT, new Float32Array(4));
+    this.glowData = null;
+    this.creative = { nativeWidth: 0, nativeHeight: 0, glow: null };
+    gl.activeTexture(gl.TEXTURE0);
     this.raw = false;
     this.hdr = false;
     this.renderedTexture = null;
     this.geometry = null;
+  }
+
+  /**
+   * Context of the creative stage: the photo's output size at full resolution (grain is
+   * scaled as a downscale of it) and the glow map ({ width, height, data } RGBA float,
+   * creative.packGlow), or null while it is not computed (bloom and halation are left out).
+   */
+  setCreative({ nativeWidth = 0, nativeHeight = 0, glow = null } = {}) {
+    this.creative = { nativeWidth, nativeHeight, glow };
+    if (!glow || glow.data === this.glowData) return;
+    const { gl } = this;
+    gl.activeTexture(gl.TEXTURE0 + UNIT.glow);
+    gl.bindTexture(gl.TEXTURE_2D, this.glowTexture);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, glow.width, glow.height, 0, gl.RGBA, gl.FLOAT, glow.data);
+    this.glowData = glow.data;
   }
 
   /** Output size: the geometry's when one is set, else the source's. */
@@ -353,7 +381,55 @@ export class GlRenderer {
     gl.activeTexture(gl.TEXTURE0 + UNIT.lut);
     gl.bindTexture(gl.TEXTURE_3D, this.lutTexture);
     gl.uniform1i(u.uLut, UNIT.lut);
+    this.setCreativeUniforms(frame ? null : params.creative);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  setCreativeUniforms(c) {
+    const { gl, uniforms: u } = this;
+    const active = Boolean(c?.active);
+    gl.uniform1i(u.uCreative, active ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE0 + UNIT.glow);
+    gl.bindTexture(gl.TEXTURE_2D, this.glowTexture);
+    gl.uniform1i(u.uGlow, UNIT.glow);
+    if (!active) return;
+    const { bleach, fade, grading, vignette, grain, bloom, halation } = c;
+    gl.uniform1i(u.uBleach, bleach ? 1 : 0);
+    if (bleach) gl.uniform4f(u.uBleachParams, bleach.amount, bleach.contrast, bleach.desaturation, bleach.protect);
+    gl.uniform1i(u.uFade, fade ? 1 : 0);
+    if (fade) {
+      gl.uniform3fv(u.uFadeBlack, fade.black);
+      gl.uniform1f(u.uFadeShoulder, fade.shoulder);
+      gl.uniform3fv(u.uFadeWhite, fade.white);
+    }
+    gl.uniform1i(u.uGrade, grading ? 1 : 0);
+    if (grading) {
+      gl.uniform3fv(u.uGradeTint, grading.tints.flat());
+      gl.uniform4fv(u.uGradeLum, grading.luminance);
+      gl.uniform1f(u.uGradeBalance, grading.balance);
+      gl.uniform1f(u.uGradeExponent, grading.exponent);
+    }
+    gl.uniform1i(u.uVignette, vignette ? 1 : 0);
+    if (vignette) {
+      gl.uniform4f(u.uVignetteParams, vignette.amount, vignette.start, vignette.width, vignette.round);
+      gl.uniform1f(u.uVignetteExponent, vignette.exponent);
+    }
+    // Grain is scaled as a downscale of the full-resolution output (detailRenderer's `scale`).
+    const { nativeWidth, nativeHeight, glow } = this.creative;
+    const scale = Math.min(1, Math.max(this.outWidth, this.outHeight) / Math.max(nativeWidth || this.outWidth, nativeHeight || this.outHeight));
+    gl.uniform1i(u.uGrain, grain ? 1 : 0);
+    if (grain) {
+      gl.uniform4f(u.uGrainParams, grain.amount * grainScale(grain.spacing, scale), grain.spacing, grain.roughness, scale);
+      gl.uniform1ui(u.uGrainSeed, grain.seed);
+      gl.uniform1ui(u.uGrainFineSeed, FINE_SEED(grain.seed));
+    }
+    gl.uniform1i(u.uBloom, bloom && glow ? 1 : 0);
+    if (bloom) gl.uniform1f(u.uBloomAmount, bloom.amount);
+    gl.uniform1i(u.uHalation, halation && glow ? 1 : 0);
+    if (halation) {
+      gl.uniform1f(u.uHalationAmount, halation.amount);
+      gl.uniform3fv(u.uHalationTint, halation.tint);
+    }
   }
 
   /** Renders and reads back RGBA8 rows top to bottom (tests and parity checks). */
@@ -393,6 +469,7 @@ export class GlRenderer {
     this.releaseSource();
     gl.deleteTexture(this.curveTexture);
     gl.deleteTexture(this.lutTexture);
+    gl.deleteTexture(this.glowTexture);
     gl.deleteTexture(this.rawPlaceholder);
     gl.deleteTexture(this.hdrPlaceholder);
     gl.deleteTexture(this.sourcePlaceholder);

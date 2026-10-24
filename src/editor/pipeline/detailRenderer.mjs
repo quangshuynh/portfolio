@@ -1,8 +1,9 @@
-// CPU renderer for photos with Detail settings: the one engine for both the Detail
-// preview and the full-resolution export, so the two cannot disagree. It runs the base
-// stage per pixel, the detail stage (detail.mjs) per tile with a halo, then the display
-// stages and 8-bit quantisation. Photos without Detail settings never come here, so their
-// output stays bit for bit what cpuRenderer.mjs produced before.
+// CPU renderer for photos with Detail settings or positional creative effects (glow,
+// vignette, grain): the one engine for both the Detail preview and the full-resolution
+// export, so the two cannot disagree. It runs the base stage per pixel, the detail stage
+// (detail.mjs) per tile with a halo, then the display stages, the creative stage with the
+// pixel's position (creative.mjs) and 8-bit quantisation. Other photos never come here, so
+// their output stays bit for bit what cpuRenderer.mjs produced before.
 //
 // Memory: one tile of float planes (DETAIL_TILE × band rows plus the halo on each side,
 // about 15 planes) is reused across tiles; nothing is allocated per full image except the
@@ -10,8 +11,10 @@
 
 import { SRGB_TO_LINEAR_8BIT } from './colorMath.mjs';
 import { developRaw, processDisplay, processLinear } from './spec.mjs';
-import { encodeSrgb8, fastTransfer, prepareRender } from './cpuRenderer.mjs';
+import { encodeSrgb8, fastTransfer, prepareRender, renderImage } from './cpuRenderer.mjs';
 import { DETAIL, applyDetail, computeGuide, detailHalo } from './detail.mjs';
+import { applyCreative, computeGlow, glowKey } from './creative.mjs';
+import { groupKeys, normalizeAdjustments } from '../model/adjustments.mjs';
 
 export const DETAIL_TILE = 512;
 export const DETAIL_BAND_ROWS = 256;
@@ -143,17 +146,50 @@ export function computeImageGuide(prepared, source) {
 }
 
 /**
- * Per-render state: settings, scale, halo and the guide.
+ * Bloom and halation map for an image's settings from its guide source (see guideSource):
+ * the base and display stages of the small image, then creative.computeGlow. Null without glow.
+ */
+export function computeImageGlow(prepared, source) {
+  const { params: p } = prepared;
+  if (!p.creative.glowActive) return null;
+  const n = source.width * source.height;
+  const rgba = channelsOf(source) === 4;
+  const planes = { r: new Float32Array(n), g: new Float32Array(n), b: new Float32Array(n), alpha: rgba ? new Float32Array(n) : null };
+  fillBase({ ...source, y0: 0 }, prepared, 0, 0, source.width, source.height, planes);
+  const rgb = [0, 0, 0];
+  for (let i = 0; i < n; i += 1) {
+    rgb[0] = planes.r[i]; rgb[1] = planes.g[i]; rgb[2] = planes.b[i];
+    processDisplay(rgb, p, fastTransfer);
+    planes.r[i] = rgb[0]; planes.g[i] = rgb[1]; planes.b[i] = rgb[2];
+  }
+  return computeGlow(planes, source.width, source.height, p.creative, fastTransfer);
+}
+
+// What the glow map depends on: the base stage, the display stages (curves, HSL, LUT) and
+// the glow radii and thresholds (not the amounts, applied when it is sampled).
+const GLOW_KEYS = [...['light', 'color', 'raw', 'hdr', 'hsl'].flatMap(groupKeys), 'lutIntensity'];
+
+/** A key that changes exactly when the glow map of the same image must be recomputed. */
+export function glowDependencies(adjustments, params) {
+  const values = normalizeAdjustments(adjustments);
+  return JSON.stringify([GLOW_KEYS.map((name) => values[name]), values.raw, values.curves, values.lut?.sha256 ?? null, glowKey(params.creative)]);
+}
+
+/**
+ * Per-render state: settings, scale, halo, the guide and the glow map.
  * :param params: deriveParams() result with an active detail stage, or prepareRender() result
  * :param options: { width, height } the render size; { nativeWidth, nativeHeight } the
  *   photo's full size; `guide` from computeImageGuide (or `guideImage` to compute it);
  *   `transparent`: whether any pixel of the image is not opaque. Blurs are weighted by
  *   alpha only then, decided for the whole image so the result never depends on tiling.
+ *   `glow` from computeImageGlow (or computed from `guideImage`).
  */
-export function prepareDetailRender(params, { width, height, nativeWidth = width, nativeHeight = height, guide, guideImage, transparent = false }) {
+export function prepareDetailRender(params, { width, height, nativeWidth = width, nativeHeight = height, guide, glow, guideImage, transparent = false }) {
   const prepared = params.tone && params.params ? params : prepareRender(params);
-  const { detail } = prepared.params;
+  const { detail, creative } = prepared.params;
   const scale = Math.min(1, Math.max(width, height) / Math.max(nativeWidth, nativeHeight));
+  const glowMap = glow !== undefined ? glow : guideImage ? computeImageGlow(prepared, guideImage) : null;
+  if (creative.glowActive && !glowMap) throw new Error('Bloom and halation need the glow map of the image.');
   return {
     prepared,
     detail,
@@ -163,6 +199,8 @@ export function prepareDetailRender(params, { width, height, nativeWidth = width
     halo: detailHalo(detail, scale),
     transparent,
     guide: guide !== undefined ? guide : computeImageGuide(prepared, guideImage),
+    // The creative stage's view of the pixel being rendered (x, y set per pixel).
+    at: { x: 0, y: 0, width, height, scale, glow: glowMap },
     pool: createPool(),
   };
 }
@@ -175,7 +213,7 @@ export function prepareDetailRender(params, { width, height, nativeWidth = width
  *   then holds x1 − x0 pixels per row and `image` may be a crop (see `image.x0`)
  */
 export function renderDetailRows(image, context, y0, y1, target, { flattenAlpha = false, tileWidth = DETAIL_TILE, columns = null } = {}) {
-  const { prepared, detail, scale, guide, halo, pool, width, height, transparent } = context;
+  const { prepared, detail, scale, guide, halo, pool, width, height, transparent, at } = context;
   const p = prepared.params;
   const channels = channelsOf(image);
   const firstRow = image.y0 ?? 0;
@@ -199,13 +237,17 @@ export function renderDetailRows(image, context, y0, y1, target, { flattenAlpha 
     const n = w * h;
     const planes = { r: pool('R', n), g: pool('G', n), b: pool('B', n), alpha: hasAlpha ? pool('A', n) : null };
     fillBase(image, prepared, left, top, w, h, planes);
-    applyDetail({ ...planes, w, h, x: left, y: top }, { detail, scale, guide, imageWidth: width, imageHeight: height, transfer: fastTransfer, pool });
+    if (detail.active) applyDetail({ ...planes, w, h, x: left, y: top }, { detail, scale, guide, imageWidth: width, imageHeight: height, transfer: fastTransfer, pool });
     for (let y = y0; y < y1; y += 1) {
       for (let x = x0; x < x1; x += 1) {
         const o = (y - top) * w + (x - left);
         const t = ((y - y0) * outWidth + x - xStart) * 4;
         rgb[0] = planes.r[o]; rgb[1] = planes.g[o]; rgb[2] = planes.b[o];
         if (p.postActive) processDisplay(rgb, p, fastTransfer);
+        if (p.creativeActive) {
+          at.x = x; at.y = y;
+          applyCreative(rgb, p.creative, at, fastTransfer);
+        }
         target[t] = Math.round(rgb[0] * 255);
         target[t + 1] = Math.round(rgb[1] * 255);
         target[t + 2] = Math.round(rgb[2] * 255);
@@ -232,13 +274,14 @@ export function rowsHaveAlpha(image, startRow, endRow) {
 
 /**
  * Renders a whole in-memory image with Detail settings, band by band.
- * :param options: { nativeWidth, nativeHeight, guide, guideImage, target, flattenAlpha,
+ * :param options: { nativeWidth, nativeHeight, guide, glow, guideImage, target, flattenAlpha,
  *   bandRows, onBand(fraction), cancelled() }
  */
 export function renderDetailImage(image, params, {
   nativeWidth = image.width,
   nativeHeight = image.height,
   guide,
+  glow,
   guideImage,
   target = new Uint8ClampedArray(image.width * image.height * 4),
   flattenAlpha = false,
@@ -254,7 +297,8 @@ export function renderDetailImage(image, params, {
     nativeHeight,
     transparent: channelsOf(image) === 4 && rowsHaveAlpha(image, 0, image.height),
     guide,
-    guideImage: guide === undefined ? (guideImage ?? guideSource(image)) : undefined,
+    glow,
+    guideImage: guide === undefined || glow === undefined ? (guideImage ?? guideSource(image)) : undefined,
   });
   for (let row = 0; row < image.height; row += bandRows) {
     if (cancelled?.()) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
@@ -263,4 +307,13 @@ export function renderDetailImage(image, params, {
     onBand?.(last / image.height);
   }
   return target;
+}
+
+/**
+ * Renders a whole in-memory image of any kind with the renderer its settings need: this
+ * one for Detail or positional creative effects, else the per-pixel renderer.
+ * :param options: { nativeWidth, nativeHeight } the photo's output size at full resolution
+ */
+export function renderAnyImage(image, params, options = {}) {
+  return params.spatialActive ? renderDetailImage(image, params, options) : renderImage(image, params);
 }

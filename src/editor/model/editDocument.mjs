@@ -14,10 +14,11 @@ export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // Version 2 added curves, HSL and LUT references; version 3 RAW sources and their white
 // balance (`raw`); version 4 merged HDR sources (`format: 'hdr'` with `hdr`: mode,
 // the three inputs by role, merge settings) and the HDR tone controls; version 5 the
-// Detail controls; version 6 geometry (`geometry`, see pipeline/geometry.mjs). Older
-// versions read unchanged (Detail and geometry neutral); older editors reject newer files
-// instead of silently dropping settings.
-export const DOCUMENT_VERSION = 6;
+// Detail controls; version 6 geometry (`geometry`, see pipeline/geometry.mjs); version 7 the
+// creative controls and text overlays (`overlays`, see model/overlays.mjs). Older versions
+// read unchanged (Detail, geometry, creative neutral, no text); older editors reject newer
+// files instead of silently dropping settings.
+export const DOCUMENT_VERSION = 7;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).
@@ -108,11 +109,11 @@ function parseSource(source, index) {
   };
 }
 
-/** Settings from untrusted JSON: finite numbers, curves, a LUT reference and geometry, all validated. */
+/** Settings from untrusted JSON: finite numbers, curves, a LUT reference, geometry and text overlays, all validated. */
 export function parseAdjustments(input) {
   const values = isObject(input) ? input : {};
   const numeric = Object.fromEntries(Object.entries(values).filter(([, value]) => typeof value === 'number' && Number.isFinite(value)));
-  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw, geometry: values.geometry });
+  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw, geometry: values.geometry, overlays: values.overlays });
 }
 
 /** Reads an edit file, refusing an oversized one before any of it is read into memory. */

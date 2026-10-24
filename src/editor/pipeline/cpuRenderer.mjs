@@ -5,6 +5,7 @@
 
 import { SRGB_TO_LINEAR_8BIT, linearToSrgb, srgbToLinear } from './colorMath.mjs';
 import { developRaw, exactToneLuminance, processDisplay, processLinear } from './spec.mjs';
+import { applyCreative } from './creative.mjs';
 
 // Tabulated transfer functions for the display stages (curves, HSL, LUT), linear between
 // entries: the encode table is indexed by sqrt(linear) to spend samples on the shadows.
@@ -71,6 +72,11 @@ const maxLuminance = (params) => {
   return source * balance * params.exposureGain * (1 + params.shadowLift);
 };
 
+// Glow, vignette and grain need the pixel's position, so detailRenderer.mjs renders those photos.
+const assertPerPixel = (p) => {
+  if (p.creative?.positional) throw new Error('Positional creative effects need the spatial renderer (detailRenderer.mjs).');
+};
+
 /** Per-render state for renderRgba8: build once, reuse across bands. */
 export function prepareRender(params) {
   return { params, tone: params.toneActive ? toneTable(params.tone, maxLuminance(params)) : exactToneLuminance };
@@ -92,6 +98,7 @@ export function renderRgba8(source, params, {
 } = {}) {
   const prepared = params.tone && params.params ? params : prepareRender(params);
   const { params: p, tone } = prepared;
+  assertPerPixel(p);
   const rgb = [0, 0, 0];
   for (let pixel = start; pixel < end; pixel += 1) {
     const i = pixel * 4;
@@ -109,6 +116,7 @@ export function renderRgba8(source, params, {
         rgb[0] = fastTransfer.toSrgb(rgb[0]); rgb[1] = fastTransfer.toSrgb(rgb[1]); rgb[2] = fastTransfer.toSrgb(rgb[2]);
       }
       processDisplay(rgb, p, fastTransfer);
+      if (p.creativeActive) applyCreative(rgb, p.creative, null, fastTransfer);
       target[i] = Math.round(rgb[0] * 255);
       target[i + 1] = Math.round(rgb[1] * 255);
       target[i + 2] = Math.round(rgb[2] * 255);
@@ -164,6 +172,7 @@ export function renderRawRgba8(source, params, {
 } = {}) {
   const prepared = params.tone && params.params ? params : prepareRender(params);
   const { params: p, tone } = prepared;
+  assertPerPixel(p);
   const rgb = [0, 0, 0];
   const scale = source instanceof Float32Array ? 1 : 1 / 65535;
   for (let pixel = start; pixel < end; pixel += 1) {
@@ -174,6 +183,7 @@ export function renderRawRgba8(source, params, {
     if (p.postActive) {
       rgb[0] = fastTransfer.toSrgb(rgb[0]); rgb[1] = fastTransfer.toSrgb(rgb[1]); rgb[2] = fastTransfer.toSrgb(rgb[2]);
       processDisplay(rgb, p, fastTransfer);
+      if (p.creativeActive) applyCreative(rgb, p.creative, null, fastTransfer);
       target[o] = Math.round(rgb[0] * 255);
       target[o + 1] = Math.round(rgb[1] * 255);
       target[o + 2] = Math.round(rgb[2] * 255);

@@ -106,7 +106,7 @@ export const handlers = {
     const params = deriveParams(adjustments, { lut, raw: session.analysis.mode === 'radiance' ? raw : null });
     const prepared = prepareRender(params);
     const { width, height } = image;
-    const detail = params.detailActive
+    const detail = params.spatialActive
       ? prepareDetailRender(prepared, { width, height, nativeWidth: native?.width ?? width, nativeHeight: native?.height ?? height, transparent: image.kind !== 'hdr' && rowsHaveAlpha(image, 0, height), guideImage: guideSource(image) })
       : null;
     for (let row = 0; row < height; row += HDR_BAND_ROWS) {

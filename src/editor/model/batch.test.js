@@ -82,8 +82,8 @@ describe('sync groups', () => {
     expect(syncGroupOf('rawTemperature')).toBe('raw');
   });
 
-  test('the default copies everything except RAW white balance and HDR tone mapping', () => {
-    expect(DEFAULT_SYNC_GROUPS).toEqual(['light', 'color', 'hsl', 'detail', 'curves', 'lut']);
+  test('the default copies everything except RAW white balance, HDR tone mapping, geometry and text', () => {
+    expect(DEFAULT_SYNC_GROUPS).toEqual(['light', 'color', 'hsl', 'detail', 'curves', 'lut', 'creative']);
   });
 
   test('changedGroups names the groups that differ', () => {

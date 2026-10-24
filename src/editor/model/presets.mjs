@@ -3,7 +3,7 @@
 // (anything the preset leaves out of a group is neutral) and leaves every other group
 // of the photo as it was. Built-in presets are ordinary presets defined here and run
 // through the same engine. Files are strict JSON with schema checks; nothing in them
-// is executed.
+// is executed. Presets never contain geometry or text overlays (they belong to one photo).
 
 import { ADJUSTMENTS, HSL_RANGES, compactAdjustments, groupKeys, hslKey, normalizeAdjustments } from './adjustments.mjs';
 
@@ -27,6 +27,7 @@ export const PRESET_GROUPS = Object.freeze([
   { id: 'detail', label: 'Detail', keys: groupKeys('detail') },
   { id: 'curves', label: 'Tone curve', keys: [], structured: 'curves' },
   { id: 'lut', label: 'LUT', keys: ['lutIntensity'], structured: 'lut' },
+  { id: 'creative', label: 'Creative', keys: groupKeys('creative') },
 ].map(Object.freeze));
 const groupById = new Map(PRESET_GROUPS.map((group) => [group.id, group]));
 

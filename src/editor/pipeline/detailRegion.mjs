@@ -7,7 +7,7 @@
 // halo pixels around the region, so the crop's edges are those of the export.
 
 import { prepareRender, renderRawRgba8, renderRgba8 } from './cpuRenderer.mjs';
-import { computeImageGuide, createAreaAccumulator, guideSize, guideSource, prepareDetailRender, renderDetailRows, rowsHaveAlpha } from './detailRenderer.mjs';
+import { computeImageGlow, computeImageGuide, createAreaAccumulator, guideSize, guideSource, prepareDetailRender, renderDetailRows, rowsHaveAlpha } from './detailRenderer.mjs';
 import { finishRows, warpRows, warpSpec } from './warp.mjs';
 import { detailHalo, detailParams } from './detail.mjs';
 import { deriveParams } from './spec.mjs';
@@ -113,9 +113,9 @@ export function renderRegion(kept, region, { adjustments, lut = null, raw = null
   const isRaw = channelsOf(source) === 3;
   const render = (values) => {
     const params = deriveParams(values, { lut, raw });
-    if (!params.detailActive) return isRaw ? renderRawRgba8(crop.data, params) : renderRgba8(crop.data, params);
+    if (!params.spatialActive) return isRaw ? renderRawRgba8(crop.data, params) : renderRgba8(crop.data, params);
     const prepared = prepareRender(params);
-    const context = prepareDetailRender(prepared, { width: native.width, height: native.height, guide: computeImageGuide(prepared, guideImage), transparent });
+    const context = prepareDetailRender(prepared, { width: native.width, height: native.height, guide: computeImageGuide(prepared, guideImage), glow: computeImageGlow(prepared, guideImage), transparent });
     const out = new Uint8ClampedArray(region.width * region.height * 4);
     renderDetailRows(source, context, region.y, region.y + region.height, out, { columns: [region.x, region.x + region.width] });
     return out;

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { renderImage } from '../pipeline/cpuRenderer.mjs';
+import { renderAnyImage } from '../pipeline/detailRenderer.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
+import { neutralGroup } from '../model/adjustments.mjs';
 import { GeometryError, geometryPlan } from '../pipeline/geometry.mjs';
 import { finishRows, warpImage, warpSpec } from '../pipeline/warp.mjs';
 
@@ -25,7 +26,7 @@ function shaped(thumbnail, geometry) {
  * (geometry included). A RAW thumbnail is half-size sensor data scaled down, developed
  * like the preview.
  */
-export default function PhotoThumb({ thumbnail, adjustments, lut = null, raw = null }) {
+export default function PhotoThumb({ thumbnail, adjustments, lut = null, raw = null, photoWidth = 0 }) {
   const canvasRef = useRef(null);
   const lastRef = useRef(0);
 
@@ -35,7 +36,11 @@ export default function PhotoThumb({ thumbnail, adjustments, lut = null, raw = n
     const draw = () => {
       lastRef.current = performance.now();
       const { image, spec } = shaped(thumbnail, adjustments.geometry);
-      const data = finishRows(spec, renderImage(image, deriveParams(adjustments, { lut, raw })), 0, image.height, false);
+      // Detail is left out (fine filters do not show at this size); creative effects are kept.
+      const params = deriveParams({ ...adjustments, ...neutralGroup('detail') }, { lut, raw });
+      // Grain and other scale-aware effects: the thumbnail is a downscale of the photo's output.
+      const factor = photoWidth ? thumbnail.width / photoWidth : 1;
+      const data = finishRows(spec, renderAnyImage(image, params, { nativeWidth: image.width / factor, nativeHeight: image.height / factor }), 0, image.height, false);
       canvas.width = image.width;
       canvas.height = image.height;
       canvas.getContext('2d').putImageData(new ImageData(data, image.width, image.height), 0, 0);
@@ -44,7 +49,7 @@ export default function PhotoThumb({ thumbnail, adjustments, lut = null, raw = n
     if (wait <= 0) { draw(); return undefined; }
     const timer = setTimeout(draw, wait);
     return () => clearTimeout(timer);
-  }, [thumbnail, adjustments, lut, raw]);
+  }, [thumbnail, adjustments, lut, raw, photoWidth]);
 
   return <canvas ref={canvasRef} className="pe-thumb" aria-hidden="true" />;
 }

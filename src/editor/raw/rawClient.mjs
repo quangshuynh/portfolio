@@ -122,7 +122,7 @@ export async function exportRaw(queue, { file, raw, adjustments, lut, settings }
   const context = canvas.getContext('2d', { colorSpace: 'srgb' });
   assertCanvasWorks(context, size.width, size.height);
   if (detailWorkers > 0) {
-    const render = deriveParams(adjustments, { lut, raw }).detailActive ? renderDetailParallel : renderPixelsParallel;
+    const render = deriveParams(adjustments, { lut, raw }).spatialActive ? renderDetailParallel : renderPixelsParallel;
     const started = performance.now();
     const signal = { cancelled: false };
     const develop = queue.run('develop', { file, raw, width: geometry.decode.width, height: geometry.decode.height });

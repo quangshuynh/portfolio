@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { deriveParams } from '../pipeline/spec.mjs';
+import { glowDependencies } from '../pipeline/detailRenderer.mjs';
 import { neutralAdjustments, neutralGroup } from '../model/adjustments.mjs';
 import { GeometryError, cropRatio, frameGeometry, geometryPlan, neutralGeometry } from '../pipeline/geometry.mjs';
 import { warpSpec } from '../pipeline/warp.mjs';
@@ -82,6 +83,9 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   const cpuBeforeRef = useRef({ image: null, key: '', data: null });
   // Detail preview: the request waiting to run, and the last frame shown with its settings key.
   const detailJobRef = useRef({ busy: false, pending: null, frame: null, key: null, image: null, generation: 0 });
+  // Bloom and halation map for the GPU preview (computed in the render worker), latest only.
+  const glowRef = useRef({ key: null, map: null, image: null, busy: false, pending: null });
+  const [glowVersion, setGlowVersion] = useState(0);
   const splitRef = useRef(0);
   const [detailQuality, setDetailQuality] = useState(null);
   const [canvas, setCanvas] = useState(null);
@@ -177,7 +181,32 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     if (!proxy) engineRef.current?.renderer?.clear();
     if (cpuBeforeRef.current.image !== proxyRef.current) Object.assign(cpuBeforeRef.current, { image: null, key: '', data: null });
     if (detailJobRef.current.image !== proxyRef.current) Object.assign(detailJobRef.current, { frame: null, image: null, key: null });
+    if (glowRef.current.image !== proxyRef.current) Object.assign(glowRef.current, { map: null, image: null, key: null });
   }, [proxy]);
+
+  /** Computes the glow map of the shown proxy in the worker; the GPU keeps drawing meanwhile. */
+  const requestGlow = useCallback(async (request) => {
+    const job = glowRef.current;
+    job.pending = request;
+    if (job.busy) return;
+    job.busy = true;
+    try {
+      while (job.pending) {
+        const current = job.pending;
+        job.pending = null;
+        if (proxyRef.current !== current.image) continue; // eslint-disable-line no-continue
+        const map = await renderInWorker(current.image, current.adjustments, current.lut, current.raw, null, current.warp, true);
+        if (proxyRef.current !== current.image || job.pending) continue; // eslint-disable-line no-continue
+        Object.assign(job, { key: current.key, map, image: current.image });
+        setGlowVersion((value) => value + 1);
+        performance.mark?.('pe-glow-map');
+      }
+    } catch (error) {
+      if (error.code !== 'cancelled') setStatus({ state: 'error', message: error.message });
+    } finally {
+      job.busy = false;
+    }
+  }, [renderInWorker]);
 
   const splitFraction = compare === 'original' ? 1 : compare === 'split' ? split : 0;
   splitRef.current = splitFraction;
@@ -283,7 +312,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     const id = (job.latest += 1);
     try {
       const out = params.warp ?? image;
-      const rendered = params.neutral && !params.warp ? image : await renderInWorker(image, params.adjustments, params.lutData, params.raw, null, params.warp);
+      const rendered = params.neutral && !params.warp ? image : await renderInWorker(image, params.adjustments, params.lutData, params.raw, params.nativeSize, params.warp);
       const sourceWidth = Math.round(out.width * params.split);
       const before = sourceWidth > 0 ? await cpuBefore(image, params.raw, params.warp) : image;
       if (id === job.latest && proxyRef.current === image) {
@@ -342,16 +371,28 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       }
       Object.assign(detailJobRef.current, { key: null, pending: null, generation: detailJobRef.current.generation + 1 });
       setDetailQuality(null);
+      const nativeSize = plan.identity ? native : plan.native;
       if (engine.kind === 'webgl2') {
+        // Bloom and halation: the last glow map of this proxy is drawn until the new one arrives.
+        let glow = null;
+        if (params.creative.glowActive) {
+          const job = glowRef.current;
+          const key = `${photo.id}|${glowDependencies(values, params)}|${specKey(previewSpec)}`;
+          if (job.key !== key && job.pending?.key !== key) requestGlow({ key, image: proxyRef.current, adjustments: values, lut: params.lutActive ? lut : null, raw, warp: previewSpec });
+          glow = job.image === proxyRef.current ? job.map : null;
+        }
         // "Before" of a RAW photo is its neutral development, not undeveloped sensor data.
         const before = raw ? deriveParams(neutralAdjustments(), { raw }) : null;
-        if (!engine.renderer.lost) engine.renderer.render(params, { split: splitFraction, before });
+        if (!engine.renderer.lost) {
+          engine.renderer.setCreative({ nativeWidth: nativeSize.width, nativeHeight: nativeSize.height, glow });
+          engine.renderer.render(params, { split: splitFraction, before });
+        }
       } else {
-        drawCpu({ ...params, neutral: params.neutral, adjustments: values, lutData: params.lutActive ? lut : null, split: splitFraction, raw, warp: previewSpec });
+        drawCpu({ ...params, neutral: params.neutral, adjustments: values, lutData: params.lutActive ? lut : null, split: splitFraction, raw, warp: previewSpec, nativeSize: { nativeWidth: nativeSize.width, nativeHeight: nativeSize.height } });
       }
     });
     return () => cancelAnimationFrame(frameRef.current);
-  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec, glowVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useLayoutEffect(() => {
     const stage = stageRef.current;

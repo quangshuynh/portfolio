@@ -385,8 +385,9 @@ function EditorWorkspace() {
 
   // CPU preview: the worker keeps the proxy and LUT, so they are sent only when they
   // change (or the worker lost them), not on every render.
-  // `detail` ({ edge, nativeWidth, nativeHeight }) renders Detail settings at that preview size.
-  const renderInWorker = useCallback(async (image, values, lut, raw = null, detail = null, warp = null) => {
+  // `detail` ({ edge, nativeWidth, nativeHeight }) renders Detail settings at that preview size;
+  // `glow` returns the bloom and halation map of the image instead of a frame.
+  const renderInWorker = useCallback(async (image, values, lut, raw = null, detail = null, warp = null, glow = false) => {
     const client = worker('render');
     const sent = renderState.current;
     if (sent.client !== client) Object.assign(sent, { client, key: null, luts: new Set() });
@@ -398,6 +399,7 @@ function EditorWorkspace() {
       raw,
       detail,
       warp,
+      glow,
       ...(full || sent.key !== key ? { source: image } : {}),
       ...(lut ? { lut: full || !sent.luts.has(lut.sha256) ? lut : { sha256: lut.sha256 } } : {}),
     });
@@ -994,7 +996,7 @@ function EditorWorkspace() {
         >
           <span className="pe-photo__frame">
             {(pending || exportState === 'running' || exportState === 'queued' || exportState === 'error') && <span className="pe-photo__flag" data-flag={exportState === 'error' ? 'error' : exportState === 'running' || exportState === 'queued' ? 'export' : 'pending'} aria-hidden="true" />}
-            {resource?.thumbnail ? <PhotoThumb thumbnail={resource.thumbnail} adjustments={item.history.present} lut={lutFor(item.history.present)} raw={item.raw} /> : <span className="pe-photo__placeholder" aria-hidden="true">{item.status === 'error' ? '!' : <span className="pe-spinner" />}</span>}
+            {resource?.thumbnail ? <PhotoThumb thumbnail={resource.thumbnail} adjustments={item.history.present} lut={lutFor(item.history.present)} raw={item.raw} photoWidth={item.width} /> : <span className="pe-photo__placeholder" aria-hidden="true">{item.status === 'error' ? '!' : <span className="pe-spinner" />}</span>}
           </span>
           {variant === 'list' && (
             <span className="pe-photo__meta">

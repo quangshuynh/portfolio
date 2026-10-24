@@ -4,12 +4,15 @@
 // geometry.mjs builds and sampled with the Catmull-Rom kernel of warp.mjs (rounded to the
 // source's precision, as the CPU stores warped pixels), then faded outside the photo as
 // applyCoverage() does. Curve tables and LUTs are read with texelFetch and interpolated here,
-// exactly as the CPU does, so no float-texture filtering extension is needed.
+// exactly as the CPU does, so no float-texture filtering extension is needed. The creative
+// stage mirrors creative.applyCreative() with the parameters creativeParams() derived; its
+// glow map (computed on the CPU from the guide grid) is a float texture sampled the same way.
 
 import { LUMA } from './colorMath.mjs';
 import { CURVE_TABLE_SIZE } from './curves.mjs';
 import { BLACK_EPSILON, HSL_CENTERS, HSL_LUMINANCE_EV, SHADOW_LIFT_SCALE, TONE_PIVOT } from './spec.mjs';
 import { POSITION_GRID, ROUNDING_BIAS } from './warp.mjs';
+import { CREATIVE } from './creative.mjs';
 
 const f = (value) => {
   const text = String(value);
@@ -78,6 +81,32 @@ uniform float uCoverageScale;
 uniform vec2 uSourceSize;
 uniform int uBackground;
 uniform bool uOpaque;
+// Creative stage (creative.mjs).
+uniform bool uCreative;
+uniform bool uBleach;
+uniform vec4 uBleachParams;
+uniform bool uFade;
+uniform vec3 uFadeBlack;
+uniform float uFadeShoulder;
+uniform vec3 uFadeWhite;
+uniform bool uGrade;
+uniform vec3 uGradeTint[4];
+uniform vec4 uGradeLum;
+uniform float uGradeBalance;
+uniform float uGradeExponent;
+uniform bool uVignette;
+uniform vec4 uVignetteParams;
+uniform float uVignetteExponent;
+uniform bool uGrain;
+uniform vec4 uGrainParams;
+uniform uint uGrainSeed;
+uniform uint uGrainFineSeed;
+uniform bool uBloom;
+uniform float uBloomAmount;
+uniform bool uHalation;
+uniform float uHalationAmount;
+uniform vec3 uHalationTint;
+uniform sampler2D uGlow;
 in vec2 vUv;
 out vec4 outColor;
 
@@ -91,6 +120,15 @@ const float PI = 3.141592653589793;
 const float SHADOW_LIFT_SCALE = ${f(SHADOW_LIFT_SCALE)};
 const float POSITION_GRID = ${f(POSITION_GRID)};
 const float ROUNDING_BIAS = ${f(ROUNDING_BIAS)};
+const float BLEACH_PROTECT_FROM = ${f(CREATIVE.bleachProtectFrom)};
+const float SKIN_HUE = ${f(CREATIVE.skinHue)};
+const float SKIN_WIDTH = ${f(CREATIVE.skinWidth)};
+const float SKIN_PROTECT = ${f(CREATIVE.skinProtect)};
+const float VIGNETTE_DARKEN = ${f(CREATIVE.vignetteDarken)};
+const float VIGNETTE_LIGHTEN = ${f(CREATIVE.vignetteLighten)};
+const float GRAIN_FLOOR = ${f(CREATIVE.grainFloor)};
+const float GRADE_BLACK = ${f(CREATIVE.gradeBlack)};
+const float SQRT6 = ${f(Math.sqrt(6))};
 
 float toLinear(float v) {
   return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4);
@@ -347,6 +385,162 @@ vec3 applyLut(vec3 p) {
   return p + (clamp(v, 0.0, 1.0) - p) * uLutIntensity;
 }
 
+// ---- Creative stage (creative.mjs) ----
+
+// Output pixel indices (row 0 at the top) of this fragment.
+vec2 outputPixel() { return vec2(gl_FragCoord.x - 0.5, uOutputSize.y - gl_FragCoord.y - 0.5); }
+
+float skinWeight(vec3 p) {
+  float hi = max(p.r, max(p.g, p.b));
+  float chroma = hi - min(p.r, min(p.g, p.b));
+  if (chroma <= 0.0) return 0.0;
+  float hue = hi == p.r ? (p.g - p.b) / chroma : hi == p.g ? (p.b - p.r) / chroma + 2.0 : (p.r - p.g) / chroma + 4.0;
+  hue *= 60.0;
+  if (hue < 0.0) hue += 360.0;
+  float s = chroma / hi;
+  float away = abs(hue - SKIN_HUE);
+  float d = min(away, 360.0 - away);
+  if (d >= SKIN_WIDTH) return 0.0;
+  return (0.5 + 0.5 * cos(PI * d / SKIN_WIDTH)) * smoothstep(0.08, 0.2, s) * (1.0 - smoothstep(0.55, 0.75, s));
+}
+
+vec3 bleachBypass(vec3 p) {
+  float l = clamp(dot(LUMA, p), 0.0, 1.0);
+  float curve = l < 0.5 ? 2.0 * l * l : 1.0 - 2.0 * (1.0 - l) * (1.0 - l);
+  float s = l + uBleachParams.y * (curve - l);
+  float desaturation = uBleachParams.x * uBleachParams.z * (1.0 - SKIN_PROTECT * skinWeight(p) * (1.0 - uBleachParams.z * uBleachParams.z));
+  float k = uBleachParams.x * (1.0 - uBleachParams.w * smoothstep(BLEACH_PROTECT_FROM, 1.0, l));
+  vec3 silver = p + ((1.0 - 2.0 * s) * p * p + 2.0 * s * p - p) * k;
+  float y = dot(LUMA, silver);
+  return clamp(y + (silver - y) * (1.0 - desaturation), 0.0, 1.0);
+}
+
+vec3 filmFade(vec3 p) {
+  vec3 v = clamp(p, 0.0, 1.0);
+  vec3 g = uFadeShoulder > 0.0 ? v / pow(1.0 + uFadeShoulder * v * v * v * v, vec3(0.25)) : v;
+  return clamp(uFadeBlack + (1.0 - uFadeBlack) * g + uFadeWhite * g * g, 0.0, 1.0);
+}
+
+vec3 fitEncoded(vec3 p, float y) {
+  if (y >= 1.0 || y <= 0.0) return vec3(y);
+  float hi = max(p.r, max(p.g, p.b));
+  float lo = min(p.r, min(p.g, p.b));
+  float t = 1.0;
+  if (hi > 1.0) t = min(t, (1.0 - y) / (hi - y));
+  if (lo < 0.0) t = min(t, y / (y - lo));
+  return clamp(y + (p - y) * t, 0.0, 1.0);
+}
+
+float powPositive(float x, float e) { return x <= 0.0 ? 0.0 : pow(x, e); }
+
+vec3 colorGrade(vec3 p) {
+  float l = dot(LUMA, p);
+  float x = clamp(l, 0.0, 1.0);
+  float shifted = x + uGradeBalance * x * (1.0 - x);
+  float ws = powPositive(1.0 - shifted, uGradeExponent);
+  float wh = powPositive(shifted, uGradeExponent);
+  float wm = 1.0 - ws - wh;
+  float offset = ws * uGradeLum.x + wm * uGradeLum.y + wh * uGradeLum.z + uGradeLum.w;
+  float tint = min(1.0, max(0.0, l) / GRADE_BLACK);
+  p += (ws * uGradeTint[0] + wm * uGradeTint[1] + wh * uGradeTint[2] + uGradeTint[3]) * tint + offset;
+  return fitEncoded(p, clamp(dot(LUMA, p), 0.0, 1.0));
+}
+
+float vignetteFalloff(vec2 at) {
+  vec2 uv = (at + 0.5) / uOutputSize * 2.0 - 1.0;
+  if (uVignetteParams.w > 0.0) uv *= 1.0 + uVignetteParams.w * (uOutputSize / max(uOutputSize.x, uOutputSize.y) - 1.0);
+  float d = uVignetteExponent == 2.0 ? sqrt(uv.x * uv.x + uv.y * uv.y)
+    : powPositive(powPositive(abs(uv.x), uVignetteExponent) + powPositive(abs(uv.y), uVignetteExponent), 1.0 / uVignetteExponent);
+  return smoothstep(uVignetteParams.y - uVignetteParams.z / 2.0, uVignetteParams.y + uVignetteParams.z / 2.0, d);
+}
+
+// The same 32 bits as creative.grainHash().
+uint grainHash(int i, int j, uint seed) {
+  uint h = (uint(i) * 0x27d4eb2du) ^ (uint(j) * 0x165667b1u) ^ seed;
+  h = (h ^ (h >> 15u)) * 0x85ebca6bu;
+  h = (h ^ (h >> 13u)) * 0xc2b2ae35u;
+  return h ^ (h >> 16u);
+}
+
+float latticeValue(int i, int j, uint seed) {
+  uint h = grainHash(i, j, seed);
+  return (float(h & 0xffffu) / 65536.0 + float(h >> 16u) / 65536.0 - 1.0) * SQRT6;
+}
+
+vec4 bspline(float t) {
+  float t2 = t * t;
+  float t3 = t2 * t;
+  float u = 1.0 - t;
+  return vec4(u * u * u / 6.0, (3.0 * t3 - 6.0 * t2 + 4.0) / 6.0, (-3.0 * t3 + 3.0 * t2 + 3.0 * t + 1.0) / 6.0, t3 / 6.0);
+}
+
+float valueNoise(vec2 at, uint seed) {
+  vec2 base = floor(at);
+  vec4 wx = bspline(at.x - base.x);
+  vec4 wy = bspline(at.y - base.y);
+  int ix = int(base.x);
+  int iy = int(base.y);
+  float sum = 0.0;
+  for (int j = 0; j < 4; j++) {
+    float row = 0.0;
+    for (int i = 0; i < 4; i++) row += wx[i] * latticeValue(ix - 1 + i, iy - 1 + j, seed);
+    sum += wy[j] * row;
+  }
+  return sum / sqrt(dot(wx, wx) * dot(wy, wy));
+}
+
+float grainValue(vec2 at) {
+  vec2 g = (at + 0.5) / uGrainParams.w / uGrainParams.y;
+  float coarse = valueNoise(g, uGrainSeed);
+  float r = uGrainParams.z;
+  if (r == 0.0) return coarse;
+  float fine = valueNoise(g * 2.0 + vec2(17.31, 5.77), uGrainFineSeed);
+  return ((1.0 - r) * coarse + r * fine) / sqrt((1.0 - r) * (1.0 - r) + r * r);
+}
+
+// Bilinear sample of the glow map at an output pixel (creative.sampleGlow).
+vec4 glowAt(vec2 at) {
+  ivec2 size = textureSize(uGlow, 0);
+  vec2 g = clamp((at + 0.5) * vec2(size) / uOutputSize - 0.5, vec2(0.0), vec2(size - 1));
+  ivec2 i0 = ivec2(floor(g));
+  ivec2 i1 = min(i0 + 1, size - 1);
+  vec2 t = g - vec2(i0);
+  vec4 a = texelFetch(uGlow, i0, 0);
+  vec4 b = texelFetch(uGlow, ivec2(i1.x, i0.y), 0);
+  vec4 c = texelFetch(uGlow, ivec2(i0.x, i1.y), 0);
+  vec4 d = texelFetch(uGlow, i1, 0);
+  return a * (1.0 - t.x) * (1.0 - t.y) + b * t.x * (1.0 - t.y) + c * (1.0 - t.x) * t.y + d * t.x * t.y;
+}
+
+vec3 screen(vec3 a, vec3 b) { return a + b - a * b; }
+
+vec3 applyCreative(vec3 p) {
+  vec2 at = outputPixel();
+  if (uBloom || uHalation) {
+    vec4 glow = glowAt(at);
+    vec3 lin = toLinear3(clamp(p, 0.0, 1.0));
+    if (uBloom) lin = screen(lin, min(vec3(1.0), uBloomAmount * glow.rgb));
+    if (uHalation) lin = screen(lin, min(vec3(1.0), uHalationAmount * glow.a * uHalationTint));
+    p = toSrgb3(lin);
+  }
+  if (uBleach) p = bleachBypass(p);
+  if (uFade) p = filmFade(p);
+  if (uGrade) p = colorGrade(p);
+  if (uVignette) {
+    float fall = vignetteFalloff(at);
+    if (fall > 0.0) {
+      if (uVignetteParams.x < 0.0) p = toSrgb3(toLinear3(clamp(p, 0.0, 1.0)) * (1.0 + uVignetteParams.x * VIGNETTE_DARKEN * fall));
+      else p += (1.0 - p) * (uVignetteParams.x * VIGNETTE_LIGHTEN * fall);
+    }
+  }
+  if (uGrain) {
+    float l = clamp(dot(LUMA, p), 0.0, 1.0);
+    float tone = GRAIN_FLOOR + (1.0 - GRAIN_FLOOR) * 4.0 * l * (1.0 - l);
+    p = clamp(p + uGrainParams.x * tone * grainValue(at), 0.0, 1.0);
+  }
+  return p;
+}
+
 void main() {
   vec3 p;
   float alpha = 1.0;
@@ -374,5 +568,6 @@ void main() {
   if (uCurvesActive) p = applyCurves(p);
   if (uHslActive) p = applyHsl(p);
   if (uLutActive) p = applyLut(p);
+  if (uCreative) p = applyCreative(p);
   outColor = finish(vec4(p, alpha), position);
 }`;
