@@ -15,6 +15,7 @@
 
 import { adjustmentsEqual, groupKeys, neutralAdjustments, normalizeAdjustments } from './adjustments.mjs';
 import { presetPatch } from './presets.mjs';
+import { filterPatch } from './filters.mjs';
 
 /** Kinds of source a group needs on both sides. */
 const developed = (photo) => Boolean(photo?.raw);
@@ -32,7 +33,7 @@ export const SYNC_GROUPS = Object.freeze([
   { id: 'detail', label: 'Detail', keys: groupKeys('detail') },
   { id: 'curves', label: 'Tone curve', keys: [], structured: 'curves' },
   { id: 'lut', label: 'LUT', keys: groupKeys('lut'), structured: 'lut' },
-  { id: 'creative', label: 'Creative', keys: groupKeys('creative') },
+  { id: 'creative', label: 'Creative', keys: groupKeys('creative'), structured: 'filter' },
   { id: 'raw', label: 'RAW white balance', keys: groupKeys('raw'), structured: 'raw', applies: developed, needs: 'RAW photos' },
   { id: 'hdr', label: 'HDR tone mapping', keys: groupKeys('hdr'), applies: radianceHdr, needs: 'merged RAW HDR photos' },
   { id: 'outputSize', label: 'Output size (resize)', keys: [], geometry: ['resize'] },
@@ -145,6 +146,12 @@ export function planPreset(preset, targets, { hasLut = () => true } = {}) {
   const errors = lut ? [`The preset uses the LUT "${lutName(lut)}", which is not loaded. Import it first.`] : [];
   return { ...plan(targets, () => ({ patch })), errors };
 }
+
+/**
+ * Applies a Filter Library filter at a strength to every target: each target's Creative group
+ * is replaced and everything else (including its grain seed, text and geometry) is kept.
+ */
+export const planFilter = (filter, strength, targets) => ({ ...plan(targets, () => ({ patch: filterPatch(filter, strength) })), errors: [] });
 
 /**
  * Sets a LUT (or none) and its intensity on every target.

@@ -85,6 +85,8 @@ export function presetPatch(preset) {
     const group = groupById.get(id);
     group.keys.forEach((key) => { patch[key] = values[key]; });
     if (group.structured) patch[group.structured] = values[group.structured];
+    // A preset's Creative values are its own: the photo's Filter Library record no longer applies.
+    if (id === 'creative') patch.filter = null;
   });
   return patch;
 }

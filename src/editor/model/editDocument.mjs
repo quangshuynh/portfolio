@@ -15,10 +15,11 @@ export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // balance (`raw`); version 4 merged HDR sources (`format: 'hdr'` with `hdr`: mode,
 // the three inputs by role, merge settings) and the HDR tone controls; version 5 the
 // Detail controls; version 6 geometry (`geometry`, see pipeline/geometry.mjs); version 7 the
-// creative controls and text overlays (`overlays`, see model/overlays.mjs). Older versions
-// read unchanged (Detail, geometry, creative neutral, no text); older editors reject newer
-// files instead of silently dropping settings.
-export const DOCUMENT_VERSION = 7;
+// creative controls and text overlays (`overlays`, see model/overlays.mjs); version 8 the digital
+// creative controls (pipeline/digital.mjs) and the Filter Library record (`filter`). Older
+// versions read unchanged (Detail, geometry, creative neutral, no text, no filter); older
+// editors reject newer files instead of silently dropping settings.
+export const DOCUMENT_VERSION = 8;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).
@@ -113,7 +114,7 @@ function parseSource(source, index) {
 export function parseAdjustments(input) {
   const values = isObject(input) ? input : {};
   const numeric = Object.fromEntries(Object.entries(values).filter(([, value]) => typeof value === 'number' && Number.isFinite(value)));
-  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw, geometry: values.geometry, overlays: values.overlays });
+  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw, geometry: values.geometry, overlays: values.overlays, filter: values.filter });
 }
 
 /** Reads an edit file, refusing an oversized one before any of it is read into memory. */
