@@ -53,7 +53,7 @@ function Section({ id, title, open, onToggle, edited, onReset, resetDisabled, ch
  * :param hdr: the active photo's merge description when it is a merged HDR, else null
  * :param geometry: Crop & Transform handlers (GeometryPanel props), or null without a photo
  */
-export default function AdjustPanel({ adjustments, disabled, dispatch, lut, presets, raw = null, hdr = null, geometry = null, text = null }) {
+export default function AdjustPanel({ adjustments, disabled, dispatch, lut, presets, raw = null, hdr = null, geometry = null, text = null, thumbnails = null }) {
   const [open, setOpen] = useState(readOpenSections);
   // Editing a text's wording from the photo opens the Text section.
   useEffect(() => { if (text?.focusRequest) setOpen((current) => ({ ...current, text: true })); }, [text?.focusRequest]);
@@ -108,7 +108,7 @@ export default function AdjustPanel({ adjustments, disabled, dispatch, lut, pres
       ))}
       {section('curves', 'Tone Curve', <CurveEditor curves={adjustments.curves} disabled={disabled} dispatch={dispatch} />)}
       {section('lut', 'LUT', <LutPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} {...lut} />, { edited: Boolean(adjustments.lut) })}
-      {section('creative', 'Creative', <CreativePanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} onPreview={presets?.onPreview} />, { lazy: true })}
+      {section('creative', 'Creative', <CreativePanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} onPreview={presets?.onPreview} presets={presets} thumbnails={thumbnails} />, { lazy: true })}
       {text && section('text', 'Text', <TextPanel overlays={adjustments.overlays} disabled={disabled} dispatch={dispatch} {...text} />, { lazy: true })}
       {section('presets', 'Presets', <PresetPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} {...presets} />, { reset: false, edited: false })}
     </section>

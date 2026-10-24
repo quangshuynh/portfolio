@@ -8,12 +8,19 @@
 // Memory: one tile of float planes (DETAIL_TILE × band rows plus the halo on each side,
 // about 15 planes) is reused across tiles; nothing is allocated per full image except the
 // caller's output. The guide grid is at most DETAIL.guideEdge px.
+//
+// Two creative effects change where a pixel's colour comes from (digital.mjs): channel shift
+// samples red and blue at displaced positions of the tile's base planes (the halo grows by the
+// largest displacement), and a capture renders the whole photo once at the capture grid's size
+// (from the guide source, with everything before the capture), JPEG-compresses that map, and
+// then every output pixel is resampled from it; only grain is added at full resolution.
 
 import { SRGB_TO_LINEAR_8BIT } from './colorMath.mjs';
 import { developRaw, processDisplay, processLinear } from './spec.mjs';
 import { encodeSrgb8, fastTransfer, prepareRender, renderImage } from './cpuRenderer.mjs';
 import { DETAIL, applyDetail, computeGuide, detailHalo } from './detail.mjs';
-import { applyCreative, computeGlow, glowKey } from './creative.mjs';
+import { applyCreative, applyGrain, computeGlow, glowKey } from './creative.mjs';
+import { captureSize, jpegCompress, sampleCapture, shiftHalo, shiftPositions } from './digital.mjs';
 import { groupKeys, normalizeAdjustments } from '../model/adjustments.mjs';
 
 export const DETAIL_TILE = 512;
@@ -176,34 +183,88 @@ export function glowDependencies(adjustments, params) {
 }
 
 /**
- * Per-render state: settings, scale, halo, the guide and the glow map.
+ * The capture map of an image's settings (null without a capture): the guide source
+ * area-averaged to the capture grid, rendered with every stage before the capture (Detail at
+ * the capture's scale, glow, colour, quantisation dithered per capture pixel, sensor noise
+ * per capture pixel), then JPEG-compressed. RGBA8 { width, height, data }.
+ * :param options: { nativeWidth, nativeHeight, guide, glow } as for prepareDetailRender
+ */
+export function computeImageCapture(params, source, { nativeWidth, nativeHeight, guide, glow }) {
+  const prepared = params.tone && params.params ? params : prepareRender(params);
+  const p = prepared.params;
+  const { capture, noise } = p.creative;
+  if (!capture) return null;
+  const size = captureSize(source, capture);
+  let small = source;
+  if (size.width !== source.width || size.height !== source.height) {
+    const accumulator = createAreaAccumulator(source.kind, source.width, source.height, size.width, size.height);
+    accumulator.add(source.data, 0, source.height);
+    small = accumulator.finish();
+  }
+  const cell = Math.max(nativeWidth, nativeHeight) / Math.max(size.width, size.height);
+  const creative = { ...p.creative, capture: null, grain: null, noise: noise && { ...noise, cell } };
+  const inner = { params: { ...p, creative }, tone: prepared.tone };
+  const transparent = channelsOf(small) === 4 && rowsHaveAlpha(small, 0, small.height);
+  const context = prepareDetailRender(inner, { width: size.width, height: size.height, nativeWidth, nativeHeight, guide, glow, transparent, captureGrid: true });
+  const data = new Uint8ClampedArray(size.width * size.height * 4);
+  renderDetailRows(small, context, 0, size.height, data);
+  if (capture.quality) jpegCompress(data, size.width, size.height, capture.quality);
+  return { width: size.width, height: size.height, data };
+}
+
+/**
+ * Per-render state: settings, scale, halo, the guide, the glow map and the capture map.
  * :param params: deriveParams() result with an active detail stage, or prepareRender() result
  * :param options: { width, height } the render size; { nativeWidth, nativeHeight } the
  *   photo's full size; `guide` from computeImageGuide (or `guideImage` to compute it);
  *   `transparent`: whether any pixel of the image is not opaque. Blurs are weighted by
  *   alpha only then, decided for the whole image so the result never depends on tiling.
- *   `glow` from computeImageGlow (or computed from `guideImage`).
+ *   `glow` from computeImageGlow and `capture` from computeImageCapture (or computed from
+ *   `guideImage`); `captureGrid`: this render is a capture map (dither per pixel).
  */
-export function prepareDetailRender(params, { width, height, nativeWidth = width, nativeHeight = height, guide, glow, guideImage, transparent = false }) {
+export function prepareDetailRender(params, { width, height, nativeWidth = width, nativeHeight = height, guide, glow, capture, guideImage, transparent = false, captureGrid = false }) {
   const prepared = params.tone && params.params ? params : prepareRender(params);
   const { detail, creative } = prepared.params;
   const scale = Math.min(1, Math.max(width, height) / Math.max(nativeWidth, nativeHeight));
   const glowMap = glow !== undefined ? glow : guideImage ? computeImageGlow(prepared, guideImage) : null;
-  if (creative.glowActive && !glowMap) throw new Error('Bloom and halation need the glow map of the image.');
+  if (creative.glowActive && !glowMap) throw new Error('Bloom, halation and soft focus need the glow map of the image.');
+  const guideMap = guide !== undefined ? guide : computeImageGuide(prepared, guideImage);
+  let captureMap = null;
+  if (creative.capture) {
+    captureMap = capture ?? (guideImage ? computeImageCapture(prepared, guideImage, { nativeWidth, nativeHeight, guide: guideMap, glow: glowMap }) : null);
+    if (!captureMap) throw new Error('Low resolution and JPEG compression need the capture map of the image.');
+  }
   return {
     prepared,
     detail,
     scale,
     width,
     height,
-    halo: detailHalo(detail, scale),
+    // A capture resamples a finished map: no neighbours of the full-resolution image are read.
+    halo: captureMap ? 0 : detailHalo(detail, scale) + shiftHalo(creative.shift, width, height),
     transparent,
-    guide: guide !== undefined ? guide : computeImageGuide(prepared, guideImage),
+    guide: guideMap,
+    capture: captureMap,
     // The creative stage's view of the pixel being rendered (x, y set per pixel).
-    at: { x: 0, y: 0, width, height, scale, glow: glowMap },
+    at: { x: 0, y: 0, width, height, scale, glow: glowMap, captureGrid },
     pool: createPool(),
   };
 }
+
+/** Bilinear sample of one plane of a tile (`w` × `h` from image column `left`, row `top`), clamped to the image. */
+function samplePlane(plane, x, y, left, top, w, h, width, height) {
+  const cx = Math.min(width - 1, Math.max(0, x)) - left;
+  const cy = Math.min(height - 1, Math.max(0, y)) - top;
+  const x0 = Math.min(w - 1, Math.max(0, Math.floor(cx)));
+  const y0 = Math.min(h - 1, Math.max(0, Math.floor(cy)));
+  const x1 = Math.min(w - 1, x0 + 1);
+  const y1 = Math.min(h - 1, y0 + 1);
+  const tx = Math.min(1, Math.max(0, cx - x0));
+  const ty = Math.min(1, Math.max(0, cy - y0));
+  return (plane[y0 * w + x0] * (1 - tx) + plane[y0 * w + x1] * tx) * (1 - ty) + (plane[y1 * w + x0] * (1 - tx) + plane[y1 * w + x1] * tx) * ty;
+}
+
+const shifted = [0, 0, 0, 0];
 
 /**
  * Renders rows [y0, y1) of an image with Detail settings into RGBA8 `target` (which
@@ -228,6 +289,35 @@ export function renderDetailRows(image, context, y0, y1, target, { flattenAlpha 
   if (!coveredLeft || !coveredRight || top < firstRow || bottom > firstRow + rowsHeld) throw new Error('The image rows do not cover the band and its halo.');
   const hasAlpha = channels === 4 && transparent;
   const rgb = [0, 0, 0];
+  const alphaAt = (x, y) => (channels === 4 ? image.data[((y - firstRow) * image.width + x - firstColumn) * 4 + 3] : 255);
+  const write = (t, alpha) => {
+    target[t] = Math.round(rgb[0] * 255);
+    target[t + 1] = Math.round(rgb[1] * 255);
+    target[t + 2] = Math.round(rgb[2] * 255);
+    if (flattenAlpha && alpha < 255) {
+      const coverage = alpha / 255;
+      for (let c = 0; c < 3; c += 1) target[t + c] = encodeSrgb8(SRGB_TO_LINEAR_8BIT[target[t + c]] * coverage + (1 - coverage));
+      target[t + 3] = 255;
+    } else {
+      target[t + 3] = alpha;
+    }
+  };
+  if (context.capture) {
+    const { grain } = p.creative;
+    const { hardness } = p.creative.capture;
+    for (let y = y0; y < y1; y += 1) {
+      for (let x = xStart; x < xEnd; x += 1) {
+        sampleCapture(context.capture, x, y, width, height, hardness, rgb);
+        if (grain) {
+          at.x = x; at.y = y;
+          applyGrain(rgb, grain, at);
+        }
+        write(((y - y0) * outWidth + x - xStart) * 4, alphaAt(x, y));
+      }
+    }
+    return target;
+  }
+  const { shift } = p.creative;
   for (let x0 = xStart; x0 < xEnd; x0 += tileWidth) {
     const x1 = Math.min(xEnd, x0 + tileWidth);
     const left = Math.max(0, x0 - halo);
@@ -242,23 +332,20 @@ export function renderDetailRows(image, context, y0, y1, target, { flattenAlpha 
       for (let x = x0; x < x1; x += 1) {
         const o = (y - top) * w + (x - left);
         const t = ((y - y0) * outWidth + x - xStart) * 4;
-        rgb[0] = planes.r[o]; rgb[1] = planes.g[o]; rgb[2] = planes.b[o];
+        if (shift) {
+          shiftPositions(x, y, width, height, shift, shifted);
+          rgb[0] = samplePlane(planes.r, shifted[0], shifted[1], left, top, w, h, width, height);
+          rgb[1] = planes.g[o];
+          rgb[2] = samplePlane(planes.b, shifted[2], shifted[3], left, top, w, h, width, height);
+        } else {
+          rgb[0] = planes.r[o]; rgb[1] = planes.g[o]; rgb[2] = planes.b[o];
+        }
         if (p.postActive) processDisplay(rgb, p, fastTransfer);
         if (p.creativeActive) {
           at.x = x; at.y = y;
           applyCreative(rgb, p.creative, at, fastTransfer);
         }
-        target[t] = Math.round(rgb[0] * 255);
-        target[t + 1] = Math.round(rgb[1] * 255);
-        target[t + 2] = Math.round(rgb[2] * 255);
-        const alpha = channels === 4 ? image.data[((y - firstRow) * image.width + x - firstColumn) * 4 + 3] : 255;
-        if (flattenAlpha && alpha < 255) {
-          const coverage = alpha / 255;
-          for (let c = 0; c < 3; c += 1) target[t + c] = encodeSrgb8(SRGB_TO_LINEAR_8BIT[target[t + c]] * coverage + (1 - coverage));
-          target[t + 3] = 255;
-        } else {
-          target[t + 3] = alpha;
-        }
+        write(t, alphaAt(x, y));
       }
     }
   }
@@ -282,6 +369,7 @@ export function renderDetailImage(image, params, {
   nativeHeight = image.height,
   guide,
   glow,
+  capture,
   guideImage,
   target = new Uint8ClampedArray(image.width * image.height * 4),
   flattenAlpha = false,
@@ -290,6 +378,7 @@ export function renderDetailImage(image, params, {
   onBand,
   cancelled,
 } = {}) {
+  const needsCapture = Boolean((params.params ?? params).creative.capture) && capture === undefined;
   const context = prepareDetailRender(params, {
     width: image.width,
     height: image.height,
@@ -298,7 +387,8 @@ export function renderDetailImage(image, params, {
     transparent: channelsOf(image) === 4 && rowsHaveAlpha(image, 0, image.height),
     guide,
     glow,
-    guideImage: guide === undefined || glow === undefined ? (guideImage ?? guideSource(image)) : undefined,
+    capture,
+    guideImage: guide === undefined || glow === undefined || needsCapture ? (guideImage ?? guideSource(image)) : undefined,
   });
   for (let row = 0; row < image.height; row += bandRows) {
     if (cancelled?.()) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });

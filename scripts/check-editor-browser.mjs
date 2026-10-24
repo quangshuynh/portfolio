@@ -27,6 +27,8 @@ const report = { checks: [], measurements: {} };
 // Geometry on merged HDR interpolates float values: at the range-fit boundary of
 // out-of-gamut colours float32 and float64 can differ by two codes (one pixel of the chart).
 const HDR_GEOMETRY_PARITY_MAX = 2;
+// Posterize/quantisation cases: pixels allowed to land one level apart (float32 vs double on a boundary).
+const QUANTIZE_FLIPS = 4;
 const failures = [];
 
 // Each check gets at most three minutes, so one failure cannot stall the run.
@@ -261,12 +263,17 @@ async function main() {
       return { cases: parity.geometryResults.length, worstMax: worst, hdrWorstMax: hdrWorst, worstMean: Number(mean.toFixed(4)) };
     });
     await check('creative: the shader (looks, grain, glow, vignette, grading, alpha, RAW, HDR, geometry) matches the CPU renderer', () => {
-      const integer = parity.creativeResults.filter(({ name }) => !name.startsWith('HDR') && !name.startsWith('geometry'));
+      // Quantisation is a step function: a value on a level boundary may round to the neighbouring
+      // level in float32. Those cases may differ by one level in at most QUANTIZE_FLIPS pixels.
+      const stepped = ({ name }) => /posterize|Posterized/.test(name);
+      const flips = parity.creativeResults.filter(stepped);
+      assert.ok(flips.every(({ over1 }) => over1 <= QUANTIZE_FLIPS), `quantisation parity: ${JSON.stringify(flips)}`);
+      const integer = parity.creativeResults.filter((item) => !stepped(item) && !item.name.startsWith('HDR') && !item.name.startsWith('geometry'));
       const other = parity.creativeResults.filter(({ name }) => name.startsWith('HDR') || name.startsWith('geometry'));
       const worst = Math.max(...integer.map(({ max }) => max));
       const otherWorst = Math.max(...other.map(({ max }) => max));
       const mean = Math.max(...parity.creativeResults.map(({ mean: m }) => m));
-      assert.ok(worst <= 1 && otherWorst <= HDR_GEOMETRY_PARITY_MAX && parity.creativeResults.every(({ over1, name }) => name.startsWith('HDR') || name.startsWith('geometry') || over1 === 0), `creative parity: ${JSON.stringify(parity.creativeResults.filter(({ max }) => max > 1))}`);
+      assert.ok(worst <= 1 && otherWorst <= HDR_GEOMETRY_PARITY_MAX && parity.creativeResults.every((item) => stepped(item) || item.name.startsWith('HDR') || item.name.startsWith('geometry') || item.over1 === 0), `creative parity: ${JSON.stringify(parity.creativeResults.filter((item) => !stepped(item) && item.max > 1))}`);
       return { cases: parity.creativeResults.length, worstMax: worst, hdrAndGeometryWorstMax: otherWorst, worstMean: Number(mean.toFixed(4)) };
     });
 

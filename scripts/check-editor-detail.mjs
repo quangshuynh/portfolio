@@ -189,7 +189,7 @@ async function runOne(run, files) {
       for (const [key, value] of Object.entries(SETTINGS)) await setValue(LABELS[key], value);
       await poll(detailState, (s) => s === 'final', 'Detail preview');
       result.detailLabel = await page.textContent('[data-detail-preview]');
-      assert.match(result.detailLabel, /Detail preview at 600×400/);
+      assert.match(result.detailLabel, /CPU preview at 600×400/);
       if (run.device) {
         const layout = await page.evaluate(() => ({
           overflow: document.documentElement.scrollWidth - window.innerWidth,

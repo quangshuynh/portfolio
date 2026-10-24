@@ -4,7 +4,7 @@
 // stays in this browser; nothing here performs network requests.
 
 import { prepareRender, renderImage, renderRawRgba8, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
-import { computeImageGlow, computeImageGuide, createAreaAccumulator, glowDependencies, guideSize, guideSource, prepareDetailRender, renderDetailImage, renderDetailRows, rowsHaveAlpha } from '../pipeline/detailRenderer.mjs';
+import { computeImageGlow, computeImageGuide, createAreaAccumulator, glowDependencies, guideSize, guideSource, prepareDetailRender, renderAnyImage, renderDetailImage, renderDetailRows, rowsHaveAlpha } from '../pipeline/detailRenderer.mjs';
 import { packGlow } from '../pipeline/creative.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { groupKeys, normalizeAdjustments } from '../model/adjustments.mjs';
@@ -73,7 +73,7 @@ function renderDetailPreview(image, params, adjustments, { edge, nativeWidth, na
   if (cache.guideKey !== guideKey) Object.assign(cache, { guideKey, guide: computeImageGuide(prepareRender(params), cache.guideSource) });
   const glow = previewGlow(image, params, adjustments);
   const source = previewSource(image, edge, cache);
-  const data = renderDetailImage(source, params, { nativeWidth, nativeHeight, guide: cache.guide, glow });
+  const data = renderDetailImage(source, params, { nativeWidth, nativeHeight, guide: cache.guide, glow, guideImage: cache.guideSource });
   return { width: source.width, height: source.height, data };
 }
 
@@ -261,7 +261,7 @@ export const handlers = {
     if (glow) {
       const map = previewGlow(image, params, adjustments);
       const packed = map && packGlow(map);
-      return { result: packed, transfer: packed ? [packed.data.buffer] : [] };
+      return { result: packed, transfer: packed ? [packed.data.buffer, ...(packed.diffuse ? [packed.diffuse.buffer] : [])] : [] };
     }
     // Detail previews come at the requested size; positional creative effects alone at the
     // proxy's (the CPU fallback preview, which sends the native size).
@@ -273,6 +273,22 @@ export const handlers = {
     const data = renderImage(image, params);
     finishRows(warp, data, 0, image.height, false);
     return { result: { width: image.width, height: image.height, data }, transfer: [data.buffer] };
+  },
+
+  /**
+   * Filter Library thumbnails: the small thumbnail source (already warped to the photo's
+   * geometry, see ui/filterThumbs.mjs) rendered with each filter's settings patch over the
+   * photo's other settings, at the photo's native size for Detail, grain and noise scale.
+   * :param filters: [{ id, patch }] a few per call, so a newer request can take over soon
+   */
+  async filterThumbs({ source, spec = null, adjustments, lut = null, raw = null, native, filters }) {
+    const results = filters.map(({ id, patch }) => {
+      const params = deriveParams({ ...adjustments, ...patch }, { lut, raw });
+      const data = renderAnyImage(source, params, { nativeWidth: native.width, nativeHeight: native.height });
+      finishRows(spec, data, 0, source.height, false);
+      return { id, width: source.width, height: source.height, data };
+    });
+    return { result: results, transfer: results.map(({ data }) => data.buffer) };
   },
 
   /** Reads, validates and hashes a .cube file. */

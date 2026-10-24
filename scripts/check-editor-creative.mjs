@@ -273,7 +273,7 @@ async function runOne(run, files) {
     await step('a look, then every effect; PNG equals the Node reference', async () => {
       await openSection('creative');
       await page.getByRole('button', { name: 'Warm Analog', exact: true }).click();
-      await page.waitForSelector('#pe-look-intensity');
+      await page.waitForSelector('#pe-filter-strength');
       await setValue('Bleach bypass amount', 35);
       await setValue('Bloom amount', 45);
       await setValue('Bloom threshold', 40);

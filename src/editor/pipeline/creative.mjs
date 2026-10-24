@@ -1,6 +1,12 @@
 // Creative stage: film-inspired effects and colour grading, after the display stages
 // (curves, HSL, LUT) on the sRGB-encoded, display-referred values. Order:
-//   glow (bloom, halation) -> bleach bypass -> film fade -> colour grading -> vignette -> grain.
+//   [channel shift] -> glow (bloom, halation) -> soft focus -> sensor colour -> camera response
+//   -> highlight clipping -> bleach bypass -> film fade -> colour grading -> quantisation
+//   -> vignette -> sensor noise -> [capture: low resolution, JPEG] -> grain.
+// The digital effects are in digital.mjs. Channel shift (chromatic aberration, displacement)
+// samples neighbouring pixels before the display stages, and a capture replaces the pixel by a
+// resampled low-resolution image, so both need the spatial renderer (`cpuOnly`: never the GPU
+// shader). Everything up to sensor noise is inside a capture; grain is applied after it.
 // Glow, vignette and grain depend on the pixel's position in the output frame (after
 // geometry), so renderers that only see a pixel (cpuRenderer.renderRgba8) hand photos with
 // `positional` effects to the detail renderer, which knows x, y and the render scale. The
@@ -26,6 +32,7 @@
 
 import { LUMA } from './colorMath.mjs';
 import { boxRadiusForSigma, createFilters } from './detail.mjs';
+import { applyClip, applyNoise, applyQuantize, applyResponse, applySensor, digitalParams } from './digital.mjs';
 
 const [LR, LG, LB] = LUMA;
 
@@ -139,14 +146,16 @@ export function creativeParams(a) {
     const tint = hueColor(a.halationHue).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
     c.halation = { amount: (a.halationAmount / 100) * CREATIVE.halationGain, sigma: lerp(CREATIVE.halationSigma, a.halationRadius / 100), threshold: lerp(CREATIVE.halationThreshold, a.halationThreshold / 100), knee: CREATIVE.halationKnee, tint };
   }
-  c.glowActive = Boolean(c.bloom || c.halation);
-  c.positional = Boolean(c.glowActive || c.vignette || c.grain);
-  c.active = Boolean(c.positional || c.bleach || c.fade || c.grading);
+  Object.assign(c, digitalParams(a));
+  c.glowActive = Boolean(c.bloom || c.halation || c.diffusion);
+  c.cpuOnly = Boolean(c.capture || c.shift);
+  c.positional = Boolean(c.glowActive || c.vignette || c.grain || c.noise || c.cpuOnly);
+  c.active = Boolean(c.positional || c.bleach || c.fade || c.grading || c.sensor || c.response || c.clip || c.quantize);
   return c;
 }
 
 /** What the glow map depends on besides the image: radii and thresholds, not amounts. */
-export const glowKey = (c) => JSON.stringify([c.bloom && [c.bloom.sigma, c.bloom.threshold], c.halation && [c.halation.sigma, c.halation.threshold]]);
+export const glowKey = (c) => JSON.stringify([c.bloom && [c.bloom.sigma, c.bloom.threshold], c.halation && [c.halation.sigma, c.halation.threshold], c.diffusion && c.diffusion.sigma]);
 
 // --- Grain: integer hash, B-spline value noise ---
 
@@ -223,7 +232,9 @@ export const grainScale = (spacing, scale) => Math.sqrt((spacing * spacing + 1) 
  * Bloom and halation sources of a small image (the guide grid), blurred.
  * :param planes: { r, g, b, alpha } encoded Float32 planes after the display stages
  * :param transfer: { toLinear }
- * :returns: { width, height, bloom: Float32Array RGB | null, halation: Float32Array | null }
+ * :returns: { width, height, bloom: Float32Array RGB | null, halation: Float32Array | null,
+ *   diffuse: Float32Array RGB | null } (soft focus: the whole image blurred in linear light,
+ *   normalised by blurred alpha so transparent areas do not darken it)
  */
 export function computeGlow(planes, w, h, c, transfer) {
   const n = w * h;
@@ -237,7 +248,7 @@ export function computeGlow(planes, w, h, c, transfer) {
     };
   })();
   const { gauss } = createFilters(w, h, pool);
-  const out = { width: w, height: h, bloom: null, halation: null };
+  const out = { width: w, height: h, bloom: null, halation: null, diffuse: null };
   const blur = (plane, sigma) => {
     const blurred = new Float32Array(n);
     gauss(plane, blurred, boxRadiusForSigma(sigma * edge));
@@ -270,25 +281,41 @@ export function computeGlow(planes, w, h, c, transfer) {
     }
     out.halation = blur(source, c.halation.sigma);
   }
+  if (c.diffusion) {
+    const { alpha } = planes;
+    const channels = [planes.r, planes.g, planes.b].map((plane) => {
+      const linear = new Float32Array(n);
+      for (let i = 0; i < n; i += 1) linear[i] = transfer.toLinear(Math.min(1, Math.max(0, plane[i]))) * (alpha ? alpha[i] : 1);
+      return blur(linear, c.diffusion.sigma);
+    });
+    const coverage = alpha ? blur(alpha, c.diffusion.sigma) : null;
+    out.diffuse = new Float32Array(n * 3);
+    for (let i = 0; i < n; i += 1) {
+      const k = coverage ? (coverage[i] > 1e-4 ? 1 / coverage[i] : 0) : 1;
+      for (let ch = 0; ch < 3; ch += 1) out.diffuse[i * 3 + ch] = channels[ch][i] * k;
+    }
+  }
   return out;
 }
 
-/** The glow map packed as RGBA (bloom RGB, halation in A) for a float texture. */
+/** The glow map packed as RGBA (bloom RGB, halation in A) for a float texture, and soft focus as a second one. */
 export function packGlow(glow) {
   const n = glow.width * glow.height;
   const data = new Float32Array(n * 4);
+  const diffuse = glow.diffuse ? new Float32Array(n * 4) : null;
   for (let i = 0; i < n; i += 1) {
     if (glow.bloom) { data[i * 4] = glow.bloom[i * 3]; data[i * 4 + 1] = glow.bloom[i * 3 + 1]; data[i * 4 + 2] = glow.bloom[i * 3 + 2]; }
     if (glow.halation) data[i * 4 + 3] = glow.halation[i];
+    if (diffuse) { diffuse[i * 4] = glow.diffuse[i * 3]; diffuse[i * 4 + 1] = glow.diffuse[i * 3 + 1]; diffuse[i * 4 + 2] = glow.diffuse[i * 3 + 2]; }
   }
-  return { width: glow.width, height: glow.height, data };
+  return { width: glow.width, height: glow.height, data, diffuse };
 }
 
 /** Bilinear position of output pixel `x` (of `size`) on a glow axis of `count` samples. */
 const glowAxis = (x, size, count) => Math.min(count - 1, Math.max(0, ((x + 0.5) * count) / size - 0.5));
 
-const glowSample = [0, 0, 0, 0];
-/** Samples the glow map (bloom RGB, halation) at an output pixel. */
+const glowSample = [0, 0, 0, 0, 0, 0, 0];
+/** Samples the glow map (bloom RGB, halation, soft focus RGB) at an output pixel. */
 function sampleGlow(glow, x, y, width, height) {
   const gx = glowAxis(x, width, glow.width);
   const gy = glowAxis(y, height, glow.height);
@@ -313,6 +340,10 @@ function sampleGlow(glow, x, y, width, height) {
   if (glow.halation) {
     const hv = glow.halation;
     glowSample[3] = hv[i00] * w00 + hv[i10] * w10 + hv[i01] * w01 + hv[i11] * w11;
+  }
+  if (glow.diffuse) {
+    const d = glow.diffuse;
+    for (let c = 0; c < 3; c += 1) glowSample[4 + c] = d[i00 * 3 + c] * w00 + d[i10 * 3 + c] * w10 + d[i01 * 3 + c] * w01 + d[i11 * 3 + c] * w11;
   }
   return glowSample;
 }
@@ -424,12 +455,17 @@ export function applyCreative(p, c, at, transfer) {
       let lin = transfer.toLinear(Math.min(1, Math.max(0, p[k])));
       if (c.bloom) lin = screen(lin, Math.min(1, c.bloom.amount * sample[k]));
       if (c.halation) lin = screen(lin, Math.min(1, c.halation.amount * sample[3] * c.halation.tint[k]));
+      if (c.diffusion) lin = diffuse(lin, sample[4 + k], c.diffusion.amount);
       p[k] = transfer.toSrgb(lin);
     }
   }
+  if (c.sensor) applySensor(p, c.sensor);
+  if (c.response) applyResponse(p, c.response);
+  if (c.clip) applyClip(p, c.clip);
   if (c.bleach) bleachBypass(p, c.bleach);
   if (c.fade) filmFade(p, c.fade);
   if (c.grading) colorGrade(p, c.grading);
+  if (c.quantize) applyQuantize(p, c.quantize, at?.captureGrid ? [at.x, at.y] : null);
   if (c.vignette && at) {
     const fall = vignetteFalloff(at.x, at.y, at.width, at.height, c.vignette);
     if (fall > 0) {
@@ -442,11 +478,22 @@ export function applyCreative(p, c, at, transfer) {
       }
     }
   }
-  if (c.grain && at) {
-    const l = Math.min(1, Math.max(0, luma(p)));
-    const tone = CREATIVE.grainFloor + (1 - CREATIVE.grainFloor) * 4 * l * (1 - l);
-    const delta = c.grain.amount * grainScale(c.grain.spacing, at.scale) * tone * grainValue(at.x, at.y, at.scale, c.grain);
-    for (let k = 0; k < 3; k += 1) p[k] = Math.min(1, Math.max(0, p[k] + delta));
-  }
+  if (c.noise && at) applyNoise(p, c.noise, at);
+  if (c.grain && at) applyGrain(p, c.grain, at);
+  return p;
+}
+
+/**
+ * Soft focus in linear light: the blurred image mixed in, fully where it is brighter (light
+ * spreads into the shadows, as a diffusion filter does) and half where it is darker.
+ */
+export const diffuse = (lin, blurred, amount) => lin + amount * (blurred - lin) * (blurred > lin ? 1 : 0.5);
+
+/** Film grain on one pixel (also after a capture). */
+export function applyGrain(p, grain, at) {
+  const l = Math.min(1, Math.max(0, luma(p)));
+  const tone = CREATIVE.grainFloor + (1 - CREATIVE.grainFloor) * 4 * l * (1 - l);
+  const delta = grain.amount * grainScale(grain.spacing, at.scale) * tone * grainValue(at.x, at.y, at.scale, grain);
+  for (let k = 0; k < 3; k += 1) p[k] = Math.min(1, Math.max(0, p[k] + delta));
   return p;
 }

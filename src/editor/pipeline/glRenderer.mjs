@@ -11,6 +11,7 @@
 import { CURVE_TABLE_SIZE } from './curves.mjs';
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './shader.mjs';
 import { FINE_SEED, grainScale } from './creative.mjs';
+import { noiseCell } from './digital.mjs';
 
 const UNIFORMS = ['uSource', 'uWhiteBalanceActive', 'uWhiteBalance', 'uExposureGain', 'uToneActive', 'uContrast',
   'uHighlights', 'uShadows', 'uWhites', 'uBlacks', 'uVibrance', 'uSaturation', 'uNeutral',
@@ -20,7 +21,9 @@ const UNIFORMS = ['uSource', 'uWhiteBalanceActive', 'uWhiteBalance', 'uExposureG
   'uGeometry', 'uGeometryMatrix', 'uOutputSize', 'uCoverage', 'uCoverageScale', 'uSourceSize', 'uBackground', 'uOpaque',
   'uCreative', 'uBleach', 'uBleachParams', 'uFade', 'uFadeBlack', 'uFadeShoulder', 'uFadeWhite', 'uGrade', 'uGradeTint', 'uGradeLum',
   'uGradeBalance', 'uGradeExponent', 'uVignette', 'uVignetteParams', 'uVignetteExponent', 'uGrain', 'uGrainParams', 'uGrainSeed',
-  'uGrainFineSeed', 'uBloom', 'uBloomAmount', 'uHalation', 'uHalationAmount', 'uHalationTint', 'uGlow'];
+  'uGrainFineSeed', 'uBloom', 'uBloomAmount', 'uHalation', 'uHalationAmount', 'uHalationTint', 'uGlow',
+  'uDiffusion', 'uDiffusionAmount', 'uDiffuse', 'uSensor', 'uSensorMatrix', 'uResponse', 'uResponseParams', 'uClip', 'uClipGain',
+  'uQuantize', 'uQuantizeSteps', 'uNoise', 'uNoiseParams', 'uNoiseSeed'];
 const BACKGROUND_CODES = { transparent: 0, white: 1, black: 2 };
 
 function opaqueRgba({ kind, data }) {
@@ -29,8 +32,8 @@ function opaqueRgba({ kind, data }) {
   return true;
 }
 
-// Texture units: the photo, the curve table, the 3D LUT, a RAW photo, a merged HDR, the glow map.
-const UNIT = { source: 0, curves: 1, lut: 2, raw: 3, hdr: 4, glow: 5 };
+// Texture units: the photo, the curve table, the 3D LUT, a RAW photo, a merged HDR, the glow map, soft focus.
+const UNIT = { source: 0, curves: 1, lut: 2, raw: 3, hdr: 4, glow: 5, diffuse: 6 };
 
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
@@ -154,6 +157,10 @@ export class GlRenderer {
     this.glowTexture = floatTexture(gl, gl.TEXTURE_2D);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 1, 1, 0, gl.RGBA, gl.FLOAT, new Float32Array(4));
     this.glowData = null;
+    gl.activeTexture(gl.TEXTURE0 + UNIT.diffuse);
+    this.diffuseTexture = floatTexture(gl, gl.TEXTURE_2D);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 1, 1, 0, gl.RGBA, gl.FLOAT, new Float32Array(4));
+    this.diffuseData = null;
     this.creative = { nativeWidth: 0, nativeHeight: 0, glow: null };
     gl.activeTexture(gl.TEXTURE0);
     this.raw = false;
@@ -165,17 +172,27 @@ export class GlRenderer {
   /**
    * Context of the creative stage: the photo's output size at full resolution (grain is
    * scaled as a downscale of it) and the glow map ({ width, height, data } RGBA float,
-   * creative.packGlow), or null while it is not computed (bloom and halation are left out).
+   * creative.packGlow, with `diffuse` for soft focus), or null while it is not computed
+   * (bloom, halation and soft focus are left out).
    */
   setCreative({ nativeWidth = 0, nativeHeight = 0, glow = null } = {}) {
     this.creative = { nativeWidth, nativeHeight, glow };
-    if (!glow || glow.data === this.glowData) return;
+    if (!glow) return;
     const { gl } = this;
-    gl.activeTexture(gl.TEXTURE0 + UNIT.glow);
-    gl.bindTexture(gl.TEXTURE_2D, this.glowTexture);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, glow.width, glow.height, 0, gl.RGBA, gl.FLOAT, glow.data);
-    this.glowData = glow.data;
+    if (glow.data !== this.glowData) {
+      gl.activeTexture(gl.TEXTURE0 + UNIT.glow);
+      gl.bindTexture(gl.TEXTURE_2D, this.glowTexture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, glow.width, glow.height, 0, gl.RGBA, gl.FLOAT, glow.data);
+      this.glowData = glow.data;
+    }
+    if (glow.diffuse && glow.diffuse !== this.diffuseData) {
+      gl.activeTexture(gl.TEXTURE0 + UNIT.diffuse);
+      gl.bindTexture(gl.TEXTURE_2D, this.diffuseTexture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, glow.width, glow.height, 0, gl.RGBA, gl.FLOAT, glow.diffuse);
+      this.diffuseData = glow.diffuse;
+    }
+    gl.activeTexture(gl.TEXTURE0);
   }
 
   /** Output size: the geometry's when one is set, else the source's. */
@@ -392,8 +409,20 @@ export class GlRenderer {
     gl.activeTexture(gl.TEXTURE0 + UNIT.glow);
     gl.bindTexture(gl.TEXTURE_2D, this.glowTexture);
     gl.uniform1i(u.uGlow, UNIT.glow);
+    gl.activeTexture(gl.TEXTURE0 + UNIT.diffuse);
+    gl.bindTexture(gl.TEXTURE_2D, this.diffuseTexture);
+    gl.uniform1i(u.uDiffuse, UNIT.diffuse);
+    gl.activeTexture(gl.TEXTURE0);
     if (!active) return;
-    const { bleach, fade, grading, vignette, grain, bloom, halation } = c;
+    const { bleach, fade, grading, vignette, grain, bloom, halation, diffusion, sensor, response, clip, quantize, noise } = c;
+    gl.uniform1i(u.uSensor, sensor ? 1 : 0);
+    if (sensor) gl.uniformMatrix3fv(u.uSensorMatrix, true, new Float32Array(sensor));
+    gl.uniform1i(u.uResponse, response ? 1 : 0);
+    if (response) gl.uniform2f(u.uResponseParams, response.exponent, response.saturation);
+    gl.uniform1i(u.uClip, clip ? 1 : 0);
+    if (clip) gl.uniform1f(u.uClipGain, clip);
+    gl.uniform1i(u.uQuantize, quantize ? 1 : 0);
+    if (quantize) gl.uniform1f(u.uQuantizeSteps, quantize.levels - 1);
     gl.uniform1i(u.uBleach, bleach ? 1 : 0);
     if (bleach) gl.uniform4f(u.uBleachParams, bleach.amount, bleach.contrast, bleach.desaturation, bleach.protect);
     gl.uniform1i(u.uFade, fade ? 1 : 0);
@@ -425,6 +454,14 @@ export class GlRenderer {
     }
     gl.uniform1i(u.uBloom, bloom && glow ? 1 : 0);
     if (bloom) gl.uniform1f(u.uBloomAmount, bloom.amount);
+    gl.uniform1i(u.uDiffusion, diffusion && glow?.diffuse ? 1 : 0);
+    if (diffusion) gl.uniform1f(u.uDiffusionAmount, diffusion.amount);
+    gl.uniform1i(u.uNoise, noise ? 1 : 0);
+    if (noise) {
+      const unit = scale * (noise.cell || noiseCell(Math.max(nativeWidth || this.outWidth, nativeHeight || this.outHeight)));
+      gl.uniform3f(u.uNoiseParams, noise.amount * Math.min(1, unit), noise.chroma, unit);
+      gl.uniform1ui(u.uNoiseSeed, noise.seed);
+    }
     gl.uniform1i(u.uHalation, halation && glow ? 1 : 0);
     if (halation) {
       gl.uniform1f(u.uHalationAmount, halation.amount);
@@ -470,6 +507,7 @@ export class GlRenderer {
     gl.deleteTexture(this.curveTexture);
     gl.deleteTexture(this.lutTexture);
     gl.deleteTexture(this.glowTexture);
+    gl.deleteTexture(this.diffuseTexture);
     gl.deleteTexture(this.rawPlaceholder);
     gl.deleteTexture(this.hdrPlaceholder);
     gl.deleteTexture(this.sourcePlaceholder);

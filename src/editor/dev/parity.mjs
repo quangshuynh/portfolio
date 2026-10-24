@@ -6,6 +6,7 @@ import { computeImageGlow, guideSource, renderDetailImage } from '../pipeline/de
 import { prepareRender } from '../pipeline/cpuRenderer.mjs';
 import { packGlow } from '../pipeline/creative.mjs';
 import { BUILT_IN_LOOKS, lookPatch } from '../model/looks.mjs';
+import { BUILT_IN_FILTERS } from '../model/filters.mjs';
 import { GlRenderer, createEditorContext } from '../pipeline/glRenderer.mjs';
 import { identityLut } from '../pipeline/lut.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
@@ -50,7 +51,8 @@ const CURVES = { master: [[0, 10], [64, 50], [190, 210], [255, 245]], red: [[0, 
 // [name, adjustments, LUT key]
 const EDITS = [
   ['neutral', {}],
-  ...ADJUSTMENTS.filter(({ key }) => key !== 'lutIntensity').flatMap(({ key, min, max }) => [[`${key} ${min}`, { [key]: min }], [`${key} +${max}`, { [key]: max }]]),
+  // Capture and channel shift are never drawn by the shader (params.cpuOnly): exports check them.
+  ...ADJUSTMENTS.filter(({ key, max }) => key !== 'lutIntensity' && !deriveParams({ [key]: max }).creative.cpuOnly).flatMap(({ key, min, max }) => [[`${key} ${min}`, { [key]: min }], [`${key} +${max}`, { [key]: max }]]),
   ['combined', COMBINED],
   ['strong', { exposure: 1.5, contrast: 80, highlights: -100, shadows: 100, temperature: -70, tint: 40, vibrance: 100, saturation: 60 }],
   ['curves', { curves: CURVES }],
@@ -104,6 +106,15 @@ const CREATIVE_EDITS = [
   ['all creative + base and LUT', { ...COMBINED, ...CREATIVE_ALL, curves: CURVES, lut: ref('look33'), lutIntensity: 70 }, 'look33'],
   ['vignette +100 round', { vignetteAmount: 100, vignetteRoundness: 100, vignetteFeather: 0 }],
   ['grain fine, smooth', { grainAmount: 100, grainSize: 0, grainRoughness: 0, grainSeed: 4242 }],
+];
+// Digital effects the shader mirrors (capture and channel shift are CPU only: params.cpuOnly).
+const DIGITAL_EDITS = [
+  ['sensor cool, response, clip', { sensorColor: -100, cameraResponse: 100, highlightClip: 60 }],
+  ['sensor warm', { sensorColor: 100 }],
+  ['posterize', { quantizeAmount: 80 }],
+  ['sensor noise', { noiseAmount: 100, noiseColor: 70, grainSeed: 99 }],
+  ['soft focus', { diffusionAmount: 100, diffusionRadius: 20 }],
+  ...BUILT_IN_FILTERS.filter((filter) => !deriveParams(lookPatch(filter, 100)).cpuOnly && !filter.id.startsWith('look:')).map((filter) => [`filter ${filter.name}`, lookPatch(filter, 100)]),
 ];
 
 /** The CPU reference: per pixel, or the spatial renderer for positional creative effects. */
@@ -239,6 +250,10 @@ function run() {
     ...CREATIVE_EDITS.slice(-4).map(([name, adjustments, lutKey]) => ({ name: `alpha ${name}`, ...creativeCase(transparent, adjustments, lutKey) })),
     ...CREATIVE_EDITS.slice(-4).map(([name, adjustments, lutKey]) => ({ name: `RAW ${name}`, ...creativeCase(raw, adjustments, lutKey, RAW_INFO) })),
     ...CREATIVE_EDITS.slice(-4, -2).map(([name, adjustments, lutKey]) => ({ name: `HDR ${name}`, ...creativeCase(hdr, adjustments, lutKey, HDR_INFO) })),
+    ...DIGITAL_EDITS.map(([name, adjustments, lutKey]) => ({ name: `RGBA ${name}`, ...creativeCase(source, adjustments, lutKey) })),
+    ...DIGITAL_EDITS.slice(0, 5).map(([name, adjustments, lutKey]) => ({ name: `alpha ${name}`, ...creativeCase(transparent, adjustments, lutKey) })),
+    ...DIGITAL_EDITS.slice(0, 5).map(([name, adjustments, lutKey]) => ({ name: `RAW ${name}`, ...creativeCase(raw, adjustments, lutKey, RAW_INFO) })),
+    ...DIGITAL_EDITS.slice(3, 5).map(([name, adjustments, lutKey]) => ({ name: `HDR ${name}`, ...creativeCase(hdr, adjustments, lutKey, HDR_INFO) })),
     { name: 'RGBA all creative, native 256×256', ...creativeCase(source, CREATIVE_ALL, null, null, { width: 256, height: 256 }) },
     ...GEOMETRIES.slice(0, 3).map(([name, geometry]) => ({ name: `geometry ${name} + creative`, ...geometryCase(renderer, source, geometry, CREATIVE_ALL) })),
   ];
