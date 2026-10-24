@@ -12,6 +12,7 @@ import { FORMATS } from '../io/imageHeader.mjs';
 import { createImageWorker, usingMainThread } from '../io/workerClient.mjs';
 import { detailWorkerCount, exportImageInBands } from '../io/detailPool.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
+import { renderRawRgba8 } from '../pipeline/cpuRenderer.mjs';
 import { RAW_FORMATS, RAW_SNIFF_BYTES, isTiff } from '../raw/rawFormat.mjs';
 import { constrainedDevice, createRawQueue, exportRaw } from '../raw/rawClient.mjs';
 import { browserCapabilities, diagnosticReport } from '../io/diagnostics.mjs';
@@ -732,7 +733,14 @@ function EditorWorkspace() {
       const failed = rasterCache.error(layer.source.sha256);
       return failed ? `Its file could not be read: ${failed}` : null;
     },
-    thumbnail: (layer) => (layer.type === 'image' ? sourceFor(layer.source.sha256)?.thumbnail ?? null : null),
+    thumbnail: (layer) => {
+      const source = layer.type === 'image' ? sourceFor(layer.source.sha256) : null;
+      if (!source?.thumbnail) return null;
+      if (source.thumbnail.kind !== 'raw') return source.thumbnail;
+      // A RAW thumbnail is half-size sensor data: developed once, neutral and as shot.
+      source.layerThumbnail ??= { width: source.thumbnail.width, height: source.thumbnail.height, data: renderRawRgba8(source.thumbnail.data, deriveParams(neutralAdjustments(), { raw: source.raw })) };
+      return source.layerThumbnail;
+    },
     workspace: state.photos.filter((item) => item.status === 'ready' && item.format !== 'hdr' && item.sha256).map(({ id, name }) => ({ id, name })),
     onAddPhoto,
     onImport: () => { layerReconnect.current = null; layerInputRef.current?.click(); },

@@ -8,8 +8,9 @@ Interval 6 (three-exposure HDR, see [Merge HDR](#merge-hdr)), Interval 7 (Textur
 Clarity, Dehaze, sharpening and noise reduction, see [Detail](#detail)) and Interval 8
 (multi-photo selection, sync, batch export and ZIP, 1:1 Detail inspection, see
 [Batch editing](#batch-editing)) and Interval 10 (crop, rotation, flips, perspective, stretch
-and resize, see [Geometry](#geometry-crop--transform)) and Interval 11 (creative effects, looks and
-text overlays, see [Creative and text](#creative-and-text));
+and resize, see [Geometry](#geometry-crop--transform)), Interval 11 (creative effects, looks and
+text, see [Creative and text](#creative-and-text)) and Interval 12 (image, text and adjustment
+layers with blend modes, see [Layers](#layers));
 the original proposal is in
 [photography-platform/editor-hdr-architecture.md](photography-platform/editor-hdr-architecture.md).
 `/photography` links to it with a small "Edit a photo" text link (in-app
@@ -28,7 +29,9 @@ navigation).
 | `src/editor/pipeline/creative.mjs`, `model/looks.mjs` | Creative stage (parameters, per-pixel reference, glow map, grain hash) and built-in looks. UI: `ui/CreativePanel.jsx`. |
 | `src/editor/pipeline/digital.mjs`, `model/filters.mjs` | Digital effects (sensor colour, response, clipping, quantisation, noise, capture and JPEG, channel shift, soft focus) and the Filter Library catalogue, search and filter record. UI: `ui/FilterLibrary.jsx`, thumbnails `ui/filterThumbs.mjs`. |
 | `scripts/check-editor-filters.mjs` | `npm run check:editor:filters`: library, thumbnails, search, switching latency, strength, compare, undo, PNG exports of digital filters against the Node reference, batch filter and ZIP, phones, CPU preview, 24 MP; genuine JPEG, ARW and merged HDR with `FILTER_FIXTURE_DIR`. |
-| `src/editor/model/overlays.mjs`, `src/editor/text/` | Text objects (schema, validation) and their fonts, layout, drawing and export sprites. UI: `ui/TextPanel.jsx`, `ui/TextLayer.jsx`. |
+| `src/editor/model/overlays.mjs`, `src/editor/text/` | Text fields (schema, validation) and their fonts, layout and drawing (`rasterizeTextLayer`). UI: `ui/TextPanel.jsx`. |
+| `src/editor/model/layers.mjs`, `pipeline/blend.mjs`, `composite.mjs`, `layerTransform.mjs`, `compositeShader.mjs` | Layers (Interval 12): stack schema, limits, migration, operations; W3C blend modes; CPU compositor and its GLSL mirror; layer placement. Export orchestration `io/composeLayers.mjs`; UI `ui/LayersPanel.jsx`, `ui/LayerHandles.jsx`, preview rasters `ui/layerRasters.mjs`; parity page `dev/layerParity.html`. |
+| `scripts/check-editor-layers.mjs` | `npm run check:editor:layers`: GPU/CPU and canvas parity of every blend mode, the Layers panel flow, PNG exports against the Node reference, text placement, reload and reconnect, batch ZIP, phones, CPU preview, 24 MP; genuine JPEG/RAW layers over RAW and over merged HDR with `LAYER_FIXTURE_DIR`. |
 | `scripts/check-editor-creative.mjs` | `npm run check:editor:creative`: looks and effects, PNG exports against the Node reference, text placement in preview and exports, paste and ZIP, phones, CPU preview, 24 MP; genuine ARW and merged HDR with `CREATIVE_FIXTURE_DIR`. |
 | `scripts/check-editor-geometry.mjs` | `npm run check:editor:geometry`: crop tool (pointer, touch, keyboard), PNG exports against the Node reference, batch resize, 24 MP timing; genuine ARW and merged HDR with `GEOMETRY_FIXTURE_DIR`. |
 | `src/editor/pipeline/detail.mjs`, `detailRenderer.mjs` | Detail stage (spatial filters, guide) and the tiled renderer used by the Detail preview and every export with Detail. |
@@ -321,7 +324,10 @@ ghosts), outdoor scenes, Firefox and WebKit timings for genuine files.
   browser, then read back from an sRGB 2D canvas. The preview proxy and the
   export use this same path, so they start from the same pixels. If a browser
   ignores EXIF orientation (checked once with a 2×1 probe), the editor rotates
-  the image itself.
+  the image itself. Firefox 142 loses alpha when `createImageBitmap` resizes with
+  `premultiplyAlpha: 'none'` (transparent areas came back opaque in reduced-size decodes, found
+  in Interval 12); a 2×2 PNG probe detects it, and affected browsers decode at the stored size
+  and let the canvas scale. Decodes at the stored size never pass resize options.
 - **Preview**: a proxy of at most 4096 px on the long edge, capped by
   `MAX_TEXTURE_SIZE`, drawn by WebGL2 into a canvas of the same size. Zoom and
   pan are CSS transforms of the processed pixels; past the proxy's resolution
@@ -623,30 +629,30 @@ font (Schibsted Grotesk or Martian Mono, SIL OFL, bundled), bold, italic (Grotes
 scale; Duplicate, Bring forward / Send backward and Delete. With the tool on, drag a text to
 move it (the photo does not pan), the corner handle scales, the round handle rotates (Shift:
 15° steps); focused text moves with the arrow keys (Shift: larger), Delete removes it, Enter
-or a double-click edits the wording; handles are 44 px on touch screens. Each object
-(`model/overlays.mjs`) is `{ id, type: 'text', text, font, weight, italic, size, x, y,
-rotation, scale, color, opacity, align, outline, shadow }` in `adjustments.overlays`; the
-array order is the z-order. Coordinates are relative to the output frame (centre at x, y),
+or a double-click edits the wording; handles are 44 px on touch screens. Since Interval 12 each
+object is a text layer in `adjustments.layers` (see [Layers](#layers)): `{ id, type: 'text', text,
+font, weight, italic, size, x, y, rotation, scale, color, opacity, align, outline, shadow }`
+plus the layer fields; Bring forward / Send backward move it within the whole stack. Coordinates are relative to the output frame (centre at x, y),
 so text keeps its place and proportions after a crop, a turn or any export size. Text is
 plain data drawn with `fillText`; on import, control and bidi-override characters are
 removed, 500 characters, 20 lines and 30 objects per photo at most, values clamped.
 
 **Text rendering.** Preview and export use the same layout (in output pixels) and drawing
-code (`text/textRender.mjs`): each object is drawn as a layer (outline, then fill) and
-composited with its opacity and shadow. Exports rasterise every object at the export's
-resolution on the page into a sprite cut to its ink, outline and shadow, and draw the
-sprites over the finished canvas just before encoding (raster, band-worker, RAW and HDR
-exports alike). Fonts load from the site's own assets (about 300 kB, only once text is used;
+code (`text/textRender.mjs`, `rasterizeTextLayer`): each object is drawn (outline, then fill,
+with its shadow) into a sprite at the render's own resolution (the preview canvas, or the export
+size) cut to its ink, outline and shadow, then composited like any layer with its opacity and
+blend mode (opacity now applies to text and shadow together, as group opacity). Fonts load from the site's own assets (about 300 kB, only once text is used;
 no font service); characters outside their Latin, Latin Extended (and Cyrillic for Martian
 Mono) subsets are drawn with a system font, and the Text panel says so. Placement measured
 in the check: preview, full-size and 300 px exports agree to 0.4% of the frame in Chromium,
 Firefox, WebKit and both phone emulations; glyph rasterisation differs slightly between
 browsers. Text is not shown in Original, sits on the edited side of Split, is hidden while
-cropping and in 1:1 Detail, and is not drawn in thumbnails.
+cropping and in 1:1 Detail, and is not drawn in thumbnails. In the preview it is as sharp as the
+preview canvas (up to 4096 px), so past that zoom it is upscaled like the photo.
 
-**Presets, sync, reset.** Presets contain Creative, never text. Paste copies Creative, never
-text; **Sync…** copies text only when Text overlays is ticked (it then replaces the target's
-text). Reset all clears text too (one undo step).
+**Presets, sync, reset.** Presets contain Creative, never layers. Paste copies Creative, never
+layers; **Sync…** copies the layer stack only when Layers is ticked. Reset all clears layers too
+(one undo step); the Text section's reset removes text layers only.
 
 **Filter Library measurements** (`npm run check:editor:filters`, Windows i7-9700, headless
 Playwright, whole browser memory; Chromium with `CHECK_GPU=1` on the RTX 3070, as headless
@@ -690,6 +696,121 @@ exports byte for byte. Shader vs CPU: 26 creative parity cases within one code v
 Three exports of the ARW cancelled after 1.5 s: 1299, 1291, 1290 MB (no growth). Headless
 Chromium renders WebGL2 with SwiftShader, so its preview timings for grain are CPU-bound;
 the creative shader is per pixel (grain reads 32 lattice values) and meant for a GPU.
+
+## Layers
+
+**Using them** (Layers panel at the top of the inspector, Adjust tab on phones; collapsible).
+The stack is listed top first above **Background**, the photo with all its own settings.
+Add **Image file…** (JPEG, PNG, WebP, ARW, DNG; imported for this photo only, not added to the
+workspace), **Photo…** (another workspace photo), **Text** or **Adjustment**; a new layer goes
+directly above the selected one. Select a row to edit that layer: blend mode, opacity, and for
+image layers X, Y, W, H (px of the canvas), angle, Free resize, Flip horizontal/vertical and
+Reset transform. Reorder by dragging the grip (mouse, pen or touch), with Move up/down, or
+Alt+↑/↓ on a focused row. The eye hides a layer, the lock keeps its content, position, opacity,
+blend mode and settings (visibility, name and order still change; it cannot be deleted).
+Double-click or F2 renames. **Delete…** asks first and never touches the file. With an image or
+adjustment layer selected, the Adjust panel edits **that layer's colour settings** (Light,
+Color, HSL, Tone Curve, LUT, Creative colour parts, presets), labelled with the layer's name;
+select Background to edit the photo. On the photo (**Move**, or T), image and text layers get a
+box: drag to move (the photo does not pan), corner handle to resize (proportional; Shift or
+Free resize: each axis), round handle to rotate (Shift: 15°), arrow keys move the focused
+layer; handles are 44 px on touch screens. Every change is one undo step (drags record one
+step on release).
+
+| Type | Content | Settings |
+| --- | --- | --- |
+| Image | A source file named by SHA-256 (plus name, size, format, dimensions); box `x`, `y` (centre, 0–1 of the canvas), `width`, `height` (canvas short edges), `rotation`, `flipH`, `flipV` | Per-pixel colour controls applied to the layer's own pixels; RAW sources are developed with their as-shot white balance first |
+| Text | The Interval 11 text object (`text`, font, size, colour, outline, shadow, `x`, `y`, `rotation`, `scale`) plus flips | – |
+| Adjustment | – | The same colour controls, applied to everything below it |
+
+Common fields: `id`, `type`, `name`, `visible`, `locked`, `opacity`, `blend`. Limits: 40 layers,
+8 image, 30 text, 12 adjustment. Colour settings are Light, Color, HSL, Tone Curve, LUT, and from
+Creative bleach bypass, film fade and tints, colour grading, sensor colour, response, highlight
+clipping and quantisation. Detail, glow, soft focus, grain, noise, vignette, capture/JPEG and
+lens effects need neighbouring pixels or the frame position and stay with the Background; RAW
+white balance and HDR tone stay with their own source.
+
+**Order and canvas.** `layers[0]` sits on the Background, the last entry is on top; each layer is
+composited over everything below it. Per render: (1) each source is developed (Background: RAW,
+HDR, every adjustment, Detail, Creative, Crop & Transform, exactly as before; image layer: its
+decode or RAW development and its colour settings), (2) image and text layers are placed with
+their transform, (3) composited bottom to top, adjustment layers acting on the composite below
+them, (4) encoded. The canvas is the Background's output frame: Crop & Transform shapes the
+canvas, and layer positions are relative to it, so they keep their place in the frame at every
+zoom, export size and device pixel ratio. Cropping does not move layers with the photo's
+content, and the Background's vignette and grain do not cover the layers.
+
+**Blending** (`pipeline/blend.mjs`, W3C Compositing and Blending Level 1): Normal, Multiply,
+Screen, Overlay, Soft Light, Hard Light, Darken, Lighten, Color Dodge, Color Burn, Difference,
+Exclusion, Hue, Saturation, Color, Luminosity. Blending runs on **sRGB-encoded** values (as CSS,
+canvas and most editors' 8-bit modes), not linear light; non-separable modes use the
+recommendation's weights 0.3, 0.59, 0.11. Colours are straight; the general formula
+`Co = (αs·((1 − αb)·Cs + αb·B(Cb, Cs)) + αb·(1 − αs)·Cb) / αo` with `αs` = the layer's alpha ×
+edge coverage × opacity, so a layer over transparency keeps its colour and soft edges never
+darken. An adjustment layer moves the composite toward `B(Cb, adjusted)` by its opacity and
+keeps its alpha. Results are not claimed to match Photoshop.
+
+**Compositing** (`pipeline/composite.mjs` CPU reference, `compositeShader.mjs` GPU mirror). The
+canvas is RGBA8 after every layer pass, on both. An image layer's raster is sampled at each
+canvas pixel centre through its inverse transform with the geometry warp's Catmull-Rom kernel
+(premultiplied, 1/256 px grid) and faded over one pixel at its edges; text is rasterised by the
+shared `textRender.mjs` at the render's own resolution and placed pixel for pixel. Passes are per
+pixel (the kernel reads the layer's raster, never the canvas), so bands need no overlap and
+tiles cannot seam. Preview: with visible layers the shader draws the photo into a framebuffer,
+then one pass per layer between two framebuffers (an adjustment layer runs the main shader in
+direct mode first); without WebGL2 the CPU composites the CPU frame. Layers are left out in
+Original, on the "before" side of Split, while cropping and in 1:1 Detail. Export: the photo
+renders as before into the export canvas, which is read once; each visible layer is prepared
+alone (image: decoded, or for RAW developed in the RAW queue, at the size its box needs on the
+export canvas, never more than the source; text: rasterised at export size), composited in
+256-row bands on the band workers (on the page, yielding, on phones), then released; the canvas
+is written back and encoded. At most one layer raster is held besides the canvas and its copy.
+A photo without layers, or with only hidden layers, empty text or neutral adjustment layers,
+renders exactly as before.
+
+**Projects.** Layers are part of the photo's settings: undo, autosave, Save edits/Open edits
+(version 9). Documents keep layer records and source references, never pixels. Version 8 and
+older files open with their text objects as text layers (same ids, order and fields; tested with
+documents written by the Interval 11.5 editor). When an image layer's file is not loaded (after a
+reload, or on another machine) the row says "missing", the layer is not drawn and the export is
+blocked with the layer's name; **Reconnect file…** accepts only the file with the same SHA-256
+(another file is refused with a message); importing the same file as a workspace photo also
+resolves it. Presets never contain layers; Paste never copies them; **Sync…** copies the whole
+stack only when **Layers** is ticked (it replaces the target's stack). Thumbnails and the Filter
+Library show the photo without layers.
+
+**Accuracy and measurements** (`npm run check:editor:layers`): Windows i7-9700, headless Playwright,
+whole browser memory, Chromium without `CHECK_GPU` (SwiftShader).
+
+- **Parity** (29 cases: every blend mode with a rotated, flipped, soft-alpha layer at 80%, over
+  transparency, an exact sprite, five adjustment layers, a three-layer stack). Shader passes vs
+  the CPU reference over the shader's own photo render: raster passes ≤ 1 code in Chromium 141,
+  Firefox 142 and WebKit 26; adjustment passes ≤ 1 in Chromium, ≤ 4 in Firefox and WebKit, where
+  a 1-code difference in the adjusted colour (the established shader tolerance) is amplified by
+  Luminosity's clip-to-gamut step (few pixels, mean 0.02). End to end, including the photo's own
+  shader-vs-CPU difference: ≤ 1 (Chromium), ≤ 6 (Firefox, WebKit; dodge and burn amplify it).
+  The CPU reference against the browsers' own canvas blend modes (an independent implementation
+  of the same formulas): ≤ 4 codes, dodge/burn ≤ 10 (canvases store premultiplied 8-bit values).
+- **Exports**: PNG exports with a hard-alpha PNG layer (multiply, 80%, 20°) and an adjustment
+  layer, in both orders, **equal the Node reference exactly** in all six environments (Chromium,
+  Firefox, WebKit, iPhone 13 and Pixel 7 emulation, no WebGL2); a text layer changes only pixels
+  around it, centred within 6 px of where its fields put it. Soft-alpha PNG layers are decoded
+  through the browser's premultiplied canvas, which can move their colours by a code before
+  compositing (covered by the unit and parity tests instead).
+
+| | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- |
+| Add a 300×200 PNG layer to its first composited frame · blend change · opacity change · drag frame (median) | 287 · 72 · 141 · 157 ms | 651 · 18 · 50 · 32 ms | 742 · 63 · 70 · 47 ms |
+| 24 MP photo + 12 MP JPEG layer + adjustment layer: layer preview · JPEG export · peak · after deleting both | 114 ms · 2.0 s · 1803 MB · 1424 MB | 279 ms · 2.2 s · 1979 MB · 1755 MB | 604 ms · 2.9 s · 1597 MB · 857 MB |
+| Genuine A7 III ARW + JPEG layer (soft light) + ARW layer (screen, 2000 px) + text: layer previews · export · peak | 3.8 s · 7.7 s · 7.7 s · 1612 MB | 0.5 s · 4.5 s · 19.4 s · 2185 MB | not run (LibRaw crash, see Known issues) |
+| Merged RAW HDR (DSC09640–42) + JPEG layer (overlay, 60%) + text: export · peak | 17.2 s · 2319 MB | not run | not run |
+
+Phones (emulation, not devices): adding a layer 0.3 s (Pixel 7) and 0.8 s (iPhone 13), drag
+frames 64–147 ms, grips and row targets 44 px, no sideways scroll. Without WebGL2 the CPU
+composites at the preview size (drag frame 90 ms at 600×400). The RAW layer preview waits for
+the RAW queue (one decoder at a time), so a RAW layer appears after its half-size decode.
+Repeated project switching with layers was not measured separately; the raster cache is bounded
+(8 rasters, 384 MB) and cleared when the workspace empties. No physical iPhone was tested.
 
 ## Batch editing
 
@@ -820,6 +941,9 @@ RAWs, ZIP parts above 1 GB.
 - Values are relative to neutral (LUT intensity defaults to 100). The ten
   Interval 3 controls are always written; other controls, curves and the LUT
   only when they change something. Missing keys are neutral.
+- Version 9 replaced `overlays` with `layers` (see [Layers](#layers)): image layers store
+  `source: { sha256, name, size, format, width, height }`, never pixels; settings are compacted
+  like the photo's. Older files' text objects become text layers (same ids and order).
 - Version 8 added the digital creative controls (`sensorColor` … `diffusionRadius`, see
   [Creative and text](#creative-and-text)) and `filter` (`{ "id": "filter:classic-ccd",
   "strength": 70 }`, the Filter Library record; an unknown id is kept and shown as modified,
@@ -862,7 +986,7 @@ RAWs, ZIP parts above 1 GB.
   …"); nothing is recorded until it is clicked.
 - Saving preselects the groups that are edited, except Exposure and White
   balance (usually per-photo corrections); any group can be ticked.
-- Presets never contain or change geometry or text (they belong to one photo); Creative is a group.
+- Presets never contain or change geometry or layers (they belong to one photo); Creative is a group. Applied with an image or adjustment layer selected, a preset sets that layer's colour settings.
 - Built-ins (Natural, Warm Portrait, Cool Landscape, Soft Film, High Contrast,
   Black & White) are ordinary presets run through the same engine; none
   touches exposure or white balance.
@@ -882,7 +1006,8 @@ format's extension. The default suffix is `-quangedit`: `DSC09420.ARW` →
 already ends with the suffix gets no second one; Unicode names, extra dots and
 names without an extension are kept. A custom suffix typed in the Export panel is
 kept (empty is allowed); saved settings that still hold the old default `-edited`
-switch to `-quangedit`.
+switch to `-quangedit`. A layered photo is named after its Background (the composition is that
+photo's), so `DSC09641-HDR` with layers exports as `DSC09641-HDR-quangedit.jpg`.
 
 ## Import limits
 
@@ -1056,6 +1181,11 @@ Safari cannot encode WebP (the option is disabled when the browser cannot).
   crashed. It looks like a
   defect in the Windows WebKit port's handling of shared wasm memory; Safari on macOS and
   iOS has not been tested, so it is not known whether it is affected.
+- Layers (Interval 12): no masks, clipping, groups or smart objects; Detail, grain, vignette and
+  geometry apply to the Background only (not over the layers); 1:1 Detail, thumbnails and the
+  Filter Library show the photo without layers; layer previews of RAW sources wait for the RAW
+  queue; in the preview a layer is as sharp as the preview canvas (4096 px at most). Merged HDR
+  photos cannot be image layers (only the Background).
 - Geometry is manual: no automatic straightening, lens or camera-profile correction; no
   upscaling; Detail is not previewed while the crop tool is open; perspective corners stay
   inside the frame. Geometry adds the warp to exports (see
@@ -1073,8 +1203,8 @@ at render time), local and exportable at full resolution. Not built yet:
 | Feature | Where it goes |
 | --- | --- |
 | More RAW formats (NEF, then CR2/CR3, RAF, ORF) | LibRaw decodes them already; add the maker to `sniffRaw`, then genuine fixtures and `rawFixtures.test.js` cases before claiming support. X-Trans (RAF) needs checking against `checkDecodable`. |
-| Layers, blend modes | Text objects already have layer-shaped records (`id`, `type`, transform, content) in `overlays`; image and adjustment layers would join that list, composited after the photo pipeline by the same engine in preview and export. |
-| Brushes, masks, gradients, local adjustments | Per-layer masks evaluated per pixel; brush masks need a stored raster or stroke list. |
+| Brushes, masks, gradients, local adjustments | Per-layer masks multiply `αs` in `composite.mjs` and the composite shader; brush masks need a stored raster or stroke list (outside the JSON document, like sources). Clipping masks and groups would nest passes. |
+| Canvas-level effects over layers | Vignette, grain and geometry over the whole composite need the spatial renderer on the composited canvas (halo bands per pass). |
 | Retouching, healing | Spatial; the tiled renderer and halo bands in `detailRenderer.mjs`. |
 | Faster export | Band workers (`detailPool.mjs`) for non-Detail exports and Detail previews; per-pixel stages are independent per band too. |
 | GPU Detail | A multi-pass WebGL2 version needs float render targets and parity checks against the CPU renderer. |

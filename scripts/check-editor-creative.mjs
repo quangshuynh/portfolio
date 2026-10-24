@@ -243,23 +243,18 @@ async function runOne(run, files) {
     await locator.dispatchEvent('pointermove', { ...base, clientX: x + dx, clientY: y + dy });
     await locator.dispatchEvent('pointerup', { ...base, clientX: x + dx, clientY: y + dy });
   };
-  // Magenta text in the preview, normalised to the displayed photo.
+  // Magenta text in the preview (the composited frame), normalised to the output frame.
   const previewTextBox = () => page.evaluate(() => {
-    const canvas = document.querySelector('.pe-text-canvas');
-    const host = document.querySelector('.pe-canvas-host').getBoundingClientRect();
-    const stage = document.querySelector('.pe-stage-area').getBoundingClientRect();
-    if (!canvas) return null;
-    const ratio = canvas.width / stage.width;
-    const { data, width, height } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    const frame = window.__photoEditorPreview?.read();
+    if (!frame) return null;
+    const { data, width, height } = frame;
     let [x0, y0, x1, y1, n] = [Infinity, Infinity, -Infinity, -Infinity, 0];
     for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
       const i = (y * width + x) * 4;
       if (data[i] > 190 && data[i + 1] < 90 && data[i + 2] > 190 && data[i + 3] > 128) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + 1); y1 = Math.max(y1, y + 1); n += 1; }
     }
     if (!n) return null;
-    const left = host.left - stage.left;
-    const top = host.top - stage.top;
-    return { cx: ((x0 + x1) / 2 / ratio - left) / host.width, cy: ((y0 + y1) / 2 / ratio - top) / host.height, w: (x1 - x0) / ratio / host.width, h: (y1 - y0) / ratio / host.height };
+    return { cx: (x0 + x1) / 2 / width, cy: (y0 + y1) / 2 / height, w: (x1 - x0) / width, h: (y1 - y0) / height };
   });
   try {
     await step('load', async () => {
@@ -322,7 +317,7 @@ async function runOne(run, files) {
       await textarea.fill('Night market\nĐà Lạt');
       await page.locator('.pe-textpanel input[type=color]').first().fill(MAGENTA);
       await page.getByRole('checkbox', { name: 'Bold' }).uncheck();
-      await savedWhen('creative-small.png', (a) => a.overlays?.[0]?.color === MAGENTA && a.overlays[0].text.startsWith('Night'), 'text saved');
+      await savedWhen('creative-small.png', (a) => a.layers?.[0]?.color === MAGENTA && a.layers[0].text.startsWith('Night'), 'text saved');
       if (run.device) await tab(2);
       const box = page.locator('.pe-textbox').first();
       await box.waitFor();
@@ -337,13 +332,13 @@ async function runOne(run, files) {
       }
       const hostBefore = await page.evaluate(() => document.querySelector('.pe-canvas-host').style.transform);
       await drag(box, -60, -40);
-      const moved = await savedWhen('creative-small.png', (a) => a.overlays?.[0] && (a.overlays[0].x !== 0.5 || a.overlays[0].y !== 0.5), 'text moved');
+      const moved = await savedWhen('creative-small.png', (a) => a.layers?.[0] && (a.layers[0].x !== 0.5 || a.layers[0].y !== 0.5), 'text moved');
       // The photo did not pan while the text was dragged.
       assert.equal(await page.evaluate(() => document.querySelector('.pe-canvas-host').style.transform), hostBefore);
       await drag(page.locator('.pe-textbox__handle--rotate'), 40, 0);
-      const rotated = await savedWhen('creative-small.png', (a) => a.overlays?.[0]?.rotation !== 0, 'text rotated');
-      result.text = { x: rotated.overlays[0].x, y: rotated.overlays[0].y, rotation: rotated.overlays[0].rotation, size: rotated.overlays[0].size };
-      assert.ok(moved.overlays[0].x < 0.5 && moved.overlays[0].y < 0.5);
+      const rotated = await savedWhen('creative-small.png', (a) => a.layers?.[0]?.rotation !== 0, 'text rotated');
+      result.text = { x: rotated.layers[0].x, y: rotated.layers[0].y, rotation: rotated.layers[0].rotation, size: rotated.layers[0].size };
+      assert.ok(moved.layers[0].x < 0.5 && moved.layers[0].y < 0.5);
       // Second object, behind the first, and keyboard nudges.
       await openSection('text');
       await page.getByRole('button', { name: 'Add text', exact: true }).click();
@@ -354,7 +349,7 @@ async function runOne(run, files) {
       await textBox.focus();
       await page.keyboard.press('Shift+ArrowDown');
       await page.keyboard.press('Shift+ArrowDown');
-      const two = await savedWhen('creative-small.png', (a) => a.overlays?.length === 2 && a.overlays[1].y > 0.53, 'second text');
+      const two = await savedWhen('creative-small.png', (a) => a.layers?.length === 2 && a.layers[1].y > 0.53, 'second text');
       await page.waitForTimeout(400);
       const previewBox = await poll(previewTextBox, Boolean, 'magenta text in the preview');
       const full = await readPng(await exportFile('png'));
@@ -384,15 +379,16 @@ async function runOne(run, files) {
     await step('Original hides the text, Split keeps it on the edited side; undo restores', async () => {
       if (run.device) return;
       await page.click('.pe-compare button:has-text("Original")');
-      assert.equal(await page.locator('.pe-text-canvas').count(), 0);
+      await page.waitForTimeout(300);
+      assert.equal(await previewTextBox(), null, 'text shown in Original');
       await page.click('.pe-compare button:has-text("Edited")');
-      assert.equal(await page.locator('.pe-text-canvas').count(), 1);
+      await poll(previewTextBox, Boolean, 'text back in Edited');
       await page.locator('.pe-textbox[data-selected]').focus();
       await page.keyboard.press('Delete');
-      await savedWhen('creative-small.png', (a) => a.overlays?.length === 1, 'deleted');
+      await savedWhen('creative-small.png', (a) => a.layers?.length === 1, 'deleted');
       await page.evaluate(() => document.activeElement?.blur());
       await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z');
-      await savedWhen('creative-small.png', (a) => a.overlays?.length === 2, 'undone');
+      await savedWhen('creative-small.png', (a) => a.layers?.length === 2, 'undone');
     });
     await step('paste to a second photo (creative, no text); ZIP entry equals the single export', async () => {
       if (run.device) return;
@@ -402,7 +398,7 @@ async function runOne(run, files) {
       await select('creative-second.png');
       await page.getByRole('button', { name: /^Paste edits/ }).click();
       const second = await savedWhen('creative-second.png', (a) => a.grainAmount > 0, 'pasted');
-      assert.ok(!second.overlays?.length, 'text was pasted');
+      assert.ok(!second.layers?.length, 'text was pasted');
       const single = await readPng(await exportFile('png'));
       await page.evaluate(() => document.activeElement?.blur());
       await page.keyboard.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a');
@@ -438,7 +434,7 @@ async function runOne(run, files) {
         await openSection('text');
         await page.getByRole('button', { name: 'Add text', exact: true }).click();
         await page.getByRole('textbox', { name: 'Text', exact: true }).fill('Large export');
-        await savedWhen('creative-24mp.jpg', (a) => a.overlays?.[0]?.text === 'Large export' && a.bloomAmount === 50, 'large settings');
+        await savedWhen('creative-24mp.jpg', (a) => a.layers?.[0]?.text === 'Large export' && a.bloomAmount === 50, 'large settings');
         const stop = sampler(profile);
         const started = Date.now();
         const download = await exportFile('jpeg');
