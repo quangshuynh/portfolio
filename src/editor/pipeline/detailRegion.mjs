@@ -7,14 +7,17 @@
 // halo pixels around the region, so the crop's edges are those of the export.
 
 import { prepareRender, renderRawRgba8, renderRgba8 } from './cpuRenderer.mjs';
-import { computeImageGlow, computeImageGuide, createAreaAccumulator, guideSize, guideSource, prepareDetailRender, renderDetailRows, rowsHaveAlpha } from './detailRenderer.mjs';
+import { createAreaAccumulator, guideSize, guideSource, prepareDetailRender, renderDetailRows, rowsHaveAlpha } from './detailRenderer.mjs';
 import { finishRows, warpRows, warpSpec } from './warp.mjs';
 import { detailHalo, detailParams } from './detail.mjs';
+import { DIGITAL, shiftHalo } from './digital.mjs';
 import { deriveParams } from './spec.mjs';
 import { neutralAdjustments } from '../model/adjustments.mjs';
 
 /** Largest halo any Detail settings need at native size. */
 export const MAX_DETAIL_HALO = detailHalo(detailParams({ texture: 100, clarity: 100, dehaze: 100, sharpening: 100, luminanceNoise: 100, colorNoise: 100 }), 1);
+/** Largest halo of any settings for an image: Detail plus the strongest channel shift (digital.mjs). */
+export const regionHalo = (image) => MAX_DETAIL_HALO + shiftHalo({ radial: DIGITAL.aberration, dx: DIGITAL.displacement, dy: 0 }, image.width, image.height);
 /** Largest 1:1 region rendered at once, in source pixels. */
 export const MAX_REGION = Object.freeze({ width: 2048, height: 1536 });
 
@@ -38,8 +41,8 @@ export function regionAt(center, size, image) {
 
 /** The crop a worker keeps for a region: `margin` (fraction) of room to pan on each side plus the halo. */
 export function sourceRect(region, image, margin = 0.5) {
-  const padX = Math.round(region.width * margin) + MAX_DETAIL_HALO;
-  const padY = Math.round(region.height * margin) + MAX_DETAIL_HALO;
+  const padX = Math.round(region.width * margin) + regionHalo(image);
+  const padY = Math.round(region.height * margin) + regionHalo(image);
   const x = Math.max(0, region.x - padX);
   const y = Math.max(0, region.y - padY);
   return { x, y, width: Math.min(image.width, region.x + region.width + padX) - x, height: Math.min(image.height, region.y + region.height + padY) - y };
@@ -47,10 +50,11 @@ export function sourceRect(region, image, margin = 0.5) {
 
 /** True when a region and its halo lie inside a kept crop (so no new decode is needed). */
 export function covers(source, region, image) {
-  const left = Math.max(0, region.x - MAX_DETAIL_HALO);
-  const top = Math.max(0, region.y - MAX_DETAIL_HALO);
-  const right = Math.min(image.width, region.x + region.width + MAX_DETAIL_HALO);
-  const bottom = Math.min(image.height, region.y + region.height + MAX_DETAIL_HALO);
+  const halo = regionHalo(image);
+  const left = Math.max(0, region.x - halo);
+  const top = Math.max(0, region.y - halo);
+  const right = Math.min(image.width, region.x + region.width + halo);
+  const bottom = Math.min(image.height, region.y + region.height + halo);
   return left >= source.x0 && top >= source.y0 && right <= source.x0 + source.width && bottom <= source.y0 + source.height;
 }
 
@@ -115,7 +119,7 @@ export function renderRegion(kept, region, { adjustments, lut = null, raw = null
     const params = deriveParams(values, { lut, raw });
     if (!params.spatialActive) return isRaw ? renderRawRgba8(crop.data, params) : renderRgba8(crop.data, params);
     const prepared = prepareRender(params);
-    const context = prepareDetailRender(prepared, { width: native.width, height: native.height, guide: computeImageGuide(prepared, guideImage), glow: computeImageGlow(prepared, guideImage), transparent });
+    const context = prepareDetailRender(prepared, { width: native.width, height: native.height, guideImage, transparent });
     const out = new Uint8ClampedArray(region.width * region.height * 4);
     renderDetailRows(source, context, region.y, region.y + region.height, out, { columns: [region.x, region.x + region.width] });
     return out;

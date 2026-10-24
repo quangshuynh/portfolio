@@ -7,12 +7,15 @@
 // exactly as the CPU does, so no float-texture filtering extension is needed. The creative
 // stage mirrors creative.applyCreative() with the parameters creativeParams() derived; its
 // glow map (computed on the CPU from the guide grid) is a float texture sampled the same way.
+// Channel shift and the capture of digital.mjs are not mirrored: photos using them are
+// rendered on the CPU (params.cpuOnly); the per-pixel digital effects and noise are.
 
 import { LUMA } from './colorMath.mjs';
 import { CURVE_TABLE_SIZE } from './curves.mjs';
 import { BLACK_EPSILON, HSL_CENTERS, HSL_LUMINANCE_EV, SHADOW_LIFT_SCALE, TONE_PIVOT } from './spec.mjs';
 import { POSITION_GRID, ROUNDING_BIAS } from './warp.mjs';
 import { CREATIVE } from './creative.mjs';
+import { DIGITAL } from './digital.mjs';
 
 const f = (value) => {
   const text = String(value);
@@ -107,6 +110,20 @@ uniform bool uHalation;
 uniform float uHalationAmount;
 uniform vec3 uHalationTint;
 uniform sampler2D uGlow;
+uniform bool uDiffusion;
+uniform float uDiffusionAmount;
+uniform sampler2D uDiffuse;
+uniform bool uSensor;
+uniform mat3 uSensorMatrix;
+uniform bool uResponse;
+uniform vec2 uResponseParams;
+uniform bool uClip;
+uniform float uClipGain;
+uniform bool uQuantize;
+uniform float uQuantizeSteps;
+uniform bool uNoise;
+uniform vec3 uNoiseParams;
+uniform uint uNoiseSeed;
 in vec2 vUv;
 out vec4 outColor;
 
@@ -129,6 +146,8 @@ const float VIGNETTE_LIGHTEN = ${f(CREATIVE.vignetteLighten)};
 const float GRAIN_FLOOR = ${f(CREATIVE.grainFloor)};
 const float GRADE_BLACK = ${f(CREATIVE.gradeBlack)};
 const float SQRT6 = ${f(Math.sqrt(6))};
+const float NOISE_FLOOR = ${f(DIGITAL.noiseFloor)};
+const vec3 NOISE_GAIN = vec3(${DIGITAL.noiseChannelGain.map(f).join(', ')});
 
 float toLinear(float v) {
   return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4);
@@ -498,34 +517,71 @@ float grainValue(vec2 at) {
   return ((1.0 - r) * coarse + r * fine) / sqrt((1.0 - r) * (1.0 - r) + r * r);
 }
 
-// Bilinear sample of the glow map at an output pixel (creative.sampleGlow).
-vec4 glowAt(vec2 at) {
-  ivec2 size = textureSize(uGlow, 0);
+// Bilinear sample of the glow map (or the soft focus map) at an output pixel (creative.sampleGlow).
+vec4 glowAt(sampler2D map, vec2 at) {
+  ivec2 size = textureSize(map, 0);
   vec2 g = clamp((at + 0.5) * vec2(size) / uOutputSize - 0.5, vec2(0.0), vec2(size - 1));
   ivec2 i0 = ivec2(floor(g));
   ivec2 i1 = min(i0 + 1, size - 1);
   vec2 t = g - vec2(i0);
-  vec4 a = texelFetch(uGlow, i0, 0);
-  vec4 b = texelFetch(uGlow, ivec2(i1.x, i0.y), 0);
-  vec4 c = texelFetch(uGlow, ivec2(i0.x, i1.y), 0);
-  vec4 d = texelFetch(uGlow, i1, 0);
+  vec4 a = texelFetch(map, i0, 0);
+  vec4 b = texelFetch(map, ivec2(i1.x, i0.y), 0);
+  vec4 c = texelFetch(map, ivec2(i0.x, i1.y), 0);
+  vec4 d = texelFetch(map, i1, 0);
   return a * (1.0 - t.x) * (1.0 - t.y) + b * t.x * (1.0 - t.y) + c * (1.0 - t.x) * t.y + d * t.x * t.y;
 }
 
 vec3 screen(vec3 a, vec3 b) { return a + b - a * b; }
 
+// ---- Digital effects (digital.mjs) ----
+
+vec3 diffuse(vec3 lin, vec3 blurred) {
+  return lin + uDiffusionAmount * (blurred - lin) * mix(vec3(0.5), vec3(1.0), vec3(greaterThan(blurred, lin)));
+}
+
+vec3 cameraResponse(vec3 p) {
+  vec3 v = clamp(p, 0.0, 1.0);
+  vec3 lo = 0.5 * pow(2.0 * v, vec3(uResponseParams.x));
+  vec3 hi = 1.0 - 0.5 * pow(max(2.0 - 2.0 * v, 0.0), vec3(uResponseParams.x));
+  p = mix(hi, lo, vec3(lessThan(v, vec3(0.5))));
+  float y = dot(LUMA, p);
+  return clamp(y + (p - y) * uResponseParams.y, 0.0, 1.0);
+}
+
+float triangular(uint h) { return (float(h & 0xffffu) / 65536.0 + float(h >> 16u) / 65536.0 - 1.0) * SQRT6; }
+
+// digital.applyNoise: uNoiseParams = (amplitude × min(1, unit), chroma share, unit).
+vec3 sensorNoise(vec3 p, vec2 at) {
+  int ix = int(floor((at.x + 0.5) / uNoiseParams.z));
+  int iy = int(floor((at.y + 0.5) / uNoiseParams.z));
+  float n0 = triangular(grainHash(ix, iy, uNoiseSeed));
+  vec3 n = vec3(triangular(grainHash(ix, iy, uNoiseSeed + 0x632be5abu)), triangular(grainHash(ix, iy, uNoiseSeed + 0xc657cb56u)), triangular(grainHash(ix, iy, uNoiseSeed + 0x2983b101u)));
+  float l = clamp(dot(LUMA, p), 0.0, 1.0);
+  float sigma = uNoiseParams.x * (NOISE_FLOOR + (1.0 - NOISE_FLOOR) * (1.0 - l) * (1.0 - l));
+  float c = uNoiseParams.y;
+  float norm = 1.0 / sqrt((1.0 - c) * (1.0 - c) + c * c);
+  return clamp(p + sigma * norm * ((1.0 - c) * n0 + c * NOISE_GAIN * n), 0.0, 1.0);
+}
+
 vec3 applyCreative(vec3 p) {
   vec2 at = outputPixel();
-  if (uBloom || uHalation) {
-    vec4 glow = glowAt(at);
+  if (uBloom || uHalation || uDiffusion) {
     vec3 lin = toLinear3(clamp(p, 0.0, 1.0));
-    if (uBloom) lin = screen(lin, min(vec3(1.0), uBloomAmount * glow.rgb));
-    if (uHalation) lin = screen(lin, min(vec3(1.0), uHalationAmount * glow.a * uHalationTint));
+    if (uBloom || uHalation) {
+      vec4 glow = glowAt(uGlow, at);
+      if (uBloom) lin = screen(lin, min(vec3(1.0), uBloomAmount * glow.rgb));
+      if (uHalation) lin = screen(lin, min(vec3(1.0), uHalationAmount * glow.a * uHalationTint));
+    }
+    if (uDiffusion) lin = diffuse(lin, glowAt(uDiffuse, at).rgb);
     p = toSrgb3(lin);
   }
+  if (uSensor) p = clamp(uSensorMatrix * p, 0.0, 1.0);
+  if (uResponse) p = cameraResponse(p);
+  if (uClip) p = min(vec3(1.0), max(p, 0.0) * uClipGain);
   if (uBleach) p = bleachBypass(p);
   if (uFade) p = filmFade(p);
   if (uGrade) p = colorGrade(p);
+  if (uQuantize) p = clamp(floor(clamp(p, 0.0, 1.0) * uQuantizeSteps + 0.5), 0.0, uQuantizeSteps) / uQuantizeSteps;
   if (uVignette) {
     float fall = vignetteFalloff(at);
     if (fall > 0.0) {
@@ -533,6 +589,7 @@ vec3 applyCreative(vec3 p) {
       else p += (1.0 - p) * (uVignetteParams.x * VIGNETTE_LIGHTEN * fall);
     }
   }
+  if (uNoise) p = sensorNoise(p, at);
   if (uGrain) {
     float l = clamp(dot(LUMA, p), 0.0, 1.0);
     float tone = GRAIN_FLOOR + (1.0 - GRAIN_FLOOR) * 4.0 * l * (1.0 - l);

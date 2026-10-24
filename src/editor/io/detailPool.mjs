@@ -10,8 +10,7 @@
 
 import { createWorkerClient, WorkerCancelled } from './workerClient.mjs';
 import { prepareRender } from '../pipeline/cpuRenderer.mjs';
-import { computeImageGlow, computeImageGuide, createAreaAccumulator, guideSize, rowsHaveAlpha } from '../pipeline/detailRenderer.mjs';
-import { detailHalo } from '../pipeline/detail.mjs';
+import { computeImageCapture, computeImageGlow, computeImageGuide, createAreaAccumulator, guideSize, prepareDetailRender, rowsHaveAlpha } from '../pipeline/detailRenderer.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { assertCanvasWorks, createCanvas, encodeCanvas } from './decode.mjs';
 import { exportGeometry } from './files.mjs';
@@ -42,8 +41,8 @@ const spawnRenderWorker = () => new Worker(new URL('./imageWorker.mjs', import.m
 const channelsOf = (image) => (image.kind === 'raw' || image.kind === 'hdr' ? 3 : 4);
 const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-/** Guide, glow map and transparency of a whole image, read in bands so the page keeps painting. */
-async function analyse(image, prepared, signal) {
+/** Guide, glow map, capture map and transparency of a whole image, read in bands so the page keeps painting. */
+async function analyse(image, prepared, signal, native) {
   const small = guideSize(image);
   const accumulator = createAreaAccumulator(image.kind, image.width, image.height, small.width, small.height);
   const channels = channelsOf(image);
@@ -58,7 +57,9 @@ async function analyse(image, prepared, signal) {
   }
   const source = accumulator.finish();
   const guideImage = small.width === image.width && small.height === image.height && !transparent ? image : source;
-  return { guide: computeImageGuide(prepared, guideImage), glow: computeImageGlow(prepared, guideImage), transparent };
+  const guide = computeImageGuide(prepared, guideImage);
+  const glow = computeImageGlow(prepared, guideImage);
+  return { guide, glow, capture: computeImageCapture(prepared, guideImage, { ...native, guide, glow }), transparent };
 }
 
 /**
@@ -152,10 +153,10 @@ export async function renderDetailParallel(image, settings, options) {
   const { adjustments, lut = null, raw = null, nativeWidth = image.width, nativeHeight = image.height, flattenAlpha = false } = settings;
   const signal = options.signal ?? { cancelled: false };
   const prepared = prepareRender(deriveParams(adjustments, { lut, raw }));
-  const { guide, glow, transparent } = await analyse(image, prepared, signal);
-  const scale = Math.min(1, Math.max(image.width, image.height) / Math.max(nativeWidth, nativeHeight));
-  const halo = detailHalo(prepared.params.detail, scale);
-  const begin = { adjustments, lut, raw, options: { width: image.width, height: image.height, nativeWidth, nativeHeight, guide, glow, transparent } };
+  const { guide, glow, capture, transparent } = await analyse(image, prepared, signal, { nativeWidth, nativeHeight });
+  const renderOptions = { width: image.width, height: image.height, nativeWidth, nativeHeight, guide, glow, capture, transparent };
+  const { halo } = prepareDetailRender(prepared, renderOptions);
+  const begin = { adjustments, lut, raw, options: renderOptions };
   return renderBands(image, { begin: ['detailBegin', begin], rowsTask: 'detailRows', halo, flattenAlpha }, { ...options, signal });
 }
 

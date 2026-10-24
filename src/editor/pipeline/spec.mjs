@@ -145,6 +145,8 @@ export function deriveParams(adjustments, { lut = null, raw = null } = {}) {
   // Detail and the positional creative effects (glow, vignette, grain) need neighbours or
   // the pixel's place in the frame: CPU renders of such photos go through detailRenderer.mjs.
   params.spatialActive = params.detailActive || params.creative.positional;
+  // Channel shift and the capture (digital.mjs) have no GPU equivalent: previews render on the CPU.
+  params.cpuOnly = params.detailActive || params.creative.cpuOnly;
   params.neutral = params.baseNeutral && !params.postActive && !params.detailActive;
   return params;
 }

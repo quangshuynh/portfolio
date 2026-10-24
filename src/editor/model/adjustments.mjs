@@ -8,7 +8,8 @@
 // imported .cube LUT by content hash, or null), `raw` (white balance of a RAW
 // photo's development; ignored for JPEG, PNG and WebP) and `geometry` (crop, rotation,
 // flips, perspective, stretch and resize; pipeline/geometry.mjs) and `overlays` (text
-// objects drawn over the finished photo; model/overlays.mjs). The `hdr` controls only act on
+// objects drawn over the finished photo; model/overlays.mjs) and `filter` (which Filter Library
+// filter set the Creative group, and at what strength; model/filters.mjs). The `hdr` controls only act on
 // merged RAW HDR photos. Creative controls (pipeline/creative.mjs) carry a `section` for the
 // panel, and `scales` when a look's intensity scales them from neutral.
 
@@ -114,6 +115,22 @@ export const ADJUSTMENTS = Object.freeze([
   ]),
   { key: 'gradeBalance', group: 'creative', section: 'grading', label: 'Grading balance', shortLabel: 'Balance', min: -100, max: 100, step: 1 },
   { key: 'gradeBlending', group: 'creative', section: 'grading', label: 'Grading blending', shortLabel: 'Blending', min: 0, max: 100, step: 1, default: 50, signed: false },
+  // Digital camera, capture and lens effects (pipeline/digital.mjs).
+  { key: 'sensorColor', group: 'creative', section: 'camera', label: 'Sensor color', shortLabel: 'Sensor color', min: -100, max: 100, step: 1, scales: true, track: 'temperature' },
+  { key: 'cameraResponse', group: 'creative', section: 'camera', label: 'Camera response', shortLabel: 'Response', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'highlightClip', group: 'creative', section: 'camera', label: 'Highlight clipping', shortLabel: 'Highlight clipping', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'noiseAmount', group: 'creative', section: 'camera', label: 'Sensor noise amount', shortLabel: 'Noise', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'noiseColor', group: 'creative', section: 'camera', label: 'Sensor noise color', shortLabel: 'Noise color', min: 0, max: 100, step: 1, default: 50, signed: false },
+  { key: 'captureResolution', group: 'creative', section: 'capture', label: 'Low resolution', shortLabel: 'Low resolution', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'pixelEdges', group: 'creative', section: 'capture', label: 'Pixel edges', shortLabel: 'Pixel edges', min: 0, max: 100, step: 1, signed: false },
+  { key: 'jpegAmount', group: 'creative', section: 'capture', label: 'JPEG compression', shortLabel: 'JPEG compression', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'quantizeAmount', group: 'creative', section: 'capture', label: 'Color quantization', shortLabel: 'Quantization', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'quantizeDither', group: 'creative', section: 'capture', label: 'Quantization dither', shortLabel: 'Dither', min: 0, max: 100, step: 1, signed: false },
+  { key: 'chromaticAberration', group: 'creative', section: 'lens', label: 'Chromatic aberration', shortLabel: 'Chromatic aberration', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'channelShift', group: 'creative', section: 'lens', label: 'Channel shift', shortLabel: 'Channel shift', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'channelShiftAngle', group: 'creative', section: 'lens', label: 'Channel shift angle', shortLabel: 'Shift angle', min: 0, max: 359, step: 1, unit: '°', signed: false },
+  { key: 'diffusionAmount', group: 'creative', section: 'lens', label: 'Soft focus', shortLabel: 'Soft focus', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'diffusionRadius', group: 'creative', section: 'lens', label: 'Soft focus radius', shortLabel: 'Radius', min: 0, max: 100, step: 1, default: 40, signed: false },
   { key: 'lutIntensity', group: 'lut', label: 'Intensity', min: 0, max: 100, step: 1, unit: '%', default: 100, signed: false },
 ].map((entry) => Object.freeze({ digits: 0, unit: '', default: 0, signed: true, ...entry })));
 
@@ -165,6 +182,20 @@ export function normalizeLutRef(input) {
   };
 }
 
+/**
+ * The filter a photo's Creative settings came from: `id` (a built-in filter or a custom one)
+ * and `strength` 0–100. It records the choice only; the pixels follow the Creative values.
+ */
+export function normalizeFilterRef(input) {
+  if (input === null || typeof input !== 'object') return null;
+  const { id, strength } = input;
+  if (typeof id !== 'string' || id.length > 100 || !/^(filter|look|preset):[^\u0000-\u001f\u007f]+$/.test(id)) return null;
+  const value = Number(strength);
+  return { id, strength: Number.isFinite(value) ? Math.min(100, Math.max(0, Math.round(value))) : 100 };
+}
+
+const filterRefsEqual = (a, b) => (a === null || b === null ? a === b : a.id === b.id && a.strength === b.strength);
+
 export const RAW_DEFAULTS = Object.freeze({ whiteBalance: 'as-shot' });
 
 /**
@@ -187,6 +218,7 @@ export function neutralAdjustments() {
     raw: { ...RAW_DEFAULTS },
     geometry: neutralGeometry(),
     overlays: [],
+    filter: null,
   };
 }
 
@@ -203,6 +235,7 @@ export function normalizeAdjustments(input = {}) {
     raw: normalizeRawSettings(source.raw),
     geometry: normalizeGeometry(source.geometry),
     overlays: normalizeOverlays(source.overlays),
+    filter: normalizeFilterRef(source.filter),
   };
 }
 
@@ -211,7 +244,7 @@ const lutRefsEqual = (a, b) => (a === null || b === null ? a === b : a.sha256 ==
 
 export const adjustmentsEqual = (a, b) => ADJUSTMENT_KEYS.every((key) => a[key] === b[key])
   && curvesEqual(a.curves, b.curves) && lutRefsEqual(a.lut, b.lut) && rawEqual(a.raw ?? RAW_DEFAULTS, b.raw ?? RAW_DEFAULTS)
-  && geometryEqual(a.geometry ?? NEUTRAL_GEOMETRY, b.geometry ?? NEUTRAL_GEOMETRY) && overlaysEqual(a.overlays ?? [], b.overlays ?? []);
+  && geometryEqual(a.geometry ?? NEUTRAL_GEOMETRY, b.geometry ?? NEUTRAL_GEOMETRY) && overlaysEqual(a.overlays ?? [], b.overlays ?? []) && filterRefsEqual(a.filter ?? null, b.filter ?? null);
 
 const numericNeutral = (adjustments, keys) => keys.every((key) => (adjustments[key] ?? byKey.get(key).default) === byKey.get(key).default);
 
@@ -240,6 +273,7 @@ export function neutralGroup(group) {
   if (group === 'raw') patch.raw = neutral.raw;
   if (group === 'geometry') patch.geometry = neutral.geometry;
   if (group === 'text') patch.overlays = [];
+  if (group === 'creative') patch.filter = null;
   return patch;
 }
 
@@ -268,5 +302,6 @@ export function compactAdjustments(adjustments) {
   const geometry = compactGeometry(a.geometry);
   if (geometry) out.geometry = geometry;
   if (a.overlays.length) out.overlays = a.overlays;
+  if (a.filter) out.filter = a.filter;
   return out;
 }
