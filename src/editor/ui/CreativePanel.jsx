@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ADJUSTMENTS, GRADE_RANGES, adjustmentSpec } from '../model/adjustments.mjs';
 import { AdjustmentRow, ResetIcon } from './AdjustmentRow';
 import FilterLibrary from './FilterLibrary';
+import { layerSettingKeys } from '../model/layers.mjs';
 
 const SECTIONS = [
   { id: 'bleach', title: 'Bleach Bypass', note: 'An approximation of the bleach-bypass look: a black-and-white copy laid over the colour, with denser shadows and muted colour. Not a simulation of the chemical process.' },
@@ -13,7 +14,7 @@ const SECTIONS = [
   { id: 'capture', title: 'Low Resolution & JPEG', note: 'The photo is captured on a small grid (at most 768 px on the long edge, smaller with Low resolution), JPEG-compressed in 8 × 8 blocks and scaled back up, so blocks cover the same part of the frame in the preview and in a full-size export. Dither applies only to such a capture.' },
   { id: 'lens', title: 'Lens & Diffusion', note: 'Chromatic aberration scales red out and blue in toward the corners; channel shift moves them apart in one direction. Soft focus spreads light into the shadows like a diffusion filter.' },
 ];
-const keysOf = (section) => ADJUSTMENTS.filter((spec) => spec.section === section && !spec.hidden);
+const keysIn = (section) => ADJUSTMENTS.filter((spec) => spec.section === section && !spec.hidden);
 // Controls that do nothing until another one is set.
 const DEPENDS = {
   noiseColor: (a) => a.noiseAmount,
@@ -110,9 +111,12 @@ function GradingPanel({ adjustments, disabled, dispatch }) {
 /**
  * The Creative section: the Filter Library, then bleach bypass, film (fade, tints, grain), glow
  * (bloom, halation), vignette, colour grading, digital camera, low resolution and JPEG, and lens
- * effects. Each part resets on its own.
+ * effects. Each part resets on its own. For an image or adjustment layer (`layer`) only the
+ * per-pixel colour controls a layer can hold are shown, without the Filter Library.
  */
-export default function CreativePanel({ adjustments, disabled, dispatch, onPreview, presets = null, thumbnails = null }) {
+export default function CreativePanel({ adjustments, disabled, dispatch, onPreview, presets = null, thumbnails = null, layer = false }) {
+  const allowed = layer ? new Set(layerSettingKeys()) : null;
+  const keysOf = (section) => keysIn(section).filter((spec) => !allowed || allowed.has(spec.key));
   const row = (spec, extra = {}) => <AdjustmentRow key={spec.key} spec={spec} label={spec.shortLabel} value={adjustments[spec.key]} disabled={disabled} dispatch={dispatch} {...extra} />;
   const body = (id) => {
     if (id === 'grading') return <GradingPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} />;
@@ -123,8 +127,9 @@ export default function CreativePanel({ adjustments, disabled, dispatch, onPrevi
         <>
           {film.map((spec) => row(spec, { disabled: disabled || (spec.key.startsWith('fadeShadow') && !adjustments.fade) || (spec.key.startsWith('fadeHighlight') && !adjustments.fadeHighlights) }))}
           <p className="pe-note">The tints colour the lifted blacks and the rolled-off whites.</p>
-          <h5 className="pe-creative__sub">Grain</h5>
+          {grain.length > 0 && <h5 className="pe-creative__sub">Grain</h5>}
           {grain.map((spec) => row(spec))}
+          {grain.length > 0 && (
           <button
             type="button"
             className="pe-text-button"
@@ -133,7 +138,8 @@ export default function CreativePanel({ adjustments, disabled, dispatch, onPrevi
           >
             New grain pattern
           </button>
-          <p className="pe-note">The pattern is saved with the photo, so previews and exports always show the same grain. Fine grain is seen best at 100% or in 1:1 Detail.</p>
+          )}
+          {grain.length > 0 && <p className="pe-note">The pattern is saved with the photo, so previews and exports always show the same grain. Fine grain is seen best at 100% or in 1:1 Detail.</p>}
         </>
       );
     }
@@ -152,9 +158,9 @@ export default function CreativePanel({ adjustments, disabled, dispatch, onPrevi
   };
   return (
     <div className="pe-creative">
-      <h4 className="pe-creative__head">Filters</h4>
-      <FilterLibrary adjustments={adjustments} disabled={disabled} dispatch={dispatch} onPreview={onPreview} presets={presets} thumbnails={thumbnails} />
-      {SECTIONS.map(({ id, title, note }) => {
+      {!layer && <h4 className="pe-creative__head">Filters</h4>}
+      {!layer && <FilterLibrary adjustments={adjustments} disabled={disabled} dispatch={dispatch} onPreview={onPreview} presets={presets} thumbnails={thumbnails} />}
+      {SECTIONS.filter(({ id }) => keysOf(id).length > 0).map(({ id, title, note }) => {
         const neutral = isSectionNeutral(adjustments, id) && (id !== 'film' || isSectionNeutral(adjustments, 'grain'));
         return (
           <div key={id} className="pe-creative__part" data-part={id}>
@@ -164,7 +170,7 @@ export default function CreativePanel({ adjustments, disabled, dispatch, onPrevi
                 type="button"
                 className="pe-icon-button"
                 disabled={disabled || neutral}
-                onClick={() => dispatch({ type: 'applySettings', patch: { ...sectionPatch(id), ...(id === 'film' ? sectionPatch('grain') : {}) } })}
+                onClick={() => dispatch({ type: 'applySettings', patch: { ...sectionPatch(id), ...(id === 'film' && !layer ? sectionPatch('grain') : {}) } })}
                 aria-label={`Reset ${title}`}
                 title={`Reset ${title}`}
               >
@@ -172,7 +178,7 @@ export default function CreativePanel({ adjustments, disabled, dispatch, onPrevi
               </button>
             </h4>
             {body(id)}
-            {note && <p className="pe-note">{note}</p>}
+            {note && !layer && <p className="pe-note">{note}</p>}
           </div>
         );
       })}

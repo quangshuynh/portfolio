@@ -26,6 +26,7 @@ read it before changing projects or project assets.
 | `src/editor/pipeline/geometry.mjs`, `warp.mjs` | Crop & Transform (Interval 10): geometry model and transform order, inverse-mapped resampling shared by preview (shader mirror) and export. Behaviour and limits in `docs/photography-editor.md` (Geometry). |
 | `src/editor/pipeline/creative.mjs`, `src/editor/model/overlays.mjs`, `src/editor/text/` | Creative stage and looks (Interval 11), text overlays (schema, bundled OFL fonts, layout, export sprites). Behaviour and limits in `docs/photography-editor.md` (Creative and text). |
 | `src/editor/pipeline/digital.mjs`, `src/editor/model/filters.mjs` | Digital effects and the Filter Library (Interval 11.5): capture, JPEG, channel shift, noise; original filters, filter record, thumbnails (`ui/filterThumbs.mjs`). Behaviour, resolution semantics and limits in `docs/photography-editor.md` (Creative and text). |
+| `src/editor/model/layers.mjs`, `src/editor/pipeline/composite.mjs`, `blend.mjs`, `compositeShader.mjs` | Layers (Interval 12): stack schema and v8→v9 migration, W3C blend modes, CPU compositor and GLSL mirror; export in `src/editor/io/composeLayers.mjs`, UI `ui/LayersPanel.jsx`. Behaviour and limits in `docs/photography-editor.md` (Layers). |
 | `experiments/raw-decode-poc/` | Isolated RAW decoding proof of concept with its own `package.json`; not part of the site build or root `npm test`. |
 
 ## Project metadata

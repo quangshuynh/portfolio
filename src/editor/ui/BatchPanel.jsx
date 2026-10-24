@@ -42,7 +42,7 @@ export default function BatchPanel({
         <button type="button" className="pe-button" onClick={() => onOpen('reset')} disabled={!selectedCount || busy}>Reset…</button>
         <button type="button" className="pe-button pe-button--primary" onClick={onExport} disabled={!selectedCount}>Export {plural(selectedCount, 'photo')}…</button>
       </div>
-      {clipboard && <p className="pe-note">Copied: {clipboard.name}{clipboard.raw ? ' (RAW)' : ''}. Paste replaces Light, Color, HSL, Detail, Tone curve, LUT and Creative; text stays with each photo.</p>}
+      {clipboard && <p className="pe-note">Copied: {clipboard.name}{clipboard.raw ? ' (RAW)' : ''}. Paste replaces Light, Color, HSL, Detail, Tone curve, LUT and Creative; layers stay with each photo.</p>}
       {(undoEntry || redoEntry || last) && (
         <div className="pe-batch__row pe-batch__history">
           {last && (

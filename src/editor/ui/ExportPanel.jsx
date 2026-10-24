@@ -125,7 +125,7 @@ export default function ExportPanel({ settings, photo, dispatch, onExport, onCan
           <progress max="1" value={status.fraction ?? 0} aria-label="Export progress" />
           {/* Only stage changes are announced; the percentage is on the progress bar. */}
           <span>
-            <span role="status">{status.stage === 'decoding' ? (Number.isInteger(status.index) ? `Decoding photo ${status.index + 1} of 3…` : photo?.raw ? 'Decoding RAW sensor data…' : 'Decoding original…') : status.stage === 'merging' ? 'Merging exposures…' : status.stage === 'encoding' ? 'Encoding…' : 'Rendering'}</span>
+            <span role="status">{status.stage === 'decoding' ? (Number.isInteger(status.index) ? `Decoding photo ${status.index + 1} of 3…` : photo?.raw ? 'Decoding RAW sensor data…' : 'Decoding original…') : status.stage === 'merging' ? 'Merging exposures…' : status.stage === 'encoding' ? 'Encoding…' : status.stage === 'compositing' ? `Compositing layer ${status.layer ?? status.layers ?? ''}${status.layers ? ` of ${status.layers}` : ''}…` : 'Rendering'}</span>
             {status.stage === 'rendering' && <span aria-hidden="true"> {Math.round((status.fraction ?? 0) * 100)}%</span>}
           </span>
           <button type="button" className="pe-text-button" onClick={onCancel}>Cancel</button>

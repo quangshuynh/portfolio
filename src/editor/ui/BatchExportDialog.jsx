@@ -14,6 +14,7 @@ function itemStatus(status, photo) {
     case 'queued': return STAGES.queued;
     case 'running': {
       if (status.stage === 'rendering') return `Rendering ${Math.round((status.fraction ?? 0) * 100)}%`;
+      if (status.stage === 'compositing') return 'Compositing layers…';
       if (status.stage === 'decoding' && photo.raw && !photo.hdr) return 'Decoding RAW sensor data';
       if (status.stage === 'decoding' && Number.isInteger(status.index)) return `Decoding photo ${status.index + 1} of 3`;
       return STAGES[status.stage] ?? 'Exporting';

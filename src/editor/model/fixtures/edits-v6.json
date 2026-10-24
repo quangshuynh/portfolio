@@ -1,0 +1,178 @@
+{
+  "type": "quanghuynh.photo-editor.edits",
+  "version": 6,
+  "savedAt": "2026-10-24T08:00:00.000Z",
+  "exportSettings": {
+    "format": "png",
+    "quality": 0.92,
+    "resize": {
+      "mode": "original",
+      "longEdge": 3840,
+      "maxWidth": 3840,
+      "maxHeight": 3840
+    },
+    "suffix": "-quangedit"
+  },
+  "photos": [
+    {
+      "source": {
+        "name": "IMG_0001.jpg",
+        "size": 4123456,
+        "lastModified": 1760000000000,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "format": "jpeg",
+        "width": 6000,
+        "height": 4000,
+        "orientation": 1
+      },
+      "adjustments": {
+        "exposure": 0.35,
+        "contrast": 12,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "temperature": -8,
+        "tint": 0,
+        "vibrance": 0,
+        "saturation": 0,
+        "redHue": 10,
+        "texture": 20,
+        "lutIntensity": 80,
+        "curves": {
+          "master": [
+            [0, 0],
+            [64, 52],
+            [192, 204],
+            [255, 255]
+          ]
+        },
+        "lut": {
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "name": "Look.cube",
+          "title": "",
+          "size": 33
+        },
+        "geometry": {
+          "angle": 2.5,
+          "crop": {
+            "x": 0.05,
+            "y": 0.05,
+            "width": 0.9,
+            "height": 0.8
+          },
+          "aspect": "3:2"
+        }
+      }
+    },
+    {
+      "source": {
+        "name": "DSC09015.ARW",
+        "size": 24000000,
+        "lastModified": 1760000000001,
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "format": "arw",
+        "width": 6024,
+        "height": 4024,
+        "orientation": 1
+      },
+      "adjustments": {
+        "exposure": 0.5,
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "temperature": 0,
+        "tint": 0,
+        "vibrance": 0,
+        "saturation": 0,
+        "rawTemperature": 5200,
+        "rawTint": 4,
+        "raw": {
+          "whiteBalance": "custom"
+        }
+      }
+    },
+    {
+      "source": {
+        "name": "DSC09641-HDR",
+        "size": 0,
+        "lastModified": 0,
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "format": "hdr",
+        "width": 6024,
+        "height": 4024,
+        "orientation": 1,
+        "hdr": {
+          "mode": "radiance",
+          "inputs": [
+            {
+              "name": "DSC09640.ARW",
+              "size": 24100000,
+              "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "format": "arw",
+              "role": "under"
+            },
+            {
+              "name": "DSC09641.ARW",
+              "size": 24200000,
+              "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "format": "arw",
+              "role": "normal"
+            },
+            {
+              "name": "DSC09642.ARW",
+              "size": 24300000,
+              "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "format": "arw",
+              "role": "over"
+            }
+          ],
+          "settings": {
+            "align": true,
+            "deghost": true,
+            "deghostStrength": 50
+          }
+        }
+      },
+      "adjustments": {
+        "exposure": 0,
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "temperature": 0,
+        "tint": 0,
+        "vibrance": 0,
+        "saturation": 0,
+        "hdrHighlights": 60
+      }
+    },
+    {
+      "source": {
+        "name": "plain.png",
+        "size": 1000,
+        "lastModified": 1,
+        "sha256": null,
+        "format": "png",
+        "width": 640,
+        "height": 480,
+        "orientation": 1
+      },
+      "adjustments": {
+        "exposure": -0.2,
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "temperature": 0,
+        "tint": 0,
+        "vibrance": 0,
+        "saturation": 0
+      }
+    }
+  ]
+}

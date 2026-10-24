@@ -27,6 +27,29 @@ export async function browserAppliesOrientation() {
   return browserOrients;
 }
 
+// Firefox 142 (Windows) loses alpha when createImageBitmap resizes with premultiplyAlpha 'none':
+// fully transparent pixels come back with alpha set (transparent areas turn opaque). Probed once
+// with a 2×2 PNG whose transparent pixel has a colour; affected browsers decode at the stored
+// size and the canvas scales instead (drawImage with high-quality smoothing).
+const RESIZE_ALPHA_PROBE = 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAGklEQVQImWNgYPjPcCLF6D8Dl4jcfw0jm/8AMy8GLbyI4eYAAAAASUVORK5CYII=';
+let resizeKeepsAlpha;
+export async function browserResizeKeepsAlpha() {
+  if (resizeKeepsAlpha === undefined) {
+    try {
+      const bytes = Uint8Array.from(atob(RESIZE_ALPHA_PROBE), (c) => c.charCodeAt(0));
+      const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }), { premultiplyAlpha: 'none', resizeWidth: 2, resizeHeight: 2, resizeQuality: 'high' });
+      const canvas = createCanvas(2, 2);
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      context.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      resizeKeepsAlpha = context.getImageData(0, 0, 1, 1).data[3] === 0;
+    } catch {
+      resizeKeepsAlpha = true;
+    }
+  }
+  return resizeKeepsAlpha;
+}
+
 // EXIF orientation -> canvas transform from stored to displayed pixels; width and
 // height are the displayed size.
 function orientationTransform(context, orientation, width, height) {
@@ -99,15 +122,16 @@ export async function decodeToCanvas(file, header, { width, height }) {
   const orients = await browserAppliesOrientation();
   const manual = !orients && header.orientation !== 1;
   const swap = manual && header.orientation >= 5;
+  // Resizing to the stored size changes nothing; skipped there and where it loses alpha.
+  const full = width === header.displayWidth && height === header.displayHeight;
+  const resize = !full && await browserResizeKeepsAlpha();
   let bitmap;
   try {
     bitmap = await createImageBitmap(file, {
       ...(orients ? { imageOrientation: 'from-image' } : {}),
       premultiplyAlpha: 'none',
       colorSpaceConversion: 'default',
-      resizeWidth: swap ? height : width,
-      resizeHeight: swap ? width : height,
-      resizeQuality: 'high',
+      ...(resize ? { resizeWidth: swap ? height : width, resizeHeight: swap ? width : height, resizeQuality: 'high' } : {}),
     });
   } catch {
     throw new ImageHeaderError('corrupt', 'The browser could not decode this image. It may be damaged or use an unsupported variant.');
@@ -117,6 +141,7 @@ export async function decodeToCanvas(file, header, { width, height }) {
     const context = canvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
     assertCanvasWorks(context, width, height);
     if (manual) orientationTransform(context, header.orientation, width, height);
+    context.imageSmoothingQuality = 'high';
     // Explicit size: browsers that ignore the resize options still scale, never crop.
     context.drawImage(bitmap, 0, 0, swap ? height : width, swap ? width : height);
     context.setTransform(1, 0, 0, 1, 0, 0);

@@ -1,11 +1,12 @@
 import React, { useReducer } from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import AdjustPanel from './AdjustPanel';
-import TextLayer from './TextLayer';
+import LayerHandles from './LayerHandles';
 import { editorReducer, initialEditorState } from '../model/editorState.mjs';
 import { createPreset } from '../model/presets.mjs';
 import { BUILT_IN_LOOKS, lookPatch } from '../model/looks.mjs';
 import { createTextOverlay, normalizeOverlays } from '../model/overlays.mjs';
+import { normalizeLayers } from '../model/layers.mjs';
 import { groupIsNeutral, normalizeAdjustments } from '../model/adjustments.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { DEFAULT_SYNC_GROUPS, planSync } from '../model/sync.mjs';
@@ -167,23 +168,23 @@ describe('Text section', () => {
     setup();
     openSection('Text');
     fireEvent.click(screen.getByRole('button', { name: 'Add text' }));
-    expect(present().overlays).toHaveLength(1);
+    expect(present().layers).toHaveLength(1);
     const textarea = screen.getByRole('textbox', { name: 'Text' });
     fireEvent.change(textarea, { target: { value: 'Ha Long Bay\u0007\r\nat dusk' } });
-    expect(present().overlays[0].text).toBe('Ha Long Bay\nat dusk');
+    expect(present().layers[0].text).toBe('Ha Long Bay\nat dusk');
     fireEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
-    expect(present().overlays).toHaveLength(2);
-    expect(present().overlays[1].x).toBeCloseTo(present().overlays[0].x + 0.03, 5);
+    expect(present().layers).toHaveLength(2);
+    expect(present().layers[1].x).toBeCloseTo(present().layers[0].x + 0.03, 5);
     // The copy is selected and in front; send it backward.
     fireEvent.click(screen.getByRole('button', { name: 'Send backward' }));
-    expect(present().overlays[0].id).not.toBe(present().overlays[1].id);
-    const ids = present().overlays.map(({ id }) => id);
+    expect(present().layers[0].id).not.toBe(present().layers[1].id);
+    const ids = present().layers.map(({ id }) => id);
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    expect(present().overlays.map(({ id }) => id)).toEqual([ids[1]]);
+    expect(present().layers.map(({ id }) => id)).toEqual([ids[1]]);
     act(() => dispatch({ type: 'undo' }));
-    expect(present().overlays.map(({ id }) => id)).toEqual(ids);
+    expect(present().layers.map(({ id }) => id)).toEqual(ids);
     act(() => dispatch({ type: 'redo' }));
-    expect(present().overlays).toHaveLength(1);
+    expect(present().layers).toHaveLength(1);
   });
 
   test('font, weight, alignment, outline, shadow and transform are stored per object', () => {
@@ -198,7 +199,7 @@ describe('Text section', () => {
     fireEvent.change(screen.getByRole('spinbutton', { name: /^Rotation value/ }), { target: { value: '-30' } });
     fireEvent.change(screen.getByRole('spinbutton', { name: /^Size value/ }), { target: { value: '12' } });
     fireEvent.change(screen.getByRole('spinbutton', { name: /^Opacity value/ }), { target: { value: '80' } });
-    expect(present().overlays[0]).toMatchObject({ font: 'mono', align: 'right', rotation: -30, size: 0.12, opacity: 0.8, outline: { width: 0.06 }, shadow: { opacity: 0.6 } });
+    expect(present().layers[0]).toMatchObject({ font: 'mono', align: 'right', rotation: -30, size: 0.12, opacity: 0.8, outline: { width: 0.06 }, shadow: { opacity: 0.6 } });
   });
 });
 
@@ -207,7 +208,7 @@ describe('text on the photo', () => {
   const box = { x: 0, y: 0, width: 600, height: 400 };
   const renderLayer = (props) => render(
     <div className="pe-stage-area">
-      <TextLayer overlays={[createTextOverlay('t1', { text: 'Hello' })]} box={box} output={output} stage={{ width: 600, height: 400 }} interactive selectedId="t1" onSelect={() => {}} onPreview={() => {}} onCommit={() => {}} onApply={() => {}} onEdit={() => {}} {...props} />
+      <LayerHandles layers={normalizeLayers([createTextOverlay('t1', { text: 'Hello' })])} box={box} output={output} selectedId="t1" onSelect={() => {}} onPreview={() => {}} onCommit={() => {}} onApply={() => {}} onEdit={() => {}} {...props} />
     </div>,
   );
 
@@ -235,7 +236,7 @@ describe('text on the photo', () => {
     const stagePointer = vi.fn();
     render(
       <div className="pe-stage-area" onPointerDown={stagePointer}>
-        <TextLayer overlays={[createTextOverlay('t1', { text: 'Hello' })]} box={box} output={output} stage={{ width: 600, height: 400 }} interactive selectedId="t1" onSelect={() => {}} onPreview={onPreview} onCommit={onCommit} onApply={() => {}} onEdit={() => {}} />
+        <LayerHandles layers={normalizeLayers([createTextOverlay('t1', { text: 'Hello' })])} box={box} output={output} selectedId="t1" onSelect={() => {}} onPreview={onPreview} onCommit={onCommit} onApply={() => {}} onEdit={() => {}} />
       </div>,
     );
     document.querySelector('.pe-stage-area').getBoundingClientRect = () => ({ left: 0, top: 0, width: 600, height: 400 });
@@ -257,10 +258,20 @@ describe('text on the photo', () => {
     expect(onCommit).toHaveBeenCalledTimes(3);
   });
 
-  test('without the Text tool the text is drawn but not interactive', () => {
-    renderLayer({ interactive: false });
-    expect(screen.queryByRole('button', { name: /^Text/ })).toBeNull();
-    expect(document.querySelector('.pe-text-canvas')).toBeInTheDocument();
+  test('a locked layer can be selected but not moved or deleted', () => {
+    const onApply = vi.fn();
+    const onPreview = vi.fn();
+    const onSelect = vi.fn();
+    renderLayer({ layers: normalizeLayers([{ ...createTextOverlay('t1', { text: 'Hello' }), locked: true }]), onApply, onPreview, onSelect });
+    const text = screen.getByRole('button', { name: /^Text “Hello”\. Locked/ });
+    fireEvent.keyDown(text, { key: 'ArrowRight' });
+    fireEvent.keyDown(text, { key: 'Delete' });
+    fireEvent.pointerDown(text, { button: 0, clientX: 300, clientY: 200, pointerId: 3 });
+    fireEvent.pointerMove(text, { clientX: 360, clientY: 160, pointerId: 3 });
+    expect(onApply).not.toHaveBeenCalled();
+    expect(onPreview).not.toHaveBeenCalled();
+    expect(onSelect).toHaveBeenCalledWith('t1');
+    expect(document.querySelector('.pe-textbox__handle')).toBeNull();
   });
 });
 
@@ -276,28 +287,28 @@ describe('creative settings and text in presets, sync and documents', () => {
 
   test('sync copies Creative by default, text only when ticked; paste never copies text', () => {
     expect(DEFAULT_SYNC_GROUPS).toContain('creative');
-    expect(DEFAULT_SYNC_GROUPS).not.toContain('text');
+    expect(DEFAULT_SYNC_GROUPS).not.toContain('layers');
     const target = { id: 't', name: 't.jpg', status: 'ready', history: { present: normalizeAdjustments({ overlays: normalizeOverlays([{ id: 'x', text: 'Mine' }]) }) } };
     const pasted = planSync(values, [target]);
     expect(pasted.items[0].after).toMatchObject({ bleachAmount: 40 });
-    expect(pasted.items[0].after.overlays.map(({ text }) => text)).toEqual(['Mine']);
-    const withText = planSync(values, [target], { groups: [...DEFAULT_SYNC_GROUPS, 'text'] });
-    expect(withText.items[0].after.overlays.map(({ text }) => text)).toEqual(['One', 'Two']);
-    expect(withText.items[0].changed).toEqual(expect.arrayContaining(['creative', 'text']));
+    expect(pasted.items[0].after.layers.map(({ text }) => text)).toEqual(['Mine']);
+    const withText = planSync(values, [target], { groups: [...DEFAULT_SYNC_GROUPS, 'layers'] });
+    expect(withText.items[0].after.layers.map(({ text }) => text)).toEqual(['One', 'Two']);
+    expect(withText.items[0].changed).toEqual(expect.arrayContaining(['creative', 'layers']));
   });
 
-  test('documents (version 8) keep creative values and editable text; older versions open without them', () => {
+  test('documents (version 9) keep creative values and editable text layers; older versions open without them', () => {
     const photo = { name: 'a.jpg', size: 1, lastModified: 0, sha256: null, format: 'jpeg', width: 10, height: 10, adjustments: values };
     const text = serializeEditDocument(createEditDocument([photo], {}, new Date(0)));
     const saved = JSON.parse(text);
     expect(saved.version).toBe(DOCUMENT_VERSION);
-    expect(DOCUMENT_VERSION).toBe(8);
-    expect(saved.photos[0].adjustments.overlays[1]).toMatchObject({ id: 'b', text: 'Two', color: '#ff0000', shadow: { blur: 0.2 } });
+    expect(DOCUMENT_VERSION).toBe(9);
+    expect(saved.photos[0].adjustments.layers[1]).toMatchObject({ id: 'b', text: 'Two', color: '#ff0000', shadow: { blur: 0.2 } });
     const read = parseEditDocument(text).photos[0].adjustments;
     expect(read).toMatchObject({ bleachAmount: 40, grainSeed: 9 });
-    expect(read.overlays).toEqual(values.overlays);
+    expect(read.layers).toEqual(values.layers);
     const old = parseEditDocument(JSON.stringify({ type: 'quanghuynh.photo-editor.edits', version: 6, photos: [{ source: { name: 'a.jpg', size: 1 }, adjustments: { exposure: 1 } }] }));
-    expect(old.photos[0].adjustments).toMatchObject({ exposure: 1, bleachAmount: 0, overlays: [] });
+    expect(old.photos[0].adjustments).toMatchObject({ exposure: 1, bleachAmount: 0, layers: [] });
   });
 
   test('malformed text objects are dropped or clamped; text stays plain data', () => {
@@ -320,19 +331,19 @@ describe('creative settings and text in presets, sync and documents', () => {
         },
       }],
     })).photos[0].adjustments;
-    const [first] = hostile.overlays;
+    const [first] = hostile.layers;
     expect(first).toMatchObject({ id: 'ok', text: '<img src=x onerror=alert(1)>', size: 0.5, x: 2, rotation: 5, color: '#ffffff', opacity: 0, font: 'sans', weight: 700, align: 'center', outline: { width: 0.3 }, shadow: null });
-    expect(hostile.overlays).toHaveLength(30);
-    expect(hostile.overlays[1].text).toHaveLength(500);
+    expect(hostile.layers).toHaveLength(30);
+    expect(hostile.layers[1].text).toHaveLength(500);
     expect(hostile).toMatchObject({ bleachAmount: 100, grainSeed: 0 });
   });
 
   test('Reset all clears text too (one undo step brings it back)', () => {
     setup();
-    act(() => dispatch({ type: 'applySettings', patch: { overlays, fade: 20 } }));
+    act(() => dispatch({ type: 'applySettings', patch: { layers: normalizeLayers(overlays), fade: 20 } }));
     fireEvent.click(screen.getByRole('button', { name: 'Reset all' }));
-    expect(present().overlays).toEqual([]);
+    expect(present().layers).toEqual([]);
     act(() => dispatch({ type: 'undo' }));
-    expect(present().overlays).toHaveLength(2);
+    expect(present().layers).toHaveLength(2);
   });
 });

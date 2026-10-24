@@ -5,7 +5,6 @@
 
 import { WorkerCancelled, createImageWorker, createWorkerClient } from '../io/workerClient.mjs';
 import { assertCanvasWorks, createCanvas, encodeCanvas } from '../io/decode.mjs';
-import { compositeSprites } from '../text/sprites.mjs';
 import { exportGeometry, proxyDimensions } from '../io/files.mjs';
 import { warpSpec } from '../pipeline/warp.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
@@ -171,7 +170,7 @@ export function checkHdrExport(mode, inputs, analysis, resize, budget = hdrMemor
  * :param photo: { mode, raw (radiance), adjustments, lut }
  * :returns: { blob, width, height, timings }
  */
-export async function exportHdr(inputs, analysis, { adjustments, raw, lut, settings, sprites = null }, { rawQueue, job, spawn = spawnHdrWorker, onProgress = () => {} }) {
+export async function exportHdr(inputs, analysis, { adjustments, raw, lut, settings, compose = null }, { rawQueue, job, spawn = spawnHdrWorker, onProgress = () => {} }) {
   const format = FORMATS[settings.format];
   const geometry = hdrExportGeometry(inputs, analysis, settings.resize, adjustments.geometry);
   const { frame, output, merged: mergedSize } = geometry;
@@ -200,7 +199,12 @@ export async function exportHdr(inputs, analysis, { adjustments, raw, lut, setti
       },
     });
     job.check();
-    compositeSprites(context, sprites);
+    if (compose) {
+      // The merge worker's float image is no longer needed while layers are composited.
+      client.terminate();
+      await compose(context, { size: output, signal: job, onProgress });
+      job.check();
+    }
     onProgress({ stage: 'encoding', fraction: 1 });
     const encodeStarted = performance.now();
     const blob = await encodeCanvas(canvas, format.mime, settings.format === 'png' ? undefined : settings.quality);

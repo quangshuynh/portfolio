@@ -11,6 +11,7 @@
 
 import { adjustmentsEqual, clampAdjustment, neutralAdjustments, neutralGroup, normalizeAdjustments } from './adjustments.mjs';
 import { presetPatch } from './presets.mjs';
+import { layerAdjustments, normalizeLayerSettings, updateLayer } from './layers.mjs';
 import * as history from './history.mjs';
 import { DEFAULT_EXPORT_SETTINGS, normalizeExportSettings } from './editDocument.mjs';
 
@@ -71,7 +72,18 @@ const updateHistory = (state, change) => {
   return updatePhoto(state, state.activeId, (photo) => (photo.status === 'ready' ? { history: change(photo.history) } : {}));
 };
 
+// An edit of the active photo's settings or, with `layerId`, of that image or adjustment
+// layer's colour settings: the panels edit a layer exactly as they edit the photo. Keys a
+// layer cannot hold are dropped; a locked layer is left as it is.
+function retarget(present, layerId, change) {
+  if (!layerId) return change(present);
+  const layer = present.layers.find(({ id }) => id === layerId);
+  if (!layer?.settings || layer.locked) return present;
+  return { ...present, layers: updateLayer(present.layers, layerId, { settings: normalizeLayerSettings(change(layerAdjustments(layer.settings))) }) };
+}
+
 export function editorReducer(state, action) {
+  const target = (h, change) => retarget(h.present, action.layerId, change);
   switch (action.type) {
     case 'photosAdded': {
       const added = action.photos.map((photo) => ({
@@ -171,33 +183,33 @@ export function editorReducer(state, action) {
       };
     }
     case 'previewAdjustment':
-      return updateHistory(state, (h) => history.preview(h, { ...h.present, [action.key]: clampAdjustment(action.key, action.value) }));
+      return updateHistory(state, (h) => history.preview(h, target(h, (a) => ({ ...a, [action.key]: clampAdjustment(action.key, action.value) }))));
     case 'commitAdjustment':
       return updateHistory(state, history.commit);
     case 'setAdjustment':
       return updateHistory(state, (h) => history.apply(
         h,
-        { ...h.present, [action.key]: clampAdjustment(action.key, action.value) },
-        { coalesceKey: action.coalesce ? action.key : null, now: action.now },
+        target(h, (a) => ({ ...a, [action.key]: clampAdjustment(action.key, action.value) })),
+        { coalesceKey: action.coalesce ? `${action.layerId ?? ''}:${action.key}` : null, now: action.now },
       ));
     case 'resetAdjustment':
-      return updateHistory(state, (h) => history.apply(h, { ...h.present, [action.key]: neutralAdjustments()[action.key] }));
+      return updateHistory(state, (h) => history.apply(h, target(h, (a) => ({ ...a, [action.key]: neutralAdjustments()[action.key] }))));
     // Structured or multi-key changes (curves, LUT, presets): `patch` is merged over the
     // current settings and normalised. Preview/commit work as for sliders.
     case 'previewSettings':
-      return updateHistory(state, (h) => history.preview(h, normalizeAdjustments({ ...h.present, ...action.patch })));
+      return updateHistory(state, (h) => history.preview(h, target(h, (a) => normalizeAdjustments({ ...a, ...action.patch }))));
     case 'applySettings':
       return updateHistory(state, (h) => history.apply(
         h,
-        normalizeAdjustments({ ...h.present, ...action.patch }),
+        target(h, (a) => normalizeAdjustments({ ...a, ...action.patch })),
         { coalesceKey: action.coalesceKey ?? null, now: action.now },
       ));
     case 'applyPreset':
-      return updateHistory(state, (h) => history.apply(h, normalizeAdjustments({ ...h.present, ...presetPatch(action.preset) })));
+      return updateHistory(state, (h) => history.apply(h, target(h, (a) => normalizeAdjustments({ ...a, ...presetPatch(action.preset) }))));
     case 'resetGroup':
-      return updateHistory(state, (h) => history.apply(h, normalizeAdjustments({ ...h.present, ...neutralGroup(action.group) })));
+      return updateHistory(state, (h) => history.apply(h, target(h, (a) => normalizeAdjustments({ ...a, ...neutralGroup(action.group, a) }))));
     case 'resetAll':
-      return updateHistory(state, (h) => history.apply(h, neutralAdjustments()));
+      return updateHistory(state, (h) => history.apply(h, target(h, () => neutralAdjustments())));
     case 'undo':
       return updateHistory(state, history.undo);
     case 'redo':

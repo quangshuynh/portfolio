@@ -36,6 +36,9 @@ precision highp float;
 precision highp sampler3D;
 precision highp usampler2D;
 uniform sampler2D uSource;
+// An adjustment layer's pass (compositeShader.mjs): the source is the composite so far, fetched
+// at the fragment in framebuffer orientation.
+uniform bool uDirect;
 // RAW sources: 16-bit camera RGB as an integer texture, developed by developRaw().
 uniform bool uRaw;
 uniform usampler2D uRawSource;
@@ -614,7 +617,7 @@ void main() {
     vec3 camera = min((uGeometry ? hdrCubic(position) : texelFetch(uHdrSource, at, 0).rgb) * uRawGain, uRawWhite);
     p = toSrgb3(process(uRawMatrix * camera));
   } else {
-    vec4 source = uGeometry ? rgbaCubic(position) : texture(uSource, vUv);
+    vec4 source = uDirect ? texelFetch(uSource, ivec2(gl_FragCoord.xy), 0) : uGeometry ? rgbaCubic(position) : texture(uSource, vUv);
     if (uNeutral) {
       outColor = finish(source, position);
       return;

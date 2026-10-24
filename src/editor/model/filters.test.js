@@ -85,7 +85,7 @@ describe('applying filters', () => {
     const after = normalizeAdjustments({ ...before, ...filterPatch(filter, 100) });
     expect(after.filter).toEqual({ id: filter.id, strength: 100 });
     expect(after).toMatchObject({ exposure: 0.7, grainSeed: 321, vignetteRoundness: 0, bloomAmount: 0, ...filter.settings });
-    expect(after.overlays).toHaveLength(1);
+    expect(after.layers).toHaveLength(1);
     expect(filterState(after, BUILT_IN_FILTERS)).toMatchObject({ filter, strength: 100, modified: false });
     // Strength scales amounts from neutral; 0 is no Creative effect at all.
     const half = normalizeAdjustments({ ...before, ...filterPatch(filter, 50) });
@@ -146,19 +146,19 @@ describe('applying filters', () => {
     const [a, b] = plan.items.map(({ after }) => after);
     expect(a).toMatchObject({ exposure: 0.5, grainSeed: 10, filter: { id: filter.id, strength: 70 } });
     expect(a.geometry.angle).toBe(4);
-    expect(a.overlays.map(({ text }) => text)).toEqual(['keep']);
+    expect(a.layers.map(({ text }) => text)).toEqual(['keep']);
     expect(b).toMatchObject({ grainSeed: 20, bleachAmount: 0, filter: { id: filter.id, strength: 70 } });
     expect(b.curves.master).toEqual([[0, 10], [255, 245]]);
   });
 });
 
 describe('documents and per-viewer lists', () => {
-  test('version 8 documents keep the digital controls and the filter; older ones open without them', () => {
+  test('version 8+ documents keep the digital controls and the filter; older ones open without them', () => {
     const adjustments = normalizeAdjustments({ ...filterPatch(BUILT_IN_FILTERS.find(({ id }) => id === 'filter:pixelated'), 90), grainSeed: 5 });
     const photo = { name: 'a.jpg', size: 10, lastModified: 1, sha256: null, format: 'jpeg', width: 300, height: 200, orientation: 1, history: { present: adjustments }, adjustments };
     const text = serializeEditDocument(createEditDocument([photo], {}, new Date(0)));
     const saved = JSON.parse(text);
-    expect(saved.version).toBe(8);
+    expect(saved.version).toBe(9);
     expect(saved.photos[0].adjustments).toMatchObject({ captureResolution: 77, pixelEdges: 100, filter: { id: 'filter:pixelated', strength: 90 } });
     const [restored] = parseEditDocument(text).photos;
     expect(normalizeAdjustments(restored.adjustments)).toMatchObject({ captureResolution: 77, filter: { id: 'filter:pixelated', strength: 90 } });
