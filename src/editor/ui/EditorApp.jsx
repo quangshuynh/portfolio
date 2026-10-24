@@ -25,6 +25,7 @@ import { hdrIdentity, hdrPhotoName } from '../hdr/hdrSource.mjs';
 import { appHref } from '../../util/navigation';
 import { loadTextFonts } from '../text/fonts.mjs';
 import { rasterizeOverlays } from '../text/textRender.mjs';
+import { thumbnailSource } from './filterThumbs.mjs';
 import AdjustPanel from './AdjustPanel';
 import BatchDialog from './BatchDialog';
 import BatchExportDialog from './BatchExportDialog';
@@ -237,6 +238,9 @@ function EditorWorkspace() {
   const adjustments = photo?.history.present ?? neutralAdjustments();
   const ready = photo?.status === 'ready';
   const lutFor = useCallback((settings) => (settings?.lut ? luts.get(settings.lut.sha256) ?? null : null), [luts]);
+  // The shown photo's preview proxy, which the Filter Library's thumbnails are made from.
+  const [viewProxy, setViewProxy] = useState(null);
+  const thumbSource = useRef({ key: null, value: null });
   // While a preset is hovered or focused, the preview shows it applied (nothing is recorded).
   const viewAdjustments = useMemo(() => (presetPreview && ready ? applyPreset(adjustments, presetPreview) : adjustments), [presetPreview, ready, adjustments]);
   const missingLut = ready && adjustments.lut && !luts.has(adjustments.lut.sha256) ? adjustments.lut : null;
@@ -436,6 +440,30 @@ function EditorWorkspace() {
   }, [worker]);
   const onEngine = useCallback((info) => setEngine(info), []);
 
+  // Filter Library thumbnails: a small source made once per photo, proxy and geometry (on
+  // this thread, from the proxy already shown), rendered in a worker of their own so they
+  // never queue behind preview frames.
+  const thumbLut = ready ? lutFor(adjustments) : null;
+  const thumbGeometry = JSON.stringify(adjustments.geometry);
+  const filterThumbnails = useMemo(() => {
+    if (!ready || !viewProxy || viewProxy.photoId !== photo.id) return null;
+    const key = `${photo.id}|${thumbGeometry}|${thumbLut?.sha256 ?? ''}`;
+    const native = { width: photo.width, height: photo.height };
+    const { image } = viewProxy;
+    const raw = photo.raw ?? null;
+    return {
+      key,
+      async getSource() {
+        if (thumbSource.current.key !== key || thumbSource.current.image !== image) {
+          const made = thumbnailSource(image, JSON.parse(thumbGeometry), native);
+          thumbSource.current = { key, image, value: { source: made.image, spec: made.spec, native: made.native } };
+        }
+        return thumbSource.current.value;
+      },
+      render: (payload) => worker('thumbs').call('filterThumbs', { ...payload, raw, lut: thumbLut }),
+    };
+  }, [ready, viewProxy, photo?.id, photo?.width, photo?.height, photo?.raw, thumbGeometry, thumbLut, worker]);
+
   // 1:1 inspection: a full-size decode keeps only a crop around the region (RAW in the RAW
   // queue, others in a fresh image worker that is ended afterwards); renders reuse it.
   const loadRegionSource = useCallback(async (target, rect, geometry = null) => {
@@ -542,7 +570,7 @@ function EditorWorkspace() {
     // With the workspace empty, end the idle workers so their heaps (decode buffers,
     // the cached CPU-preview proxy) are freed now rather than at the next collection.
     if (!resources.current.size) {
-      ['proxy', 'render', 'import'].forEach((name) => {
+      ['proxy', 'render', 'import', 'thumbs'].forEach((name) => {
         workers.current[name]?.terminate();
         workers.current[name] = null;
       });
@@ -1148,6 +1176,7 @@ function EditorWorkspace() {
           loadProxy={loadProxy}
           renderInWorker={renderInWorker}
           onEngine={onEngine}
+          onProxy={setViewProxy}
           zoomCommand={zoomCommand}
           inspect={inspect}
           transform={transform}
@@ -1257,6 +1286,7 @@ function EditorWorkspace() {
             hdr={ready ? photo.hdr ?? null : null}
             geometry={ready ? { native: { width: photo.width, height: photo.height }, mode: transformMode, onMode: openTransform, onChange: changeGeometry, onCommit: commitGeometry, onStraightening: setStraightening } : null}
             text={{ selectedId: selectedText, onSelect: setSelectedText, editing: textTool, onTool: (on) => { if (!transformMode) setTextTool(on); }, focusRequest: textFocus }}
+            thumbnails={filterThumbnails}
           />
         </div>
         <div className="pe-inspector__section" data-section="export">

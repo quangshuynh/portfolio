@@ -1,17 +1,18 @@
 import React, { useMemo, useState } from 'react';
 import { BUILT_IN_PRESETS, PRESET_GROUPS } from '../model/presets.mjs';
-import { DEFAULT_SYNC_GROUPS, SYNC_GROUPS, planLut, planPreset, planReset, planSync, sourceKind } from '../model/sync.mjs';
+import { DEFAULT_SYNC_GROUPS, SYNC_GROUPS, planFilter, planLut, planPreset, planReset, planSync, sourceKind } from '../model/sync.mjs';
+import { BUILT_IN_FILTERS, FILTER_CATEGORIES, customFilters } from '../model/filters.mjs';
 import Dialog from './Dialog';
 import PhotoThumb from './PhotoThumb';
 
 /** Targets shown with before/after thumbnails (each renders on the main thread). */
 export const PREVIEW_LIMIT = 12;
 const groupLabel = (id) => SYNC_GROUPS.find((group) => group.id === id)?.label ?? id;
-const TITLES = { sync: 'Sync edits', preset: 'Apply preset', lut: 'Apply LUT', reset: 'Reset photos' };
+const TITLES = { sync: 'Sync edits', preset: 'Apply preset', filter: 'Apply filter', lut: 'Apply LUT', reset: 'Reset photos' };
 
 /**
  * Batch change on the selected photos: Sync (chosen groups of the active photo's
- * settings), a preset, a LUT with intensity, or a reset. Shows what will change on each
+ * settings), a preset, a Filter Library filter with strength, a LUT with intensity, or a reset. Shows what will change on each
  * photo, with before/after thumbnails, before anything is applied; Cancel changes nothing.
  * :param props: mode, source (active photo), targets (selected photos; for Sync without the
  *   source), presets (the visitor's), luts (loaded this session), thumbnailOf(id), lutFor(settings),
@@ -23,6 +24,10 @@ export default function BatchDialog({ mode, source, targets, presets = [], luts 
   const [presetId, setPresetId] = useState(allPresets[0]?.id ?? '');
   const [lutSha, setLutSha] = useState(luts[0]?.sha256 ?? '');
   const [intensity, setIntensity] = useState(100);
+  const filters = useMemo(() => [...BUILT_IN_FILTERS, ...customFilters(presets)], [presets]);
+  const [filterId, setFilterId] = useState(BUILT_IN_FILTERS[0].id);
+  const [strength, setStrength] = useState(100);
+  const filter = filters.find(({ id }) => id === filterId) ?? null;
   const hasLut = (sha256) => luts.some((lut) => lut.sha256 === sha256);
   const preset = allPresets.find(({ id }) => id === presetId) ?? null;
   const lut = luts.find(({ sha256 }) => sha256 === lutSha) ?? null;
@@ -30,11 +35,12 @@ export default function BatchDialog({ mode, source, targets, presets = [], luts 
   const plan = useMemo(() => {
     if (mode === 'sync') return planSync(source.history.present, targets, { groups, hasLut, kind: sourceKind(source) });
     if (mode === 'preset') return preset ? planPreset(preset, targets, { hasLut }) : { items: [], changedCount: 0, errors: ['Choose a preset.'] };
+    if (mode === 'filter') return filter ? planFilter(filter, strength, targets) : { items: [], changedCount: 0, errors: ['Choose a filter.'] };
     if (mode === 'lut') return planLut(lut, intensity, targets, { hasLut });
     return planReset(targets);
-  }, [mode, source, targets, groups, preset, lut, intensity, luts]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, source, targets, groups, preset, filter, strength, lut, intensity, luts]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const label = mode === 'sync' ? 'sync edits' : mode === 'preset' ? `preset ${preset?.name ?? ''}`.trim() : mode === 'lut' ? (lut ? `LUT ${lut.title || lut.name}` : 'LUT removal') : 'reset';
+  const label = mode === 'sync' ? 'sync edits' : mode === 'preset' ? `preset ${preset?.name ?? ''}`.trim() : mode === 'filter' ? `filter ${filter?.name ?? ''}`.trim() : mode === 'lut' ? (lut ? `LUT ${lut.title || lut.name}` : 'LUT removal') : 'reset';
   const blocked = plan.errors.length > 0 || plan.changedCount === 0;
   const byId = new Map(targets.map((photo) => [photo.id, photo]));
 
@@ -77,6 +83,24 @@ export default function BatchDialog({ mode, source, targets, presets = [], luts 
           </select>
           {preset && <span className="pe-note">Replaces: {preset.groups.map((id) => PRESET_GROUPS.find((g) => g.id === id).label).join(', ')}. Other settings of each photo stay.</span>}
         </label>
+      )}
+      {mode === 'filter' && (
+        <>
+          <label className="pe-field">
+            <span>Filter</span>
+            <select value={filterId} onChange={(event) => setFilterId(event.target.value)}>
+              {FILTER_CATEGORIES.map(({ id, label: name }) => {
+                const inCategory = filters.filter(({ category }) => category === id);
+                return inCategory.length ? <optgroup key={id} label={name}>{inCategory.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</optgroup> : null;
+              })}
+            </select>
+          </label>
+          <label className="pe-field">
+            <span>Strength {strength}%</span>
+            <input type="range" className="pe-range" min="0" max="100" step="1" value={strength} style={{ '--fill-from': '0%', '--fill-to': `${strength}%` }} onChange={(event) => setStrength(Number(event.target.value))} />
+          </label>
+          <p className="pe-note">Replaces each photo's Creative settings. Light, Color, HSL, Detail, curves, LUT, crop, RAW and HDR settings, text and the grain pattern of each photo stay.</p>
+        </>
       )}
       {mode === 'lut' && (
         <>

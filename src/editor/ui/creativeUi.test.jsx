@@ -1,5 +1,5 @@
 import React, { useReducer } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import AdjustPanel from './AdjustPanel';
 import TextLayer from './TextLayer';
 import { editorReducer, initialEditorState } from '../model/editorState.mjs';
@@ -7,12 +7,13 @@ import { createPreset } from '../model/presets.mjs';
 import { BUILT_IN_LOOKS, lookPatch } from '../model/looks.mjs';
 import { createTextOverlay, normalizeOverlays } from '../model/overlays.mjs';
 import { groupIsNeutral, normalizeAdjustments } from '../model/adjustments.mjs';
+import { deriveParams } from '../pipeline/spec.mjs';
 import { DEFAULT_SYNC_GROUPS, planSync } from '../model/sync.mjs';
 import { DOCUMENT_VERSION, createEditDocument, parseEditDocument, serializeEditDocument } from '../model/editDocument.mjs';
 
 beforeEach(() => localStorage.clear());
 
-function Harness({ onState, onPreview = () => {}, text = {} }) {
+function Harness({ onState, onPreview = () => {}, text = {}, presets = {} }) {
   const [state, dispatch] = useReducer(editorReducer, undefined, () => {
     let s = editorReducer(initialEditorState(), { type: 'photosAdded', photos: [{ id: 'a', name: 'a.jpg', size: 1, lastModified: 0 }] });
     s = editorReducer(s, { type: 'importSucceeded', id: 'a', info: { format: 'jpeg', width: 1200, height: 800, orientation: 1, sha256: null } });
@@ -26,7 +27,7 @@ function Harness({ onState, onPreview = () => {}, text = {} }) {
       disabled={false}
       dispatch={dispatch}
       lut={{ library: [], onImport: () => {}, status: {} }}
-      presets={{ userPresets: [], onChange: () => {}, onPreview, onDownload: () => {}, newId: () => 'p1' }}
+      presets={{ userPresets: [], onChange: () => {}, onPreview, onDownload: () => {}, newId: () => 'p1', ...presets }}
       text={{ selectedId, onSelect: setSelectedId, editing: false, onTool: () => {}, focusRequest: 0, ...text }}
     />
   );
@@ -52,34 +53,82 @@ describe('Creative section', () => {
     ['Bleach bypass amount', 'Fade', 'Grain amount', 'Bloom amount', 'Halation amount', 'Vignette amount', 'Shadows hue', 'Grading balance'].forEach((name) => expect(screen.getByRole('slider', { name })).toBeInTheDocument());
   });
 
-  test('a look previews on hover, applies as one undo step, scales by intensity and keeps the grain seed', () => {
+  test('a filter previews on hover, applies as one undo step, scales by strength and keeps every other edit', () => {
     const onPreview = vi.fn();
     setup({ onPreview });
     openSection('Creative');
     act(() => dispatch({ type: 'applySettings', patch: { exposure: 0.5, grainSeed: 77, vignetteRoundness: 40 } }));
     const look = BUILT_IN_LOOKS.find(({ name }) => name === 'Warm Analog');
     const button = screen.getByRole('button', { name: 'Warm Analog' });
-    fireEvent.pointerEnter(button);
+    fireEvent.pointerEnter(button, { pointerType: 'mouse' });
     expect(onPreview).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Warm Analog', groups: ['creative'] }));
     fireEvent.click(button);
-    expect(present()).toMatchObject({ ...lookPatch(look, 100), exposure: 0.5, grainSeed: 77 });
-    // The look replaces the Creative group: a value it does not set returns to neutral.
+    expect(present()).toMatchObject({ ...lookPatch(look, 100), exposure: 0.5, grainSeed: 77, filter: { id: look.id, strength: 100 } });
+    // The filter replaces the Creative group: a value it does not set returns to neutral.
     expect(present().vignetteRoundness).toBe(0);
     expect(button).toHaveAttribute('aria-pressed', 'true');
-    const intensity = screen.getByRole('slider', { name: 'Warm Analog intensity' });
-    fireEvent.input(intensity, { target: { value: '50' } });
+    const strength = screen.getByRole('slider', { name: 'Filter strength' });
+    fireEvent.input(strength, { target: { value: '50' } });
     expect(present().grainAmount).toBe(Math.round(look.settings.grainAmount / 2));
     expect(present().gradeHighlightsHue).toBe(look.settings.gradeHighlightsHue);
-    // Changing a control by hand ends the look's intensity control.
+    expect(present().filter).toEqual({ id: look.id, strength: 50 });
+    // Strength 0 is the photo without Creative effects, other edits kept.
+    fireEvent.input(strength, { target: { value: '0' } });
+    expect(deriveParams(present()).creativeActive).toBe(false);
+    expect(present().exposure).toBe(0.5);
+    fireEvent.input(strength, { target: { value: '50' } });
+    // Compare shows the photo without the filter (nothing recorded).
+    fireEvent.click(screen.getByRole('button', { name: 'Compare' }));
+    expect(onPreview).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Without filter', settings: { grainSeed: 77 } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Compare' }));
+    expect(onPreview).toHaveBeenLastCalledWith(null);
+    // Changing a control by hand marks the filter modified; its strength is then locked until reverted.
     setNumber('Grain amount', 5);
-    expect(screen.queryByRole('slider', { name: 'Warm Analog intensity' })).toBeNull();
-    act(() => dispatch({ type: 'undo' }));
-    act(() => dispatch({ type: 'undo' }));
-    act(() => dispatch({ type: 'undo' }));
+    expect(screen.getByText('Modified')).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: 'Filter strength' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Revert changes' }));
+    expect(present().grainAmount).toBe(Math.round(look.settings.grainAmount / 2));
+    // A second filter replaces the first.
+    fireEvent.click(screen.getByRole('button', { name: 'Sepia' }));
+    expect(present().filter).toEqual({ id: 'filter:sepia', strength: 100 });
+    expect(present().halationAmount).toBe(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter' }));
+    expect(present().filter).toBeNull();
+    expect(groupIsNeutral({ ...present(), grainSeed: 0 }, 'creative')).toBe(true);
+    // Six steps: apply, strength (coalesced), the hand edit, revert, Sepia, remove.
+    for (let i = 0; i < 6; i += 1) act(() => dispatch({ type: 'undo' }));
+    expect(present().filter).toBeNull();
+    expect(present().exposure).toBe(0.5);
     expect(groupIsNeutral({ ...present(), grainSeed: 0, vignetteRoundness: 0 }, 'creative')).toBe(true);
-  });
+  }, 20000);
 
-  test('each part resets on its own; character settings stay disabled until their amount is set', () => {
+  test('filters can be searched, browsed by category, starred, found again under Recent and saved as custom filters', () => {
+    const onChange = vi.fn();
+    render(<Harness onState={(s, d) => { state = s; dispatch = d; }} presets={{ onChange }} />);
+    openSection('Creative');
+    const grid = () => screen.getByRole('list', { name: 'Filters' });
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search filters' }), { target: { value: 'jpeg' } });
+    expect(within(grid()).getAllByRole('button', { name: /^(?!Favorite)/ }).map((b) => b.textContent)).toEqual(expect.arrayContaining(['JPEG Damage']));
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search filters' }), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Experimental' }));
+    expect(within(grid()).queryByRole('button', { name: 'Sepia' })).toBeNull();
+    expect(within(grid()).getByRole('button', { name: 'Pixelated' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Favorite Pixelated' }));
+    expect(JSON.parse(localStorage.getItem('photo-editor:filters:favorites:v1'))).toEqual(['filter:pixelated']);
+    fireEvent.click(within(grid()).getByRole('button', { name: 'Pixelated' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Favorites' }));
+    expect(within(grid()).getAllByRole('button', { name: 'Pixelated' })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Recent' }));
+    expect(within(grid()).getByRole('button', { name: 'Pixelated' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save as custom' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Custom filter name' }), { target: { value: 'My blocks' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const [[saved]] = onChange.mock.calls;
+    expect(saved[0]).toMatchObject({ name: 'My blocks', groups: ['creative'], settings: { captureResolution: 75, pixelEdges: 100 } });
+    expect(present().filter).toEqual({ id: 'preset:My blocks', strength: 100 });
+  }, 20000);
+
+  test('each part resets on its own; character settings stay disabled until their amount is set', { timeout: 20000 }, () => {
     setup();
     openSection('Creative');
     expect(screen.getByRole('slider', { name: 'Black tint hue' })).toBeDisabled();
@@ -237,12 +286,12 @@ describe('creative settings and text in presets, sync and documents', () => {
     expect(withText.items[0].changed).toEqual(expect.arrayContaining(['creative', 'text']));
   });
 
-  test('documents (version 7) keep creative values and editable text; older versions open without them', () => {
+  test('documents (version 8) keep creative values and editable text; older versions open without them', () => {
     const photo = { name: 'a.jpg', size: 1, lastModified: 0, sha256: null, format: 'jpeg', width: 10, height: 10, adjustments: values };
     const text = serializeEditDocument(createEditDocument([photo], {}, new Date(0)));
     const saved = JSON.parse(text);
     expect(saved.version).toBe(DOCUMENT_VERSION);
-    expect(DOCUMENT_VERSION).toBe(7);
+    expect(DOCUMENT_VERSION).toBe(8);
     expect(saved.photos[0].adjustments.overlays[1]).toMatchObject({ id: 'b', text: 'Two', color: '#ff0000', shadow: { blur: 0.2 } });
     const read = parseEditDocument(text).photos[0].adjustments;
     expect(read).toMatchObject({ bleachAmount: 40, grainSeed: 9 });

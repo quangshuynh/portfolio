@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ADJUSTMENTS, GRADE_RANGES, adjustmentSpec } from '../model/adjustments.mjs';
-import { BUILT_IN_LOOKS, lookMatches, lookPatch } from '../model/looks.mjs';
 import { AdjustmentRow, ResetIcon } from './AdjustmentRow';
+import FilterLibrary from './FilterLibrary';
 
 const SECTIONS = [
   { id: 'bleach', title: 'Bleach Bypass', note: 'An approximation of the bleach-bypass look: a black-and-white copy laid over the colour, with denser shadows and muted colour. Not a simulation of the chemical process.' },
@@ -9,8 +9,19 @@ const SECTIONS = [
   { id: 'glow', title: 'Glow' },
   { id: 'vignette', title: 'Vignette', note: 'Centred on the photo as exported (after crop and rotation).' },
   { id: 'grading', title: 'Color Grading' },
+  { id: 'camera', title: 'Digital Camera', note: 'Early-camera rendering by eye, not measured from any camera: sensor colour crosstalk (cool CCD-like or warm), a contrasty response curve, per-channel highlight clipping and sensor noise. Noise is drawn on a virtual sensor of about 2 MP, so it reads the same in the preview and the export.' },
+  { id: 'capture', title: 'Low Resolution & JPEG', note: 'The photo is captured on a small grid (at most 768 px on the long edge, smaller with Low resolution), JPEG-compressed in 8 × 8 blocks and scaled back up, so blocks cover the same part of the frame in the preview and in a full-size export. Dither applies only to such a capture.' },
+  { id: 'lens', title: 'Lens & Diffusion', note: 'Chromatic aberration scales red out and blue in toward the corners; channel shift moves them apart in one direction. Soft focus spreads light into the shadows like a diffusion filter.' },
 ];
 const keysOf = (section) => ADJUSTMENTS.filter((spec) => spec.section === section && !spec.hidden);
+// Controls that do nothing until another one is set.
+const DEPENDS = {
+  noiseColor: (a) => a.noiseAmount,
+  pixelEdges: (a) => a.captureResolution,
+  quantizeDither: (a) => a.quantizeAmount && (a.captureResolution || a.jpegAmount),
+  channelShiftAngle: (a) => a.channelShift,
+  diffusionRadius: (a) => a.diffusionAmount,
+};
 const isSectionNeutral = (adjustments, section) => ADJUSTMENTS.filter((spec) => spec.section === section).every((spec) => adjustments[spec.key] === spec.default);
 const sectionPatch = (section) => Object.fromEntries(ADJUSTMENTS.filter((spec) => spec.section === section).map((spec) => [spec.key, spec.default]));
 
@@ -96,84 +107,12 @@ function GradingPanel({ adjustments, disabled, dispatch }) {
   );
 }
 
-/** Looks: pick one (hover or focus previews it), then set its intensity. */
-function LookPicker({ adjustments, disabled, dispatch, onPreview }) {
-  const [chosen, setChosen] = useState(null);
-  const active = chosen && lookMatches(adjustments, chosen.look, chosen.intensity) ? chosen : null;
-  const dragging = useRef(false);
-  const preview = (look) => onPreview?.(look ? { name: look.name, groups: ['creative'], settings: { ...lookPatch(look, 100), grainSeed: adjustments.grainSeed } } : null);
-  useEffect(() => {
-    const end = () => {
-      if (!dragging.current) return;
-      dragging.current = false;
-      dispatch({ type: 'commitAdjustment' });
-    };
-    window.addEventListener('pointerup', end);
-    return () => window.removeEventListener('pointerup', end);
-  }, [dispatch]);
-  const apply = (look) => {
-    preview(null);
-    dispatch({ type: 'applySettings', patch: lookPatch(look, 100) });
-    setChosen({ look, intensity: 100 });
-  };
-  const setIntensity = (value) => {
-    const patch = lookPatch(active.look, value);
-    if (dragging.current) dispatch({ type: 'previewSettings', patch });
-    else dispatch({ type: 'applySettings', patch, coalesceKey: `look:${active.look.id}` });
-    setChosen({ look: active.look, intensity: value });
-  };
-  return (
-    <div className="pe-looks">
-      <ul className="pe-looks__list">
-        {BUILT_IN_LOOKS.map((look) => (
-          <li key={look.id}>
-            <button
-              type="button"
-              className="pe-looks__look"
-              disabled={disabled}
-              aria-pressed={active?.look.id === look.id}
-              title={look.description}
-              onClick={() => apply(look)}
-              {...(disabled ? {} : { onPointerEnter: () => preview(look), onPointerLeave: () => preview(null), onFocus: () => preview(look), onBlur: () => preview(null) })}
-            >
-              {look.name}
-            </button>
-          </li>
-        ))}
-      </ul>
-      {active && (
-        <div className="pe-adjust">
-          <div className="pe-adjust__head">
-            <label htmlFor="pe-look-intensity">{active.look.name} intensity</label>
-            <output className="pe-adjust__value mono" htmlFor="pe-look-intensity">{active.intensity}%</output>
-          </div>
-          <input
-            id="pe-look-intensity"
-            className="pe-range"
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={active.intensity}
-            disabled={disabled}
-            aria-valuetext={`${active.intensity}%`}
-            style={{ '--fill-from': '0%', '--fill-to': `${active.intensity}%` }}
-            onPointerDown={() => { dragging.current = true; }}
-            onInput={(event) => setIntensity(Number(event.target.value))}
-            onChange={() => {}}
-          />
-        </div>
-      )}
-      <p className="pe-note">A look replaces every Creative setting below and keeps the rest of the photo's edits. Adjust it, then save it as a preset (Presets, with Creative ticked).</p>
-    </div>
-  );
-}
-
 /**
- * The Creative section: looks, then bleach bypass, film (fade, tints, grain), glow (bloom,
- * halation), vignette and colour grading. Each part resets on its own.
+ * The Creative section: the Filter Library, then bleach bypass, film (fade, tints, grain), glow
+ * (bloom, halation), vignette, colour grading, digital camera, low resolution and JPEG, and lens
+ * effects. Each part resets on its own.
  */
-export default function CreativePanel({ adjustments, disabled, dispatch, onPreview }) {
+export default function CreativePanel({ adjustments, disabled, dispatch, onPreview, presets = null, thumbnails = null }) {
   const row = (spec, extra = {}) => <AdjustmentRow key={spec.key} spec={spec} label={spec.shortLabel} value={adjustments[spec.key]} disabled={disabled} dispatch={dispatch} {...extra} />;
   const body = (id) => {
     if (id === 'grading') return <GradingPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} />;
@@ -209,12 +148,12 @@ export default function CreativePanel({ adjustments, disabled, dispatch, onPrevi
         </>
       );
     }
-    return keysOf(id).map((spec) => row(spec));
+    return keysOf(id).map((spec) => row(spec, DEPENDS[spec.key] ? { disabled: disabled || !DEPENDS[spec.key](adjustments) } : {}));
   };
   return (
     <div className="pe-creative">
-      <h4 className="pe-creative__head">Looks</h4>
-      <LookPicker adjustments={adjustments} disabled={disabled} dispatch={dispatch} onPreview={onPreview} />
+      <h4 className="pe-creative__head">Filters</h4>
+      <FilterLibrary adjustments={adjustments} disabled={disabled} dispatch={dispatch} onPreview={onPreview} presets={presets} thumbnails={thumbnails} />
       {SECTIONS.map(({ id, title, note }) => {
         const neutral = isSectionNeutral(adjustments, id) && (id !== 'film' || isSectionNeutral(adjustments, 'grain'));
         return (

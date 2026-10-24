@@ -14,6 +14,7 @@ import TextLayer from './TextLayer';
 const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 8;
 const STAGE_PADDING = 24;
+const CPU_ONLY_OFF = Object.freeze({ captureResolution: 0, jpegAmount: 0, chromaticAberration: 0, channelShift: 0 });
 // Detail preview (rendered on the CPU by the export's renderer): a quick draft while
 // values change, then the final frame. Long edges in pixels, capped by the proxy.
 export const DETAIL_DRAFT_EDGE = 1024;
@@ -73,7 +74,7 @@ export function viewGeometry(geometry, mode, native) {
  * :param transform: Crop & Transform mode ({ mode: 'crop' | 'corners', guide, onPreview,
  *   onCommit, onSet, onApply, onCancel }) or null
  */
-export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, zoomCommand, inspect = null, transform = null, text = null }) {
+export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, text = null }) {
   const stageRef = useRef(null);
   const canvasHostRef = useRef(null);
   const engineRef = useRef(null);
@@ -157,6 +158,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     if (!engine || !photo || photo.status !== 'ready') {
       setProxy(null);
       proxyRef.current = null;
+      onProxy?.(null);
       setStatus({ state: photo?.status === 'error' ? 'error' : 'idle', message: photo?.error });
       return undefined;
     }
@@ -167,6 +169,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       if (engine.kind === 'webgl2') engine.renderer.setSource(image);
       else { canvas.width = image.width; canvas.height = image.height; }
       proxyRef.current = image;
+      onProxy?.({ photoId: photo.id, image });
       setProxy({ id: photo.id, width: image.width, height: image.height });
       setView({ fit: true, zoom: 1, x: 0, y: 0 });
       setStatus({ state: 'ready' });
@@ -346,7 +349,8 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     return warpSpec(plan, out, { width: proxy.width, height: proxy.height });
   }, [plan, proxy, native]);
   // While cropping, Detail (CPU frames) is not rendered, so handles follow the pointer.
-  const renderAdjustments = useMemo(() => (transformMode ? { ...adjustments, ...neutralGroup('detail') } : adjustments), [adjustments, transformMode]);
+  // So are the CPU-only digital effects (capture, channel shift).
+  const renderAdjustments = useMemo(() => (transformMode ? { ...adjustments, ...neutralGroup('detail'), ...CPU_ONLY_OFF } : adjustments), [adjustments, transformMode]);
 
   // Render on the next frame with the latest values; intermediate values are dropped.
   // Never with another photo's settings: wait until this photo's proxy is loaded.
@@ -359,7 +363,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       const values = renderAdjustments;
       const params = deriveParams(values, { lut, raw });
       if (engine.kind === 'webgl2' && !engine.renderer.lost) engine.renderer.setGeometry(previewSpec);
-      if (params.detailActive) {
+      if (params.cpuOnly) {
         // Spatial Detail: the CPU renders the frame (draft, then final); a split or
         // compare change alone repaints the last frame.
         const key = `${photo.id}|${JSON.stringify(values)}|${params.lutActive ? lut.sha256 : ''}|${specKey(previewSpec)}`;
@@ -610,7 +614,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         <span className="pe-readout mono" aria-live="polite">{proxy ? `${Math.round(zoom * 100)}%` : '—'}</span>
         {beyondProxy && <span className="pe-readout-note">Preview at {previewSize.width}×{previewSize.height}; export uses full resolution</span>}
         {proxy && !plan.identity && !transform && <span className="pe-readout-note mono" data-output-size>{plan.native.width}×{plan.native.height} px</span>}
-        {transform && deriveParams(adjustments).detailActive && <span className="pe-readout-note">Detail is not previewed while cropping</span>}
+        {transform && deriveParams(adjustments).cpuOnly && <span className="pe-readout-note">Detail, low resolution, JPEG and channel shift are not previewed while cropping</span>}
         {engineKind === 'cpu' && <span className="pe-readout-note">CPU preview (WebGL2 unavailable)</span>}
         {proxy && detailQuality && (
           <span
