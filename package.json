@@ -31,6 +31,7 @@
     "check:editor:raw-stability": "node scripts/check-editor-raw-stability.mjs",
     "check:editor:memory": "node scripts/check-editor-memory.mjs",
     "check:editor:geometry": "node scripts/check-editor-geometry.mjs",
+    "check:editor:creative": "node scripts/check-editor-creative.mjs",
     "cms": "node cms/server.mjs",
     "assets:refresh": "node scripts/refresh-project-assets.mjs",
     "test:hero:browser": "node scripts/check-hero-browser.mjs",

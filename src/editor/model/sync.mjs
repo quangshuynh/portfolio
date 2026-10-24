@@ -10,6 +10,8 @@
 // Geometry is split in two groups, both off by default (paste never copies them): Output
 // size (the resize box, reusable on any photo) and Crop & transform (crop, rotation, flips,
 // perspective, stretch: source-specific, so only to photos of the same proportions).
+// Text overlays belong to one photo's composition: they are copied only when Text overlays is
+// ticked in Sync (paste never copies them) and then replace the target's text.
 
 import { adjustmentsEqual, groupKeys, neutralAdjustments, normalizeAdjustments } from './adjustments.mjs';
 import { presetPatch } from './presets.mjs';
@@ -30,6 +32,7 @@ export const SYNC_GROUPS = Object.freeze([
   { id: 'detail', label: 'Detail', keys: groupKeys('detail') },
   { id: 'curves', label: 'Tone curve', keys: [], structured: 'curves' },
   { id: 'lut', label: 'LUT', keys: groupKeys('lut'), structured: 'lut' },
+  { id: 'creative', label: 'Creative', keys: groupKeys('creative') },
   { id: 'raw', label: 'RAW white balance', keys: groupKeys('raw'), structured: 'raw', applies: developed, needs: 'RAW photos' },
   { id: 'hdr', label: 'HDR tone mapping', keys: groupKeys('hdr'), applies: radianceHdr, needs: 'merged RAW HDR photos' },
   { id: 'outputSize', label: 'Output size (resize)', keys: [], geometry: ['resize'] },
@@ -41,11 +44,12 @@ export const SYNC_GROUPS = Object.freeze([
     needs: 'photos with the same proportions',
     compatible: (source, photo) => sameProportions(source.proportions ?? null, proportions(photo)),
   },
+  { id: 'text', label: 'Text overlays', keys: [], structured: 'overlays' },
 ].map(Object.freeze));
 const groupById = new Map(SYNC_GROUPS.map((group) => [group.id, group]));
 
 /** Groups copied unless the visitor changes the choice: everything that is not source-specific. */
-export const DEFAULT_SYNC_GROUPS = Object.freeze(['light', 'color', 'hsl', 'detail', 'curves', 'lut']);
+export const DEFAULT_SYNC_GROUPS = Object.freeze(['light', 'color', 'hsl', 'detail', 'curves', 'lut', 'creative']);
 
 // Every adjustment belongs to exactly one sync group (tested), so "all groups" is everything.
 export const syncGroupOf = (key) => SYNC_GROUPS.find(({ keys }) => keys.includes(key))?.id ?? null;

@@ -67,7 +67,7 @@ describe('BatchDialog', () => {
     expect(screen.getByText(/The LUT "Film" is not loaded/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('checkbox', { name: 'LUT' }));
     expect(screen.getByRole('button', { name: 'Apply to 2' })).toBeEnabled();
-    ['Light', 'Color', 'HSL', 'Detail', 'Tone curve'].forEach((name) => fireEvent.click(screen.getByRole('checkbox', { name })));
+    ['Light', 'Color', 'HSL', 'Detail', 'Tone curve', 'Creative'].forEach((name) => fireEvent.click(screen.getByRole('checkbox', { name })));
     expect(screen.getByText('Choose at least one group of settings.')).toBeInTheDocument();
   });
 

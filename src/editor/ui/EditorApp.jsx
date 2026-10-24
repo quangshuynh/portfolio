@@ -23,6 +23,8 @@ import { createExportBatch } from '../batch/exportBatch.mjs';
 import { createZipArchive } from '../batch/zipArchive.mjs';
 import { hdrIdentity, hdrPhotoName } from '../hdr/hdrSource.mjs';
 import { appHref } from '../../util/navigation';
+import { loadTextFonts } from '../text/fonts.mjs';
+import { rasterizeOverlays } from '../text/textRender.mjs';
 import AdjustPanel from './AdjustPanel';
 import BatchDialog from './BatchDialog';
 import BatchExportDialog from './BatchExportDialog';
@@ -145,6 +147,20 @@ function Unsupported({ missing }) {
 const hdrMemoryMessage = ({ megabytes, suggestion }) => `An HDR export at this size needs about ${megabytes.toLocaleString('en-US')} MB of memory, more than this device can safely use. ${suggestion ? `Choose Long edge ${suggestion} px or smaller.` : 'Choose a smaller size.'}`;
 
 /** The public photo editor. Everything runs in this browser tab; nothing is uploaded. */
+/** Output size of an export of `target` with `settings` (its geometry and the resize). */
+function outputSize(resource, target, settings) {
+  const { geometry } = target.history.present;
+  return resource.hdr
+    ? hdrExportGeometry(resource.hdr.inputs, resource.hdr.analysis, settings.resize, geometry).output
+    : exportGeometry(geometry, { width: target.width, height: target.height }, settings.resize).output;
+}
+
+/** Text overlay sprites at an export's size, drawn once the bundled fonts are loaded. */
+async function textSprites(overlays, size) {
+  await loadTextFonts();
+  return rasterizeOverlays(overlays, size);
+}
+
 export default function EditorApp() {
   const [capabilities] = useState(() => browserCapabilities());
   const unsupported = capabilities.missing.length > 0;
@@ -186,6 +202,10 @@ function EditorWorkspace() {
   const [selecting, setSelecting] = useState(false);
   // 1:1 inspection of the visible region (InspectView), and the crop decode in flight.
   const [inspecting, setInspecting] = useState(false);
+  // Text tool: text objects can be moved, resized and rotated on the photo; one is selected.
+  const [textTool, setTextTool] = useState(false);
+  const [selectedText, setSelectedText] = useState(null);
+  const [textFocus, setTextFocus] = useState(0);
   const inspectJob = useRef(null);
   const regionSent = useRef(null);
   // A merged HDR's preview is re-merged from its sources when it left the proxy cache.
@@ -385,8 +405,9 @@ function EditorWorkspace() {
 
   // CPU preview: the worker keeps the proxy and LUT, so they are sent only when they
   // change (or the worker lost them), not on every render.
-  // `detail` ({ edge, nativeWidth, nativeHeight }) renders Detail settings at that preview size.
-  const renderInWorker = useCallback(async (image, values, lut, raw = null, detail = null, warp = null) => {
+  // `detail` ({ edge, nativeWidth, nativeHeight }) renders Detail settings at that preview size;
+  // `glow` returns the bloom and halation map of the image instead of a frame.
+  const renderInWorker = useCallback(async (image, values, lut, raw = null, detail = null, warp = null, glow = false) => {
     const client = worker('render');
     const sent = renderState.current;
     if (sent.client !== client) Object.assign(sent, { client, key: null, luts: new Set() });
@@ -398,6 +419,7 @@ function EditorWorkspace() {
       raw,
       detail,
       warp,
+      glow,
       ...(full || sent.key !== key ? { source: image } : {}),
       ...(lut ? { lut: full || !sent.luts.has(lut.sha256) ? lut : { sha256: lut.sha256 } } : {}),
     });
@@ -483,7 +505,7 @@ function EditorWorkspace() {
     if (mode && !transformStart.current) transformStart.current = geometryRef.current;
     if (!mode) { dispatch({ type: 'commitAdjustment' }); transformStart.current = null; }
     setTransformMode(mode);
-    if (mode) setInspecting(false);
+    if (mode) { setInspecting(false); setTextTool(false); }
   }, []);
   const applyTransform = useCallback(() => openTransform(null), [openTransform]);
   const cancelTransform = useCallback(() => {
@@ -496,7 +518,7 @@ function EditorWorkspace() {
   const transformRef = useRef(null);
   transformRef.current = transformMode ? cancelTransform : null;
   // Another photo: the tool closes and keeps what was done.
-  useEffect(() => { transformStart.current = null; setTransformMode(null); }, [state.activeId]);
+  useEffect(() => { transformStart.current = null; setTransformMode(null); setSelectedText(null); }, [state.activeId]);
   const transform = useMemo(() => (transformMode && ready ? {
     mode: transformMode,
     guide: straightening,
@@ -561,12 +583,14 @@ function EditorWorkspace() {
     const resource = resources.current.get(target.id);
     const values = target.history.present;
     const lut = values.lut ? lutsRef.current.get(values.lut.sha256) : null;
+    // Text overlays: rasterised here, with the bundled fonts, at the export's output size.
+    const sprites = values.overlays.length ? await textSprites(values.overlays, outputSize(resource, target, settings)) : null;
     if (resource.hdr) {
       const { inputs, analysis } = resource.hdr;
       const job = createHdrJob();
       onCancel(() => job.cancel());
       try {
-        return { ...await exportHdr(inputs, analysis, { adjustments: values, raw: target.raw, lut, settings }, { rawQueue: raws(), job, onProgress }), hdr: true };
+        return { ...await exportHdr(inputs, analysis, { adjustments: values, raw: target.raw, lut, settings, sprites }, { rawQueue: raws(), job, onProgress }), hdr: true };
       } finally {
         job.cancel();
       }
@@ -575,7 +599,7 @@ function EditorWorkspace() {
       // A RAW export runs in the RAW queue; cancelling ends its worker.
       const rawJob = { job: null, cancelled: false };
       onCancel(() => { rawJob.cancelled = true; rawJob.job?.cancel(); });
-      const result = await exportRaw(raws(), { file: resource.file, raw: resource.raw, adjustments: values, lut, settings }, {
+      const result = await exportRaw(raws(), { file: resource.file, raw: resource.raw, adjustments: values, lut, settings, sprites }, {
         onProgress,
         detailWorkers: detailWorkerCount(),
         onStart: (job) => {
@@ -593,9 +617,9 @@ function EditorWorkspace() {
     try {
       // Band workers when there is something to render (a neutral export only re-encodes).
       if (workers > 0 && !deriveParams(values, { lut }).neutral) {
-        return await exportImageInBands(client, { file: resource.file, header: resource.header, adjustments: values, lut, settings }, { workers, onProgress, signal });
+        return await exportImageInBands(client, { file: resource.file, header: resource.header, adjustments: values, lut, settings, sprites }, { workers, onProgress, signal });
       }
-      return await client.call('export', { file: resource.file, header: resource.header, adjustments: values, lut, settings }, { onProgress });
+      return await client.call('export', { file: resource.file, header: resource.header, adjustments: values, lut, settings, sprites }, { onProgress, transfer: sprites ? sprites.map(({ bitmap }) => bitmap) : [] });
     } finally {
       client.terminate();
     }
@@ -869,6 +893,10 @@ function EditorWorkspace() {
   pasteRef.current = pasteEdits;
   const cropKeyRef = useRef(null);
   cropKeyRef.current = ready ? () => openTransform(transformMode === 'crop' ? null : 'crop') : null;
+  const textKeyRef = useRef(null);
+  textKeyRef.current = ready && !transformMode ? () => setTextTool((on) => !on) : null;
+  const textToolRef = useRef(false);
+  textToolRef.current = textTool;
   const dialogOpenRef = useRef(false);
   dialogOpenRef.current = Boolean(batchDialog || exportDialogOpen);
   // Keyboard shortcuts. Text fields keep their own undo and arrow keys.
@@ -890,6 +918,7 @@ function EditorWorkspace() {
       }
       if (mod || event.altKey || isControl(event.target) || hdrOpenRef.current) return;
       if (event.key === 'Escape' && transformRef.current) { event.preventDefault(); transformRef.current(); return; }
+      if (event.key === 'Escape' && textToolRef.current) { event.preventDefault(); setTextTool(false); return; }
       if (event.key === 'Escape' && !dialogOpenRef.current) { dispatch({ type: 'clearSelection' }); setSelecting(false); return; }
       if (event.key === '\\') setCompare((value) => (value === 'original' ? 'edited' : 'original'));
       else if (key === 'y') setCompare((value) => (value === 'split' ? 'edited' : 'split'));
@@ -900,6 +929,7 @@ function EditorWorkspace() {
       else if (event.key === '0') setZoomCommand({ type: 'fit', at: Date.now() });
       else if (event.key === '1') setZoomCommand({ type: 'actual', at: Date.now() });
       else if (key === 'c' && cropKeyRef.current) cropKeyRef.current();
+      else if (key === 't' && textKeyRef.current) textKeyRef.current();
       else return;
       event.preventDefault();
     };
@@ -994,7 +1024,7 @@ function EditorWorkspace() {
         >
           <span className="pe-photo__frame">
             {(pending || exportState === 'running' || exportState === 'queued' || exportState === 'error') && <span className="pe-photo__flag" data-flag={exportState === 'error' ? 'error' : exportState === 'running' || exportState === 'queued' ? 'export' : 'pending'} aria-hidden="true" />}
-            {resource?.thumbnail ? <PhotoThumb thumbnail={resource.thumbnail} adjustments={item.history.present} lut={lutFor(item.history.present)} raw={item.raw} /> : <span className="pe-photo__placeholder" aria-hidden="true">{item.status === 'error' ? '!' : <span className="pe-spinner" />}</span>}
+            {resource?.thumbnail ? <PhotoThumb thumbnail={resource.thumbnail} adjustments={item.history.present} lut={lutFor(item.history.present)} raw={item.raw} photoWidth={item.width} /> : <span className="pe-photo__placeholder" aria-hidden="true">{item.status === 'error' ? '!' : <span className="pe-spinner" />}</span>}
           </span>
           {variant === 'list' && (
             <span className="pe-photo__meta">
@@ -1121,6 +1151,15 @@ function EditorWorkspace() {
           zoomCommand={zoomCommand}
           inspect={inspect}
           transform={transform}
+          text={ready ? {
+            interactive: textTool && !transformMode,
+            selectedId: selectedText,
+            onSelect: setSelectedText,
+            onPreview: (overlays) => dispatch({ type: 'previewSettings', patch: { overlays } }),
+            onCommit: () => dispatch({ type: 'commitAdjustment' }),
+            onApply: (overlays, coalesceKey = null) => dispatch({ type: 'applySettings', patch: { overlays }, coalesceKey }),
+            onEdit: (id) => { setSelectedText(id); setMobilePanel('adjust'); setTextFocus((count) => count + 1); },
+          } : null}
         />
         {!state.photos.length && (
           <div className="pe-empty">
@@ -1185,6 +1224,16 @@ function EditorWorkspace() {
           </button>
           <button
             type="button"
+            className="pe-text-button pe-zoom__text"
+            disabled={!ready || Boolean(transformMode)}
+            aria-pressed={textTool}
+            onClick={() => setTextTool((on) => !on)}
+            title="Add, move, resize and rotate text on the photo (T)"
+          >
+            Text
+          </button>
+          <button
+            type="button"
             className="pe-text-button pe-zoom__inspect"
             disabled={!ready || Boolean(photo?.hdr) || Boolean(transformMode)}
             aria-pressed={inspecting}
@@ -1207,6 +1256,7 @@ function EditorWorkspace() {
             raw={ready ? photo.raw ?? null : null}
             hdr={ready ? photo.hdr ?? null : null}
             geometry={ready ? { native: { width: photo.width, height: photo.height }, mode: transformMode, onMode: openTransform, onChange: changeGeometry, onCommit: commitGeometry, onStraightening: setStraightening } : null}
+            text={{ selectedId: selectedText, onSelect: setSelectedText, editing: textTool, onTool: (on) => { if (!transformMode) setTextTool(on); }, focusRequest: textFocus }}
           />
         </div>
         <div className="pe-inspector__section" data-section="export">
@@ -1235,6 +1285,7 @@ function EditorWorkspace() {
             <div><dt>Ctrl/⌘ Shift C, V</dt><dd>Copy edits, paste to selected</dd></div>
             <div><dt>+ − 0 1</dt><dd>Zoom in, out, fit, 100%</dd></div>
             <div><dt>C, Enter, Esc</dt><dd>Crop tool, apply, cancel</dd></div>
+            <div><dt>T, arrows, Delete</dt><dd>Text tool; move or remove the selected text</dd></div>
             <div><dt>Double-click a label</dt><dd>Reset that adjustment</dd></div>
           </dl>
           {engine && <p className="pe-note">Preview: {engine.kind === 'webgl2' ? 'WebGL2' : 'CPU'}, up to {engine.maxEdge} px. Exports are rendered on the CPU at full resolution.</p>}

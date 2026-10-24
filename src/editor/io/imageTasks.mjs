@@ -4,7 +4,8 @@
 // stays in this browser; nothing here performs network requests.
 
 import { prepareRender, renderImage, renderRawRgba8, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
-import { computeImageGuide, createAreaAccumulator, guideSize, guideSource, prepareDetailRender, renderDetailImage, renderDetailRows, rowsHaveAlpha } from '../pipeline/detailRenderer.mjs';
+import { computeImageGlow, computeImageGuide, createAreaAccumulator, glowDependencies, guideSize, guideSource, prepareDetailRender, renderDetailImage, renderDetailRows, rowsHaveAlpha } from '../pipeline/detailRenderer.mjs';
+import { packGlow } from '../pipeline/creative.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { groupKeys, normalizeAdjustments } from '../model/adjustments.mjs';
 import { assertCanvasWorks, createCanvas, decodeToCanvas, decodeToRgba, encodeCanvas, inspectFile } from './decode.mjs';
@@ -15,6 +16,7 @@ import { LutError, MAX_CUBE_BYTES, parseCube } from '../pipeline/lut.mjs';
 import { contentHash } from './hash.mjs';
 import { renderRegion, warpedRegionSource } from '../pipeline/detailRegion.mjs';
 import { decodeSize, geometryPlan, normalizeGeometry } from '../pipeline/geometry.mjs';
+import { compositeSprites } from '../text/sprites.mjs';
 
 export const EXPORT_BAND_ROWS = 256;
 
@@ -29,6 +31,16 @@ const cancelled = () => Object.assign(new Error('Cancelled.'), { code: 'cancelle
 // What the Detail guide depends on: the base stage (light, colour, RAW, HDR) and the two
 // guide-based controls. Fine filters and display stages (curves, HSL, LUT) do not matter.
 const GUIDE_KEYS = [...['light', 'color', 'raw', 'hdr'].flatMap(groupKeys), 'clarity', 'dehaze'];
+/** The glow map of the cached preview image (recomputed only when what it depends on changes). */
+function previewGlow(image, params, adjustments) {
+  if (!params.creative.glowActive) return null;
+  renderCache.detail ??= { sizes: new Map(), guideSource: null, guideKey: null, guide: null };
+  const cache = renderCache.detail;
+  cache.guideSource ??= guideSource(image);
+  const key = glowDependencies(adjustments, params);
+  if (cache.glowKey !== key) Object.assign(cache, { glowKey: key, glow: computeImageGlow(prepareRender(params), cache.guideSource) });
+  return cache.glow;
+}
 
 /** The proxy area-averaged to a long edge (cached per edge), or the proxy itself. */
 function previewSource(image, edge, cache) {
@@ -59,8 +71,9 @@ function renderDetailPreview(image, params, adjustments, { edge, nativeWidth, na
   const values = normalizeAdjustments(adjustments);
   const guideKey = JSON.stringify([GUIDE_KEYS.map((name) => values[name]), values.raw]);
   if (cache.guideKey !== guideKey) Object.assign(cache, { guideKey, guide: computeImageGuide(prepareRender(params), cache.guideSource) });
+  const glow = previewGlow(image, params, adjustments);
   const source = previewSource(image, edge, cache);
-  const data = renderDetailImage(source, params, { nativeWidth, nativeHeight, guide: cache.guide });
+  const data = renderDetailImage(source, params, { nativeWidth, nativeHeight, guide: cache.guide, glow });
   return { width: source.width, height: source.height, data };
 }
 
@@ -233,7 +246,7 @@ export const handlers = {
    * CPU preview render. `source` and `lut.data` are sent only when not cached here.
    * `raw` is the photo's RAW colour info when the source is a RAW proxy.
    */
-  async render({ key, source, adjustments, lut, raw = null, detail = null, warp = null }) {
+  async render({ key, source, adjustments, lut, raw = null, detail = null, warp = null, glow = false }) {
     if (source) Object.assign(renderCache, { key, source, detail: null, warped: null });
     else if (!key || renderCache.key !== key) throw stale('source');
     if (lut?.data) {
@@ -244,8 +257,16 @@ export const handlers = {
     if (lut && !lutData) throw stale('lut');
     const image = warp ? warpedPreview(warp) : renderCache.source;
     const params = deriveParams(adjustments, { lut: lutData, raw });
-    if (detail && params.detailActive) {
-      const rendered = renderDetailPreview(image, params, adjustments, detail);
+    // The GPU preview's bloom and halation map, packed for a float texture.
+    if (glow) {
+      const map = previewGlow(image, params, adjustments);
+      const packed = map && packGlow(map);
+      return { result: packed, transfer: packed ? [packed.data.buffer] : [] };
+    }
+    // Detail previews come at the requested size; positional creative effects alone at the
+    // proxy's (the CPU fallback preview, which sends the native size).
+    if (params.spatialActive) {
+      const rendered = renderDetailPreview(image, params, adjustments, { edge: Math.max(image.width, image.height), nativeWidth: image.width, nativeHeight: image.height, ...detail });
       if (warp) finishRows(scaledSpec(warp, rendered), rendered.data, 0, rendered.height, false);
       return { result: rendered, transfer: [rendered.data.buffer] };
     }
@@ -274,7 +295,7 @@ export const handlers = {
    * the decode canvas, then encode that canvas. Only one band of pixels is held besides
    * the canvas, instead of a full-resolution copy and a second canvas.
    */
-  async export({ file, header, adjustments, lut = null, settings }, progress, signal = {}) {
+  async export({ file, header, adjustments, lut = null, settings, sprites = null }, progress, signal = {}) {
     const started = performance.now();
     const format = FORMATS[settings.format];
     const native = { width: header.displayWidth, height: header.displayHeight };
@@ -309,7 +330,7 @@ export const handlers = {
     progress({ stage: 'rendering', fraction: 0 });
     const params = deriveParams(adjustments, { lut });
     const prepared = prepareRender(params);
-    if (params.detailActive) {
+    if (params.spatialActive) {
       await exportDetailBands(context, size, prepared, geometry.identity ? native : geometry.plan.native, settings, progress, signal, spec);
     } else for (let row = 0; row < size.height; row += EXPORT_BAND_ROWS) {
       if (signal.cancelled) throw cancelled();
@@ -323,6 +344,8 @@ export const handlers = {
       // Lets a main-thread run paint progress and see a cancel between bands.
       if (signal.yield) await signal.yield();
     }
+    // Text overlays, rasterised on the page at this size, over the finished photo.
+    compositeSprites(context, sprites);
     const renderedAt = performance.now();
     progress({ stage: 'encoding', fraction: 1 });
     const blob = await encodeCanvas(canvas, format.mime, settings.format === 'png' ? undefined : settings.quality);

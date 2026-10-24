@@ -107,8 +107,8 @@ export default function BatchDialog({ mode, source, targets, presets = [], luts 
             <li key={item.id} className="pe-batch-plan__item" data-changed={item.changed.length > 0 || undefined}>
               {thumbnail && (
                 <span className="pe-batch-plan__thumbs" aria-hidden="true">
-                  <PhotoThumb thumbnail={thumbnail} adjustments={item.before} lut={lutFor(item.before)} raw={photo.raw} />
-                  <PhotoThumb thumbnail={thumbnail} adjustments={item.after} lut={lutFor(item.after)} raw={photo.raw} />
+                  <PhotoThumb thumbnail={thumbnail} adjustments={item.before} lut={lutFor(item.before)} raw={photo.raw} photoWidth={photo.width} />
+                  <PhotoThumb thumbnail={thumbnail} adjustments={item.after} lut={lutFor(item.after)} raw={photo.raw} photoWidth={photo.width} />
                 </span>
               )}
               <span className="pe-batch-plan__meta">

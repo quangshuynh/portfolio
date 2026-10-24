@@ -260,6 +260,15 @@ async function main() {
       assert.ok(worst <= 1 && hdrWorst <= HDR_GEOMETRY_PARITY_MAX, `max difference ${worst} (HDR ${hdrWorst}): ${JSON.stringify(parity.geometryResults)}`);
       return { cases: parity.geometryResults.length, worstMax: worst, hdrWorstMax: hdrWorst, worstMean: Number(mean.toFixed(4)) };
     });
+    await check('creative: the shader (looks, grain, glow, vignette, grading, alpha, RAW, HDR, geometry) matches the CPU renderer', () => {
+      const integer = parity.creativeResults.filter(({ name }) => !name.startsWith('HDR') && !name.startsWith('geometry'));
+      const other = parity.creativeResults.filter(({ name }) => name.startsWith('HDR') || name.startsWith('geometry'));
+      const worst = Math.max(...integer.map(({ max }) => max));
+      const otherWorst = Math.max(...other.map(({ max }) => max));
+      const mean = Math.max(...parity.creativeResults.map(({ mean: m }) => m));
+      assert.ok(worst <= 1 && otherWorst <= HDR_GEOMETRY_PARITY_MAX && parity.creativeResults.every(({ over1, name }) => name.startsWith('HDR') || name.startsWith('geometry') || over1 === 0), `creative parity: ${JSON.stringify(parity.creativeResults.filter(({ max }) => max > 1))}`);
+      return { cases: parity.creativeResults.length, worstMax: worst, hdrAndGeometryWorstMax: otherWorst, worstMean: Number(mean.toFixed(4)) };
+    });
 
     // ---------- page load ----------
     await viewport(1440, 900);

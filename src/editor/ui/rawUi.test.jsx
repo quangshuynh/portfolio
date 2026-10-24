@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import AdjustPanel from './AdjustPanel';
 import ExportPanel from './ExportPanel';
 import { editorReducer, initialEditorState } from '../model/editorState.mjs';
-import { createEditDocument, parseEditDocument, serializeEditDocument } from '../model/editDocument.mjs';
+import { DOCUMENT_VERSION, createEditDocument, parseEditDocument, serializeEditDocument } from '../model/editDocument.mjs';
 import { BUILT_IN_PRESETS } from '../model/presets.mjs';
 import { exposureSummary } from './RawPanel';
 
@@ -85,7 +85,7 @@ describe('RAW panel', () => {
     expect(present().raw).toEqual({ whiteBalance: 'daylight' });
     const photo = { ...state.photos[0], adjustments: present() };
     const document = JSON.parse(serializeEditDocument(createEditDocument([photo], state.exportSettings)));
-    expect(document).toMatchObject({ version: 6, photos: [{ source: { format: 'arw', name: 'DSC09420.ARW' }, adjustments: { raw: { whiteBalance: 'daylight' } } }] });
+    expect(document).toMatchObject({ version: DOCUMENT_VERSION, photos: [{ source: { format: 'arw', name: 'DSC09420.ARW' }, adjustments: { raw: { whiteBalance: 'daylight' } } }] });
     expect(parseEditDocument(JSON.stringify(document)).photos[0]).toMatchObject({ source: { format: 'arw' }, adjustments: { raw: { whiteBalance: 'daylight' } } });
   });
 });

@@ -7,13 +7,16 @@
 // curve control points, see pipeline/curves.mjs), `lut` (a reference to an
 // imported .cube LUT by content hash, or null), `raw` (white balance of a RAW
 // photo's development; ignored for JPEG, PNG and WebP) and `geometry` (crop, rotation,
-// flips, perspective, stretch and resize; pipeline/geometry.mjs). The `hdr` controls only
-// act on merged RAW HDR photos.
+// flips, perspective, stretch and resize; pipeline/geometry.mjs) and `overlays` (text
+// objects drawn over the finished photo; model/overlays.mjs). The `hdr` controls only act on
+// merged RAW HDR photos. Creative controls (pipeline/creative.mjs) carry a `section` for the
+// panel, and `scales` when a look's intensity scales them from neutral.
 
 import { CURVE_CHANNELS, curvesEqual, curvesNeutral, isNeutralCurve, neutralCurves, normalizeCurves } from '../pipeline/curves.mjs';
 import { MAX_LUT_SIZE, MIN_LUT_SIZE } from '../pipeline/lut.mjs';
 import { compactGeometry, geometryEqual, geometryNeutral, neutralGeometry, normalizeGeometry } from '../pipeline/geometry.mjs';
 import { DAYLIGHT_KELVIN, RAW_KELVIN, RAW_TINT, WHITE_BALANCE_MODES } from '../raw/rawColor.mjs';
+import { normalizeOverlays, overlaysEqual } from './overlays.mjs';
 
 /** Colour ranges for HSL, with their hue centres in degrees (HSV hue of sRGB values). */
 export const HSL_RANGES = Object.freeze([
@@ -34,6 +37,14 @@ export const HSL_PROPERTIES = Object.freeze([
 ]);
 
 export const hslKey = (range, property) => `${range}${property[0].toUpperCase()}${property.slice(1)}`;
+
+/** Colour grading ranges and the hue each starts at (a classic cool-shadow, warm-highlight split). */
+export const GRADE_RANGES = Object.freeze([
+  { id: 'Shadows', label: 'Shadows', hue: 220 },
+  { id: 'Midtones', label: 'Midtones', hue: 30 },
+  { id: 'Highlights', label: 'Highlights', hue: 45 },
+  { id: 'Global', label: 'Global', hue: 30 },
+].map(Object.freeze));
 
 export const ADJUSTMENTS = Object.freeze([
   { key: 'exposure', group: 'light', label: 'Exposure', min: -5, max: 5, step: 0.05, unit: 'EV', digits: 2 },
@@ -69,6 +80,40 @@ export const ADJUSTMENTS = Object.freeze([
   // Merged RAW HDR only: tone mapping of the scene values (spec.hdrKnee, shadowLift).
   { key: 'hdrHighlights', group: 'hdr', label: 'Highlight compression', min: 0, max: 100, step: 1, default: 50, signed: false },
   { key: 'hdrShadows', group: 'hdr', label: 'Shadow lift', min: 0, max: 100, step: 1, signed: false },
+  // Creative (pipeline/creative.mjs): after the LUT, on the finished colours.
+  { key: 'bleachAmount', group: 'creative', section: 'bleach', label: 'Bleach bypass amount', shortLabel: 'Amount', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'bleachContrast', group: 'creative', section: 'bleach', label: 'Bleach bypass contrast', shortLabel: 'Contrast', min: 0, max: 100, step: 1, default: 50, signed: false },
+  { key: 'bleachDesaturation', group: 'creative', section: 'bleach', label: 'Bleach bypass desaturation', shortLabel: 'Desaturation', min: 0, max: 100, step: 1, default: 60, signed: false },
+  { key: 'bleachProtect', group: 'creative', section: 'bleach', label: 'Bleach bypass highlight protection', shortLabel: 'Highlight protection', min: 0, max: 100, step: 1, default: 30, signed: false },
+  { key: 'fade', group: 'creative', section: 'film', label: 'Fade', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'fadeHighlights', group: 'creative', section: 'film', label: 'Highlight roll-off', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'fadeShadowTint', group: 'creative', section: 'film', label: 'Black tint', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'fadeShadowHue', group: 'creative', section: 'film', label: 'Black tint hue', shortLabel: 'Black hue', min: 0, max: 359, step: 1, default: 210, unit: '°', signed: false, track: 'hue' },
+  { key: 'fadeHighlightTint', group: 'creative', section: 'film', label: 'White tint', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'fadeHighlightHue', group: 'creative', section: 'film', label: 'White tint hue', shortLabel: 'White hue', min: 0, max: 359, step: 1, default: 45, unit: '°', signed: false, track: 'hue' },
+  { key: 'grainAmount', group: 'creative', section: 'grain', label: 'Grain amount', shortLabel: 'Amount', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'grainSize', group: 'creative', section: 'grain', label: 'Grain size', shortLabel: 'Size', min: 0, max: 100, step: 1, default: 35, signed: false },
+  { key: 'grainRoughness', group: 'creative', section: 'grain', label: 'Grain roughness', shortLabel: 'Roughness', min: 0, max: 100, step: 1, default: 50, signed: false },
+  // The grain pattern's seed, stored with the photo so the pattern never changes by itself.
+  { key: 'grainSeed', group: 'creative', section: 'grain', label: 'Grain pattern', min: 0, max: 65535, step: 1, signed: false, hidden: true },
+  { key: 'bloomAmount', group: 'creative', section: 'glow', label: 'Bloom amount', shortLabel: 'Bloom', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'bloomRadius', group: 'creative', section: 'glow', label: 'Bloom radius', shortLabel: 'Radius', min: 0, max: 100, step: 1, default: 40, signed: false },
+  { key: 'bloomThreshold', group: 'creative', section: 'glow', label: 'Bloom threshold', shortLabel: 'Threshold', min: 0, max: 100, step: 1, default: 60, signed: false },
+  { key: 'halationAmount', group: 'creative', section: 'glow', label: 'Halation amount', shortLabel: 'Halation', min: 0, max: 100, step: 1, signed: false, scales: true },
+  { key: 'halationRadius', group: 'creative', section: 'glow', label: 'Halation radius', shortLabel: 'Radius', min: 0, max: 100, step: 1, default: 30, signed: false },
+  { key: 'halationThreshold', group: 'creative', section: 'glow', label: 'Halation threshold', shortLabel: 'Threshold', min: 0, max: 100, step: 1, default: 60, signed: false },
+  { key: 'halationHue', group: 'creative', section: 'glow', label: 'Halation hue', shortLabel: 'Hue', min: 0, max: 60, step: 1, default: 15, unit: '°', signed: false, track: 'warmth' },
+  { key: 'vignetteAmount', group: 'creative', section: 'vignette', label: 'Vignette amount', shortLabel: 'Amount', min: -100, max: 100, step: 1, scales: true },
+  { key: 'vignetteMidpoint', group: 'creative', section: 'vignette', label: 'Vignette midpoint', shortLabel: 'Midpoint', min: 0, max: 100, step: 1, default: 50, signed: false },
+  { key: 'vignetteRoundness', group: 'creative', section: 'vignette', label: 'Vignette roundness', shortLabel: 'Roundness', min: -100, max: 100, step: 1 },
+  { key: 'vignetteFeather', group: 'creative', section: 'vignette', label: 'Vignette feather', shortLabel: 'Feather', min: 0, max: 100, step: 1, default: 50, signed: false },
+  ...GRADE_RANGES.flatMap(({ id, label, hue }) => [
+    { key: `grade${id}Hue`, group: 'creative', section: 'grading', range: id, label: `${label} hue`, shortLabel: 'Hue', min: 0, max: 359, step: 1, default: hue, unit: '°', signed: false, track: 'hue' },
+    { key: `grade${id}Sat`, group: 'creative', section: 'grading', range: id, label: `${label} saturation`, shortLabel: 'Saturation', min: 0, max: 100, step: 1, signed: false, scales: true },
+    { key: `grade${id}Lum`, group: 'creative', section: 'grading', range: id, label: `${label} luminance`, shortLabel: 'Luminance', min: -100, max: 100, step: 1, scales: true },
+  ]),
+  { key: 'gradeBalance', group: 'creative', section: 'grading', label: 'Grading balance', shortLabel: 'Balance', min: -100, max: 100, step: 1 },
+  { key: 'gradeBlending', group: 'creative', section: 'grading', label: 'Grading blending', shortLabel: 'Blending', min: 0, max: 100, step: 1, default: 50, signed: false },
   { key: 'lutIntensity', group: 'lut', label: 'Intensity', min: 0, max: 100, step: 1, unit: '%', default: 100, signed: false },
 ].map((entry) => Object.freeze({ digits: 0, unit: '', default: 0, signed: true, ...entry })));
 
@@ -81,6 +126,8 @@ export const ADJUSTMENT_GROUPS = Object.freeze([
   { id: 'detail', label: 'Detail' },
   { id: 'curves', label: 'Tone Curve' },
   { id: 'lut', label: 'LUT' },
+  { id: 'creative', label: 'Creative' },
+  { id: 'text', label: 'Text' },
   { id: 'raw', label: 'RAW' },
   { id: 'hdr', label: 'HDR' },
 ].map(Object.freeze));
@@ -139,6 +186,7 @@ export function neutralAdjustments() {
     lut: null,
     raw: { ...RAW_DEFAULTS },
     geometry: neutralGeometry(),
+    overlays: [],
   };
 }
 
@@ -154,6 +202,7 @@ export function normalizeAdjustments(input = {}) {
     lut: normalizeLutRef(source.lut),
     raw: normalizeRawSettings(source.raw),
     geometry: normalizeGeometry(source.geometry),
+    overlays: normalizeOverlays(source.overlays),
   };
 }
 
@@ -162,7 +211,7 @@ const lutRefsEqual = (a, b) => (a === null || b === null ? a === b : a.sha256 ==
 
 export const adjustmentsEqual = (a, b) => ADJUSTMENT_KEYS.every((key) => a[key] === b[key])
   && curvesEqual(a.curves, b.curves) && lutRefsEqual(a.lut, b.lut) && rawEqual(a.raw ?? RAW_DEFAULTS, b.raw ?? RAW_DEFAULTS)
-  && geometryEqual(a.geometry ?? NEUTRAL_GEOMETRY, b.geometry ?? NEUTRAL_GEOMETRY);
+  && geometryEqual(a.geometry ?? NEUTRAL_GEOMETRY, b.geometry ?? NEUTRAL_GEOMETRY) && overlaysEqual(a.overlays ?? [], b.overlays ?? []);
 
 const numericNeutral = (adjustments, keys) => keys.every((key) => (adjustments[key] ?? byKey.get(key).default) === byKey.get(key).default);
 
@@ -175,6 +224,7 @@ export function groupIsNeutral(adjustments, group) {
   if (group === 'lut') return !adjustments.lut;
   if (group === 'raw') return rawEqual(normalizeRawSettings(adjustments.raw), RAW_DEFAULTS) && numericNeutral(adjustments, groupKeys('raw'));
   if (group === 'geometry') return geometryNeutral(adjustments.geometry ?? NEUTRAL_GEOMETRY);
+  if (group === 'text') return !adjustments.overlays?.length;
   return numericNeutral(adjustments, groupKeys(group));
 }
 
@@ -189,6 +239,7 @@ export function neutralGroup(group) {
   if (group === 'lut') patch.lut = null;
   if (group === 'raw') patch.raw = neutral.raw;
   if (group === 'geometry') patch.geometry = neutral.geometry;
+  if (group === 'text') patch.overlays = [];
   return patch;
 }
 
@@ -197,7 +248,7 @@ export function formatAdjustment(key, value) {
   const spec = byKey.get(key);
   const fixed = value.toFixed(spec.digits);
   const signed = spec.signed && value > 0 ? `+${fixed}` : fixed;
-  if (spec.unit === '%') return `${signed}%`;
+  if (spec.unit === '%' || spec.unit === '°') return `${signed}${spec.unit}`;
   return spec.unit ? `${signed} ${spec.unit}` : signed;
 }
 
@@ -216,5 +267,6 @@ export function compactAdjustments(adjustments) {
   if (!rawEqual(a.raw, RAW_DEFAULTS)) out.raw = a.raw;
   const geometry = compactGeometry(a.geometry);
   if (geometry) out.geometry = geometry;
+  if (a.overlays.length) out.overlays = a.overlays;
   return out;
 }

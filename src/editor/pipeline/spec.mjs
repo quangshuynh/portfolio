@@ -9,7 +9,8 @@
 //   whites, blacks on luminance) -> vibrance -> saturation -> range fit -> encode sRGB.
 // Then on the sRGB-encoded values (display-referred, 0–1):
 //   [detail stage, spatial: pipeline/detail.mjs] -> tone curves (master, then per
-//   channel) -> HSL -> 3D LUT (mixed by intensity).
+//   channel) -> HSL -> 3D LUT (mixed by intensity) -> creative stage (pipeline/creative.mjs:
+//   glow, bleach bypass, fade, colour grading, vignette, grain).
 // Each later stage is skipped when neutral, so earlier edits render unchanged.
 //
 // RAW photos start before that from 16-bit linear camera RGB (see raw/rawColor.mjs):
@@ -29,6 +30,7 @@ import { curveTables, sampleCurve } from './curves.mjs';
 import { sampleLut } from './lut.mjs';
 import { rawDevelopParams } from '../raw/rawColor.mjs';
 import { detailParams } from './detail.mjs';
+import { creativeParams } from './creative.mjs';
 
 // Middle grey (18% linear) in the sRGB-encoded tone domain: the contrast pivot.
 export const TONE_PIVOT = linearToSrgb(0.18);
@@ -133,11 +135,16 @@ export function deriveParams(adjustments, { lut = null, raw = null } = {}) {
   params.lutIntensity = a.lutIntensity / 100;
   params.lutActive = Boolean(params.lut) && params.lutIntensity > 0;
   params.lutMissing = Boolean(a.lut) && !lut;
-  params.postActive = params.curvesActive || params.hslActive || params.lutActive;
+  params.creative = creativeParams(a);
+  params.creativeActive = params.creative.active;
+  params.postActive = params.curvesActive || params.hslActive || params.lutActive || params.creativeActive;
   // Detail is spatial: renderers that only work per pixel (the GPU preview) must hand
   // photos with `detailActive` to the detail renderer (detailRenderer.mjs).
   params.detail = detailParams(a);
   params.detailActive = params.detail.active;
+  // Detail and the positional creative effects (glow, vignette, grain) need neighbours or
+  // the pixel's place in the frame: CPU renders of such photos go through detailRenderer.mjs.
+  params.spatialActive = params.detailActive || params.creative.positional;
   params.neutral = params.baseNeutral && !params.postActive && !params.detailActive;
   return params;
 }

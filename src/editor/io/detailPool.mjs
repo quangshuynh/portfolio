@@ -10,13 +10,14 @@
 
 import { createWorkerClient, WorkerCancelled } from './workerClient.mjs';
 import { prepareRender } from '../pipeline/cpuRenderer.mjs';
-import { computeImageGuide, createAreaAccumulator, guideSize, rowsHaveAlpha } from '../pipeline/detailRenderer.mjs';
+import { computeImageGlow, computeImageGuide, createAreaAccumulator, guideSize, rowsHaveAlpha } from '../pipeline/detailRenderer.mjs';
 import { detailHalo } from '../pipeline/detail.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { assertCanvasWorks, createCanvas, encodeCanvas } from './decode.mjs';
 import { exportGeometry } from './files.mjs';
 import { FORMATS } from './imageHeader.mjs';
 import { finishRows, hasAlpha, sourceRows, warpSpec } from '../pipeline/warp.mjs';
+import { compositeSprites } from '../text/sprites.mjs';
 
 export const DETAIL_POOL_BAND_ROWS = 256;
 const MAX_DETAIL_WORKERS = 4;
@@ -41,7 +42,7 @@ const spawnRenderWorker = () => new Worker(new URL('./imageWorker.mjs', import.m
 const channelsOf = (image) => (image.kind === 'raw' || image.kind === 'hdr' ? 3 : 4);
 const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-/** Guide and transparency of a whole image, read in bands so the page keeps painting. */
+/** Guide, glow map and transparency of a whole image, read in bands so the page keeps painting. */
 async function analyse(image, prepared, signal) {
   const small = guideSize(image);
   const accumulator = createAreaAccumulator(image.kind, image.width, image.height, small.width, small.height);
@@ -57,7 +58,7 @@ async function analyse(image, prepared, signal) {
   }
   const source = accumulator.finish();
   const guideImage = small.width === image.width && small.height === image.height && !transparent ? image : source;
-  return { guide: computeImageGuide(prepared, guideImage), transparent };
+  return { guide: computeImageGuide(prepared, guideImage), glow: computeImageGlow(prepared, guideImage), transparent };
 }
 
 /**
@@ -151,10 +152,10 @@ export async function renderDetailParallel(image, settings, options) {
   const { adjustments, lut = null, raw = null, nativeWidth = image.width, nativeHeight = image.height, flattenAlpha = false } = settings;
   const signal = options.signal ?? { cancelled: false };
   const prepared = prepareRender(deriveParams(adjustments, { lut, raw }));
-  const { guide, transparent } = await analyse(image, prepared, signal);
+  const { guide, glow, transparent } = await analyse(image, prepared, signal);
   const scale = Math.min(1, Math.max(image.width, image.height) / Math.max(nativeWidth, nativeHeight));
   const halo = detailHalo(prepared.params.detail, scale);
-  const begin = { adjustments, lut, raw, options: { width: image.width, height: image.height, nativeWidth, nativeHeight, guide, transparent } };
+  const begin = { adjustments, lut, raw, options: { width: image.width, height: image.height, nativeWidth, nativeHeight, guide, glow, transparent } };
   return renderBands(image, { begin: ['detailBegin', begin], rowsTask: 'detailRows', halo, flattenAlpha }, { ...options, signal });
 }
 
@@ -177,7 +178,7 @@ export function renderPixelsParallel(image, { adjustments, lut = null, raw = nul
  * (8 bytes per pixel).
  * :returns: { blob, width, height, timings }
  */
-export async function exportImageInBands(decoder, { file, header, adjustments, lut = null, settings }, { workers, onProgress = () => {}, signal, spawn }) {
+export async function exportImageInBands(decoder, { file, header, adjustments, lut = null, settings, sprites = null }, { workers, onProgress = () => {}, signal, spawn }) {
   const started = performance.now();
   const format = FORMATS[settings.format];
   const native = { width: header.displayWidth, height: header.displayHeight };
@@ -193,7 +194,7 @@ export async function exportImageInBands(decoder, { file, header, adjustments, l
   let image = await decoder.call('decode', { file, header, ...geometry.decode });
   if (spec) image = await warpParallel(image, spec, { workers, signal, spawn, onProgress: (fraction) => onProgress({ stage: 'decoding', fraction }) });
   const decodedAt = performance.now();
-  const render = deriveParams(adjustments, { lut }).detailActive ? renderDetailParallel : renderPixelsParallel;
+  const render = deriveParams(adjustments, { lut }).spatialActive ? renderDetailParallel : renderPixelsParallel;
   const nativeSize = geometry.identity ? native : geometry.plan.native;
   await render(image, { adjustments, lut, nativeWidth: nativeSize.width, nativeHeight: nativeSize.height, flattenAlpha: flatten }, {
     workers,
@@ -202,6 +203,7 @@ export async function exportImageInBands(decoder, { file, header, adjustments, l
     onBand: ({ row, rows, data }) => context.putImageData(new ImageData(finishRows(spec, data, row, rows, flatten), size.width, rows), 0, row),
     onProgress: (fraction) => onProgress({ stage: 'rendering', fraction }),
   });
+  compositeSprites(context, sprites);
   onProgress({ stage: 'encoding', fraction: 1 });
   const renderedAt = performance.now();
   const blob = await encodeCanvas(canvas, format.mime, settings.format === 'png' ? undefined : settings.quality);

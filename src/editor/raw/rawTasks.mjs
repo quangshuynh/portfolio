@@ -152,7 +152,7 @@ export function createRawHandlers(loadModule) {
       const params = deriveParams(adjustments, { lut, raw });
       const prepared = prepareRender(params);
       // Detail reads neighbouring rows, which the decoded image holds in full.
-      const detail = params.detailActive
+      const detail = params.spatialActive
         ? prepareDetailRender(prepared, { width: size.width, height: size.height, nativeWidth: nativeSize.width, nativeHeight: nativeSize.height, guideImage: guideSource(image) })
         : null;
       for (let row = 0; row < size.height; row += RAW_BAND_ROWS) {

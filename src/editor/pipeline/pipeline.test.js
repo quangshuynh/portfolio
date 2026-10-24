@@ -1,3 +1,4 @@
+import { renderAnyImage } from './detailRenderer.mjs';
 import { ADJUSTMENTS, neutralAdjustments } from '../model/adjustments.mjs';
 import { SRGB_TO_LINEAR_8BIT, linearToSrgb, srgbToLinear, whiteBalanceMatrix } from './colorMath.mjs';
 import { encodeSrgb8, renderRgba8, renderRgba8InBands } from './cpuRenderer.mjs';
@@ -213,7 +214,8 @@ describe('CPU renderer', () => {
   test('every slider extreme stays in range and finite', () => {
     const source = chart();
     ADJUSTMENTS.forEach(({ key, min, max }) => [min, max].forEach((value) => {
-      const out = renderRgba8(source, deriveParams({ [key]: value }));
+      // Positional creative effects (grain, vignette, glow) render on the spatial renderer.
+      const out = renderAnyImage({ width: 18, height: source.length / 4 / 18, data: source }, deriveParams({ [key]: value }));
       expect(out.every((v) => Number.isInteger(v) && v >= 0 && v <= 255)).toBe(true);
     }));
   });
