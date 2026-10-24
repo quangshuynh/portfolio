@@ -3,14 +3,16 @@
 // exist in one place and not another. Every value is relative to neutral (its
 // `default`), so a missing key in a saved document means "no change".
 //
-// A photo's settings are these numbers plus three structured values: `curves` (tone
+// A photo's settings are these numbers plus four structured values: `curves` (tone
 // curve control points, see pipeline/curves.mjs), `lut` (a reference to an
-// imported .cube LUT by content hash, or null) and `raw` (white balance of a RAW
-// photo's development; ignored for JPEG, PNG and WebP). The `hdr` controls only act on
-// merged RAW HDR photos.
+// imported .cube LUT by content hash, or null), `raw` (white balance of a RAW
+// photo's development; ignored for JPEG, PNG and WebP) and `geometry` (crop, rotation,
+// flips, perspective, stretch and resize; pipeline/geometry.mjs). The `hdr` controls only
+// act on merged RAW HDR photos.
 
 import { CURVE_CHANNELS, curvesEqual, curvesNeutral, isNeutralCurve, neutralCurves, normalizeCurves } from '../pipeline/curves.mjs';
 import { MAX_LUT_SIZE, MIN_LUT_SIZE } from '../pipeline/lut.mjs';
+import { compactGeometry, geometryEqual, geometryNeutral, neutralGeometry, normalizeGeometry } from '../pipeline/geometry.mjs';
 import { DAYLIGHT_KELVIN, RAW_KELVIN, RAW_TINT, WHITE_BALANCE_MODES } from '../raw/rawColor.mjs';
 
 /** Colour ranges for HSL, with their hue centres in degrees (HSV hue of sRGB values). */
@@ -72,6 +74,7 @@ export const ADJUSTMENTS = Object.freeze([
 
 /** Panel groups in display order. `curves` and `lut` also own the structured values. */
 export const ADJUSTMENT_GROUPS = Object.freeze([
+  { id: 'geometry', label: 'Crop & Transform' },
   { id: 'light', label: 'Light' },
   { id: 'color', label: 'Color' },
   { id: 'hsl', label: 'HSL' },
@@ -135,6 +138,7 @@ export function neutralAdjustments() {
     curves: neutralCurves(),
     lut: null,
     raw: { ...RAW_DEFAULTS },
+    geometry: neutralGeometry(),
   };
 }
 
@@ -149,13 +153,16 @@ export function normalizeAdjustments(input = {}) {
     curves: normalizeCurves(source.curves),
     lut: normalizeLutRef(source.lut),
     raw: normalizeRawSettings(source.raw),
+    geometry: normalizeGeometry(source.geometry),
   };
 }
 
+const NEUTRAL_GEOMETRY = neutralGeometry();
 const lutRefsEqual = (a, b) => (a === null || b === null ? a === b : a.sha256 === b.sha256);
 
 export const adjustmentsEqual = (a, b) => ADJUSTMENT_KEYS.every((key) => a[key] === b[key])
-  && curvesEqual(a.curves, b.curves) && lutRefsEqual(a.lut, b.lut) && rawEqual(a.raw ?? RAW_DEFAULTS, b.raw ?? RAW_DEFAULTS);
+  && curvesEqual(a.curves, b.curves) && lutRefsEqual(a.lut, b.lut) && rawEqual(a.raw ?? RAW_DEFAULTS, b.raw ?? RAW_DEFAULTS)
+  && geometryEqual(a.geometry ?? NEUTRAL_GEOMETRY, b.geometry ?? NEUTRAL_GEOMETRY);
 
 const numericNeutral = (adjustments, keys) => keys.every((key) => (adjustments[key] ?? byKey.get(key).default) === byKey.get(key).default);
 
@@ -167,6 +174,7 @@ export function groupIsNeutral(adjustments, group) {
   if (group === 'curves') return curvesNeutral(adjustments.curves);
   if (group === 'lut') return !adjustments.lut;
   if (group === 'raw') return rawEqual(normalizeRawSettings(adjustments.raw), RAW_DEFAULTS) && numericNeutral(adjustments, groupKeys('raw'));
+  if (group === 'geometry') return geometryNeutral(adjustments.geometry ?? NEUTRAL_GEOMETRY);
   return numericNeutral(adjustments, groupKeys(group));
 }
 
@@ -180,6 +188,7 @@ export function neutralGroup(group) {
   if (group === 'curves') patch.curves = neutral.curves;
   if (group === 'lut') patch.lut = null;
   if (group === 'raw') patch.raw = neutral.raw;
+  if (group === 'geometry') patch.geometry = neutral.geometry;
   return patch;
 }
 
@@ -205,5 +214,7 @@ export function compactAdjustments(adjustments) {
   if (!curvesNeutral(a.curves)) out.curves = Object.fromEntries(CURVE_CHANNELS.filter((c) => !isNeutralCurve(a.curves[c])).map((c) => [c, a.curves[c].map((point) => [...point])]));
   if (a.lut) out.lut = a.lut;
   if (!rawEqual(a.raw, RAW_DEFAULTS)) out.raw = a.raw;
+  const geometry = compactGeometry(a.geometry);
+  if (geometry) out.geometry = geometry;
   return out;
 }

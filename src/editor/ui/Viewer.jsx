@@ -1,6 +1,9 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { deriveParams } from '../pipeline/spec.mjs';
-import { neutralAdjustments } from '../model/adjustments.mjs';
+import { neutralAdjustments, neutralGroup } from '../model/adjustments.mjs';
+import { GeometryError, cropRatio, frameGeometry, geometryPlan, neutralGeometry } from '../pipeline/geometry.mjs';
+import { warpSpec } from '../pipeline/warp.mjs';
+import CropOverlay from './CropOverlay';
 import { GlRenderer, probeEditorContext } from '../pipeline/glRenderer.mjs';
 import { debugFlag, recordDiagnostic } from '../io/diagnostics.mjs';
 import { previewEdgeLimit } from '../io/files.mjs';
@@ -42,12 +45,33 @@ function createCpuEngine(host, maxPreviewEdge) {
 }
 
 const clampZoom = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
+const NEUTRAL_GEOMETRY = neutralGeometry();
+const specKey = (spec) => (spec ? JSON.stringify([spec.matrix, spec.width, spec.height, spec.coverage, spec.background]) : '');
+
+/**
+ * What the viewer shows: the photo's geometry, or in Crop & Transform the whole
+ * transformed frame (no crop or resize; in corners mode also no perspective) under the
+ * overlay. A transform that cannot be built falls back to none, with the reason.
+ */
+export function viewGeometry(geometry, mode, native) {
+  const base = geometry ?? NEUTRAL_GEOMETRY;
+  const shown = mode === 'corners' ? { ...frameGeometry(base), quad: null, perspective: { vertical: 0, horizontal: 0 } } : mode ? frameGeometry(base) : base;
+  try {
+    return { plan: geometryPlan(shown, native), error: null };
+  } catch (error) {
+    if (!(error instanceof GeometryError)) throw error;
+    return { plan: geometryPlan(NEUTRAL_GEOMETRY, native), error: error.message };
+  }
+}
 
 /**
  * Centre workspace: the processed preview with zoom, pan and before/after.
- * Zoom is expressed in source pixels per CSS pixel (1 = 100%).
+ * Zoom is expressed in output pixels per CSS pixel (1 = 100%): pixels of the photo after
+ * its geometry (crop, rotation, resize), so 100% is the export's pixel grid at original size.
+ * :param transform: Crop & Transform mode ({ mode: 'crop' | 'corners', guide, onPreview,
+ *   onCommit, onSet, onApply, onCancel }) or null
  */
-export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, zoomCommand, inspect = null }) {
+export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, zoomCommand, inspect = null, transform = null }) {
   const stageRef = useRef(null);
   const canvasHostRef = useRef(null);
   const engineRef = useRef(null);
@@ -55,7 +79,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   const frameRef = useRef(0);
   const cpuJobRef = useRef({ latest: 0, busy: false, queued: null });
   // CPU preview of a RAW photo: its neutral development, for Original and Split.
-  const cpuBeforeRef = useRef({ image: null, data: null });
+  const cpuBeforeRef = useRef({ image: null, key: '', data: null });
   // Detail preview: the request waiting to run, and the last frame shown with its settings key.
   const detailJobRef = useRef({ busy: false, pending: null, frame: null, key: null, image: null, generation: 0 });
   const splitRef = useRef(0);
@@ -151,7 +175,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   // they would keep that photo's pixels (tens of MB for a RAW) alive after it left.
   useEffect(() => {
     if (!proxy) engineRef.current?.renderer?.clear();
-    if (cpuBeforeRef.current.image !== proxyRef.current) Object.assign(cpuBeforeRef.current, { image: null, data: null });
+    if (cpuBeforeRef.current.image !== proxyRef.current) Object.assign(cpuBeforeRef.current, { image: null, key: '', data: null });
     if (detailJobRef.current.image !== proxyRef.current) Object.assign(detailJobRef.current, { frame: null, image: null, key: null });
   }, [proxy]);
 
@@ -159,11 +183,12 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   splitRef.current = splitFraction;
 
   // The "before" side of the CPU preview: the source itself, or for RAW and merged RAW
-  // HDR its neutral development.
-  const cpuBefore = useCallback(async (image, raw) => {
-    if (image.kind !== 'raw' && image.kind !== 'hdr') return image;
+  // HDR its neutral development; with geometry, warped like the edited side.
+  const cpuBefore = useCallback(async (image, raw, warp = null) => {
+    if (image.kind !== 'raw' && image.kind !== 'hdr' && !warp) return image;
     const cache = cpuBeforeRef.current;
-    if (cache.image !== image) Object.assign(cache, { image, data: (await renderInWorker(image, neutralAdjustments(), null, raw)).data });
+    const key = specKey(warp);
+    if (cache.image !== image || cache.key !== key) Object.assign(cache, { image, key, data: (await renderInWorker(image, neutralAdjustments(), null, raw, null, warp)).data });
     return { data: cache.data };
   }, [renderInWorker]);
 
@@ -178,20 +203,23 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       if (!engine.renderer.lost) engine.renderer.render(request.params, { split, before, rendered: frame });
       return;
     }
-    const sourceWidth = Math.round(image.width * split);
-    const before = sourceWidth > 0 ? await cpuBefore(image, request.raw) : null;
+    const out = request.warp ?? image;
+    const sourceWidth = Math.round(out.width * split);
+    const before = sourceWidth > 0 ? await cpuBefore(image, request.raw, request.warp) : null;
     if (proxyRef.current !== image) return;
     const { context } = engine;
-    if (frame.width === image.width && frame.height === image.height) {
+    if (context.canvas.width !== out.width || context.canvas.height !== out.height) Object.assign(context.canvas, { width: out.width, height: out.height });
+    if (frame.width === out.width && frame.height === out.height) {
       context.putImageData(new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height), 0, 0);
     } else {
       const scratch = document.createElement('canvas');
       scratch.width = frame.width;
       scratch.height = frame.height;
       scratch.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height), 0, 0);
-      context.drawImage(scratch, 0, 0, image.width, image.height);
+      context.clearRect(0, 0, out.width, out.height);
+      context.drawImage(scratch, 0, 0, out.width, out.height);
     }
-    if (before) context.putImageData(new ImageData(new Uint8ClampedArray(before.data), image.width, image.height), 0, 0, 0, 0, sourceWidth, image.height);
+    if (before) context.putImageData(new ImageData(new Uint8ClampedArray(before.data), out.width, out.height), 0, 0, 0, 0, sourceWidth, out.height);
   }, [cpuBefore]);
 
   /**
@@ -203,7 +231,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     job.pending = request;
     if (job.busy) return;
     job.busy = true;
-    const needsFinal = (current) => Math.max(current.image.width, current.image.height) > DETAIL_DRAFT_EDGE;
+    const needsFinal = (current) => Math.max((current.warp ?? current.image).width, (current.warp ?? current.image).height) > DETAIL_DRAFT_EDGE;
     try {
       let current = null;
       let final = false;
@@ -227,7 +255,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
           edge: final ? DETAIL_FINAL_EDGE : DETAIL_DRAFT_EDGE,
           nativeWidth: current.nativeWidth,
           nativeHeight: current.nativeHeight,
-        });
+        }, current.warp);
         // Newer values, another photo, or Detail turned off meanwhile: this frame is stale.
         if (current.generation !== job.generation) current = null;
         if (!current || job.pending || proxyRef.current !== image) continue; // eslint-disable-line no-continue
@@ -254,12 +282,15 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     job.busy = true;
     const id = (job.latest += 1);
     try {
-      const rendered = params.neutral ? image : await renderInWorker(image, params.adjustments, params.lutData, params.raw);
-      const sourceWidth = Math.round(image.width * params.split);
-      const before = sourceWidth > 0 ? await cpuBefore(image, params.raw) : image;
+      const out = params.warp ?? image;
+      const rendered = params.neutral && !params.warp ? image : await renderInWorker(image, params.adjustments, params.lutData, params.raw, null, params.warp);
+      const sourceWidth = Math.round(out.width * params.split);
+      const before = sourceWidth > 0 ? await cpuBefore(image, params.raw, params.warp) : image;
       if (id === job.latest && proxyRef.current === image) {
-        engine.context.putImageData(new ImageData(new Uint8ClampedArray(rendered.data), image.width, image.height), 0, 0);
-        if (sourceWidth > 0) engine.context.putImageData(new ImageData(new Uint8ClampedArray(before.data), image.width, image.height), 0, 0, 0, 0, sourceWidth, image.height);
+        const { canvas: target } = engine.context;
+        if (target.width !== out.width || target.height !== out.height) Object.assign(target, { width: out.width, height: out.height });
+        engine.context.putImageData(new ImageData(new Uint8ClampedArray(rendered.data), out.width, out.height), 0, 0);
+        if (sourceWidth > 0) engine.context.putImageData(new ImageData(new Uint8ClampedArray(before.data), out.width, out.height), 0, 0, 0, 0, sourceWidth, out.height);
       }
     } catch (error) {
       if (error.code !== 'cancelled') setStatus({ state: 'error', message: error.message });
@@ -273,6 +304,20 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     }
   }, [renderInWorker, cpuBefore]);
 
+  // Geometry: what is shown (the whole frame while cropping), its output size at native
+  // resolution, and the preview's warp (proxy px) at the proxy's scale.
+  const native = useMemo(() => ({ width: photo?.width ?? 1, height: photo?.height ?? 1 }), [photo?.width, photo?.height]);
+  const transformMode = transform?.mode ?? null;
+  const { plan, error: geometryError } = useMemo(() => viewGeometry(adjustments.geometry, transformMode, native), [adjustments.geometry, transformMode, native]);
+  const previewSpec = useMemo(() => {
+    if (!proxy || plan.identity) return null;
+    const scale = proxy.width / native.width;
+    const out = { width: Math.max(1, Math.round(plan.native.width * scale)), height: Math.max(1, Math.round(plan.native.height * scale)) };
+    return warpSpec(plan, out, { width: proxy.width, height: proxy.height });
+  }, [plan, proxy, native]);
+  // While cropping, Detail (CPU frames) is not rendered, so handles follow the pointer.
+  const renderAdjustments = useMemo(() => (transformMode ? { ...adjustments, ...neutralGroup('detail') } : adjustments), [adjustments, transformMode]);
+
   // Render on the next frame with the latest values; intermediate values are dropped.
   // Never with another photo's settings: wait until this photo's proxy is loaded.
   const raw = photo?.raw ?? null;
@@ -281,13 +326,16 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     if (!engine || !proxy || proxy.id !== photo?.id) return undefined;
     cancelAnimationFrame(frameRef.current);
     frameRef.current = requestAnimationFrame(() => {
-      const params = deriveParams(adjustments, { lut, raw });
+      const values = renderAdjustments;
+      const params = deriveParams(values, { lut, raw });
+      if (engine.kind === 'webgl2' && !engine.renderer.lost) engine.renderer.setGeometry(previewSpec);
       if (params.detailActive) {
         // Spatial Detail: the CPU renders the frame (draft, then final); a split or
         // compare change alone repaints the last frame.
-        const key = `${photo.id}|${JSON.stringify(adjustments)}|${params.lutActive ? lut.sha256 : ''}`;
+        const key = `${photo.id}|${JSON.stringify(values)}|${params.lutActive ? lut.sha256 : ''}|${specKey(previewSpec)}`;
         const job = detailJobRef.current;
-        const request = { key, image: proxyRef.current, adjustments, params, lut: params.lutActive ? lut : null, raw, nativeWidth: photo.width, nativeHeight: photo.height, generation: job.generation };
+        const nativeSize = plan.identity ? native : plan.native;
+        const request = { key, image: proxyRef.current, adjustments: values, params, lut: params.lutActive ? lut : null, raw, warp: previewSpec, nativeWidth: nativeSize.width, nativeHeight: nativeSize.height, generation: job.generation };
         if (job.key === key && job.frame && job.image === proxyRef.current && !job.pending && !job.busy) paintDetail(job.frame, request);
         else runDetail(request);
         return;
@@ -299,11 +347,11 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         const before = raw ? deriveParams(neutralAdjustments(), { raw }) : null;
         if (!engine.renderer.lost) engine.renderer.render(params, { split: splitFraction, before });
       } else {
-        drawCpu({ ...params, neutral: params.neutral, adjustments, lutData: params.lutActive ? lut : null, split: splitFraction, raw });
+        drawCpu({ ...params, neutral: params.neutral, adjustments: values, lutData: params.lutActive ? lut : null, split: splitFraction, raw, warp: previewSpec });
       }
     });
     return () => cancelAnimationFrame(frameRef.current);
-  }, [adjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -315,9 +363,12 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     return () => observer.disconnect();
   }, []);
 
-  const sourceWidth = photo?.width ?? 1;
-  const sourceHeight = photo?.height ?? 1;
-  const proxyScale = proxy ? proxy.width / sourceWidth : 1;
+  // Entering or leaving Crop & Transform changes what is shown: start from the whole view.
+  useEffect(() => { setView({ fit: true, zoom: 1, x: 0, y: 0 }); }, [transformMode]);
+
+  const sourceWidth = plan.native.width;
+  const sourceHeight = plan.native.height;
+  const proxyScale = proxy ? (previewSpec?.width ?? proxy.width) / sourceWidth : 1;
   const fitZoom = proxy
     ? Math.min((stageSize.width - STAGE_PADDING * 2) / sourceWidth, (stageSize.height - STAGE_PADDING * 2) / sourceHeight, 1)
     : 1;
@@ -416,6 +467,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   };
 
   const beyondProxy = proxy && zoom > proxyScale * 1.01;
+  const previewSize = previewSpec ?? proxy;
   const splitX = offsetX + displayWidth * split;
 
   return (
@@ -461,6 +513,23 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         {engineError && <p className="pe-stage-message pe-stage-message--error" role="alert">{engineError}</p>}
         {!engineError && status.state === 'error' && <p className="pe-stage-message pe-stage-message--error" role="alert">{status.message || 'This photograph could not be shown.'}</p>}
         {photo && photo.status === 'importing' && <p className="pe-stage-message" role="status"><span className="pe-spinner" aria-hidden="true" />{{ waiting: 'Waiting for the RAW decoder:', decoding: 'Decoding RAW sensor data:' }[photo.progress] ?? 'Reading'} {photo.name}…</p>}
+        {transform && proxy && proxy.id === photo?.id && !geometryError && (
+          <CropOverlay
+            mode={transform.mode}
+            geometry={adjustments.geometry}
+            content={plan.content}
+            ratio={cropRatio(adjustments.geometry.aspect, plan.frame)}
+            output={viewGeometry(adjustments.geometry, null, native).plan.crop}
+            box={{ x: offsetX, y: offsetY, width: displayWidth, height: displayHeight }}
+            guide={transform.guide}
+            onPreview={transform.onPreview}
+            onCommit={transform.onCommit}
+            onSet={transform.onSet}
+            onApply={transform.onApply}
+            onCancel={transform.onCancel}
+          />
+        )}
+        {geometryError && proxy && <p className="pe-stage-message pe-stage-message--error" role="alert">{geometryError} Shown without geometry.</p>}
         {inspect && proxy && proxy.id === photo?.id && (
           <InspectView
             photo={photo}
@@ -470,6 +539,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
             compare={compare}
             split={split}
             center={{ x: (stageSize.width / 2 - offsetX) / zoom, y: (stageSize.height / 2 - offsetY) / zoom }}
+            size={plan.identity ? null : plan.native}
             loadSource={inspect.loadSource}
             render={inspect.render}
             onClose={inspect.onClose}
@@ -480,7 +550,9 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       </div>
       <div className="pe-viewer-bar">
         <span className="pe-readout mono" aria-live="polite">{proxy ? `${Math.round(zoom * 100)}%` : '—'}</span>
-        {beyondProxy && <span className="pe-readout-note">Preview at {proxy.width}×{proxy.height}; export uses full resolution</span>}
+        {beyondProxy && <span className="pe-readout-note">Preview at {previewSize.width}×{previewSize.height}; export uses full resolution</span>}
+        {proxy && !plan.identity && !transform && <span className="pe-readout-note mono" data-output-size>{plan.native.width}×{plan.native.height} px</span>}
+        {transform && deriveParams(adjustments).detailActive && <span className="pe-readout-note">Detail is not previewed while cropping</span>}
         {engineKind === 'cpu' && <span className="pe-readout-note">CPU preview (WebGL2 unavailable)</span>}
         {proxy && detailQuality && (
           <span

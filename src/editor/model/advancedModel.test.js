@@ -196,7 +196,7 @@ describe('Detail settings', () => {
   test('documents save Detail values (version 5) and read them back; older documents get neutral Detail', () => {
     const text = serializeEditDocument(createEditDocument([{ name: 'a.jpg', size: 1, lastModified: 0, sha256: null, format: 'jpeg', width: 10, height: 10, adjustments: normalizeAdjustments(DETAIL) }], {}, new Date(0)));
     const saved = JSON.parse(text);
-    expect(saved.version).toBe(5);
+    expect(saved.version).toBe(6);
     expect(saved.photos[0].adjustments).toMatchObject(DETAIL);
     expect(parseEditDocument(text).photos[0].adjustments).toMatchObject(DETAIL);
     // Neutral Detail values are left out of the compact form.

@@ -5,9 +5,11 @@
 
 import { prepareRender, renderRawRgba8 } from '../pipeline/cpuRenderer.mjs';
 import { guideSource, prepareDetailRender, renderDetailRows } from '../pipeline/detailRenderer.mjs';
-import { extractRect } from '../pipeline/detailRegion.mjs';
+import { extractRect, warpedRegionSource } from '../pipeline/detailRegion.mjs';
+import { geometryPlan, normalizeGeometry } from '../pipeline/geometry.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
-import { exportDimensions, LIMITS, proxyDimensions } from '../io/files.mjs';
+import { exportGeometry, LIMITS, proxyDimensions } from '../io/files.mjs';
+import { finishRows, warpImage, warpSpec } from '../pipeline/warp.mjs';
 import { contentHash } from '../io/hash.mjs';
 import { RawDecodeError, decodeRaw, downsampleRaw } from './rawDecoder.mjs';
 import { RAW_SNIFF_BYTES, sniffRaw } from './rawFormat.mjs';
@@ -76,7 +78,7 @@ export function createRawHandlers(loadModule) {
      * 1:1 inspection source: the full demosaic (as an export at original size), its guide
      * source, and only `rect` of the pixels.
      */
-    async region({ file, raw, rect }) {
+    async region({ file, raw, rect, geometry = null }) {
       const { Module, bytes, format } = await openRaw(file, loadModule);
       const decoded = decodeRaw(Module, bytes, { format, halfSize: false });
       if (decoded.info.width !== raw.width || decoded.info.height !== raw.height) {
@@ -84,6 +86,11 @@ export function createRawHandlers(loadModule) {
       }
       const image = downsampleRaw(decoded.image, raw.width, raw.height);
       decoded.image = null;
+      const plan = geometryPlan(normalizeGeometry(geometry), { width: raw.width, height: raw.height });
+      if (!plan.identity) {
+        const kept = warpedRegionSource(image, plan, rect);
+        return { result: kept, transfer: [kept.source.data.buffer] };
+      }
       const guideImage = guideSource(image);
       const source = extractRect(image, rect);
       return { result: { source, guideImage, transparent: false, native: { width: raw.width, height: raw.height } }, transfer: [source.data.buffer] };
@@ -123,31 +130,37 @@ export function createRawHandlers(loadModule) {
      */
     async export({ file, raw, adjustments, lut = null, settings }, progress) {
       const started = performance.now();
-      const size = exportDimensions({ width: raw.width, height: raw.height }, settings.resize);
+      const geometry = exportGeometry(adjustments.geometry, { width: raw.width, height: raw.height }, settings.resize);
+      const size = geometry.output;
+      const developSize = geometry.decode;
       progress({ stage: 'decoding', fraction: 0 });
       const { Module, bytes, format } = await openRaw(file, loadModule);
-      const decoded = decodeRaw(Module, bytes, { format, halfSize: !needsFullDecode(raw, size) });
+      const decoded = decodeRaw(Module, bytes, { format, halfSize: !needsFullDecode(raw, developSize) });
       if (decoded.info.width !== raw.width || decoded.info.height !== raw.height) {
         throw new RawDecodeError('corrupt', 'The file changed since it was imported. Import it again.');
       }
       const source = decoded.image.width === raw.width ? 'full' : 'half';
-      const image = downsampleRaw(decoded.image, size.width, size.height);
+      let image = downsampleRaw(decoded.image, developSize.width, developSize.height);
       decoded.image = null;
-      if (image.width !== size.width || image.height !== size.height) {
-        throw new RawDecodeError('corrupt', `LibRaw returned ${image.width}×${image.height} instead of ${size.width}×${size.height}.`);
+      if (image.width !== developSize.width || image.height !== developSize.height) {
+        throw new RawDecodeError('corrupt', `LibRaw returned ${image.width}×${image.height} instead of ${developSize.width}×${developSize.height}.`);
       }
+      const spec = geometry.identity ? null : warpSpec(geometry.plan, size, developSize);
+      if (spec) image = warpImage(image, spec.matrix, spec);
+      const nativeSize = geometry.identity ? raw : geometry.plan.native;
       const decodedAt = performance.now();
       const params = deriveParams(adjustments, { lut, raw });
       const prepared = prepareRender(params);
       // Detail reads neighbouring rows, which the decoded image holds in full.
       const detail = params.detailActive
-        ? prepareDetailRender(prepared, { width: size.width, height: size.height, nativeWidth: raw.width, nativeHeight: raw.height, guideImage: guideSource(image) })
+        ? prepareDetailRender(prepared, { width: size.width, height: size.height, nativeWidth: nativeSize.width, nativeHeight: nativeSize.height, guideImage: guideSource(image) })
         : null;
       for (let row = 0; row < size.height; row += RAW_BAND_ROWS) {
         const rows = Math.min(RAW_BAND_ROWS, size.height - row);
         const data = new Uint8ClampedArray(size.width * rows * 4);
         if (detail) renderDetailRows(image, detail, row, row + rows, data);
         else renderRawRgba8(image.data.subarray(row * size.width * 3, (row + rows) * size.width * 3), prepared, { target: data });
+        finishRows(spec, data, row, rows, settings.format === 'jpeg');
         progress({ stage: 'rendering', fraction: (row + rows) / size.height, band: { row, rows, data } });
       }
       return {

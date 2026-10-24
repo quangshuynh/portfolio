@@ -7,6 +7,9 @@
 // and exposure live in `photo.raw`, a merge's inputs, roles and settings in `photo.hdr`;
 // neither is an adjustment. The RAW white balance and HDR tone mapping groups copy only
 // between photos they apply to (RAW-developed, merged RAW HDR) and are off by default.
+// Geometry is split in two groups, both off by default (paste never copies them): Output
+// size (the resize box, reusable on any photo) and Crop & transform (crop, rotation, flips,
+// perspective, stretch: source-specific, so only to photos of the same proportions).
 
 import { adjustmentsEqual, groupKeys, neutralAdjustments, normalizeAdjustments } from './adjustments.mjs';
 import { presetPatch } from './presets.mjs';
@@ -14,6 +17,11 @@ import { presetPatch } from './presets.mjs';
 /** Kinds of source a group needs on both sides. */
 const developed = (photo) => Boolean(photo?.raw);
 const radianceHdr = (photo) => photo?.hdr?.mode === 'radiance';
+/** Width / height of a photo as imported (before its own geometry). */
+const proportions = (photo) => (photo?.width && photo?.height ? photo.width / photo.height : null);
+const sameProportions = (a, b) => a !== null && b !== null && Math.abs(a / b - 1) < 0.005;
+
+const TRANSFORM_PARTS = ['quarterTurns', 'flipH', 'flipV', 'angle', 'perspective', 'quad', 'stretch', 'crop', 'aspect', 'constrain', 'background'];
 
 export const SYNC_GROUPS = Object.freeze([
   { id: 'light', label: 'Light', keys: groupKeys('light') },
@@ -24,6 +32,15 @@ export const SYNC_GROUPS = Object.freeze([
   { id: 'lut', label: 'LUT', keys: groupKeys('lut'), structured: 'lut' },
   { id: 'raw', label: 'RAW white balance', keys: groupKeys('raw'), structured: 'raw', applies: developed, needs: 'RAW photos' },
   { id: 'hdr', label: 'HDR tone mapping', keys: groupKeys('hdr'), applies: radianceHdr, needs: 'merged RAW HDR photos' },
+  { id: 'outputSize', label: 'Output size (resize)', keys: [], geometry: ['resize'] },
+  {
+    id: 'transform',
+    label: 'Crop & transform',
+    keys: [],
+    geometry: TRANSFORM_PARTS,
+    needs: 'photos with the same proportions',
+    compatible: (source, photo) => sameProportions(source.proportions ?? null, proportions(photo)),
+  },
 ].map(Object.freeze));
 const groupById = new Map(SYNC_GROUPS.map((group) => [group.id, group]));
 
@@ -33,8 +50,11 @@ export const DEFAULT_SYNC_GROUPS = Object.freeze(['light', 'color', 'hsl', 'deta
 // Every adjustment belongs to exactly one sync group (tested), so "all groups" is everything.
 export const syncGroupOf = (key) => SYNC_GROUPS.find(({ keys }) => keys.includes(key))?.id ?? null;
 
-/** The settings of the given groups from `source`, as a patch. */
-export function groupPatch(source, groups) {
+/**
+ * The settings of the given groups from `source`, as a patch over `target` (geometry groups
+ * replace their parts of the target's geometry and keep the rest).
+ */
+export function groupPatch(source, groups, target = neutralAdjustments()) {
   const values = normalizeAdjustments(source);
   const patch = {};
   groups.forEach((id) => {
@@ -42,6 +62,10 @@ export function groupPatch(source, groups) {
     if (!group) throw new Error(`Unknown sync group: ${id}`);
     group.keys.forEach((key) => { patch[key] = values[key]; });
     if (group.structured) patch[group.structured] = values[group.structured];
+    if (group.geometry) {
+      const base = patch.geometry ?? normalizeAdjustments(target).geometry;
+      patch.geometry = { ...base, ...Object.fromEntries(group.geometry.map((part) => [part, values.geometry[part]])) };
+    }
   });
   return patch;
 }
@@ -91,16 +115,21 @@ export function planSync(source, targets, { groups = DEFAULT_SYNC_GROUPS, hasLut
   const lut = chosen.some(({ id }) => id === 'lut') ? missingLut(values, hasLut) : null;
   if (lut) errors.push(`The LUT "${lutName(lut)}" is not loaded. Import it again, or leave LUT out.`);
   const sourceIs = { raw: Boolean(kind.raw), hdr: Boolean(kind.hdr) };
-  const result = plan(targets, (photo) => {
+  const result = plan(targets, (photo, before) => {
     const skipped = [];
     const usable = chosen.filter((group) => {
+      if (group.compatible) {
+        if (group.compatible(kind, photo)) return true;
+        skipped.push({ group: group.id, reason: `only for ${group.needs}` });
+        return false;
+      }
       if (!group.applies) return true;
       const sourceFits = group.id === 'raw' ? sourceIs.raw : sourceIs.hdr;
       if (!sourceFits) { skipped.push({ group: group.id, reason: `the source is not one of the ${group.needs}` }); return false; }
       if (!group.applies(photo)) { skipped.push({ group: group.id, reason: `only for ${group.needs}` }); return false; }
       return true;
     });
-    return { patch: groupPatch(values, usable.map(({ id }) => id)), skipped };
+    return { patch: groupPatch(values, usable.map(({ id }) => id), before), skipped };
   });
   return { ...result, errors };
 }
@@ -127,4 +156,4 @@ export function planLut(lut, intensity, targets, { hasLut = () => true } = {}) {
 export const planReset = (targets) => ({ ...plan(targets, () => ({ patch: neutralAdjustments() })), errors: [] });
 
 /** What a photo's source is, for compatibility with copied settings. */
-export const sourceKind = (photo) => ({ raw: developed(photo), hdr: radianceHdr(photo) });
+export const sourceKind = (photo) => ({ raw: developed(photo), hdr: radianceHdr(photo), proportions: proportions(photo) });

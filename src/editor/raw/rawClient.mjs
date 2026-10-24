@@ -5,10 +5,11 @@
 
 import { WorkerCancelled, createWorkerClient } from '../io/workerClient.mjs';
 import { assertCanvasWorks, createCanvas, encodeCanvas } from '../io/decode.mjs';
-import { exportDimensions } from '../io/files.mjs';
+import { exportGeometry } from '../io/files.mjs';
+import { finishRows, warpSpec } from '../pipeline/warp.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { recordDiagnostic } from '../io/diagnostics.mjs';
-import { renderDetailParallel, renderPixelsParallel } from '../io/detailPool.mjs';
+import { renderDetailParallel, renderPixelsParallel, warpParallel } from '../io/detailPool.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 
 const PRIORITY = { decode: 0, region: 0, export: 1, develop: 1, inspect: 2 };
@@ -114,7 +115,8 @@ export function createRawQueue({ spawn = spawnRawWorker, limit = 1 } = {}) {
  */
 export async function exportRaw(queue, { file, raw, adjustments, lut, settings }, { onProgress = () => {}, onStart = () => {}, detailWorkers = 0, spawnRender } = {}) {
   const format = FORMATS[settings.format];
-  const size = exportDimensions({ width: raw.width, height: raw.height }, settings.resize);
+  const geometry = exportGeometry(adjustments.geometry, { width: raw.width, height: raw.height }, settings.resize);
+  const size = geometry.output;
   // Fail before the decode if this browser cannot hold a canvas of this size.
   const canvas = createCanvas(size.width, size.height);
   const context = canvas.getContext('2d', { colorSpace: 'srgb' });
@@ -123,16 +125,24 @@ export async function exportRaw(queue, { file, raw, adjustments, lut, settings }
     const render = deriveParams(adjustments, { lut, raw }).detailActive ? renderDetailParallel : renderPixelsParallel;
     const started = performance.now();
     const signal = { cancelled: false };
-    const develop = queue.run('develop', { file, raw, width: size.width, height: size.height });
+    const develop = queue.run('develop', { file, raw, width: geometry.decode.width, height: geometry.decode.height });
     onStart({ cancel: () => { signal.cancelled = true; develop.cancel(); } });
     onProgress({ stage: 'decoding', fraction: 0 });
-    const image = await develop.promise;
+    let image = await develop.promise;
+    const developed = image.width === raw.width ? 'full' : 'half';
+    const spec = geometry.identity ? null : warpSpec(geometry.plan, size, image);
+    if (spec) {
+      // The development (LibRaw's worker has ended) is warped on the band workers.
+      image = await warpParallel(image, spec, { workers: detailWorkers, signal, spawn: spawnRender });
+      if (signal.cancelled) throw new WorkerCancelled();
+    }
     const decodedAt = performance.now();
-    await render(image, { adjustments, lut, raw, nativeWidth: raw.width, nativeHeight: raw.height }, {
+    const nativeSize = geometry.identity ? raw : geometry.plan.native;
+    await render(image, { adjustments, lut, raw, nativeWidth: nativeSize.width, nativeHeight: nativeSize.height }, {
       workers: detailWorkers,
       signal,
       spawn: spawnRender,
-      onBand: ({ row, rows, data }) => context.putImageData(new ImageData(data, size.width, rows), 0, row),
+      onBand: ({ row, rows, data }) => context.putImageData(new ImageData(finishRows(spec, data, row, rows, settings.format === 'jpeg'), size.width, rows), 0, row),
       onProgress: (fraction) => onProgress({ stage: 'rendering', fraction }),
     });
     onProgress({ stage: 'encoding', fraction: 1 });
@@ -143,7 +153,7 @@ export async function exportRaw(queue, { file, raw, adjustments, lut, settings }
       blob,
       width: size.width,
       height: size.height,
-      source: image.width === raw.width ? 'full' : 'half',
+      source: developed,
       timings: { decode: decodedAt - started, render: renderedAt - decodedAt, encode: performance.now() - renderedAt, bandWorkers: detailWorkers },
     };
   }

@@ -1,11 +1,15 @@
 // GLSL mirror of spec.mjs. Constants come from the JS spec so the two cannot drift;
 // the per-pixel steps follow processLinear(), toneCurve() and processDisplay() in the
-// same order. Curve tables and LUTs are read with texelFetch and interpolated here,
+// same order. Geometry: each output pixel is mapped back to the source by the matrix
+// geometry.mjs builds and sampled with the Catmull-Rom kernel of warp.mjs (rounded to the
+// source's precision, as the CPU stores warped pixels), then faded outside the photo as
+// applyCoverage() does. Curve tables and LUTs are read with texelFetch and interpolated here,
 // exactly as the CPU does, so no float-texture filtering extension is needed.
 
 import { LUMA } from './colorMath.mjs';
 import { CURVE_TABLE_SIZE } from './curves.mjs';
 import { BLACK_EPSILON, HSL_CENTERS, HSL_LUMINANCE_EV, SHADOW_LIFT_SCALE, TONE_PIVOT } from './spec.mjs';
+import { POSITION_GRID, ROUNDING_BIAS } from './warp.mjs';
 
 const f = (value) => {
   const text = String(value);
@@ -65,6 +69,15 @@ uniform int uLutSize;
 uniform vec3 uLutDomainMin;
 uniform vec3 uLutDomainMax;
 uniform float uLutIntensity;
+// Geometry (warp.mjs): output px -> source px, the output size, and edge coverage.
+uniform bool uGeometry;
+uniform mat3 uGeometryMatrix;
+uniform vec2 uOutputSize;
+uniform bool uCoverage;
+uniform float uCoverageScale;
+uniform vec2 uSourceSize;
+uniform int uBackground;
+uniform bool uOpaque;
 in vec2 vUv;
 out vec4 outColor;
 
@@ -76,6 +89,8 @@ const float HSL_EV = ${f(HSL_LUMINANCE_EV)};
 const float HSL_CENTERS[8] = float[8](${HSL_CENTERS.map(f).join(', ')});
 const float PI = 3.141592653589793;
 const float SHADOW_LIFT_SCALE = ${f(SHADOW_LIFT_SCALE)};
+const float POSITION_GRID = ${f(POSITION_GRID)};
+const float ROUNDING_BIAS = ${f(ROUNDING_BIAS)};
 
 float toLinear(float v) {
   return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4);
@@ -212,6 +227,101 @@ vec3 applyHsl(vec3 p) {
   return toSrgb3(fitRange(lin, y));
 }
 
+vec4 cubicWeights(float t) {
+  float t2 = t * t;
+  float t3 = t2 * t;
+  return vec4((-t3 + 2.0 * t2 - t) * 0.5, (3.0 * t3 - 5.0 * t2 + 2.0) * 0.5, (-3.0 * t3 + 4.0 * t2 + t) * 0.5, (t3 - t2) * 0.5);
+}
+
+// Source position (px) of this output pixel's centre: gl_FragCoord holds exact centres
+// (row 0 at the bottom).
+vec2 sourcePosition() {
+  vec3 s = uGeometryMatrix * vec3(gl_FragCoord.x, uOutputSize.y - gl_FragCoord.y, 1.0);
+  return s.xy / s.z;
+}
+
+float roundCode(float v) { return floor(v + 0.5 + ROUNDING_BIAS); }
+vec3 roundCode(vec3 v) { return floor(v + 0.5 + ROUNDING_BIAS); }
+vec2 snapPosition(vec2 at) { return floor(at * POSITION_GRID + 0.5) / POSITION_GRID - 0.5; }
+
+// Catmull-Rom of an RGBA8 texture in whole code values, premultiplied unless the source is
+// opaque, and rounded to 8 bits: the same arithmetic as warpRows(), so ties round alike.
+vec4 rgbaCubic(vec2 at) {
+  ivec2 size = textureSize(uSource, 0);
+  vec2 p = snapPosition(at);
+  vec2 base = floor(p);
+  vec4 wx = cubicWeights(p.x - base.x);
+  vec4 wy = cubicWeights(p.y - base.y);
+  vec3 color = vec3(0.0);
+  float alpha = 0.0;
+  for (int j = 0; j < 4; j++) {
+    int y = clamp(int(base.y) - 1 + j, 0, size.y - 1);
+    for (int k = 0; k < 4; k++) {
+      int x = clamp(int(base.x) - 1 + k, 0, size.x - 1);
+      vec4 texel = floor(texelFetch(uSource, ivec2(x, y), 0) * 255.0 + 0.5);
+      float weight = wy[j] * wx[k];
+      if (uOpaque) {
+        color += texel.rgb * weight;
+      } else {
+        float a = texel.a * weight;
+        color += texel.rgb * a;
+        alpha += a;
+      }
+    }
+  }
+  if (uOpaque) return vec4(min(roundCode(clamp(color, 0.0, 255.0)), 255.0) / 255.0, 1.0);
+  float a = clamp(alpha, 0.0, 255.0);
+  vec3 rgb = a > 0.0 ? min(roundCode(clamp(color / alpha, 0.0, 255.0)), 255.0) : vec3(0.0);
+  return vec4(rgb, min(roundCode(a), 255.0)) / 255.0;
+}
+
+// Catmull-Rom of 16-bit camera RGB, rounded to whole values like warpRows().
+vec3 rawCubic(vec2 at) {
+  ivec2 size = textureSize(uRawSource, 0);
+  vec2 p = snapPosition(at);
+  vec2 base = floor(p);
+  vec4 wx = cubicWeights(p.x - base.x);
+  vec4 wy = cubicWeights(p.y - base.y);
+  vec3 sum = vec3(0.0);
+  for (int j = 0; j < 4; j++) {
+    int y = clamp(int(base.y) - 1 + j, 0, size.y - 1);
+    for (int k = 0; k < 4; k++) {
+      int x = clamp(int(base.x) - 1 + k, 0, size.x - 1);
+      sum += vec3(texelFetch(uRawSource, ivec2(x, y), 0).rgb) * (wy[j] * wx[k]);
+    }
+  }
+  return min(roundCode(clamp(sum, 0.0, 65535.0)), 65535.0);
+}
+
+vec3 hdrCubic(vec2 at) {
+  ivec2 size = textureSize(uHdrSource, 0);
+  vec2 p = snapPosition(at);
+  vec2 base = floor(p);
+  vec4 wx = cubicWeights(p.x - base.x);
+  vec4 wy = cubicWeights(p.y - base.y);
+  vec3 sum = vec3(0.0);
+  for (int j = 0; j < 4; j++) {
+    int y = clamp(int(base.y) - 1 + j, 0, size.y - 1);
+    for (int k = 0; k < 4; k++) {
+      int x = clamp(int(base.x) - 1 + k, 0, size.x - 1);
+      sum += texelFetch(uHdrSource, ivec2(x, y), 0).rgb * (wy[j] * wx[k]);
+    }
+  }
+  return max(sum, 0.0);
+}
+
+// Fades pixels outside the photo to the background (applyCoverage in warp.mjs).
+vec4 finish(vec4 color, vec2 at) {
+  if (!uGeometry || !uCoverage) return color;
+  float d = min(min(at.x, uSourceSize.x - at.x), min(at.y, uSourceSize.y - at.y));
+  float coverage = clamp(d / uCoverageScale + 0.5, 0.0, 1.0);
+  if (coverage >= 1.0) return color;
+  float alpha = color.a * coverage;
+  if (uBackground == 0) return vec4(color.rgb, alpha);
+  float solid = uBackground == 1 ? 1.0 : 0.0;
+  return vec4(toSrgb3(toLinear3(color.rgb) * alpha + solid * (1.0 - alpha)), 1.0);
+}
+
 vec3 lutAt(ivec3 i) { return texelFetch(uLut, i, 0).rgb; }
 
 // Tetrahedral interpolation, as sampleLut() in lut.mjs.
@@ -240,20 +350,22 @@ vec3 applyLut(vec3 p) {
 void main() {
   vec3 p;
   float alpha = 1.0;
+  vec2 position = uGeometry ? sourcePosition() : vec2(0.0);
   if (uRaw) {
     ivec2 size = textureSize(uRawSource, 0);
     ivec2 at = min(ivec2(vUv * vec2(size)), size - 1);
-    vec3 camera = min(vec3(texelFetch(uRawSource, at, 0).rgb) / 65535.0 * uRawGain, uRawWhite);
+    vec3 sensor = uGeometry ? rawCubic(position) : vec3(texelFetch(uRawSource, at, 0).rgb);
+    vec3 camera = min(sensor / 65535.0 * uRawGain, uRawWhite);
     p = toSrgb3(process(uRawMatrix * camera));
   } else if (uHdr) {
     ivec2 size = textureSize(uHdrSource, 0);
     ivec2 at = min(ivec2(vUv * vec2(size)), size - 1);
-    vec3 camera = min(texelFetch(uHdrSource, at, 0).rgb * uRawGain, uRawWhite);
+    vec3 camera = min((uGeometry ? hdrCubic(position) : texelFetch(uHdrSource, at, 0).rgb) * uRawGain, uRawWhite);
     p = toSrgb3(process(uRawMatrix * camera));
   } else {
-    vec4 source = texture(uSource, vUv);
+    vec4 source = uGeometry ? rgbaCubic(position) : texture(uSource, vUv);
     if (uNeutral) {
-      outColor = source;
+      outColor = finish(source, position);
       return;
     }
     alpha = source.a;
@@ -262,5 +374,5 @@ void main() {
   if (uCurvesActive) p = applyCurves(p);
   if (uHslActive) p = applyHsl(p);
   if (uLutActive) p = applyLut(p);
-  outColor = vec4(p, alpha);
+  outColor = finish(vec4(p, alpha), position);
 }`;

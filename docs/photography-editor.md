@@ -7,7 +7,8 @@ visitor's browser. Built in Interval 3 (light and colour), extended in Interval 
 Interval 6 (three-exposure HDR, see [Merge HDR](#merge-hdr)), Interval 7 (Texture,
 Clarity, Dehaze, sharpening and noise reduction, see [Detail](#detail)) and Interval 8
 (multi-photo selection, sync, batch export and ZIP, 1:1 Detail inspection, see
-[Batch editing](#batch-editing));
+[Batch editing](#batch-editing)) and Interval 10 (crop, rotation, flips, perspective, stretch
+and resize, see [Geometry](#geometry-crop--transform));
 the original proposal is in
 [photography-platform/editor-hdr-architecture.md](photography-platform/editor-hdr-architecture.md).
 `/photography` links to it with a small "Edit a photo" text link (in-app
@@ -22,6 +23,8 @@ navigation).
 | `src/editor/model/presets.mjs` | Preset schema, validation, built-in presets, apply rules. |
 | `src/editor/pipeline/colorMath.mjs` | sRGB transfer, matrices, daylight locus, Bradford white balance. |
 | `src/editor/pipeline/cpuRenderer.mjs` | Deterministic CPU renderer: tests, export, no-WebGL2 preview. |
+| `src/editor/pipeline/geometry.mjs`, `warp.mjs` | Geometry: model, validation, transform order, crop constraints (`geometry.mjs`); inverse-mapped Catmull-Rom resampling and edge coverage (`warp.mjs`). UI: `ui/GeometryPanel.jsx`, `ui/CropOverlay.jsx`. |
+| `scripts/check-editor-geometry.mjs` | `npm run check:editor:geometry`: crop tool (pointer, touch, keyboard), PNG exports against the Node reference, batch resize, 24 MP timing; genuine ARW and merged HDR with `GEOMETRY_FIXTURE_DIR`. |
 | `src/editor/pipeline/detail.mjs`, `detailRenderer.mjs` | Detail stage (spatial filters, guide) and the tiled renderer used by the Detail preview and every export with Detail. |
 | `src/editor/pipeline/detailRegion.mjs`, `ui/InspectView.jsx` | 1:1 Detail inspection: crop and region maths, region render equal to the export. |
 | `src/editor/io/detailPool.mjs` | Detail exports rendered in bands on several render workers. |
@@ -348,6 +351,73 @@ Display P3 and other wide-gamut sources are converted to sRGB on decode, and
 exports are untagged sRGB. Semi-transparent PNG/WebP pixels pass through the
 canvas's premultiplied storage, so very low alpha loses precision.
 
+## Geometry (Crop & Transform)
+
+**Crop** (C, or **Crop** under the preview): the viewer shows the whole transformed frame
+with the crop box; drag the box, its edges or corners (44 px touch targets), or focus one
+and use the arrow keys (Shift: larger steps). Enter or **Apply** keeps it, Escape or
+**Cancel** restores the geometry the tool opened with (one more undo step); every drag is an
+ordinary undo step. Ratios: Freeform, Original, 1:1, 4:3, 3:2, 16:9, 9:16, 5:4, 4:5 or a
+custom W:H, turned with Landscape/Portrait; a new ratio makes the largest crop with it around
+the current centre. Ratios are in output pixels and never stretch the photo. **Perspective
+corners** shows the frame without perspective and four points to place on lines that should
+form a rectangle. The inspector section holds the numbers: 90° turns and 180°, Straighten
+(−45° to +45°, 0.05° steps, fine grid while dragging), flips, Vertical/Horizontal keystone
+(±100: the shorter edge of the quad mapped onto the frame is 60% of the other at 100),
+Stretch and Resize. Detail is not previewed while the crop tool is open.
+
+**Order** (`geometry.mjs`), source to output, all at native size: quarter turns (clockwise)
+then flips → straighten about the frame centre (the frame keeps its size) → perspective (a
+homography taking a quad of the straightened frame onto the frame, so it follows the
+straightened axes) → stretch → crop → resize; then the Export panel's resize. Every render
+maps each output pixel centre back to the source through one 3×3 matrix (inverse mapping, no
+holes) and samples it with a Catmull-Rom kernel, edges clamped, RGBA premultiplied;
+pixel-aligned crops, turns and flips at full size copy pixels exactly. Turning or flipping
+acts on the result shown: crop, angle, perspective, stretch, resize and ratio are carried
+along (tested against the composed transforms).
+
+**Coordinates and sizes.** Crop and corners are normalised (0–1, origin top left) in the
+stretched, straightened frame; the crop snaps inwards to whole native pixels (the output size
+in the viewer bar and inspector). **Crop to fill** (default) shrinks the crop about its
+centre whenever straightening or perspective would put empty corners inside it, and a first
+straighten makes the largest crop with the photo's proportions. Turned off, areas outside the
+photo fade to transparent (PNG, WebP; white in JPEG), white or black over one output pixel.
+**Stretch** scales an axis 50–200%, normalised so the output never gains pixels; **Resize**
+fits the crop into width × height and never upscales (upscaling is not offered); unlocked it
+scales each axis to its own size, which distorts and says so.
+
+**Preview and export.** The WebGL2 shader warps the proxy with the same matrix, kernel,
+1/256 px position grid and rounding as `warpRows`, so preview, before/after and split share
+one mapping (RGBA and RAW within one code value of the CPU, merged HDR within two at the
+range fit of out-of-gamut colours; parity cases in `check:editor`). The CPU fallback, Detail
+frames, thumbnails and 1:1 inspection warp in the worker. Zoom is in output pixels: 100% is
+the export's pixel grid at original size, and 1:1 Detail renders a region cut from the warped
+output, equal to those export pixels (unit test). Exports decode the original only as large
+as the warp needs (`decodeSize`: at least one source pixel per output pixel in every
+direction), warp it (RAW: the development, after LibRaw's worker has ended; merged HDR: the
+finished merge, its three sources and merge settings untouched), then render as before, with
+Detail radii relative to the geometry's native output. On desktops the warp runs on the band
+workers, each sent only the source rows its band reads (bit for bit a whole warp, tested);
+this holds the decoded original and the warped output at once (about 2 × 96 MB at 24 MP
+RGBA). Neutral geometry keeps every earlier path and size unchanged. Invalid transforms (a
+perspective that would send part of the photo to infinity, folded or degenerate corners) are
+rejected when edited, read from a file, or exported.
+
+**Measurements** (`npm run check:editor:geometry`, Windows i7-9700, headless Playwright,
+whole browser memory; small PNG with straighten 6.5°, 3:2, flip, perspective, with and
+without Detail: **exports equal the Node reference exactly** in all five environments):
+
+| Environment | Crop key step · straighten · perspective (to the painted frame) | 24 MP JPEG straightened −4°, cropped (5442×3628) | Genuine ARW, straighten 2.5°, 4:5, Texture: 1:1 first frame · export | Merged RAW HDR (DSC09640–42), straighten and turn: export |
+| --- | --- | --- | --- | --- |
+| Chromium 141 | 68 · 54 · 41 ms | 4.4 s, peak 1051 MB (baseline 489) | 5.4 s (1573 MB) · 4.7 s (1416 MB) | 16.4 s, 3730×5572, 2106 MB |
+| Firefox 142 | 30 · 9 · 7 ms | 3.5 s, 1354 MB (863) | 15.8 s (1969 MB) · 15.6 s (1875 MB) | not run |
+| WebKit 26 | 81 · 77 · 25 ms | 16.9 s, 924 MB (500) | not run (LibRaw crash, see Known issues) | not run |
+| Chromium, no WebGL2 | 32 · 26 · 33 ms | – | – | – |
+
+Warp alone (Node, one thread, 24 MP RGBA, straightened): 2.1 s; a pixel-aligned crop 0.25 s.
+Without geometry nothing changed (neutral plans skip the warp). WebKit's 24 MP time includes
+main-thread decoding (Playwright's Windows WebKit has no worker canvas).
+
 ## Detail
 
 Texture, Clarity, Dehaze, Sharpening and Luminance/Color noise reduction, in a Detail
@@ -484,7 +554,9 @@ roles and merge settings (`photo.hdr`). Two groups are off by default and copy o
 they apply: **RAW white balance** (mode, kelvin and tint; RAW source to RAW and merged RAW
 targets, each developed through its own camera matrix) and **HDR tone mapping** (between
 merged RAW HDR photos). A LUT that is not loaded blocks the sync until it is imported or LUT
-is left out. Settings move freely between JPEG, PNG, WebP, RAW and merged photos.
+is left out. Geometry is copied only when ticked (paste never copies it): **Output size
+(resize)** copies the resize box to any photo; **Crop & transform** (crop, ratio, turns,
+flips, straighten, perspective, stretch) only to photos with the same proportions. Settings move freely between JPEG, PNG, WebP, RAW and merged photos.
 
 **Presets, LUTs, reset.** **Preset…** applies a built-in or saved preset to every selected
 photo exactly as to one (only the groups it contains). **LUT…** sets a loaded `.cube` (or
@@ -581,6 +653,9 @@ RAWs, ZIP parts above 1 GB.
 - Values are relative to neutral (LUT intensity defaults to 100). The ten
   Interval 3 controls are always written; other controls, curves and the LUT
   only when they change something. Missing keys are neutral.
+- Version 6 added `geometry` (only parts that differ from neutral are written, for example
+  `{ "angle": 3.5, "crop": { "x": 0.1, "y": 0.1, "width": 0.5, "height": 0.5 } }`); values
+  are clamped and degenerate quads dropped on reading; older files open with none.
 - Version 5 added the Detail controls `texture`, `clarity`, `dehaze`,
   `sharpening`, `luminanceNoise`, `colorNoise`; older files open with Detail neutral.
 - Version 4 added merged HDR sources (see [Merge HDR](#merge-hdr)) and the HDR tone
@@ -613,6 +688,7 @@ RAWs, ZIP parts above 1 GB.
   …"); nothing is recorded until it is clicked.
 - Saving preselects the groups that are edited, except Exposure and White
   balance (usually per-photo corrections); any group can be ticked.
+- Presets never contain or change geometry (crops and perspective belong to one photo).
 - Built-ins (Natural, Warm Portrait, Cool Landscape, Soft Film, High Contrast,
   Black & White) are ordinary presets run through the same engine; none
   touches exposure or white balance.
@@ -801,6 +877,11 @@ Safari cannot encode WebP (the option is disabled when the browser cannot).
   crashed. It looks like a
   defect in the Windows WebKit port's handling of shared wasm memory; Safari on macOS and
   iOS has not been tested, so it is not known whether it is affected.
+- Geometry is manual: no automatic straightening, lens or camera-profile correction; no
+  upscaling; Detail is not previewed while the crop tool is open; perspective corners stay
+  inside the frame. Geometry adds the warp to exports (see
+  [Geometry](#geometry-crop--transform)). Touch was tested with synthetic pointer events in
+  iPhone 13 emulation, not on a physical phone or in Safari.
 - Detail previews render on one CPU thread (exports use band workers): see
   [Detail](#detail). A multi-pass WebGL2 Detail preview is not built. 1:1 inspection is not
   available for merged HDR photos.
@@ -813,7 +894,6 @@ at render time), local and exportable at full resolution. Not built yet:
 | Feature | Where it goes |
 | --- | --- |
 | More RAW formats (NEF, then CR2/CR3, RAF, ORF) | LibRaw decodes them already; add the maker to `sniffRaw`, then genuine fixtures and `rawFixtures.test.js` cases before claiming support. X-Trans (RAF) needs checking against `checkDecodable`. |
-| Crop, rotate, straighten, perspective, resize | A geometry stage before the per-pixel pipeline: proxy and export sample through one transform; a `geometry` object in the settings (new document version). |
 | Creative filters (bleach bypass, grain, halation, bloom) | Per-pixel looks fit after the LUT; grain, halation and bloom are spatial: the tiled renderer in `detailRenderer.mjs`. |
 | Text, layers, blend modes | A layer list in the document composited after the photo pipeline, by the same engine in preview and banded export. |
 | Brushes, masks, gradients, local adjustments | Per-layer masks evaluated per pixel; brush masks need a stored raster or stroke list. |

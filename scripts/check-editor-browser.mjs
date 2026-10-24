@@ -24,6 +24,9 @@ const downloads = path.join(work, 'downloads');
 const output = process.env.EDITOR_CHECK_OUTPUT || path.join(work, 'screenshots');
 [fixtures, downloads, output].forEach((dir) => mkdirSync(dir, { recursive: true }));
 const report = { checks: [], measurements: {} };
+// Geometry on merged HDR interpolates float values: at the range-fit boundary of
+// out-of-gamut colours float32 and float64 can differ by two codes (one pixel of the chart).
+const HDR_GEOMETRY_PARITY_MAX = 2;
 const failures = [];
 
 // Each check gets at most three minutes, so one failure cannot stall the run.
@@ -247,6 +250,15 @@ async function main() {
       const rawWorst = Math.max(...parity.rawResults.map(({ max }) => max));
       assert.ok(rawWorst <= 1 && parity.rawSplitMax <= 1, `RAW max difference ${rawWorst}, split ${parity.rawSplitMax}`);
       return { gpu: parity.gpu, cases: parity.results.length, worstMax: worst, worstMean: Number(mean.toFixed(4)), rawCases: parity.rawResults.length, rawWorstMax: rawWorst };
+    });
+    await check('geometry: the shader warp matches warpImage + the CPU renderer', () => {
+      const integer = parity.geometryResults.filter(({ name }) => !name.startsWith('HDR'));
+      const float = parity.geometryResults.filter(({ name }) => name.startsWith('HDR'));
+      const worst = Math.max(...integer.map(({ max }) => max));
+      const hdrWorst = Math.max(...float.map(({ max }) => max));
+      const mean = Math.max(...parity.geometryResults.map(({ mean: m }) => m));
+      assert.ok(worst <= 1 && hdrWorst <= HDR_GEOMETRY_PARITY_MAX, `max difference ${worst} (HDR ${hdrWorst}): ${JSON.stringify(parity.geometryResults)}`);
+      return { cases: parity.geometryResults.length, worstMax: worst, hdrWorstMax: hdrWorst, worstMean: Number(mean.toFixed(4)) };
     });
 
     // ---------- page load ----------
@@ -541,7 +553,7 @@ async function main() {
       assert.ok(await evaluate('!!document.querySelector(".pe-library .pe-button--primary")?.offsetParent'));
       await shot('editor-mobile-photos.png');
       await click('.pe-tabs button:nth-child(2)');
-      const thumb = await evaluate('Math.round(document.querySelector(".pe-range").getBoundingClientRect().height)');
+      const thumb = await evaluate('Math.round(document.querySelector(".pe-section[data-section-id=light] .pe-range").getBoundingClientRect().height)');
       assert.ok(thumb >= 36, `slider ${thumb}px`);
       await viewport(1440, 900);
     });

@@ -14,9 +14,10 @@ export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // Version 2 added curves, HSL and LUT references; version 3 RAW sources and their white
 // balance (`raw`); version 4 merged HDR sources (`format: 'hdr'` with `hdr`: mode,
 // the three inputs by role, merge settings) and the HDR tone controls; version 5 the
-// Detail controls. Older versions read unchanged (Detail neutral); older editors reject
-// newer files instead of silently dropping settings.
-export const DOCUMENT_VERSION = 5;
+// Detail controls; version 6 geometry (`geometry`, see pipeline/geometry.mjs). Older
+// versions read unchanged (Detail and geometry neutral); older editors reject newer files
+// instead of silently dropping settings.
+export const DOCUMENT_VERSION = 6;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).
@@ -107,11 +108,11 @@ function parseSource(source, index) {
   };
 }
 
-/** Settings from untrusted JSON: finite numbers, curves and a LUT reference, all validated. */
+/** Settings from untrusted JSON: finite numbers, curves, a LUT reference and geometry, all validated. */
 export function parseAdjustments(input) {
   const values = isObject(input) ? input : {};
   const numeric = Object.fromEntries(Object.entries(values).filter(([, value]) => typeof value === 'number' && Number.isFinite(value)));
-  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw });
+  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw, geometry: values.geometry });
 }
 
 /** Reads an edit file, refusing an oversized one before any of it is read into memory. */

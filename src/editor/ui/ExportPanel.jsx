@@ -99,9 +99,12 @@ export function ExportSettingsFields({ settings, dispatch, unsupportedFormats, n
   );
 }
 
-export default function ExportPanel({ settings, photo, dispatch, onExport, onCancel, unsupportedFormats, busy, blockedReason = null }) {
+/** :param output: { width, height } the export will have (geometry and resize), when known */
+export default function ExportPanel({ settings, photo, dispatch, onExport, onCancel, unsupportedFormats, busy, blockedReason = null, output: known = null }) {
   const ready = photo?.status === 'ready';
-  const output = ready ? exportDimensions({ width: photo.width, height: photo.height }, settings.resize) : null;
+  const plain = ready ? exportDimensions({ width: photo.width, height: photo.height }, settings.resize) : null;
+  const output = known ?? plain;
+  const original = plain && !plain.scaled && output.width === photo.width && output.height === photo.height;
   const status = photo?.exportStatus ?? { state: 'idle' };
   const running = status.state === 'running';
 
@@ -113,7 +116,7 @@ export default function ExportPanel({ settings, photo, dispatch, onExport, onCan
       {ready && (
         <dl className="pe-export-summary">
           <div><dt>File</dt><dd className="mono">{exportFileName(photo.name, settings.format, settings.suffix)}</dd></div>
-          <div><dt>Pixels</dt><dd className="mono">{output.width} × {output.height}{output.scaled ? '' : ' (original)'}</dd></div>
+          <div><dt>Pixels</dt><dd className="mono">{output.width} × {output.height}{original ? ' (original)' : ''}</dd></div>
         </dl>
       )}
 

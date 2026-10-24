@@ -239,3 +239,47 @@ describe('batch changes and undo', () => {
     expect(activePhoto(state).id).toBe('a');
   });
 });
+
+describe('geometry in batches', () => {
+  const crop = { x: 0.1, y: 0.2, width: 0.5, height: 0.5 };
+  const geometry = { quarterTurns: 1, angle: 4, crop, perspective: { vertical: 30, horizontal: 0 }, resize: { width: 5, height: 5, locked: true } };
+
+  test('paste and default sync never copy geometry', () => {
+    let state = edit(workspace(), 'a', { exposure: 1, geometry });
+    const source = state.photos[0];
+    const plan = planSync(source.history.present, state.photos.slice(1), { kind: sourceKind(source) });
+    plan.items.forEach(({ after }) => expect(after.geometry).toEqual(neutralAdjustments().geometry));
+    expect(DEFAULT_SYNC_GROUPS).not.toContain('transform');
+    expect(DEFAULT_SYNC_GROUPS).not.toContain('outputSize');
+    state = run(state, { type: 'applyBatch', label: 'x', changes: plan.items.map(({ id, after }) => ({ id, after })) });
+    expect(present(state, 'b').exposure).toBe(1);
+  });
+
+  test('Output size copies only the resize box; Crop & transform only to photos of the same proportions', () => {
+    let state = workspace();
+    state = run(state, { type: 'importSucceeded', id: 'c', info: { format: 'jpeg', width: 20, height: 10, orientation: 1, sha256: null } });
+    state = edit(state, 'b', { geometry: { flipV: true } });
+    state = edit(state, 'a', { geometry });
+    const source = state.photos[0];
+    const size = planSync(source.history.present, state.photos.slice(1), { groups: ['outputSize'], kind: sourceKind(source) });
+    const b = size.items.find(({ id }) => id === 'b');
+    expect(b.after.geometry).toMatchObject({ resize: geometry.resize, flipV: true, crop: null, quarterTurns: 0 });
+    expect(b.changed).toEqual(['outputSize']);
+    const transform = planSync(source.history.present, state.photos.slice(1), { groups: ['transform'], kind: sourceKind(source) });
+    const same = transform.items.find(({ id }) => id === 'b');
+    expect(same.after.geometry).toMatchObject({ quarterTurns: 1, angle: 4, crop, resize: null });
+    const wide = transform.items.find(({ id }) => id === 'c');
+    expect(wide.after.geometry).toEqual(neutralAdjustments().geometry);
+    expect(wide.skipped).toEqual([{ group: 'transform', reason: 'only for photos with the same proportions' }]);
+  });
+
+  test('batch undo restores geometry', () => {
+    let state = edit(workspace(), 'a', { geometry });
+    const source = state.photos[0];
+    const plan = planSync(source.history.present, state.photos.slice(1), { groups: ['transform'], kind: sourceKind(source) });
+    state = run(state, { type: 'applyBatch', label: 'sync', changes: plan.items.map(({ id, after }) => ({ id, after })) });
+    expect(present(state, 'b').geometry.angle).toBe(4);
+    state = run(state, { type: 'undoBatch' });
+    expect(present(state, 'b').geometry).toEqual(neutralAdjustments().geometry);
+  });
+});

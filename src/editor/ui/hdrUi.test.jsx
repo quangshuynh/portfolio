@@ -129,7 +129,7 @@ describe('HDR panel and editor integration', () => {
     const text = serializeEditDocument(createEditDocument(state.photos.map((photo) => ({ ...photo, adjustments: photo.history.present })), state.exportSettings));
     expect(text).not.toMatch(/thumbnail|blob:|data:/);
     const document = parseEditDocument(text);
-    expect(document.version).toBe(5);
+    expect(document.version).toBe(6);
     expect(document.photos[0].source).toMatchObject({ format: 'hdr', sha256: IDENTITY, hdr: { mode: 'radiance', inputs: INPUTS, settings: HDR.settings } });
     // A fresh workspace waits for the merge; a merge of the same files picks the edits up.
     let s = editorReducer(initialEditorState(), { type: 'loadDocument', document });

@@ -2,6 +2,7 @@ import React, { useId, useState } from 'react';
 import { ADJUSTMENTS, groupIsNeutral, isNeutral } from '../model/adjustments.mjs';
 import { AdjustmentRow, ResetIcon } from './AdjustmentRow';
 import CurveEditor from './CurveEditor';
+import GeometryPanel from './GeometryPanel';
 import HdrPanel from './HdrPanel';
 import HslPanel from './HslPanel';
 import LutPanel from './LutPanel';
@@ -48,8 +49,9 @@ function Section({ id, title, open, onToggle, edited, onReset, resetDisabled, ch
  * open; the choice is remembered locally.
  * :param raw: the active photo's RAW info, or null for JPEG, PNG and WebP
  * :param hdr: the active photo's merge description when it is a merged HDR, else null
+ * :param geometry: Crop & Transform handlers (GeometryPanel props), or null without a photo
  */
-export default function AdjustPanel({ adjustments, disabled, dispatch, lut, presets, raw = null, hdr = null }) {
+export default function AdjustPanel({ adjustments, disabled, dispatch, lut, presets, raw = null, hdr = null, geometry = null }) {
   const [open, setOpen] = useState(readOpenSections);
   const toggle = (id) => setOpen((current) => {
     const next = { ...current, [id]: !current[id] };
@@ -85,6 +87,9 @@ export default function AdjustPanel({ adjustments, disabled, dispatch, lut, pres
           Reset all
         </button>
       </div>
+      {section('geometry', 'Crop & Transform', geometry
+        ? <GeometryPanel geometry={adjustments.geometry} disabled={disabled} {...geometry} />
+        : <p className="pe-note">Open a photo to crop, rotate or transform it.</p>)}
       {hdr && section('hdr', 'HDR', <HdrPanel hdr={hdr} adjustments={adjustments} disabled={disabled} dispatch={dispatch} />, { reset: hdr.mode === 'radiance' })}
       {raw && section('raw', 'RAW', <RawPanel raw={raw} adjustments={adjustments} disabled={disabled} dispatch={dispatch} />)}
       {section('light', 'Light', rows('light'))}

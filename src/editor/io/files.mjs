@@ -1,6 +1,7 @@
 // Import limits, filename hygiene and export sizing. Pure functions, unit tested.
 
 import { FORMATS } from './imageHeader.mjs';
+import { decodeSize, geometryPlan, normalizeGeometry, outputSize } from '../pipeline/geometry.mjs';
 
 export const LIMITS = Object.freeze({
   maxFileBytes: 200 * 1024 * 1024,
@@ -91,6 +92,23 @@ export function exportDimensions({ width, height }, resize = { mode: 'original' 
     height: Math.max(1, Math.round(height * scale)),
     scaled: true,
   };
+}
+
+/**
+ * Sizes of an export with geometry: the plan, the output (the geometry's output size, then
+ * the export resize; never upscaled) and the size to decode the original at. Neutral
+ * geometry gives exactly exportDimensions() for both, so such exports are unchanged.
+ * :param native: { width, height } of the oriented original
+ * :returns: { plan, identity, output, decode }
+ */
+export function exportGeometry(geometry, native, resize) {
+  const plan = geometryPlan(normalizeGeometry(geometry), native);
+  if (plan.identity) {
+    const size = exportDimensions(native, resize);
+    return { plan, identity: true, output: { width: size.width, height: size.height }, decode: { width: size.width, height: size.height } };
+  }
+  const output = outputSize(plan, (size) => exportDimensions(size, resize));
+  return { plan, identity: false, output, decode: decodeSize(plan, output, native) };
 }
 
 /**
