@@ -106,7 +106,6 @@ describe('Creative section', () => {
     const wheel = document.querySelector('.pe-wheel');
     expect(wheel).toHaveAttribute('aria-hidden', 'true');
     wheel.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 100, right: 100, bottom: 100 });
-    wheel.setPointerCapture = () => {};
     fireEvent.pointerDown(wheel, { button: 0, clientX: 50, clientY: 50, pointerId: 1 });
     fireEvent.pointerMove(wheel, { clientX: 50, clientY: 0, pointerId: 1 });
     fireEvent.pointerUp(window, { pointerId: 1 });
@@ -192,7 +191,6 @@ describe('text on the photo', () => {
     );
     document.querySelector('.pe-stage-area').getBoundingClientRect = () => ({ left: 0, top: 0, width: 600, height: 400 });
     const text = screen.getByRole('button', { name: /^Text “Hello”/ });
-    text.setPointerCapture = () => {};
     fireEvent.pointerDown(text, { button: 0, clientX: 300, clientY: 200, pointerId: 3 });
     fireEvent.pointerMove(text, { clientX: 360, clientY: 160, pointerId: 3 });
     fireEvent.pointerUp(text, { clientX: 360, clientY: 160, pointerId: 3 });
@@ -200,12 +198,10 @@ describe('text on the photo', () => {
     expect(onPreview.mock.calls.at(-1)[0][0]).toMatchObject({ x: 0.6, y: 0.4 });
     expect(onCommit).toHaveBeenCalledTimes(1);
     const scale = document.querySelector('.pe-textbox__handle--scale');
-    scale.setPointerCapture = () => {};
     fireEvent.pointerDown(scale, { button: 0, clientX: 340, clientY: 200, pointerId: 4 });
     fireEvent.pointerUp(scale, { clientX: 380, clientY: 200, pointerId: 4 });
     expect(onPreview.mock.calls.at(-1)[0][0].scale).toBeCloseTo(2, 6);
     const rotate = document.querySelector('.pe-textbox__handle--rotate');
-    rotate.setPointerCapture = () => {};
     fireEvent.pointerDown(rotate, { button: 0, clientX: 300, clientY: 150, pointerId: 5 });
     fireEvent.pointerUp(rotate, { clientX: 350, clientY: 200, pointerId: 5, shiftKey: true });
     expect(onPreview.mock.calls.at(-1)[0][0].rotation).toBe(90);

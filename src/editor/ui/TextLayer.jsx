@@ -44,9 +44,10 @@ export default function TextLayer({ overlays, box, output, stage, clip = 0, inte
     context.clearRect(0, 0, width, height);
     if (!fonts || !overlays.length) return;
     context.save();
+    // Text is cut at the photo's frame, as in the export; the "before" side of a split shows none.
     const left = (box.x + box.width * clip) * ratio;
     context.beginPath();
-    context.rect(left, 0, width - left, height);
+    context.rect(left, box.y * ratio, (box.x + box.width) * ratio - left, box.height * ratio);
     context.clip();
     const view = { scale: zoom * ratio, offsetX: box.x * ratio, offsetY: box.y * ratio, width: output.width, height: output.height };
     overlays.forEach((overlay) => paintText(context, overlay, view));
@@ -65,7 +66,7 @@ export default function TextLayer({ overlays, box, output, stage, clip = 0, inte
     if (event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* a synthetic or already released pointer */ }
     onSelect(overlay.id);
     const angle = Math.atan2(event.clientY - centre.y, event.clientX - centre.x);
     const distance = Math.hypot(event.clientX - centre.x, event.clientY - centre.y) || 1;

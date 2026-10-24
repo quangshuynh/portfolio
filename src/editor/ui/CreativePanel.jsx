@@ -54,7 +54,7 @@ function ColorWheel({ hueKey, satKey, hue, saturation, disabled, dispatch }) {
       data-disabled={disabled || undefined}
       onPointerDown={(event) => {
         if (disabled || event.button !== 0) return;
-        event.currentTarget.setPointerCapture(event.pointerId);
+        try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* a synthetic or already released pointer */ }
         dragging.current = true;
         fromPointer(event, false);
       }}
