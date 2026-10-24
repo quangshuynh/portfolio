@@ -13,7 +13,15 @@ const UNIFORMS = ['uSource', 'uWhiteBalanceActive', 'uWhiteBalance', 'uExposureG
   'uHighlights', 'uShadows', 'uWhites', 'uBlacks', 'uVibrance', 'uSaturation', 'uNeutral',
   'uRaw', 'uRawSource', 'uRawGain', 'uRawMatrix', 'uRawWhite', 'uRolloffWhite', 'uRolloffKnee', 'uShadowLift', 'uHdr', 'uHdrSource',
   'uBaseNeutral', 'uCurvesActive', 'uCurveActive', 'uCurves', 'uHslActive', 'uHslHue', 'uHslSat', 'uHslLum',
-  'uLutActive', 'uLut', 'uLutSize', 'uLutDomainMin', 'uLutDomainMax', 'uLutIntensity'];
+  'uLutActive', 'uLut', 'uLutSize', 'uLutDomainMin', 'uLutDomainMax', 'uLutIntensity',
+  'uGeometry', 'uGeometryMatrix', 'uOutputSize', 'uCoverage', 'uCoverageScale', 'uSourceSize', 'uBackground', 'uOpaque'];
+const BACKGROUND_CODES = { transparent: 0, white: 1, black: 2 };
+
+function opaqueRgba({ kind, data }) {
+  if (kind === 'raw' || kind === 'hdr') return true;
+  for (let i = 3; i < data.length; i += 4) if (data[i] !== 255) return false;
+  return true;
+}
 
 // Texture units: the photo, the curve table, the 3D LUT, a RAW photo, a merged HDR.
 const UNIT = { source: 0, curves: 1, lut: 2, raw: 3, hdr: 4 };
@@ -139,6 +147,23 @@ export class GlRenderer {
     this.raw = false;
     this.hdr = false;
     this.renderedTexture = null;
+    this.geometry = null;
+  }
+
+  /** Output size: the geometry's when one is set, else the source's. */
+  get outWidth() { return this.geometry?.width ?? this.width; }
+
+  get outHeight() { return this.geometry?.height ?? this.height; }
+
+  /**
+   * Sets the preview geometry (warp.mjs warpSpec for the current source), or null. The
+   * canvas takes the output size.
+   */
+  setGeometry(spec) {
+    this.geometry = spec ?? null;
+    if (this.geometry && this.opaque === undefined) this.opaque = Boolean(this.uploaded?.data) && opaqueRgba(this.uploaded);
+    if (this.canvas.width !== this.outWidth) this.canvas.width = this.outWidth;
+    if (this.canvas.height !== this.outHeight) this.canvas.height = this.outHeight;
   }
 
   /** Uploads the curve table when it changed (tables are cached per curve set). */
@@ -181,6 +206,11 @@ export class GlRenderer {
     }
     this.raw = source.kind === 'raw';
     this.hdr = source.kind === 'hdr';
+    this.geometry = null;
+    // The warp interpolates opaque sources without premultiplying, as warpRows() does;
+    // checked when a geometry first needs it.
+    this.opaque = undefined;
+    this.uploaded = source;
     if (this.raw || this.hdr) {
       this.texture = this.raw ? rawTexture(gl, width, height, source.data) : hdrTexture(gl, width, height, source.data);
       this.width = width;
@@ -224,16 +254,16 @@ export class GlRenderer {
   render(params, { split = 0, before = null, rendered = null } = {}) {
     const { gl } = this;
     if (!this.texture) return;
-    gl.viewport(0, 0, this.width, this.height);
+    gl.viewport(0, 0, this.outWidth, this.outHeight);
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
     if (rendered) this.draw({ ...params, neutral: true }, this.uploadRendered(rendered));
     else this.draw(params);
     // Pixel x is "before" when its centre lies left of the split, (x + 0.5) / width < split.
-    const columns = Math.min(this.width, Math.max(0, Math.ceil(split * this.width - 0.5)));
+    const columns = Math.min(this.outWidth, Math.max(0, Math.ceil(split * this.outWidth - 0.5)));
     if (columns > 0) {
       gl.enable(gl.SCISSOR_TEST);
-      gl.scissor(0, 0, columns, this.height);
+      gl.scissor(0, 0, columns, this.outHeight);
       this.draw(before ?? { ...params, neutral: true });
       gl.disable(gl.SCISSOR_TEST);
     }
@@ -272,6 +302,16 @@ export class GlRenderer {
     gl.bindTexture(gl.TEXTURE_2D, hdr ? this.texture : this.hdrPlaceholder);
     gl.uniform1i(u.uHdrSource, UNIT.hdr);
     gl.uniform1i(u.uHdr, hdr ? 1 : 0);
+    // A CPU-rendered frame is already in output coordinates.
+    const geometry = frame ? null : this.geometry;
+    gl.uniform1i(u.uGeometry, geometry ? 1 : 0);
+    gl.uniformMatrix3fv(u.uGeometryMatrix, true, new Float32Array(geometry?.matrix ?? IDENTITY));
+    gl.uniform2f(u.uOutputSize, this.outWidth, this.outHeight);
+    gl.uniform1i(u.uCoverage, geometry?.coverage ? 1 : 0);
+    gl.uniform1f(u.uCoverageScale, geometry?.scale ?? 1);
+    gl.uniform2f(u.uSourceSize, geometry?.src.width ?? this.width, geometry?.src.height ?? this.height);
+    gl.uniform1i(u.uBackground, BACKGROUND_CODES[geometry?.background] ?? 0);
+    gl.uniform1i(u.uOpaque, this.opaque ? 1 : 0);
     gl.uniform3fv(u.uRawGain, params.raw?.gain ?? [1, 1, 1]);
     gl.uniformMatrix3fv(u.uRawMatrix, true, new Float32Array(params.raw?.matrix ?? IDENTITY));
     gl.uniform1f(u.uRawWhite, params.raw?.white ?? 1);
@@ -320,16 +360,18 @@ export class GlRenderer {
   readPixels(params, options) {
     const { gl } = this;
     this.render(params, options);
-    const out = new Uint8Array(this.width * this.height * 4);
-    gl.readPixels(0, 0, this.width, this.height, gl.RGBA, gl.UNSIGNED_BYTE, out);
+    const [width, height] = [this.outWidth, this.outHeight];
+    const out = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, out);
     // The default framebuffer's row 0 is the bottom; flip to image order.
-    const row = this.width * 4;
+    const row = width * 4;
     const flipped = new Uint8Array(out.length);
-    for (let y = 0; y < this.height; y += 1) flipped.set(out.subarray(y * row, (y + 1) * row), (this.height - 1 - y) * row);
+    for (let y = 0; y < height; y += 1) flipped.set(out.subarray(y * row, (y + 1) * row), (height - 1 - y) * row);
     return flipped;
   }
 
   releaseSource() {
+    this.uploaded = null;
     if (this.texture) this.gl.deleteTexture(this.texture);
     if (this.renderedTexture) this.gl.deleteTexture(this.renderedTexture);
     this.texture = null;
@@ -341,6 +383,7 @@ export class GlRenderer {
   /** Frees the texture and shrinks the drawing buffer while no photo is shown. */
   clear() {
     this.releaseSource();
+    this.geometry = null;
     this.canvas.width = 1;
     this.canvas.height = 1;
   }

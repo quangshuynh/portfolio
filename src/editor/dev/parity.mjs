@@ -6,6 +6,8 @@ import { renderDetailImage } from '../pipeline/detailRenderer.mjs';
 import { GlRenderer, createEditorContext } from '../pipeline/glRenderer.mjs';
 import { identityLut } from '../pipeline/lut.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
+import { geometryPlan, normalizeGeometry } from '../pipeline/geometry.mjs';
+import { applyCoverage, warpImage, warpSpec } from '../pipeline/warp.mjs';
 import { lookLut } from './lutFixtures.mjs';
 
 // 64×64 = every RGB value in steps of 17 (16 levels per channel), opaque.
@@ -85,6 +87,29 @@ const HDR_EDITS = [
   ['HDR daylight', { raw: { whiteBalance: 'daylight' } }],
   ['HDR everything', { ...COMBINED, hdrHighlights: 70, hdrShadows: 30, curves: CURVES, orangeHue: -20, lut: ref('look33'), lutIntensity: 70 }, 'look33'],
 ];
+
+// Geometry: the shader's warp against warpImage + the CPU renderer + applyCoverage.
+const GEOMETRIES = [
+  ['quarter turn, flip, crop', { quarterTurns: 1, flipH: true, crop: { x: 0.125, y: 0.25, width: 0.75, height: 0.5 } }],
+  ['straighten 7.5°', { angle: 7.5, crop: { x: 0.15, y: 0.15, width: 0.7, height: 0.7 } }],
+  ['perspective', { perspective: { vertical: 70, horizontal: -40 } }],
+  ['stretch and resize', { stretch: { x: 160, y: 100 }, resize: { width: 40, height: 40, locked: true } }],
+  ['rotated, transparent corners', { angle: -20, constrain: false }],
+  ['rotated, white corners', { angle: 33, constrain: false, background: 'white' }],
+];
+const GEOMETRY_EDIT = { ...COMBINED, curves: CURVES };
+
+function geometryCase(renderer, source, geometry, adjustments, info = null) {
+  const plan = geometryPlan(normalizeGeometry(geometry), source);
+  const spec = warpSpec(plan, plan.native, source);
+  renderer.setSource(source);
+  renderer.setGeometry(spec);
+  const params = deriveParams(adjustments, { raw: info });
+  const warped = warpImage(source, spec.matrix, spec);
+  const cpu = source.kind ? renderRawRgba8(warped.data, params) : renderRgba8(warped.data, params);
+  if (spec.coverage) applyCoverage(cpu, spec.width, 0, spec.height, spec);
+  return compare(renderer.readPixels(params), cpu);
+}
 
 function compare(gpu, cpu) {
   let max = 0;
@@ -167,6 +192,14 @@ function run() {
       else detailFrameMax = Math.max(detailFrameMax, Math.abs(drawn[i + c] - detailFrame.data[i + c]));
     }
   }
+  const transparent = chart();
+  for (let i = 3; i < transparent.data.length; i += 4) transparent.data[i] = (i >> 2) % 64 < 16 ? 0 : 255;
+  const geometryResults = [
+    ...GEOMETRIES.map(([name, geometry]) => ({ name: `RGBA ${name}`, ...geometryCase(renderer, source, geometry, GEOMETRY_EDIT) })),
+    ...GEOMETRIES.slice(0, 3).map(([name, geometry]) => ({ name: `alpha ${name}`, ...geometryCase(renderer, transparent, geometry, GEOMETRY_EDIT) })),
+    ...GEOMETRIES.map(([name, geometry]) => ({ name: `RAW ${name}`, ...geometryCase(renderer, raw, geometry, GEOMETRY_EDIT, RAW_INFO) })),
+    ...GEOMETRIES.slice(1, 3).map(([name, geometry]) => ({ name: `HDR ${name}`, ...geometryCase(renderer, hdr, geometry, { hdrHighlights: 70 }, HDR_INFO) })),
+  ];
   renderer.setSource(source);
   // Rendering many frames back to back with changing curves and LUTs (texture reuse).
   const started = performance.now();
@@ -185,6 +218,7 @@ function run() {
     hdrSplitMax,
     detailFrameMax,
     detailSplitMax,
+    geometryResults,
     frameMs64: Number(frameMs.toFixed(3)),
   };
 }
