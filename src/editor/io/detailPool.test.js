@@ -1,5 +1,7 @@
 // @vitest-environment node
-import { detailWorkerCount, renderDetailParallel, renderPixelsParallel } from './detailPool.mjs';
+import { detailWorkerCount, renderDetailParallel, renderPixelsParallel, warpParallel } from './detailPool.mjs';
+import { geometryPlan, normalizeGeometry } from '../pipeline/geometry.mjs';
+import { warpImage, warpSpec } from '../pipeline/warp.mjs';
 import { renderRawRgba8, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
 import { normalizeAdjustments } from '../model/adjustments.mjs';
 import { lookLut } from '../dev/lutFixtures.mjs';
@@ -157,5 +159,21 @@ describe('parallel Detail rendering', () => {
     expect(detailWorkerCount({ ...desktop, navigator: { hardwareConcurrency: 8, deviceMemory: 4 } })).toBe(0);
     expect(detailWorkerCount({ ...desktop, matchMedia: () => ({ matches: true }), screen: { width: 390, height: 844 } })).toBe(0);
     expect(detailWorkerCount({ ...desktop, Worker: undefined })).toBe(0);
+  });
+});
+
+describe('parallel warp', () => {
+  test.each([
+    ['straightened RGBA with transparency', () => rgbaImage(700, 600, { alpha: true }), { angle: 9, crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 } }],
+    ['perspective RAW, turned and flipped', () => rawImage(500, 610), { quarterTurns: 1, flipH: true, perspective: { vertical: 60, horizontal: -30 } }],
+    ['rotated beyond the photo', () => rgbaImage(530, 300), { angle: -40, constrain: false }],
+  ])('%s: bands from row slices equal a whole warp', async (_, make, geometry) => {
+    const source = make();
+    const plan = geometryPlan(normalizeGeometry(geometry), source);
+    const spec = warpSpec(plan, plan.native, source);
+    const log = [];
+    const warped = await warpParallel(source, spec, { workers: 3, spawn: () => fakeWorker(log) });
+    expect(Array.from(warped.data)).toEqual(Array.from(warpImage(source, spec.matrix, spec).data));
+    expect(log.filter((type) => type === 'terminate')).toHaveLength(3);
   });
 });

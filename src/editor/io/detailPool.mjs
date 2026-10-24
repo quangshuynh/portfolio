@@ -16,7 +16,7 @@ import { deriveParams } from '../pipeline/spec.mjs';
 import { assertCanvasWorks, createCanvas, encodeCanvas } from './decode.mjs';
 import { exportGeometry } from './files.mjs';
 import { FORMATS } from './imageHeader.mjs';
-import { finishRows, warpSpec } from '../pipeline/warp.mjs';
+import { finishRows, hasAlpha, sourceRows, warpSpec } from '../pipeline/warp.mjs';
 
 export const DETAIL_POOL_BAND_ROWS = 256;
 const MAX_DETAIL_WORKERS = 4;
@@ -101,6 +101,46 @@ async function renderBands(image, { begin: [beginTask, beginPayload], rowsTask, 
 }
 
 /**
+ * Geometry on several workers: each output band is warped by a render worker from a copy
+ * of just the source rows it maps to (for a straightened photo, a little more than the
+ * band). Every band uses the same arithmetic as a whole warpImage(), so the result is bit
+ * for bit the same (tested). :returns: the warped image ({ kind?, width, height, data })
+ */
+export async function warpParallel(source, spec, { workers, signal = { cancelled: false }, spawn = spawnRenderWorker, onProgress = () => {} }) {
+  const channels = channelsOf(source);
+  const { width, height } = spec;
+  const data = new source.data.constructor(width * height * channels);
+  const opaque = !hasAlpha(source);
+  const bands = [];
+  for (let row = 0; row < height; row += DETAIL_POOL_BAND_ROWS) bands.push(row);
+  const clients = [];
+  let done = 0;
+  try {
+    for (let i = 0; i < Math.max(1, workers); i += 1) clients.push(createWorkerClient(spawn()));
+    const lane = async (client) => {
+      while (bands.length) {
+        if (signal.cancelled) throw new WorkerCancelled();
+        const row = bands.shift();
+        const rows = Math.min(DETAIL_POOL_BAND_ROWS, height - row);
+        const [top, bottom] = sourceRows(spec.matrix, width, row, row + rows, source.height);
+        const slice = source.data.slice(top * source.width * channels, bottom * source.width * channels);
+        const band = await client.call('warpRows', {
+          source: { ...(source.kind ? { kind: source.kind } : {}), width: source.width, height: source.height, top, data: slice },
+          matrix: spec.matrix, width, y0: row, y1: row + rows, opaque,
+        }, { transfer: [slice.buffer] });
+        data.set(band, row * width * channels);
+        done += rows;
+        onProgress(done / height);
+      }
+    };
+    await Promise.all(clients.map(lane));
+  } finally {
+    clients.forEach((client) => client.terminate());
+  }
+  return { ...(source.kind ? { kind: source.kind } : {}), width, height, data };
+}
+
+/**
  * Renders an in-memory image with Detail settings on `workers` helpers.
  * :param image: { kind?, width, height, data } (RGBA8, or RAW/HDR linear RGB)
  * :param settings: { adjustments, lut, raw, nativeWidth, nativeHeight, flattenAlpha }
@@ -148,9 +188,10 @@ export async function exportImageInBands(decoder, { file, header, adjustments, l
   const context = canvas.getContext('2d', { colorSpace: 'srgb' });
   assertCanvasWorks(context, size.width, size.height);
   onProgress({ stage: 'decoding', fraction: 0 });
-  // With geometry the decoder warps in its worker, so only the output reaches the page.
+  // With geometry the decoded original is warped on the band workers too.
   const spec = geometry.identity ? null : warpSpec(geometry.plan, size, geometry.decode);
-  const image = await decoder.call('decode', { file, header, ...geometry.decode, warp: spec });
+  let image = await decoder.call('decode', { file, header, ...geometry.decode });
+  if (spec) image = await warpParallel(image, spec, { workers, signal, spawn, onProgress: (fraction) => onProgress({ stage: 'decoding', fraction }) });
   const decodedAt = performance.now();
   const render = deriveParams(adjustments, { lut }).detailActive ? renderDetailParallel : renderPixelsParallel;
   const nativeSize = geometry.identity ? native : geometry.plan.native;

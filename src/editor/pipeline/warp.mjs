@@ -55,7 +55,7 @@ export function exactMapping(m) {
 // Whether a source has transparency decides premultiplication for the whole image (so the
 // result never depends on banding); scanned once per pixel buffer.
 const alphaCache = new WeakMap();
-const hasAlpha = (image) => {
+export const hasAlpha = (image) => {
   if (channelsOf(image) !== 4) return false;
   if (!alphaCache.has(image.data)) {
     let found = false;
@@ -72,10 +72,13 @@ const hasAlpha = (image) => {
  * :param width: columns to write, from output column `x0`
  * :param options: { opaque } skip premultiplication (computed when omitted); { x0 } first
  *   output column (a region of the output, bit for bit the same pixels as a whole warp)
+ *   `source.top`: `data` holds only rows from `top` of a source `height` rows tall (a band
+ *   worker's slice; every tap must fall inside it, see sourceRows)
  */
 export function warpRows(source, matrix, width, y0, y1, target, { opaque = !hasAlpha(source), x0 = 0 } = {}) {
   const channels = channelsOf(source);
   const { width: sw, height: sh, data } = source;
+  const top = source.top ?? 0;
   const maxValue = source.kind === 'raw' ? 65535 : source.kind === 'hdr' ? Infinity : 255;
   const exact = exactMapping(matrix);
   if (exact) {
@@ -84,65 +87,116 @@ export function warpRows(source, matrix, width, y0, y1, target, { opaque = !hasA
       for (let x = x0; x < x0 + width; x += 1) {
         const sx = Math.min(sw - 1, Math.max(0, xx * x + xy * y + tx));
         const sy = Math.min(sh - 1, Math.max(0, yx * x + yy * y + ty));
-        const i = (sy * sw + sx) * channels;
+        const i = ((sy - top) * sw + sx) * channels;
         const o = ((y - y0) * width + x - x0) * channels;
         for (let c = 0; c < channels; c += 1) target[o + c] = data[i + c];
       }
     }
     return target;
   }
-  const wx = new Float64Array(4);
-  const wy = new Float64Array(4);
-  const columns = new Int32Array(4);
-  const rows = new Int32Array(4);
-  const sum = new Float64Array(4);
   const premultiply = channels === 4 && !opaque;
   const integral = maxValue !== Infinity;
+  const stride = sw * channels;
+  const lastX = sw - 1;
+  const lastY = sh - 1;
+  const [m0, m1, m2, m3, m4, m5, m6, m7, m8] = matrix;
   for (let y = y0; y < y1; y += 1) {
     const cy = y + 0.5;
     for (let x = x0; x < x0 + width; x += 1) {
       const cx = x + 0.5;
-      const w = matrix[6] * cx + matrix[7] * cy + matrix[8];
-      const px = Math.floor(((matrix[0] * cx + matrix[1] * cy + matrix[2]) / w) * POSITION_GRID + 0.5) / POSITION_GRID - 0.5;
-      const py = Math.floor(((matrix[3] * cx + matrix[4] * cy + matrix[5]) / w) * POSITION_GRID + 0.5) / POSITION_GRID - 0.5;
+      const w = m6 * cx + m7 * cy + m8;
+      const px = Math.floor(((m0 * cx + m1 * cy + m2) / w) * POSITION_GRID + 0.5) / POSITION_GRID - 0.5;
+      const py = Math.floor(((m3 * cx + m4 * cy + m5) / w) * POSITION_GRID + 0.5) / POSITION_GRID - 0.5;
       const ix = Math.floor(px);
       const iy = Math.floor(py);
-      cubicWeights(px - ix, wx);
-      cubicWeights(py - iy, wy);
-      for (let k = 0; k < 4; k += 1) {
-        columns[k] = Math.min(sw - 1, Math.max(0, ix - 1 + k));
-        rows[k] = Math.min(sh - 1, Math.max(0, iy - 1 + k)) * sw;
-      }
-      sum[0] = 0; sum[1] = 0; sum[2] = 0; sum[3] = 0;
+      // Catmull-Rom weights (cubicWeights), inline.
+      const tx = px - ix;
+      const tx2 = tx * tx;
+      const tx3 = tx2 * tx;
+      const wx0 = (-tx3 + 2 * tx2 - tx) / 2;
+      const wx1 = (3 * tx3 - 5 * tx2 + 2) / 2;
+      const wx2 = (-3 * tx3 + 4 * tx2 + tx) / 2;
+      const wx3 = (tx3 - tx2) / 2;
+      const ty = py - iy;
+      const ty2 = ty * ty;
+      const ty3 = ty2 * ty;
+      const wy0 = (-ty3 + 2 * ty2 - ty) / 2;
+      const wy1 = (3 * ty3 - 5 * ty2 + 2) / 2;
+      const wy2 = (-3 * ty3 + 4 * ty2 + ty) / 2;
+      const wy3 = (ty3 - ty2) / 2;
+      // Tap offsets, clamped to the edge.
+      const c0 = (ix - 1 < 0 ? 0 : ix - 1 > lastX ? lastX : ix - 1) * channels;
+      const c1 = (ix < 0 ? 0 : ix > lastX ? lastX : ix) * channels;
+      const c2 = (ix + 1 < 0 ? 0 : ix + 1 > lastX ? lastX : ix + 1) * channels;
+      const c3 = (ix + 2 < 0 ? 0 : ix + 2 > lastX ? lastX : ix + 2) * channels;
+      let s0 = 0;
+      let s1 = 0;
+      let s2 = 0;
+      let s3 = 0;
       for (let j = 0; j < 4; j += 1) {
-        const row = rows[j];
-        const weightY = wy[j];
-        for (let k = 0; k < 4; k += 1) {
-          const weight = weightY * wx[k];
-          const i = (row + columns[k]) * channels;
-          if (premultiply) {
-            const a = data[i + 3] * weight;
-            sum[0] += data[i] * a; sum[1] += data[i + 1] * a; sum[2] += data[i + 2] * a; sum[3] += a;
-          } else {
-            sum[0] += data[i] * weight; sum[1] += data[i + 1] * weight; sum[2] += data[i + 2] * weight;
-          }
+        const yy = iy - 1 + j;
+        const row = ((yy < 0 ? 0 : yy > lastY ? lastY : yy) - top) * stride;
+        const wyj = j === 0 ? wy0 : j === 1 ? wy1 : j === 2 ? wy2 : wy3;
+        const a = row + c0;
+        const b = row + c1;
+        const c = row + c2;
+        const d = row + c3;
+        const k0 = wyj * wx0;
+        const k1 = wyj * wx1;
+        const k2 = wyj * wx2;
+        const k3 = wyj * wx3;
+        if (premultiply) {
+          const q0 = data[a + 3] * k0;
+          const q1 = data[b + 3] * k1;
+          const q2 = data[c + 3] * k2;
+          const q3 = data[d + 3] * k3;
+          s0 += data[a] * q0 + data[b] * q1 + data[c] * q2 + data[d] * q3;
+          s1 += data[a + 1] * q0 + data[b + 1] * q1 + data[c + 1] * q2 + data[d + 1] * q3;
+          s2 += data[a + 2] * q0 + data[b + 2] * q1 + data[c + 2] * q2 + data[d + 2] * q3;
+          s3 += q0 + q1 + q2 + q3;
+        } else {
+          s0 += data[a] * k0 + data[b] * k1 + data[c] * k2 + data[d] * k3;
+          s1 += data[a + 1] * k0 + data[b + 1] * k1 + data[c + 1] * k2 + data[d + 1] * k3;
+          s2 += data[a + 2] * k0 + data[b + 2] * k1 + data[c + 2] * k2 + data[d + 2] * k3;
         }
       }
       const o = ((y - y0) * width + x - x0) * channels;
       if (premultiply) {
-        const alpha = Math.min(255, Math.max(0, sum[3]));
-        for (let c = 0; c < 3; c += 1) target[o + c] = alpha > 0 ? Math.min(255, roundCode(Math.min(255, Math.max(0, sum[c] / sum[3])))) : 0;
-        target[o + 3] = Math.min(255, roundCode(alpha));
-      } else {
-        for (let c = 0; c < 3; c += 1) {
-          const v = Math.min(maxValue, Math.max(0, sum[c]));
-          target[o + c] = integral ? Math.min(maxValue, roundCode(v)) : v;
+        const alpha = Math.min(255, Math.max(0, s3));
+        if (alpha > 0) {
+          target[o] = Math.min(255, roundCode(Math.min(255, Math.max(0, s0 / s3))));
+          target[o + 1] = Math.min(255, roundCode(Math.min(255, Math.max(0, s1 / s3))));
+          target[o + 2] = Math.min(255, roundCode(Math.min(255, Math.max(0, s2 / s3))));
+        } else {
+          target[o] = 0; target[o + 1] = 0; target[o + 2] = 0;
         }
+        target[o + 3] = Math.min(255, roundCode(alpha));
+      } else if (integral) {
+        target[o] = Math.min(maxValue, roundCode(Math.min(maxValue, Math.max(0, s0))));
+        target[o + 1] = Math.min(maxValue, roundCode(Math.min(maxValue, Math.max(0, s1))));
+        target[o + 2] = Math.min(maxValue, roundCode(Math.min(maxValue, Math.max(0, s2))));
         if (channels === 4) target[o + 3] = 255;
+      } else {
+        target[o] = Math.max(0, s0);
+        target[o + 1] = Math.max(0, s1);
+        target[o + 2] = Math.max(0, s2);
       }
     }
   }
   return target;
+}
+
+/**
+ * Source rows [top, bottom) that output rows [y0, y1) read (the band's corners mapped
+ * back, plus the kernel's reach), or the whole source when the mapping is not finite there.
+ */
+export function sourceRows(matrix, width, y0, y1, height) {
+  const ys = [[0, y0], [width, y0], [0, y1], [width, y1]].map(([x, y]) => {
+    const w = matrix[6] * x + matrix[7] * y + matrix[8];
+    return w > 0 ? (matrix[3] * x + matrix[4] * y + matrix[5]) / w : NaN;
+  });
+  if (!ys.every(Number.isFinite)) return [0, height];
+  return [Math.max(0, Math.min(height - 1, Math.floor(Math.min(...ys)) - 3)), Math.min(height, Math.max(1, Math.ceil(Math.max(...ys)) + 3))];
 }
 
 /**

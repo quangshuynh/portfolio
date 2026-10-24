@@ -553,7 +553,7 @@ async function main() {
       assert.ok(await evaluate('!!document.querySelector(".pe-library .pe-button--primary")?.offsetParent'));
       await shot('editor-mobile-photos.png');
       await click('.pe-tabs button:nth-child(2)');
-      const thumb = await evaluate('Math.round(document.querySelector(".pe-range").getBoundingClientRect().height)');
+      const thumb = await evaluate('Math.round(document.querySelector(".pe-section[data-section-id=light] .pe-range").getBoundingClientRect().height)');
       assert.ok(thumb >= 36, `slider ${thumb}px`);
       await viewport(1440, 900);
     });

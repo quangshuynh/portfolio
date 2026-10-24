@@ -9,7 +9,7 @@ import { exportGeometry } from '../io/files.mjs';
 import { finishRows, warpSpec } from '../pipeline/warp.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { recordDiagnostic } from '../io/diagnostics.mjs';
-import { renderDetailParallel, renderPixelsParallel } from '../io/detailPool.mjs';
+import { renderDetailParallel, renderPixelsParallel, warpParallel } from '../io/detailPool.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 
 const PRIORITY = { decode: 0, region: 0, export: 1, develop: 1, inspect: 2 };
@@ -25,7 +25,6 @@ export function constrainedDevice(win = globalThis) {
 }
 
 const spawnRawWorker = () => new Worker(new URL('./rawWorker.mjs', import.meta.url), { type: 'module' });
-const createRenderClient = (spawn) => createWorkerClient(spawn ? spawn() : new Worker(new URL('../io/imageWorker.mjs', import.meta.url), { type: 'module' }));
 
 function rawError(error) {
   if (error instanceof WorkerCancelled || error.code === 'cancelled') return error;
@@ -114,7 +113,7 @@ export function createRawQueue({ spawn = spawnRawWorker, limit = 1 } = {}) {
  * :param onStart: receives the job, so the caller can cancel it
  * :returns: { blob, width, height, source: 'full' | 'half', timings }
  */
-export async function exportRaw(queue, { file, raw, adjustments, lut, settings }, { onProgress = () => {}, onStart = () => {}, detailWorkers = 0, spawnRender, warper = null } = {}) {
+export async function exportRaw(queue, { file, raw, adjustments, lut, settings }, { onProgress = () => {}, onStart = () => {}, detailWorkers = 0, spawnRender } = {}) {
   const format = FORMATS[settings.format];
   const geometry = exportGeometry(adjustments.geometry, { width: raw.width, height: raw.height }, settings.resize);
   const size = geometry.output;
@@ -127,21 +126,14 @@ export async function exportRaw(queue, { file, raw, adjustments, lut, settings }
     const started = performance.now();
     const signal = { cancelled: false };
     const develop = queue.run('develop', { file, raw, width: geometry.decode.width, height: geometry.decode.height });
-    let warping = null;
-    onStart({ cancel: () => { signal.cancelled = true; develop.cancel(); warping?.terminate(); } });
+    onStart({ cancel: () => { signal.cancelled = true; develop.cancel(); } });
     onProgress({ stage: 'decoding', fraction: 0 });
     let image = await develop.promise;
     const developed = image.width === raw.width ? 'full' : 'half';
     const spec = geometry.identity ? null : warpSpec(geometry.plan, size, image);
     if (spec) {
-      // The development is warped in a render worker (moved there, not copied), after
-      // LibRaw's worker has ended.
-      warping = (warper ?? createRenderClient)(spawnRender);
-      try {
-        image = await warping.call('warp', { image, warp: spec }, { transfer: [image.data.buffer] });
-      } finally {
-        warping.terminate();
-      }
+      // The development (LibRaw's worker has ended) is warped on the band workers.
+      image = await warpParallel(image, spec, { workers: detailWorkers, signal, spawn: spawnRender });
       if (signal.cancelled) throw new WorkerCancelled();
     }
     const decodedAt = performance.now();

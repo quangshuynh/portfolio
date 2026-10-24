@@ -216,6 +216,13 @@ export const handlers = {
     return { result: image, transfer: [image.data.buffer] };
   },
 
+  /** One band of a parallel warp (detailPool.warpParallel): `source` holds the rows it reads. */
+  async warpRows({ source, matrix, width, y0, y1, opaque }) {
+    const band = new source.data.constructor((y1 - y0) * width * (source.kind ? 3 : 4));
+    warpRows(source, matrix, width, y0, y1, band, { opaque });
+    return { result: band, transfer: [band.buffer] };
+  },
+
   /** Warps an in-memory image (a RAW development before a band export). */
   async warp({ image, warp }) {
     const warped = warpImage(image, warp.matrix, warp);

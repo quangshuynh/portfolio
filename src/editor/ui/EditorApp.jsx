@@ -1214,6 +1214,7 @@ function EditorWorkspace() {
             blockedReason={missingLut ? `The LUT "${missingLut.name}" is not loaded. Import it again (LUT section) or remove it to export.` : hdrExportCheck && !hdrExportCheck.fits ? hdrMemoryMessage(hdrExportCheck) : null}
             settings={state.exportSettings}
             photo={photo}
+            output={ready ? outputOf(photo) : null}
             dispatch={dispatch}
             onExport={exportActive}
             onCancel={cancelExport}

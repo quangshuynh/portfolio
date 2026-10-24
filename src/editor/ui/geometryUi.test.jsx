@@ -2,6 +2,9 @@ import React, { useReducer } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import AdjustPanel from './AdjustPanel';
 import CropOverlay from './CropOverlay';
+import ExportPanel from './ExportPanel';
+import { exportGeometry } from '../io/files.mjs';
+import { DEFAULT_EXPORT_SETTINGS } from '../model/editDocument.mjs';
 import { editorReducer, initialEditorState } from '../model/editorState.mjs';
 import { BUILT_IN_PRESETS, createPreset } from '../model/presets.mjs';
 import { createEditDocument, parseEditDocument, serializeEditDocument, DOCUMENT_TYPE } from '../model/editDocument.mjs';
@@ -198,4 +201,10 @@ describe('crop overlay', () => {
     fireEvent.pointerMove(point, { pointerId: 1, clientX: 0, clientY: 390 });
     expect(p.onPreview).not.toHaveBeenCalled();
   });
+});
+
+test('the Export panel states the size after geometry', () => {
+  const output = exportGeometry({ quarterTurns: 1, crop: { x: 0, y: 0, width: 0.5, height: 1 } }, NATIVE, { mode: 'original' }).output;
+  render(<ExportPanel settings={DEFAULT_EXPORT_SETTINGS} photo={{ status: 'ready', name: 'a.jpg', ...NATIVE }} output={output} dispatch={() => {}} onExport={() => {}} onCancel={() => {}} unsupportedFormats={[]} busy={false} />);
+  expect(screen.getByText('200 × 600')).toBeInTheDocument();
 });

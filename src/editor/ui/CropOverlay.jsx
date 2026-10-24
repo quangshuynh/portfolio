@@ -40,7 +40,7 @@ export default function CropOverlay({ mode, geometry, content, ratio, output, bo
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* a synthetic or already released pointer */ }
     dragRef.current = { target, pointerId: event.pointerId, x: event.clientX, y: event.clientY, rect, quad, moved: false };
     setActive(target);
   };
