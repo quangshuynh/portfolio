@@ -7,7 +7,8 @@
 // halo pixels around the region, so the crop's edges are those of the export.
 
 import { prepareRender, renderRawRgba8, renderRgba8 } from './cpuRenderer.mjs';
-import { computeImageGuide, prepareDetailRender, renderDetailRows } from './detailRenderer.mjs';
+import { computeImageGuide, createAreaAccumulator, guideSize, guideSource, prepareDetailRender, renderDetailRows, rowsHaveAlpha } from './detailRenderer.mjs';
+import { finishRows, warpRows, warpSpec } from './warp.mjs';
 import { detailHalo, detailParams } from './detail.mjs';
 import { deriveParams } from './spec.mjs';
 import { neutralAdjustments } from '../model/adjustments.mjs';
@@ -64,6 +65,42 @@ export function extractRect(image, rect) {
   return { ...(image.kind ? { kind: image.kind } : {}), width: rect.width, height: rect.height, x0: rect.x, y0: rect.y, data };
 }
 
+const WARP_BAND_ROWS = 256;
+
+/**
+ * 1:1 source with geometry: the output at native size is warped from the decoded original
+ * band by band into the guide accumulator (never held whole), and only `rect` of it kept,
+ * warped with the same arithmetic as a whole warp, so the region equals the export's pixels.
+ * :param source: the decoded original (RGBA8 or RAW RGB) at the size decodeSize() gives
+ * :param plan: geometryPlan() of the photo; `rect` is in its output (native) pixels
+ * :returns: the kept crop as regionSource returns it, plus the warp spec for coverage
+ */
+export function warpedRegionSource(source, plan, rect) {
+  const out = plan.native;
+  const spec = warpSpec(plan, out, source);
+  const channels = channelsOf(source);
+  const small = guideSize(out);
+  const accumulator = createAreaAccumulator(source.kind, out.width, out.height, small.width, small.height);
+  const band = new source.data.constructor(Math.min(WARP_BAND_ROWS, out.height) * out.width * channels);
+  let transparent = false;
+  for (let row = 0; row < out.height; row += WARP_BAND_ROWS) {
+    const rows = Math.min(WARP_BAND_ROWS, out.height - row);
+    const view = band.subarray(0, rows * out.width * channels);
+    warpRows(source, spec.matrix, out.width, row, row + rows, view);
+    accumulator.add(view, row, rows);
+    if (channels === 4) transparent ||= rowsHaveAlpha({ width: out.width, data: view }, 0, rows);
+  }
+  const data = new source.data.constructor(rect.width * rect.height * channels);
+  warpRows(source, spec.matrix, rect.width, rect.y, rect.y + rect.height, data, { x0: rect.x });
+  return {
+    source: { ...(source.kind ? { kind: source.kind } : {}), width: rect.width, height: rect.height, x0: rect.x, y0: rect.y, data },
+    guideImage: guideSource(accumulator.finish()),
+    transparent,
+    native: { width: out.width, height: out.height },
+    warp: spec,
+  };
+}
+
 /**
  * Renders a region from a kept crop: the edited pixels and the "before" (the source, or a
  * RAW's neutral development), both RGBA8 of region.width × region.height.
@@ -71,7 +108,7 @@ export function extractRect(image, rect) {
  * :param settings: { adjustments, lut, raw }
  */
 export function renderRegion(kept, region, { adjustments, lut = null, raw = null }) {
-  const { source, guideImage, transparent = false, native } = kept;
+  const { source, guideImage, transparent = false, native, warp = null } = kept;
   const crop = extractRect({ ...source, height: source.height }, { x: region.x - source.x0, y: region.y - source.y0, width: region.width, height: region.height });
   const isRaw = channelsOf(source) === 3;
   const render = (values) => {
@@ -83,9 +120,11 @@ export function renderRegion(kept, region, { adjustments, lut = null, raw = null
     renderDetailRows(source, context, region.y, region.y + region.height, out, { columns: [region.x, region.x + region.width] });
     return out;
   };
+  // Outside the photo (geometry without crop to fill): faded as in the export.
+  const finish = (rgba) => finishRows(warp, rgba, region.y, region.height, false, region);
   return {
     region,
-    after: render(adjustments),
-    before: isRaw ? render(neutralAdjustments()) : new Uint8ClampedArray(crop.data),
+    after: finish(render(adjustments)),
+    before: finish(isRaw ? render(neutralAdjustments()) : new Uint8ClampedArray(crop.data)),
   };
 }

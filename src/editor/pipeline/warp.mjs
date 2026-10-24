@@ -52,21 +52,28 @@ export function exactMapping(m) {
   return { xx: s[0], xy: s[1], yx: s[3], yy: s[4], tx, ty };
 }
 
-/** True when any pixel of an RGBA image is not opaque. */
+// Whether a source has transparency decides premultiplication for the whole image (so the
+// result never depends on banding); scanned once per pixel buffer.
+const alphaCache = new WeakMap();
 const hasAlpha = (image) => {
   if (channelsOf(image) !== 4) return false;
-  for (let i = 3; i < image.data.length; i += 4) if (image.data[i] !== 255) return true;
-  return false;
+  if (!alphaCache.has(image.data)) {
+    let found = false;
+    for (let i = 3; i < image.data.length && !found; i += 4) found = image.data[i] !== 255;
+    alphaCache.set(image.data, found);
+  }
+  return alphaCache.get(image.data);
 };
 
 /**
  * Warps rows [y0, y1) of the output into `target` (same type and channels as the source).
  * :param source: { kind?, width, height, data } RGBA8, RAW Uint16 RGB or HDR Float32 RGB
  * :param matrix: output px → source px (geometryPlan().toSource)
- * :param width: output width
- * :param options: { opaque } skip premultiplication (computed when omitted)
+ * :param width: columns to write, from output column `x0`
+ * :param options: { opaque } skip premultiplication (computed when omitted); { x0 } first
+ *   output column (a region of the output, bit for bit the same pixels as a whole warp)
  */
-export function warpRows(source, matrix, width, y0, y1, target, { opaque = !hasAlpha(source) } = {}) {
+export function warpRows(source, matrix, width, y0, y1, target, { opaque = !hasAlpha(source), x0 = 0 } = {}) {
   const channels = channelsOf(source);
   const { width: sw, height: sh, data } = source;
   const maxValue = source.kind === 'raw' ? 65535 : source.kind === 'hdr' ? Infinity : 255;
@@ -74,11 +81,11 @@ export function warpRows(source, matrix, width, y0, y1, target, { opaque = !hasA
   if (exact) {
     const { xx, xy, yx, yy, tx, ty } = exact;
     for (let y = y0; y < y1; y += 1) {
-      for (let x = 0; x < width; x += 1) {
+      for (let x = x0; x < x0 + width; x += 1) {
         const sx = Math.min(sw - 1, Math.max(0, xx * x + xy * y + tx));
         const sy = Math.min(sh - 1, Math.max(0, yx * x + yy * y + ty));
         const i = (sy * sw + sx) * channels;
-        const o = ((y - y0) * width + x) * channels;
+        const o = ((y - y0) * width + x - x0) * channels;
         for (let c = 0; c < channels; c += 1) target[o + c] = data[i + c];
       }
     }
@@ -93,7 +100,7 @@ export function warpRows(source, matrix, width, y0, y1, target, { opaque = !hasA
   const integral = maxValue !== Infinity;
   for (let y = y0; y < y1; y += 1) {
     const cy = y + 0.5;
-    for (let x = 0; x < width; x += 1) {
+    for (let x = x0; x < x0 + width; x += 1) {
       const cx = x + 0.5;
       const w = matrix[6] * cx + matrix[7] * cy + matrix[8];
       const px = Math.floor(((matrix[0] * cx + matrix[1] * cy + matrix[2]) / w) * POSITION_GRID + 0.5) / POSITION_GRID - 0.5;
@@ -121,7 +128,7 @@ export function warpRows(source, matrix, width, y0, y1, target, { opaque = !hasA
           }
         }
       }
-      const o = ((y - y0) * width + x) * channels;
+      const o = ((y - y0) * width + x - x0) * channels;
       if (premultiply) {
         const alpha = Math.min(255, Math.max(0, sum[3]));
         for (let c = 0; c < 3; c += 1) target[o + c] = alpha > 0 ? Math.min(255, roundCode(Math.min(255, Math.max(0, sum[c] / sum[3])))) : 0;
@@ -172,9 +179,12 @@ export function warpSpec(plan, out, src) {
   };
 }
 
-/** Applies a warp spec's coverage to rendered rows, when it has any. */
-export function finishRows(spec, rgba, y0, rows, flatten) {
-  if (spec?.coverage) applyCoverage(rgba, spec.width, y0, rows, { ...spec, flatten });
+/**
+ * Applies a warp spec's coverage to rendered rows, when it has any.
+ * :param region: { x, width } when the rows hold only those output columns
+ */
+export function finishRows(spec, rgba, y0, rows, flatten, region = null) {
+  if (spec?.coverage) applyCoverage(rgba, region?.width ?? spec.width, y0, rows, { ...spec, flatten, x0: region?.x ?? 0 });
   return rgba;
 }
 
@@ -196,11 +206,11 @@ export function coverageAt(matrix, src, scale, x, y) {
  * `flatten`, for JPEG, composites onto white like every other transparent pixel).
  * :param options: { matrix, src, scale, background, flatten }
  */
-export function applyCoverage(rgba, width, y0, rows, { matrix, src, scale, background = 'transparent', flatten = false }) {
+export function applyCoverage(rgba, width, y0, rows, { matrix, src, scale, background = 'transparent', flatten = false, x0 = 0 }) {
   const solid = BACKGROUND_LINEAR[background] ?? (flatten ? 1 : null);
   for (let y = 0; y < rows; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      const coverage = coverageAt(matrix, src, scale, x, y0 + y);
+      const coverage = coverageAt(matrix, src, scale, x0 + x, y0 + y);
       if (coverage >= 1) continue; // eslint-disable-line no-continue
       const i = (y * width + x) * 4;
       const alpha = (rgba[i + 3] / 255) * coverage;

@@ -3,9 +3,11 @@ import { activePhoto, editorReducer, initialEditorState, selectedPhotos } from '
 import { canRedo, canUndo } from '../model/history.mjs';
 import { createEditDocument, parseEditDocument, readEditDocumentFile, serializeEditDocument } from '../model/editDocument.mjs';
 import { adjustmentsEqual, isNeutral, neutralAdjustments } from '../model/adjustments.mjs';
+import { ASPECT_PRESETS, GeometryError, constrainGeometry, geometryEqual, parseAspect, setAspect, swapAspect, turnGeometry } from '../pipeline/geometry.mjs';
+import { TURN_LEFT, TURN_RIGHT, aspectBase, aspectChoices } from './GeometryPanel';
 import { DEFAULT_SYNC_GROUPS, planSync, sourceKind } from '../model/sync.mjs';
 import { PRESETS_STORAGE_KEY, applyPreset, parsePresetFile, serializePresets } from '../model/presets.mjs';
-import { LIMITS, exportDimensions, exportFileName, formatBytes, previewEdgeLimit, proxyDimensions } from '../io/files.mjs';
+import { LIMITS, exportDimensions, exportFileName, exportGeometry, formatBytes, previewEdgeLimit, proxyDimensions } from '../io/files.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { createImageWorker, usingMainThread } from '../io/workerClient.mjs';
 import { detailWorkerCount, exportImageInBands } from '../io/detailPool.mjs';
@@ -384,7 +386,7 @@ function EditorWorkspace() {
   // CPU preview: the worker keeps the proxy and LUT, so they are sent only when they
   // change (or the worker lost them), not on every render.
   // `detail` ({ edge, nativeWidth, nativeHeight }) renders Detail settings at that preview size.
-  const renderInWorker = useCallback(async (image, values, lut, raw = null, detail = null) => {
+  const renderInWorker = useCallback(async (image, values, lut, raw = null, detail = null, warp = null) => {
     const client = worker('render');
     const sent = renderState.current;
     if (sent.client !== client) Object.assign(sent, { client, key: null, luts: new Set() });
@@ -395,6 +397,7 @@ function EditorWorkspace() {
       adjustments: values,
       raw,
       detail,
+      warp,
       ...(full || sent.key !== key ? { source: image } : {}),
       ...(lut ? { lut: full || !sent.luts.has(lut.sha256) ? lut : { sha256: lut.sha256 } } : {}),
     });
@@ -413,21 +416,21 @@ function EditorWorkspace() {
 
   // 1:1 inspection: a full-size decode keeps only a crop around the region (RAW in the RAW
   // queue, others in a fresh image worker that is ended afterwards); renders reuse it.
-  const loadRegionSource = useCallback(async (target, rect) => {
+  const loadRegionSource = useCallback(async (target, rect, geometry = null) => {
     inspectJob.current?.cancel();
     const resource = resources.current.get(target.id);
     if (!resource?.header) throw new Error('The original file is no longer available.');
     if (resource.hdr) throw Object.assign(new Error('1:1 inspection is not available for merged HDR photos: it would decode and merge the three files at full size. Export to inspect them.'), { code: 'unsupported' });
     if (resource.raw) {
       if (constrainedDevice()) throw Object.assign(new Error('1:1 inspection of RAW files needs a full-size decode (several hundred MB), more than this device can safely use.'), { code: 'memory' });
-      const job = raws().run('region', { file: resource.file, raw: resource.raw, rect });
+      const job = raws().run('region', { file: resource.file, raw: resource.raw, rect, geometry });
       inspectJob.current = job;
       return job.promise;
     }
     const client = createImageWorker();
     inspectJob.current = { cancel: () => client.terminate() };
     try {
-      return await client.call('regionSource', { file: resource.file, header: resource.header, rect });
+      return await client.call('regionSource', { file: resource.file, header: resource.header, rect, geometry });
     } finally {
       client.terminate();
     }
@@ -449,6 +452,61 @@ function EditorWorkspace() {
   const inspect = useMemo(() => (inspecting ? { loadSource: loadRegionSource, render: renderRegion, onClose: closeInspect } : null), [inspecting, loadRegionSource, renderRegion, closeInspect]);
   const lutsRef = useRef(luts);
   lutsRef.current = luts;
+
+  // Crop & Transform: the viewer shows the whole transformed frame with the crop box (or
+  // the perspective corners). Every change is an ordinary undoable edit; Apply keeps them,
+  // Cancel returns the geometry to what it was when the tool opened (one more undo step).
+  const [transformMode, setTransformMode] = useState(null);
+  const [straightening, setStraightening] = useState(false);
+  const transformStart = useRef(null);
+  const geometryRef = useRef(adjustments.geometry);
+  geometryRef.current = adjustments.geometry;
+  const nativeRef = useRef(null);
+  nativeRef.current = ready ? { width: photo.width, height: photo.height } : null;
+  const setGeometry = useCallback((next, { preview = false, coalesceKey = null } = {}) => {
+    dispatch(preview
+      ? { type: 'previewSettings', patch: { geometry: next } }
+      : { type: 'applySettings', patch: { geometry: next }, coalesceKey, now: Date.now() });
+  }, []);
+  // Corner drags can make a crop reach outside the photo: crop to fill applies, and a
+  // transform that cannot be built is ignored.
+  const constrained = useCallback((next) => {
+    try {
+      return constrainGeometry(next, nativeRef.current);
+    } catch (error) {
+      if (error instanceof GeometryError) return null;
+      throw error;
+    }
+  }, []);
+  const commitGeometry = useCallback(() => dispatch({ type: 'commitAdjustment' }), []);
+  const openTransform = useCallback((mode) => {
+    if (mode && !transformStart.current) transformStart.current = geometryRef.current;
+    if (!mode) { dispatch({ type: 'commitAdjustment' }); transformStart.current = null; }
+    setTransformMode(mode);
+    if (mode) setInspecting(false);
+  }, []);
+  const applyTransform = useCallback(() => openTransform(null), [openTransform]);
+  const cancelTransform = useCallback(() => {
+    dispatch({ type: 'commitAdjustment' });
+    const start = transformStart.current;
+    if (start && !geometryEqual(start, geometryRef.current)) setGeometry(start);
+    transformStart.current = null;
+    setTransformMode(null);
+  }, [setGeometry]);
+  const transformRef = useRef(null);
+  transformRef.current = transformMode ? cancelTransform : null;
+  // Another photo: the tool closes and keeps what was done.
+  useEffect(() => { transformStart.current = null; setTransformMode(null); }, [state.activeId]);
+  const transform = useMemo(() => (transformMode && ready ? {
+    mode: transformMode,
+    guide: straightening,
+    onPreview: (next) => { const value = constrained(next); if (value) setGeometry(value, { preview: true }); },
+    onCommit: commitGeometry,
+    onSet: (next, coalesceKey) => { const value = constrained(next); if (value) setGeometry(value, { coalesceKey }); },
+    onApply: applyTransform,
+    onCancel: cancelTransform,
+  } : null), [transformMode, ready, straightening, constrained, setGeometry, commitGeometry, applyTransform, cancelTransform]);
+  const changeGeometry = useCallback((next, options = {}) => setGeometry(next, options), [setGeometry]);
 
   const removePhoto = useCallback((id) => {
     resources.current.get(id)?.job?.cancel();
@@ -478,8 +536,14 @@ function EditorWorkspace() {
     if (values.lut && !lutsRef.current.has(values.lut.sha256)) return `Import the LUT "${values.lut.name}" again, or remove it, before exporting.`;
     const resource = resources.current.get(target.id);
     if (!resource?.header) return 'The original file is no longer available.';
+    try {
+      exportGeometry(values.geometry, { width: target.width, height: target.height }, settings.resize);
+    } catch (error) {
+      if (error instanceof GeometryError) return `${error.message} Change the photo's Crop & Transform settings to export it.`;
+      throw error;
+    }
     if (resource.hdr) {
-      const check = checkHdrExport(resource.hdr.mode, resource.hdr.inputs, resource.hdr.analysis, settings.resize);
+      const check = checkHdrExport(resource.hdr.mode, resource.hdr.inputs, resource.hdr.analysis, settings.resize, undefined, values.geometry);
       if (!check.fits) return hdrMemoryMessage(check);
     }
     return null;
@@ -803,6 +867,8 @@ function EditorWorkspace() {
   copyRef.current = copyEdits;
   const pasteRef = useRef(pasteEdits);
   pasteRef.current = pasteEdits;
+  const cropKeyRef = useRef(null);
+  cropKeyRef.current = ready ? () => openTransform(transformMode === 'crop' ? null : 'crop') : null;
   const dialogOpenRef = useRef(false);
   dialogOpenRef.current = Boolean(batchDialog || exportDialogOpen);
   // Keyboard shortcuts. Text fields keep their own undo and arrow keys.
@@ -823,6 +889,7 @@ function EditorWorkspace() {
         if (key === 'v' && event.shiftKey) { event.preventDefault(); pasteRef.current(); return; }
       }
       if (mod || event.altKey || isControl(event.target) || hdrOpenRef.current) return;
+      if (event.key === 'Escape' && transformRef.current) { event.preventDefault(); transformRef.current(); return; }
       if (event.key === 'Escape' && !dialogOpenRef.current) { dispatch({ type: 'clearSelection' }); setSelecting(false); return; }
       if (event.key === '\\') setCompare((value) => (value === 'original' ? 'edited' : 'original'));
       else if (key === 'y') setCompare((value) => (value === 'split' ? 'edited' : 'split'));
@@ -832,6 +899,7 @@ function EditorWorkspace() {
       else if (event.key === '-') setZoomCommand({ type: 'out', at: Date.now() });
       else if (event.key === '0') setZoomCommand({ type: 'fit', at: Date.now() });
       else if (event.key === '1') setZoomCommand({ type: 'actual', at: Date.now() });
+      else if (key === 'c' && cropKeyRef.current) cropKeyRef.current();
       else return;
       event.preventDefault();
     };
@@ -860,13 +928,21 @@ function EditorWorkspace() {
   const thumbnailOf = (id) => resources.current.get(id)?.thumbnail ?? null;
   const outputOf = (item) => {
     const hdr = resources.current.get(item.id)?.hdr;
-    return hdr ? hdrExportGeometry(hdr.inputs, hdr.analysis, state.exportSettings.resize).output : exportDimensions({ width: item.width, height: item.height }, state.exportSettings.resize);
+    const { geometry } = item.history.present;
+    try {
+      return hdr
+        ? hdrExportGeometry(hdr.inputs, hdr.analysis, state.exportSettings.resize, geometry).output
+        : exportGeometry(geometry, { width: item.width, height: item.height }, state.exportSettings.resize).output;
+    } catch (error) {
+      if (error instanceof GeometryError) return exportDimensions({ width: item.width, height: item.height }, state.exportSettings.resize);
+      throw error;
+    }
   };
   const pendingHdr = state.pendingEdits.filter(({ source }) => source.hdr);
   const activeResource = photo ? resources.current.get(photo.id) : null;
   const hdrExportCheck = useMemo(() => (ready && activeResource?.hdr
-    ? checkHdrExport(activeResource.hdr.mode, activeResource.hdr.inputs, activeResource.hdr.analysis, state.exportSettings.resize)
-    : null), [ready, activeResource, state.exportSettings.resize]);
+    ? checkHdrExport(activeResource.hdr.mode, activeResource.hdr.inputs, activeResource.hdr.analysis, state.exportSettings.resize, undefined, adjustments.geometry)
+    : null), [ready, activeResource, state.exportSettings.resize, adjustments.geometry]);
 
   const multiple = state.selectedIds.length > 1;
   // Plain click opens one photo; Ctrl/Cmd-click (or a tap in selection mode) adds or removes
@@ -1044,6 +1120,7 @@ function EditorWorkspace() {
           onEngine={onEngine}
           zoomCommand={zoomCommand}
           inspect={inspect}
+          transform={transform}
         />
         {!state.photos.length && (
           <div className="pe-empty">
@@ -1053,6 +1130,44 @@ function EditorWorkspace() {
             <p className="pe-note">Your photographs are decoded, edited and exported on this device. They are never uploaded, and no account is needed.</p>
           </div>
         )}
+        {transform && (
+          <div className="pe-croptools" role="toolbar" aria-label={transformMode === 'corners' ? 'Perspective corners' : 'Crop and straighten'}>
+            {transformMode === 'crop' && (
+              <>
+                <label className="pe-croptools__ratio">
+                  <span className="visually-hidden">Crop ratio</span>
+                  <select
+                    value={aspectBase(adjustments.geometry.aspect)}
+                    onChange={(event) => {
+                      const base = event.target.value;
+                      const current = parseAspect(adjustments.geometry.aspect);
+                      const aspect = current && current.h > current.w && parseAspect(base) ? swapAspect(base) : base;
+                      try { setGeometry(setAspect(adjustments.geometry, aspect, { width: photo.width, height: photo.height })); } catch (error) { if (!(error instanceof GeometryError)) throw error; }
+                    }}
+                  >
+                    {aspectChoices(aspectBase(adjustments.geometry.aspect)).map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="pe-icon-button"
+                  disabled={!parseAspect(adjustments.geometry.aspect)}
+                  onClick={() => setGeometry(setAspect(adjustments.geometry, swapAspect(adjustments.geometry.aspect), { width: photo.width, height: photo.height }))}
+                  aria-label="Swap the crop ratio between landscape and portrait"
+                  title="Swap landscape / portrait"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="5" width="8" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="7" y="2.5" width="6" height="11" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" strokeDasharray="2 1.5" /></svg>
+                </button>
+                <button type="button" className="pe-icon-button" onClick={() => { const value = constrained(turnGeometry(adjustments.geometry, -1)); if (value) setGeometry(value); }} aria-label="Rotate 90° counterclockwise" title="Rotate 90° counterclockwise">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d={TURN_LEFT} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+              </>
+            )}
+            <span className="pe-croptools__spacer" />
+            <button type="button" className="pe-button" onClick={cancelTransform}>Cancel</button>
+            <button type="button" className="pe-button pe-button--primary" onClick={applyTransform}>Apply</button>
+          </div>
+        )}
         <div className="pe-zoom" role="group" aria-label="Zoom">
           <button type="button" className="pe-icon-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'out', at: Date.now() })} aria-label="Zoom out" title="Zoom out (−)">−</button>
           <button type="button" className="pe-text-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'fit', at: Date.now() })} title="Fit to screen (0)">Fit</button>
@@ -1060,8 +1175,18 @@ function EditorWorkspace() {
           <button type="button" className="pe-icon-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'in', at: Date.now() })} aria-label="Zoom in" title="Zoom in (+)">+</button>
           <button
             type="button"
+            className="pe-text-button pe-zoom__crop"
+            disabled={!ready}
+            aria-pressed={transformMode === 'crop'}
+            onClick={() => openTransform(transformMode === 'crop' ? null : 'crop')}
+            title="Crop, straighten and rotate (C)"
+          >
+            Crop
+          </button>
+          <button
+            type="button"
             className="pe-text-button pe-zoom__inspect"
-            disabled={!ready || Boolean(photo?.hdr)}
+            disabled={!ready || Boolean(photo?.hdr) || Boolean(transformMode)}
             aria-pressed={inspecting}
             onClick={() => (inspecting ? closeInspect() : setInspecting(true))}
             title={photo?.hdr ? '1:1 inspection is not available for merged HDR photos' : 'Render the visible area at full resolution, as the export does (Detail at 1:1)'}
@@ -1081,6 +1206,7 @@ function EditorWorkspace() {
             presets={{ userPresets, onChange: changePresets, onPreview: setPresetPreview, onDownload: downloadBlob, newId }}
             raw={ready ? photo.raw ?? null : null}
             hdr={ready ? photo.hdr ?? null : null}
+            geometry={ready ? { native: { width: photo.width, height: photo.height }, mode: transformMode, onMode: openTransform, onChange: changeGeometry, onCommit: commitGeometry, onStraightening: setStraightening } : null}
           />
         </div>
         <div className="pe-inspector__section" data-section="export">
@@ -1107,6 +1233,7 @@ function EditorWorkspace() {
             <div><dt>Ctrl/⌘ A, Esc</dt><dd>Select all, clear selection</dd></div>
             <div><dt>Ctrl/⌘ Shift C, V</dt><dd>Copy edits, paste to selected</dd></div>
             <div><dt>+ − 0 1</dt><dd>Zoom in, out, fit, 100%</dd></div>
+            <div><dt>C, Enter, Esc</dt><dd>Crop tool, apply, cancel</dd></div>
             <div><dt>Double-click a label</dt><dd>Reset that adjustment</dd></div>
           </dl>
           {engine && <p className="pe-note">Preview: {engine.kind === 'webgl2' ? 'WebGL2' : 'CPU'}, up to {engine.maxEdge} px. Exports are rendered on the CPU at full resolution.</p>}

@@ -13,7 +13,8 @@ import { finishRows, warpImage, warpRows, warpSpec } from '../pipeline/warp.mjs'
 import { FORMATS } from './imageHeader.mjs';
 import { LutError, MAX_CUBE_BYTES, parseCube } from '../pipeline/lut.mjs';
 import { contentHash } from './hash.mjs';
-import { renderRegion } from '../pipeline/detailRegion.mjs';
+import { renderRegion, warpedRegionSource } from '../pipeline/detailRegion.mjs';
+import { decodeSize, geometryPlan, normalizeGeometry } from '../pipeline/geometry.mjs';
 
 export const EXPORT_BAND_ROWS = 256;
 
@@ -134,8 +135,17 @@ export const handlers = {
    * size does), reads the guide source in bands like exportDetailBands, and keeps only
    * `rect` (the region, room to pan and the halo).
    */
-  async regionSource({ file, header, rect }) {
+  async regionSource({ file, header, rect, geometry = null }) {
     const size = { width: header.displayWidth, height: header.displayHeight };
+    const plan = geometryPlan(normalizeGeometry(geometry), size);
+    if (!plan.identity) {
+      // Geometry: `rect` is in output pixels; the original is decoded as an export at
+      // original size would decode it.
+      const decode = decodeSize(plan, plan.native, size);
+      const original = await decodeToRgba(file, header, decode);
+      const kept = warpedRegionSource(original, plan, rect);
+      return { result: kept, transfer: [kept.source.data.buffer] };
+    }
     const { context } = await decodeToCanvas(file, header, size);
     const small = guideSize(size);
     const accumulator = createAreaAccumulator(undefined, size.width, size.height, small.width, small.height);

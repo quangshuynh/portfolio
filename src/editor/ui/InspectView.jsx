@@ -10,10 +10,13 @@ const RENDER_DELAY_MS = 120;
  * Not a zoomed preview: the original is decoded once at full size and a crop around the
  * region is kept; panning inside it only re-renders. Drag to pan; Original and Split
  * compare with the unedited pixels.
- * :param props: photo, adjustments, lut, raw, compare, split, center ({ x, y } source px),
- *   loadSource(photo, rect) -> kept, render(kept, keyed, region, settings) -> { after, before }
+ * With geometry, positions are output pixels (after crop, rotation and resize) and the
+ * kept crop is cut from the warped output; a geometry change decodes again.
+ * :param props: photo, adjustments, lut, raw, compare, split, center ({ x, y } output px),
+ *   size ({ width, height } of the output), loadSource(photo, rect, geometry) -> kept,
+ *   render(kept, keyed, region, settings) -> { after, before }
  */
-export default function InspectView({ photo, adjustments, lut, raw, compare, split, center, loadSource, render, onClose }) {
+export default function InspectView({ photo, adjustments, lut, raw, compare, split, center, size = null, loadSource, render, onClose }) {
   const hostRef = useRef(null);
   const canvasRef = useRef(null);
   const keptRef = useRef(null);
@@ -23,13 +26,14 @@ export default function InspectView({ photo, adjustments, lut, raw, compare, spl
   const [status, setStatus] = useState({ state: 'idle' });
   const [drag, setDrag] = useState(null);
   const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
-  const image = { width: photo.width, height: photo.height };
+  const image = size ?? { width: photo.width, height: photo.height };
+  const geometryKey = JSON.stringify(adjustments.geometry ?? null);
 
   // The region: as many source pixels as the stage has device pixels, around the centre.
   useLayoutEffect(() => {
     const host = hostRef.current;
     setRegion(regionAt(center, { width: host.clientWidth * dpr, height: host.clientHeight * dpr }, image));
-  }, [photo.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [photo.id, image.width, image.height]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const paint = useCallback(() => {
     const frame = frameRef.current;
@@ -59,11 +63,11 @@ export default function InspectView({ photo, adjustments, lut, raw, compare, spl
         const current = job.next;
         job.next = null;
         let kept = keptRef.current;
-        if (!kept || kept.photoId !== photo.id || !covers(kept.rect, current.region, image)) {
+        if (!kept || kept.photoId !== photo.id || kept.geometryKey !== current.geometryKey || !covers(kept.rect, current.region, image)) {
           setStatus({ state: 'decoding' });
           const rect = sourceRect(current.region, image);
-          const source = await loadSource(photo, rect);
-          kept = { photoId: photo.id, key: `${photo.id}:${rect.x},${rect.y},${rect.width},${rect.height}`, rect: { x0: rect.x, y0: rect.y, width: rect.width, height: rect.height }, source };
+          const source = await loadSource(photo, rect, current.geometry);
+          kept = { photoId: photo.id, geometryKey: current.geometryKey, key: `${photo.id}:${rect.x},${rect.y},${rect.width},${rect.height}:${current.geometryKey}`, rect: { x0: rect.x, y0: rect.y, width: rect.width, height: rect.height }, source };
           keptRef.current = kept;
         }
         setStatus({ state: 'rendering' });
@@ -84,9 +88,9 @@ export default function InspectView({ photo, adjustments, lut, raw, compare, spl
 
   useEffect(() => {
     if (!region) return undefined;
-    const timer = setTimeout(() => run({ region, adjustments, lut, raw }), RENDER_DELAY_MS);
+    const timer = setTimeout(() => run({ region, adjustments, lut, raw, geometry: adjustments.geometry ?? null, geometryKey }), RENDER_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [region, adjustments, lut, raw, run]);
+  }, [region, adjustments, lut, raw, run, geometryKey]);
 
   // Drag pans the region (the current frame moves with the pointer until it is re-rendered).
   const onPointerDown = (event) => {

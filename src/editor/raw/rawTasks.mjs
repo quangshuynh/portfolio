@@ -5,7 +5,8 @@
 
 import { prepareRender, renderRawRgba8 } from '../pipeline/cpuRenderer.mjs';
 import { guideSource, prepareDetailRender, renderDetailRows } from '../pipeline/detailRenderer.mjs';
-import { extractRect } from '../pipeline/detailRegion.mjs';
+import { extractRect, warpedRegionSource } from '../pipeline/detailRegion.mjs';
+import { geometryPlan, normalizeGeometry } from '../pipeline/geometry.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { exportGeometry, LIMITS, proxyDimensions } from '../io/files.mjs';
 import { finishRows, warpImage, warpSpec } from '../pipeline/warp.mjs';
@@ -77,7 +78,7 @@ export function createRawHandlers(loadModule) {
      * 1:1 inspection source: the full demosaic (as an export at original size), its guide
      * source, and only `rect` of the pixels.
      */
-    async region({ file, raw, rect }) {
+    async region({ file, raw, rect, geometry = null }) {
       const { Module, bytes, format } = await openRaw(file, loadModule);
       const decoded = decodeRaw(Module, bytes, { format, halfSize: false });
       if (decoded.info.width !== raw.width || decoded.info.height !== raw.height) {
@@ -85,6 +86,11 @@ export function createRawHandlers(loadModule) {
       }
       const image = downsampleRaw(decoded.image, raw.width, raw.height);
       decoded.image = null;
+      const plan = geometryPlan(normalizeGeometry(geometry), { width: raw.width, height: raw.height });
+      if (!plan.identity) {
+        const kept = warpedRegionSource(image, plan, rect);
+        return { result: kept, transfer: [kept.source.data.buffer] };
+      }
       const guideImage = guideSource(image);
       const source = extractRect(image, rect);
       return { result: { source, guideImage, transparent: false, native: { width: raw.width, height: raw.height } }, transfer: [source.data.buffer] };

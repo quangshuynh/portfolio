@@ -7,6 +7,7 @@ import {
 import { applyCoverage, coverageAt, cubicWeights, exactMapping, warpImage, warpRows, warpSpec } from './warp.mjs';
 import { exportDimensions, exportGeometry } from '../io/files.mjs';
 import { renderDetailImage } from './detailRenderer.mjs';
+import { renderRegion, warpedRegionSource } from './detailRegion.mjs';
 import { deriveParams } from './spec.mjs';
 import { normalizeAdjustments } from '../model/adjustments.mjs';
 
@@ -391,6 +392,24 @@ describe('resampling', () => {
     const whole = renderDetailImage(warped, params, { bandRows: 1000 });
     const bands = renderDetailImage(warped, params, { bandRows: 9, tileWidth: 13 });
     expect(Array.from(bands)).toEqual(Array.from(whole));
+  });
+
+  test('1:1 inspection with geometry renders exactly the export pixels of the region', () => {
+    const image = coordinateImage(120, 90);
+    const plan = geometryPlan(g({ angle: -8, constrain: false, background: 'black', crop: { x: 0, y: 0, width: 0.9, height: 1 } }), image);
+    const adjustments = normalizeAdjustments({ texture: 50, clarity: 30, sharpening: 40, contrast: 20 });
+    const spec = warpSpec(plan, plan.native, image);
+    const warped = warpImage(image, spec.matrix, spec);
+    const full = renderDetailImage(warped, deriveParams(adjustments), { nativeWidth: plan.native.width, nativeHeight: plan.native.height });
+    applyCoverage(full, spec.width, 0, spec.height, spec);
+    const region = { x: 3, y: 5, width: 40, height: 30 };
+    const kept = warpedRegionSource(image, plan, { x: 0, y: 0, width: 70, height: 60 });
+    const { after } = renderRegion(kept, region, { adjustments });
+    for (let y = 0; y < region.height; y += 1) {
+      for (let x = 0; x < region.width; x += 1) {
+        expect(pixel({ width: region.width, data: after }, x, y)).toEqual(pixel({ width: plan.native.width, data: full }, region.x + x, region.y + y));
+      }
+    }
   });
 
   test('a long chain of transforms stays numerically stable', () => {
