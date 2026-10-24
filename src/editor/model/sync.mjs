@@ -10,8 +10,9 @@
 // Geometry is split in two groups, both off by default (paste never copies them): Output
 // size (the resize box, reusable on any photo) and Crop & transform (crop, rotation, flips,
 // perspective, stretch: source-specific, so only to photos of the same proportions).
-// Text overlays belong to one photo's composition: they are copied only when Text overlays is
-// ticked in Sync (paste never copies them) and then replace the target's text.
+// Layers (image, text, adjustment) belong to one photo's composition: they are copied only when
+// Layers is ticked in Sync (paste never copies them) and then replace the target's whole stack;
+// an image or adjustment layer's colour settings are never part of the colour groups.
 
 import { adjustmentsEqual, groupKeys, neutralAdjustments, normalizeAdjustments } from './adjustments.mjs';
 import { presetPatch } from './presets.mjs';
@@ -45,7 +46,7 @@ export const SYNC_GROUPS = Object.freeze([
     needs: 'photos with the same proportions',
     compatible: (source, photo) => sameProportions(source.proportions ?? null, proportions(photo)),
   },
-  { id: 'text', label: 'Text overlays', keys: [], structured: 'overlays' },
+  { id: 'layers', label: 'Layers (whole stack)', keys: [], structured: 'layers' },
 ].map(Object.freeze));
 const groupById = new Map(SYNC_GROUPS.map((group) => [group.id, group]));
 

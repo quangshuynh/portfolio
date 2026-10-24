@@ -16,7 +16,6 @@ import { assertCanvasWorks, createCanvas, encodeCanvas } from './decode.mjs';
 import { exportGeometry } from './files.mjs';
 import { FORMATS } from './imageHeader.mjs';
 import { finishRows, hasAlpha, sourceRows, warpSpec } from '../pipeline/warp.mjs';
-import { compositeSprites } from '../text/sprites.mjs';
 
 export const DETAIL_POOL_BAND_ROWS = 256;
 const MAX_DETAIL_WORKERS = 4;
@@ -176,10 +175,11 @@ export function renderPixelsParallel(image, { adjustments, lut = null, raw = nul
  * decodes the original at the export size, the bands are rendered in parallel (with or
  * without Detail) into a page canvas, which is encoded. The one-thread export renders in
  * place in the decode canvas instead; this holds the decoded pixels and the canvas
- * (8 bytes per pixel).
+ * (8 bytes per pixel). `compose(context, { size, signal, onProgress })` composites the photo's
+ * layers over the rendered canvas before encoding.
  * :returns: { blob, width, height, timings }
  */
-export async function exportImageInBands(decoder, { file, header, adjustments, lut = null, settings, sprites = null }, { workers, onProgress = () => {}, signal, spawn }) {
+export async function exportImageInBands(decoder, { file, header, adjustments, lut = null, settings, compose = null }, { workers, onProgress = () => {}, signal, spawn }) {
   const started = performance.now();
   const format = FORMATS[settings.format];
   const native = { width: header.displayWidth, height: header.displayHeight };
@@ -204,7 +204,8 @@ export async function exportImageInBands(decoder, { file, header, adjustments, l
     onBand: ({ row, rows, data }) => context.putImageData(new ImageData(finishRows(spec, data, row, rows, flatten), size.width, rows), 0, row),
     onProgress: (fraction) => onProgress({ stage: 'rendering', fraction }),
   });
-  compositeSprites(context, sprites);
+  // Layers (io/composeLayers.mjs) over the finished photo.
+  if (compose) await compose(context, { size, signal, onProgress });
   onProgress({ stage: 'encoding', fraction: 1 });
   const renderedAt = performance.now();
   const blob = await encodeCanvas(canvas, format.mime, settings.format === 'png' ? undefined : settings.quality);

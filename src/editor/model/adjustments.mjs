@@ -7,8 +7,8 @@
 // curve control points, see pipeline/curves.mjs), `lut` (a reference to an
 // imported .cube LUT by content hash, or null), `raw` (white balance of a RAW
 // photo's development; ignored for JPEG, PNG and WebP) and `geometry` (crop, rotation,
-// flips, perspective, stretch and resize; pipeline/geometry.mjs) and `overlays` (text
-// objects drawn over the finished photo; model/overlays.mjs) and `filter` (which Filter Library
+// flips, perspective, stretch and resize; pipeline/geometry.mjs) and `layers` (image, text and
+// adjustment layers composited over the finished photo; model/layers.mjs) and `filter` (which Filter Library
 // filter set the Creative group, and at what strength; model/filters.mjs). The `hdr` controls only act on
 // merged RAW HDR photos. Creative controls (pipeline/creative.mjs) carry a `section` for the
 // panel, and `scales` when a look's intensity scales them from neutral.
@@ -17,7 +17,7 @@ import { CURVE_CHANNELS, curvesEqual, curvesNeutral, isNeutralCurve, neutralCurv
 import { MAX_LUT_SIZE, MIN_LUT_SIZE } from '../pipeline/lut.mjs';
 import { compactGeometry, geometryEqual, geometryNeutral, neutralGeometry, normalizeGeometry } from '../pipeline/geometry.mjs';
 import { DAYLIGHT_KELVIN, RAW_KELVIN, RAW_TINT, WHITE_BALANCE_MODES } from '../raw/rawColor.mjs';
-import { normalizeOverlays, overlaysEqual } from './overlays.mjs';
+import { compactLayers, layersEqual, normalizeLayers, textLayers } from './layers.mjs';
 
 /** Colour ranges for HSL, with their hue centres in degrees (HSV hue of sRGB values). */
 export const HSL_RANGES = Object.freeze([
@@ -145,6 +145,7 @@ export const ADJUSTMENT_GROUPS = Object.freeze([
   { id: 'lut', label: 'LUT' },
   { id: 'creative', label: 'Creative' },
   { id: 'text', label: 'Text' },
+  { id: 'layers', label: 'Layers' },
   { id: 'raw', label: 'RAW' },
   { id: 'hdr', label: 'HDR' },
 ].map(Object.freeze));
@@ -217,7 +218,7 @@ export function neutralAdjustments() {
     lut: null,
     raw: { ...RAW_DEFAULTS },
     geometry: neutralGeometry(),
-    overlays: [],
+    layers: [],
     filter: null,
   };
 }
@@ -234,7 +235,8 @@ export function normalizeAdjustments(input = {}) {
     lut: normalizeLutRef(source.lut),
     raw: normalizeRawSettings(source.raw),
     geometry: normalizeGeometry(source.geometry),
-    overlays: normalizeOverlays(source.overlays),
+    // Documents before version 9 kept text in `overlays`; they become text layers.
+    layers: normalizeLayers(source.layers, source.overlays),
     filter: normalizeFilterRef(source.filter),
   };
 }
@@ -244,7 +246,7 @@ const lutRefsEqual = (a, b) => (a === null || b === null ? a === b : a.sha256 ==
 
 export const adjustmentsEqual = (a, b) => ADJUSTMENT_KEYS.every((key) => a[key] === b[key])
   && curvesEqual(a.curves, b.curves) && lutRefsEqual(a.lut, b.lut) && rawEqual(a.raw ?? RAW_DEFAULTS, b.raw ?? RAW_DEFAULTS)
-  && geometryEqual(a.geometry ?? NEUTRAL_GEOMETRY, b.geometry ?? NEUTRAL_GEOMETRY) && overlaysEqual(a.overlays ?? [], b.overlays ?? []) && filterRefsEqual(a.filter ?? null, b.filter ?? null);
+  && geometryEqual(a.geometry ?? NEUTRAL_GEOMETRY, b.geometry ?? NEUTRAL_GEOMETRY) && layersEqual(a.layers ?? [], b.layers ?? []) && filterRefsEqual(a.filter ?? null, b.filter ?? null);
 
 const numericNeutral = (adjustments, keys) => keys.every((key) => (adjustments[key] ?? byKey.get(key).default) === byKey.get(key).default);
 
@@ -257,22 +259,24 @@ export function groupIsNeutral(adjustments, group) {
   if (group === 'lut') return !adjustments.lut;
   if (group === 'raw') return rawEqual(normalizeRawSettings(adjustments.raw), RAW_DEFAULTS) && numericNeutral(adjustments, groupKeys('raw'));
   if (group === 'geometry') return geometryNeutral(adjustments.geometry ?? NEUTRAL_GEOMETRY);
-  if (group === 'text') return !adjustments.overlays?.length;
+  if (group === 'text') return !textLayers(adjustments.layers ?? []).length;
+  if (group === 'layers') return !adjustments.layers?.length;
   return numericNeutral(adjustments, groupKeys(group));
 }
 
 export const isNeutral = (adjustments) => ADJUSTMENT_GROUPS.every(({ id }) => groupIsNeutral(adjustments, id))
   && numericNeutral(adjustments, ['lutIntensity']);
 
-/** Settings of one group, as a patch that resets it to neutral. */
-export function neutralGroup(group) {
+/** Settings of one group, as a patch that resets it to neutral (Text needs the `current` settings: it keeps other layers). */
+export function neutralGroup(group, current = null) {
   const neutral = neutralAdjustments();
   const patch = Object.fromEntries(groupKeys(group).map((key) => [key, neutral[key]]));
   if (group === 'curves') patch.curves = neutral.curves;
   if (group === 'lut') patch.lut = null;
   if (group === 'raw') patch.raw = neutral.raw;
   if (group === 'geometry') patch.geometry = neutral.geometry;
-  if (group === 'text') patch.overlays = [];
+  if (group === 'layers') patch.layers = [];
+  if (group === 'text') patch.layers = (current?.layers ?? []).filter((layer) => layer.type !== 'text' || layer.locked);
   if (group === 'creative') patch.filter = null;
   return patch;
 }
@@ -301,7 +305,7 @@ export function compactAdjustments(adjustments) {
   if (!rawEqual(a.raw, RAW_DEFAULTS)) out.raw = a.raw;
   const geometry = compactGeometry(a.geometry);
   if (geometry) out.geometry = geometry;
-  if (a.overlays.length) out.overlays = a.overlays;
+  if (a.layers.length) out.layers = compactLayers(a.layers);
   if (a.filter) out.filter = a.filter;
   return out;
 }

@@ -23,8 +23,14 @@ import { createExportBatch } from '../batch/exportBatch.mjs';
 import { createZipArchive } from '../batch/zipArchive.mjs';
 import { hdrIdentity, hdrPhotoName } from '../hdr/hdrSource.mjs';
 import { appHref } from '../../util/navigation';
+import { createTextOverlay } from '../model/overlays.mjs';
 import { loadTextFonts } from '../text/fonts.mjs';
-import { rasterizeOverlays } from '../text/textRender.mjs';
+import { rasterizeTextLayer } from '../text/textRender.mjs';
+import { createImageLayer, createAdjustmentLayer, insertLayer, layerAdjustments, layerLabel, settingsNeutral, visibleLayers } from '../model/layers.mjs';
+import { rasterSize } from '../pipeline/layerTransform.mjs';
+import { composeLayers } from '../io/composeLayers.mjs';
+import { createRasterCache } from './layerRasters.mjs';
+import LayersPanel, { newLayerId } from './LayersPanel';
 import { thumbnailSource } from './filterThumbs.mjs';
 import AdjustPanel from './AdjustPanel';
 import BatchDialog from './BatchDialog';
@@ -156,11 +162,8 @@ function outputSize(resource, target, settings) {
     : exportGeometry(geometry, { width: target.width, height: target.height }, settings.resize).output;
 }
 
-/** Text overlay sprites at an export's size, drawn once the bundled fonts are loaded. */
-async function textSprites(overlays, size) {
-  await loadTextFonts();
-  return rasterizeOverlays(overlays, size);
-}
+// Actions the inspector panels send that edit the selected image or adjustment layer instead of the photo.
+const LAYER_TARGETED = new Set(['previewAdjustment', 'setAdjustment', 'resetAdjustment', 'previewSettings', 'applySettings', 'applyPreset', 'resetGroup', 'resetAll']);
 
 export default function EditorApp() {
   const [capabilities] = useState(() => browserCapabilities());
@@ -204,8 +207,17 @@ function EditorWorkspace() {
   // 1:1 inspection of the visible region (InspectView), and the crop decode in flight.
   const [inspecting, setInspecting] = useState(false);
   // Text tool: text objects can be moved, resized and rotated on the photo; one is selected.
-  const [textTool, setTextTool] = useState(false);
-  const [selectedText, setSelectedText] = useState(null);
+  const [layerToolOn, setLayerToolOn] = useState(false);
+  // The layer the panels edit (null: the Background, the photo itself).
+  const [activeLayer, setActiveLayer] = useState(null);
+  const [freeResize, setFreeResize] = useState(false);
+  // Image layer sources imported as layers only (by SHA-256); workspace photos serve as sources too.
+  const layerFiles = useRef(new Map());
+  const layerInputRef = useRef(null);
+  const layerReconnect = useRef(null);
+  const [layerMessage, setLayerMessage] = useState(null);
+  const [layerBusy, setLayerBusy] = useState(false);
+  const [rasterVersion, setRasterVersion] = useState(0);
   const [textFocus, setTextFocus] = useState(0);
   const inspectJob = useRef(null);
   const regionSent = useRef(null);
@@ -440,6 +452,7 @@ function EditorWorkspace() {
   }, [worker]);
   const onEngine = useCallback((info) => setEngine(info), []);
 
+
   // Filter Library thumbnails: a small source made once per photo, proxy and geometry (on
   // this thread, from the proxy already shown), rendered in a worker of their own so they
   // never queue behind preview frames.
@@ -533,7 +546,7 @@ function EditorWorkspace() {
     if (mode && !transformStart.current) transformStart.current = geometryRef.current;
     if (!mode) { dispatch({ type: 'commitAdjustment' }); transformStart.current = null; }
     setTransformMode(mode);
-    if (mode) { setInspecting(false); setTextTool(false); }
+    if (mode) { setInspecting(false); setLayerToolOn(false); }
   }, []);
   const applyTransform = useCallback(() => openTransform(null), [openTransform]);
   const cancelTransform = useCallback(() => {
@@ -546,7 +559,7 @@ function EditorWorkspace() {
   const transformRef = useRef(null);
   transformRef.current = transformMode ? cancelTransform : null;
   // Another photo: the tool closes and keeps what was done.
-  useEffect(() => { transformStart.current = null; setTransformMode(null); setSelectedText(null); }, [state.activeId]);
+  useEffect(() => { transformStart.current = null; setTransformMode(null); setActiveLayer(null); }, [state.activeId]);
   const transform = useMemo(() => (transformMode && ready ? {
     mode: transformMode,
     guide: straightening,
@@ -557,6 +570,176 @@ function EditorWorkspace() {
     onCancel: cancelTransform,
   } : null), [transformMode, ready, straightening, constrained, setGeometry, commitGeometry, applyTransform, cancelTransform]);
   const changeGeometry = useCallback((next, options = {}) => setGeometry(next, options), [setGeometry]);
+
+  // ---------- Layers ----------
+  // An image layer's source: a file imported as a layer, or a workspace photo with the same content.
+  const sourceFor = useCallback((sha256) => {
+    if (!sha256) return null;
+    if (layerFiles.current.has(sha256)) return layerFiles.current.get(sha256);
+    for (const resource of resources.current.values()) if (resource.sha256 === sha256 && resource.header && resource.file && !resource.hdr) return resource;
+    return null;
+  }, []);
+  const lutOfLayer = (layer) => (layer.settings?.lut ? lutsRef.current.get(layer.settings.lut.sha256) ?? null : null);
+  // Preview raster: the source decoded at the size bucket (RAW: half-size sensor data in the RAW
+  // queue), developed with the layer's settings in a worker of its own.
+  const loadLayerRaster = useCallback(async (layer, size) => {
+    const source = sourceFor(layer.source.sha256);
+    if (!source) throw new Error('The source file is not loaded.');
+    const image = source.raw
+      ? await raws().run('decode', { file: source.file, maxEdge: Math.max(size.width, size.height) }).promise
+      : await worker('layers').call('decode', { file: source.file, header: source.header, width: size.width, height: size.height });
+    if (!source.raw && settingsNeutral(layer.settings)) return image;
+    return worker('layers').call('render', { key: newId(), source: image, adjustments: layerAdjustments(layer.settings), lut: lutOfLayer(layer), raw: source.raw ?? null });
+  }, [sourceFor, raws, worker]); // eslint-disable-line react-hooks/exhaustive-deps
+  const loadLayerRasterRef = useRef(loadLayerRaster);
+  loadLayerRasterRef.current = loadLayerRaster;
+  const rasterCache = useMemo(() => createRasterCache({
+    load: (layer, size) => loadLayerRasterRef.current(layer, size),
+    onChange: () => setRasterVersion((value) => value + 1),
+    maxEdge: engine?.maxEdge ?? 4096,
+  }), [engine?.maxEdge]);
+  const rasterCacheRef = useRef(rasterCache);
+  rasterCacheRef.current = rasterCache;
+  const layerRasters = useMemo(() => ({ get: rasterCache.get, version: rasterVersion }), [rasterCache, rasterVersion]);
+
+  // Export raster: the original decoded (RAW: developed) at the size the layer needs on the
+  // export canvas, never larger than the source, then its settings; the worker ends afterwards.
+  const exportLayerRaster = useCallback(async (layer, canvas, signal) => {
+    const source = sourceFor(layer.source.sha256);
+    if (!source) throw Object.assign(new Error(`The file of the layer "${layerLabel(layer)}" is not loaded.`), { code: 'blocked' });
+    const size = rasterSize(layer, canvas);
+    const client = createImageWorker();
+    try {
+      let image;
+      if (source.raw) {
+        const job = raws().run('develop', { file: source.file, raw: source.raw, width: size.width, height: size.height });
+        const watch = setInterval(() => { if (signal.cancelled) job.cancel(); }, 100);
+        try { image = await job.promise; } finally { clearInterval(watch); }
+      } else {
+        image = await client.call('decode', { file: source.file, header: source.header, width: size.width, height: size.height });
+      }
+      if (signal.cancelled) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
+      if (!source.raw && settingsNeutral(layer.settings)) return image;
+      return await client.call('render', { key: 'layer', source: image, adjustments: layerAdjustments(layer.settings), lut: lutOfLayer(layer), raw: source.raw ?? null }, { transfer: [image.data.buffer] });
+    } finally {
+      client.terminate();
+    }
+  }, [sourceFor, raws]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The canvas: the photo's output frame at full size (its own Crop & Transform).
+  const canvasSize = useMemo(() => {
+    if (!ready) return null;
+    try {
+      return exportGeometry(adjustments.geometry, { width: photo.width, height: photo.height }, { mode: 'original' }).output;
+    } catch (error) {
+      if (error instanceof GeometryError) return { width: photo.width, height: photo.height };
+      throw error;
+    }
+  }, [ready, adjustments.geometry, photo?.width, photo?.height]);
+  const canvasSizeRef = useRef(canvasSize);
+  canvasSizeRef.current = canvasSize;
+
+  // The panels edit the selected image or adjustment layer's colour settings, else the photo.
+  const targetLayer = ready && activeLayer ? adjustments.layers.find((layer) => layer.id === activeLayer && layer.settings) ?? null : null;
+  const targetId = targetLayer?.id ?? null;
+  const panelAdjustments = useMemo(() => (targetLayer ? layerAdjustments(targetLayer.settings) : adjustments), [targetLayer, adjustments]);
+  const panelDispatch = useCallback((action) => dispatch(targetId && LAYER_TARGETED.has(action.type) && !action.patch?.layers ? { ...action, layerId: targetId } : action), [targetId]);
+  const lutTarget = useRef(null);
+  lutTarget.current = targetId;
+  // A layer that no longer exists (undo, another photo) is no longer selected.
+  useEffect(() => { if (activeLayer && ready && !adjustments.layers.some((layer) => layer.id === activeLayer)) setActiveLayer(null); }, [activeLayer, ready, adjustments.layers]);
+
+  const insertAboveActive = useCallback((layer, message) => {
+    const target = activePhoto(stateRef.current);
+    if (target?.status !== 'ready') return false;
+    const { layers } = target.history.present;
+    const at = layers.findIndex(({ id }) => id === activeLayer);
+    const next = insertLayer(layers, layer, at === -1 ? layers.length - 1 : at);
+    if (next === layers) { setLayerMessage(message); return false; }
+    dispatch({ type: 'applySettings', patch: { layers: next } });
+    setActiveLayer(layer.id);
+    setLayerMessage(null);
+    return true;
+  }, [activeLayer]);
+  const addImageLayer = useCallback((resource) => {
+    const source = {
+      sha256: resource.sha256,
+      name: resource.file.name,
+      size: resource.file.size,
+      format: resource.header.format,
+      width: resource.header.displayWidth,
+      height: resource.header.displayHeight,
+    };
+    const layer = createImageLayer(newLayerId('image'), source, canvasSizeRef.current);
+    if (layer && insertAboveActive(layer, 'A photo can hold up to 8 image layers and 40 layers in all.') && !transformMode) setLayerToolOn(true);
+  }, [insertAboveActive, transformMode]);
+  const onAddPhoto = useCallback((id) => {
+    const resource = resources.current.get(id);
+    if (resource?.header && resource.sha256 && !resource.hdr) addImageLayer(resource);
+  }, [addImageLayer]);
+  const addTextLayer = useCallback(() => {
+    if (insertAboveActive(createTextOverlay(newLayerId('text')), 'A photo can hold up to 30 text layers and 40 layers in all.')) {
+      if (!transformMode) setLayerToolOn(true);
+      setTextFocus((count) => count + 1);
+    }
+  }, [insertAboveActive, transformMode]);
+  const addAdjustmentLayer = useCallback(() => {
+    insertAboveActive(createAdjustmentLayer(newLayerId('adjust')), 'A photo can hold up to 12 adjustment layers and 40 layers in all.');
+  }, [insertAboveActive]);
+  const selectLayer = useCallback((id) => {
+    setActiveLayer(id);
+    const layer = id && activePhoto(stateRef.current)?.history.present.layers.find((item) => item.id === id);
+    if (layer && (layer.type === 'image' || layer.type === 'text') && !transformMode) setLayerToolOn(true);
+  }, [transformMode]);
+
+  // A file chosen as a new image layer, or to reconnect a layer whose source is missing
+  // (matched by content: the SHA-256 must be the one the layer names).
+  const onLayerFile = useCallback(async (file) => {
+    const reconnect = layerReconnect.current;
+    layerReconnect.current = null;
+    if (!file) return;
+    setLayerBusy(true);
+    setLayerMessage(null);
+    try {
+      const head = new Uint8Array(await file.slice(0, RAW_SNIFF_BYTES).arrayBuffer());
+      const inspected = isTiff(head)
+        ? await raws().run('inspect', { file, thumbnailEdge: THUMBNAIL_EDGE }).promise
+        : await worker('import').call('inspect', { file, thumbnailEdge: THUMBNAIL_EDGE });
+      const resource = { file, header: inspected.header, sha256: inspected.sha256, thumbnail: inspected.thumbnail, raw: inspected.raw ?? null };
+      if (!resource.sha256) throw new Error('This file could not be identified.');
+      if (reconnect && resource.sha256 !== reconnect.source.sha256) {
+        throw new Error(`${file.name} is not the file this layer was made from (its content differs). Choose ${reconnect.source.name || 'the original file'}.`);
+      }
+      layerFiles.current.set(resource.sha256, resource);
+      rasterCacheRef.current.retry(resource.sha256);
+      if (reconnect) {
+        setLayerMessage(`Reconnected ${file.name}.`);
+        setRasterVersion((value) => value + 1);
+      } else {
+        addImageLayer(resource);
+      }
+    } catch (error) {
+      if (error.code !== 'cancelled') setLayerMessage(error.message || 'This file could not be read.');
+    } finally {
+      setLayerBusy(false);
+    }
+  }, [raws, worker, addImageLayer]);
+
+  const layerSourcesUi = {
+    missing: (layer) => {
+      if (layer.type !== 'image') return null;
+      if (!sourceFor(layer.source.sha256)) return `Its file ${layer.source.name || ''} (${layer.source.width}×${layer.source.height}) is not loaded. Reconnect it (or import it as a photo) to show and export this layer.`;
+      const failed = rasterCache.error(layer.source.sha256);
+      return failed ? `Its file could not be read: ${failed}` : null;
+    },
+    thumbnail: (layer) => (layer.type === 'image' ? sourceFor(layer.source.sha256)?.thumbnail ?? null : null),
+    workspace: state.photos.filter((item) => item.status === 'ready' && item.format !== 'hdr' && item.sha256).map(({ id, name }) => ({ id, name })),
+    onAddPhoto,
+    onImport: () => { layerReconnect.current = null; layerInputRef.current?.click(); },
+    onReconnect: (layer) => { layerReconnect.current = layer; layerInputRef.current?.click(); },
+    busy: layerBusy,
+    message: layerMessage,
+  };
 
   const removePhoto = useCallback((id) => {
     resources.current.get(id)?.job?.cancel();
@@ -570,7 +753,8 @@ function EditorWorkspace() {
     // With the workspace empty, end the idle workers so their heaps (decode buffers,
     // the cached CPU-preview proxy) are freed now rather than at the next collection.
     if (!resources.current.size) {
-      ['proxy', 'render', 'import', 'thumbs'].forEach((name) => {
+      rasterCacheRef.current.clear();
+      ['proxy', 'render', 'import', 'thumbs', 'layers'].forEach((name) => {
         workers.current[name]?.terminate();
         workers.current[name] = null;
       });
@@ -584,6 +768,10 @@ function EditorWorkspace() {
     const values = target.history.present;
     if (unsupportedFormats.includes(settings.format)) return `This browser cannot encode ${FORMATS[settings.format].label}.`;
     if (values.lut && !lutsRef.current.has(values.lut.sha256)) return `Import the LUT "${values.lut.name}" again, or remove it, before exporting.`;
+    for (const layer of visibleLayers(values.layers)) {
+      if (layer.type === 'image' && !sourceFor(layer.source.sha256)) return `The layer "${layerLabel(layer)}" needs its file ${layer.source.name || ''} (Layers: Reconnect file), or hide or delete it, before exporting.`;
+      if (layer.settings?.lut && !lutsRef.current.has(layer.settings.lut.sha256)) return `Import the LUT "${layer.settings.lut.name}" of the layer "${layerLabel(layer)}" again before exporting.`;
+    }
     const resource = resources.current.get(target.id);
     if (!resource?.header) return 'The original file is no longer available.';
     try {
@@ -597,7 +785,7 @@ function EditorWorkspace() {
       if (!check.fits) return hdrMemoryMessage(check);
     }
     return null;
-  }, [unsupportedFormats]);
+  }, [unsupportedFormats, sourceFor]);
 
   /**
    * Exports one photo from its original file with its own settings: the single-photo
@@ -611,14 +799,28 @@ function EditorWorkspace() {
     const resource = resources.current.get(target.id);
     const values = target.history.present;
     const lut = values.lut ? lutsRef.current.get(values.lut.sha256) : null;
-    // Text overlays: rasterised here, with the bundled fonts, at the export's output size.
-    const sprites = values.overlays.length ? await textSprites(values.overlays, outputSize(resource, target, settings)) : null;
+    // Layers: composited over the rendered photo before encoding (io/composeLayers.mjs).
+    const layerCancel = { cancelled: false };
+    const compose = visibleLayers(values.layers).length ? async (context, { size, signal, onProgress: progress }) => {
+      if (values.layers.some((layer) => layer.type === 'text')) await loadTextFonts();
+      const merged = { get cancelled() { return layerCancel.cancelled || Boolean(signal?.cancelled); } };
+      await composeLayers(context, values.layers, {
+        size,
+        loadRaster: (layer, canvasSize) => exportLayerRaster(layer, canvasSize, merged),
+        rasterizeText: rasterizeTextLayer,
+        lutFor: (layerSettings) => (layerSettings?.lut ? lutsRef.current.get(layerSettings.lut.sha256) ?? null : null),
+        workers: detailWorkerCount(),
+        signal: merged,
+        onProgress: progress,
+      });
+    } : null;
+    onCancel(() => { layerCancel.cancelled = true; });
     if (resource.hdr) {
       const { inputs, analysis } = resource.hdr;
       const job = createHdrJob();
       onCancel(() => job.cancel());
       try {
-        return { ...await exportHdr(inputs, analysis, { adjustments: values, raw: target.raw, lut, settings, sprites }, { rawQueue: raws(), job, onProgress }), hdr: true };
+        return { ...await exportHdr(inputs, analysis, { adjustments: values, raw: target.raw, lut, settings, compose }, { rawQueue: raws(), job, onProgress }), hdr: true };
       } finally {
         job.cancel();
       }
@@ -626,8 +828,8 @@ function EditorWorkspace() {
     if (resource.raw) {
       // A RAW export runs in the RAW queue; cancelling ends its worker.
       const rawJob = { job: null, cancelled: false };
-      onCancel(() => { rawJob.cancelled = true; rawJob.job?.cancel(); });
-      const result = await exportRaw(raws(), { file: resource.file, raw: resource.raw, adjustments: values, lut, settings, sprites }, {
+      onCancel(() => { rawJob.cancelled = true; rawJob.job?.cancel(); layerCancel.cancelled = true; });
+      const result = await exportRaw(raws(), { file: resource.file, raw: resource.raw, adjustments: values, lut, settings, compose }, {
         onProgress,
         detailWorkers: detailWorkerCount(),
         onStart: (job) => {
@@ -640,18 +842,19 @@ function EditorWorkspace() {
     }
     const client = createImageWorker();
     const signal = { cancelled: false };
-    onCancel(() => { signal.cancelled = true; client.terminate(); });
+    onCancel(() => { signal.cancelled = true; layerCancel.cancelled = true; client.terminate(); });
     const workers = detailWorkerCount();
     try {
       // Band workers when there is something to render (a neutral export only re-encodes).
-      if (workers > 0 && !deriveParams(values, { lut }).neutral) {
-        return await exportImageInBands(client, { file: resource.file, header: resource.header, adjustments: values, lut, settings, sprites }, { workers, onProgress, signal });
+      // Layers are composited on the page, so a photo with layers always takes this path.
+      if (compose || (workers > 0 && !deriveParams(values, { lut }).neutral)) {
+        return await exportImageInBands(client, { file: resource.file, header: resource.header, adjustments: values, lut, settings, compose }, { workers: Math.max(1, workers), onProgress, signal });
       }
-      return await client.call('export', { file: resource.file, header: resource.header, adjustments: values, lut, settings, sprites }, { onProgress, transfer: sprites ? sprites.map(({ bitmap }) => bitmap) : [] });
+      return await client.call('export', { file: resource.file, header: resource.header, adjustments: values, lut, settings }, { onProgress });
     } finally {
       client.terminate();
     }
-  }, [raws, exportBlocker]);
+  }, [raws, exportBlocker, exportLayerRaster]);
 
   const exportActive = useCallback(async () => {
     const target = activePhoto(stateRef.current);
@@ -865,7 +1068,8 @@ function EditorWorkspace() {
       setLuts((current) => new Map(current).set(lut.sha256, lut));
       const target = activePhoto(stateRef.current);
       if (target?.status === 'ready') {
-        dispatch({ type: 'applySettings', patch: { lut: { sha256: lut.sha256, name: lut.name, title: lut.title, size: lut.size } } });
+        // Applied to what the panels edit: the photo, or the selected image or adjustment layer.
+        dispatch({ type: 'applySettings', patch: { lut: { sha256: lut.sha256, name: lut.name, title: lut.title, size: lut.size } }, ...(lutTarget.current ? { layerId: lutTarget.current } : {}) });
       }
       setLutStatus({ busy: false, error: null });
     } catch (error) {
@@ -922,9 +1126,9 @@ function EditorWorkspace() {
   const cropKeyRef = useRef(null);
   cropKeyRef.current = ready ? () => openTransform(transformMode === 'crop' ? null : 'crop') : null;
   const textKeyRef = useRef(null);
-  textKeyRef.current = ready && !transformMode ? () => setTextTool((on) => !on) : null;
-  const textToolRef = useRef(false);
-  textToolRef.current = textTool;
+  textKeyRef.current = ready && !transformMode ? () => setLayerToolOn((on) => !on) : null;
+  const layerToolRef = useRef(false);
+  layerToolRef.current = layerToolOn;
   const dialogOpenRef = useRef(false);
   dialogOpenRef.current = Boolean(batchDialog || exportDialogOpen);
   // Keyboard shortcuts. Text fields keep their own undo and arrow keys.
@@ -946,7 +1150,7 @@ function EditorWorkspace() {
       }
       if (mod || event.altKey || isControl(event.target) || hdrOpenRef.current) return;
       if (event.key === 'Escape' && transformRef.current) { event.preventDefault(); transformRef.current(); return; }
-      if (event.key === 'Escape' && textToolRef.current) { event.preventDefault(); setTextTool(false); return; }
+      if (event.key === 'Escape' && layerToolRef.current) { event.preventDefault(); setLayerToolOn(false); return; }
       if (event.key === 'Escape' && !dialogOpenRef.current) { dispatch({ type: 'clearSelection' }); setSelecting(false); return; }
       if (event.key === '\\') setCompare((value) => (value === 'original' ? 'edited' : 'original'));
       else if (key === 'y') setCompare((value) => (value === 'split' ? 'edited' : 'split'));
@@ -1180,15 +1384,18 @@ function EditorWorkspace() {
           zoomCommand={zoomCommand}
           inspect={inspect}
           transform={transform}
-          text={ready ? {
-            interactive: textTool && !transformMode,
-            selectedId: selectedText,
-            onSelect: setSelectedText,
-            onPreview: (overlays) => dispatch({ type: 'previewSettings', patch: { overlays } }),
+          layerTool={ready ? {
+            interactive: layerToolOn && !transformMode,
+            selectedId: activeLayer,
+            freeResize,
+            onSelect: setActiveLayer,
+            onPreview: (layers) => dispatch({ type: 'previewSettings', patch: { layers } }),
             onCommit: () => dispatch({ type: 'commitAdjustment' }),
-            onApply: (overlays, coalesceKey = null) => dispatch({ type: 'applySettings', patch: { overlays }, coalesceKey }),
-            onEdit: (id) => { setSelectedText(id); setMobilePanel('adjust'); setTextFocus((count) => count + 1); },
+            onApply: (layers, coalesceKey = null) => dispatch({ type: 'applySettings', patch: { layers }, coalesceKey }),
+            onEdit: (id) => { setActiveLayer(id); setMobilePanel('adjust'); setTextFocus((count) => count + 1); },
           } : null}
+          layerRasters={layerRasters}
+          lutFor={lutFor}
         />
         {!state.photos.length && (
           <div className="pe-empty">
@@ -1255,8 +1462,8 @@ function EditorWorkspace() {
             type="button"
             className="pe-text-button pe-zoom__text"
             disabled={!ready || Boolean(transformMode)}
-            aria-pressed={textTool}
-            onClick={() => setTextTool((on) => !on)}
+            aria-pressed={layerToolOn}
+            onClick={() => setLayerToolOn((on) => !on)}
             title="Add, move, resize and rotate text on the photo (T)"
           >
             Text
@@ -1276,16 +1483,36 @@ function EditorWorkspace() {
 
       <aside className="pe-inspector" aria-label="Adjustments and export">
         <div className="pe-inspector__section" data-section="adjust">
-          <AdjustPanel
-            adjustments={adjustments}
+          <LayersPanel
+            layers={adjustments.layers}
+            activeId={activeLayer}
             disabled={!ready}
-            dispatch={dispatch}
+            canvas={ready ? canvasSize : null}
+            sources={layerSourcesUi}
+            onSelect={selectLayer}
+            onApply={(layers, coalesceKey = null) => dispatch({ type: 'applySettings', patch: { layers }, coalesceKey })}
+            onPreview={(layers) => dispatch({ type: 'previewSettings', patch: { layers } })}
+            onCommit={() => dispatch({ type: 'commitAdjustment' })}
+            onAddText={addTextLayer}
+            onAddAdjustment={addAdjustmentLayer}
+            onEditSettings={() => setMobilePanel('adjust')}
+            tool={layerToolOn}
+            onTool={(on) => { if (!transformMode) setLayerToolOn(on); }}
+            freeResize={freeResize}
+            onFreeResize={setFreeResize}
+          />
+          <input ref={layerInputRef} type="file" accept={ACCEPT} hidden data-layer-input onChange={(event) => { onLayerFile(event.target.files[0]); event.target.value = ''; }} />
+          <AdjustPanel
+            adjustments={panelAdjustments}
+            layer={targetLayer ? { label: layerLabel(targetLayer), adjustment: targetLayer.type === 'adjustment' } : null}
+            disabled={!ready || Boolean(targetLayer?.locked)}
+            dispatch={panelDispatch}
             lut={{ library: [...luts.values()], onImport: importLut, status: lutStatus }}
-            presets={{ userPresets, onChange: changePresets, onPreview: setPresetPreview, onDownload: downloadBlob, newId }}
+            presets={{ userPresets, onChange: changePresets, onPreview: targetLayer ? () => {} : setPresetPreview, onDownload: downloadBlob, newId }}
             raw={ready ? photo.raw ?? null : null}
             hdr={ready ? photo.hdr ?? null : null}
             geometry={ready ? { native: { width: photo.width, height: photo.height }, mode: transformMode, onMode: openTransform, onChange: changeGeometry, onCommit: commitGeometry, onStraightening: setStraightening } : null}
-            text={{ selectedId: selectedText, onSelect: setSelectedText, editing: textTool, onTool: (on) => { if (!transformMode) setTextTool(on); }, focusRequest: textFocus }}
+            text={{ selectedId: activeLayer, onSelect: setActiveLayer, editing: layerToolOn, onTool: (on) => { if (!transformMode) setLayerToolOn(on); }, focusRequest: textFocus }}
             thumbnails={filterThumbnails}
           />
         </div>
@@ -1315,7 +1542,8 @@ function EditorWorkspace() {
             <div><dt>Ctrl/⌘ Shift C, V</dt><dd>Copy edits, paste to selected</dd></div>
             <div><dt>+ − 0 1</dt><dd>Zoom in, out, fit, 100%</dd></div>
             <div><dt>C, Enter, Esc</dt><dd>Crop tool, apply, cancel</dd></div>
-            <div><dt>T, arrows, Delete</dt><dd>Text tool; move or remove the selected text</dd></div>
+            <div><dt>T, arrows, Delete</dt><dd>Move tool for image and text layers; move or remove the selected layer</dd></div>
+            <div><dt>Alt ↑ ↓ on a layer</dt><dd>Move the layer up or down the stack</dd></div>
             <div><dt>Double-click a label</dt><dd>Reset that adjustment</dd></div>
           </dl>
           {engine && <p className="pe-note">Preview: {engine.kind === 'webgl2' ? 'WebGL2' : 'CPU'}, up to {engine.maxEdge} px. Exports are rendered on the CPU at full resolution.</p>}

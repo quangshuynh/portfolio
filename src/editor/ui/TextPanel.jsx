@@ -1,8 +1,8 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import {
-  DEFAULT_OUTLINE, DEFAULT_SHADOW, TEXT_ALIGNS, TEXT_FONTS, TEXT_LIMITS, cleanText, createTextOverlay, duplicateOverlay,
-  fontOf, normalizeTextOverlay, reorderOverlays,
+  DEFAULT_OUTLINE, DEFAULT_SHADOW, TEXT_ALIGNS, TEXT_FONTS, TEXT_LIMITS, cleanText, createTextOverlay, fontOf,
 } from '../model/overlays.mjs';
+import { canAddLayer, duplicateLayer, insertLayer, moveLayer, removeLayer, textLayers, updateLayer } from '../model/layers.mjs';
 import { uncoveredCharacters } from '../text/fonts.mjs';
 
 let sequence = 0;
@@ -76,12 +76,16 @@ function TextRange({ label, value, min, max, step, unit = '', disabled, onPrevie
 const firstLine = (text) => (text.split('\n')[0] || 'Empty text').slice(0, 40);
 
 /**
- * The Text section: the photo's text objects (front first) and the selected one's content,
- * font, size, colour, opacity, alignment, outline, shadow and transform.
- * :param text: { overlays, selectedId, onSelect(id), editing (Text tool on), onTool(on), focusRequest }
+ * The Text section: the photo's text layers (front first) and the selected one's content,
+ * font, size, colour, opacity, alignment, outline, shadow and transform. Text layers live in
+ * the layer stack with image and adjustment layers; order buttons move them within it.
+ * :param text: { selectedId, onSelect(id), editing (Text tool on), onTool(on), focusRequest }
  */
-export default function TextPanel({ overlays, disabled, dispatch, selectedId, onSelect, editing, onTool, focusRequest }) {
+export default function TextPanel({ layers, disabled: panelDisabled, dispatch, selectedId, onSelect, editing, onTool, focusRequest }) {
+  const overlays = textLayers(layers);
   const selected = overlays.find(({ id }) => id === selectedId) ?? null;
+  // A locked text layer keeps its content and transform.
+  const disabled = panelDisabled || Boolean(selected?.locked);
   const textareaRef = useRef(null);
   const [message, setMessage] = useState(null);
   useEffect(() => {
@@ -91,10 +95,10 @@ export default function TextPanel({ overlays, disabled, dispatch, selectedId, on
     }
   }, [focusRequest]);
 
-  const apply = (next, coalesceKey = null) => dispatch({ type: 'applySettings', patch: { overlays: next }, coalesceKey });
-  const preview = (next) => dispatch({ type: 'previewSettings', patch: { overlays: next } });
+  const apply = (next, coalesceKey = null) => dispatch({ type: 'applySettings', patch: { layers: next }, coalesceKey });
+  const preview = (next) => dispatch({ type: 'previewSettings', patch: { layers: next } });
   const commit = () => dispatch({ type: 'commitAdjustment' });
-  const withSelected = (patch) => overlays.map((overlay) => (overlay.id === selectedId ? normalizeTextOverlay({ ...overlay, ...patch }) : overlay));
+  const withSelected = (patch) => updateLayer(layers, selectedId, patch);
   const field = (name, extra = {}) => ({
     disabled,
     onPreview: (value) => preview(withSelected({ [name]: value })),
@@ -111,20 +115,20 @@ export default function TextPanel({ overlays, disabled, dispatch, selectedId, on
   });
 
   const add = () => {
-    if (overlays.length >= TEXT_LIMITS.objects) { setMessage(`A photo can hold up to ${TEXT_LIMITS.objects} text objects.`); return; }
+    if (!canAddLayer(layers, 'text')) { setMessage(`A photo can hold up to ${TEXT_LIMITS.objects} text layers and 40 layers in all.`); return; }
     const offset = (overlays.length % 5) * 0.04;
     const overlay = createTextOverlay(newTextId(), { y: 0.5 + offset, x: 0.5 + offset });
-    apply([...overlays, overlay]);
+    apply(insertLayer(layers, overlay));
     onSelect(overlay.id);
     onTool(true);
     setMessage(null);
     requestAnimationFrame(() => { textareaRef.current?.focus(); textareaRef.current?.select(); });
   };
-  const index = selected ? overlays.indexOf(selected) : -1;
+  const index = selected ? layers.indexOf(selected) : -1;
   const remove = (id) => {
-    const next = overlays.filter((overlay) => overlay.id !== id);
+    const next = removeLayer(layers, id);
     apply(next);
-    if (id === selectedId) onSelect(next.at(-1)?.id ?? null);
+    if (id === selectedId) onSelect(textLayers(next).at(-1)?.id ?? null);
   };
   const missing = selected ? uncoveredCharacters(selected) : [];
   const font = selected ? fontOf(selected) : null;
@@ -139,11 +143,11 @@ export default function TextPanel({ overlays, disabled, dispatch, selectedId, on
       </div>
       {message && <p className="pe-note" role="status">{message}</p>}
       {overlays.length > 0 && (
-        <ol className="pe-textpanel__list" aria-label="Text objects, front first">
+        <ol className="pe-textpanel__list" aria-label="Text layers, front first">
           {[...overlays].reverse().map((overlay) => (
             <li key={overlay.id}>
               <button type="button" className="pe-textpanel__item" aria-pressed={overlay.id === selectedId} disabled={disabled} onClick={() => onSelect(overlay.id)}>
-                {firstLine(overlay.text)}
+                {firstLine(overlay.text)}{overlay.locked ? ' (locked)' : ''}
               </button>
             </li>
           ))}
@@ -152,16 +156,16 @@ export default function TextPanel({ overlays, disabled, dispatch, selectedId, on
       {selected && (
         <div className="pe-textpanel__props" role="group" aria-label={`Text “${firstLine(selected.text)}”`}>
           <div className="pe-textpanel__order">
-            <button type="button" className="pe-text-button" disabled={disabled || index === overlays.length - 1} onClick={() => apply(reorderOverlays(overlays, index, 1))}>Bring forward</button>
-            <button type="button" className="pe-text-button" disabled={disabled || index === 0} onClick={() => apply(reorderOverlays(overlays, index, -1))}>Send backward</button>
+            <button type="button" className="pe-text-button" disabled={panelDisabled || index === layers.length - 1} onClick={() => apply(moveLayer(layers, selected.id, index + 1))}>Bring forward</button>
+            <button type="button" className="pe-text-button" disabled={panelDisabled || index === 0} onClick={() => apply(moveLayer(layers, selected.id, index - 1))}>Send backward</button>
             <button
               type="button"
               className="pe-text-button"
-              disabled={disabled || overlays.length >= TEXT_LIMITS.objects}
+              disabled={panelDisabled || !canAddLayer(layers, 'text')}
               onClick={() => {
-                const copy = duplicateOverlay(selected, newTextId());
-                apply([...overlays, copy]);
-                onSelect(copy.id);
+                const id = newTextId();
+                apply(duplicateLayer(layers, selected.id, id));
+                onSelect(id);
               }}
             >
               Duplicate
@@ -253,7 +257,7 @@ export default function TextPanel({ overlays, disabled, dispatch, selectedId, on
         </div>
       )}
       <p className="pe-note">
-        Text is drawn over the finished photo and stays editable; positions and sizes follow the cropped frame, so text keeps its place at any export size. Fonts: Schibsted Grotesk and Martian Mono (SIL Open Font License), bundled with the editor.
+        Text layers are composited over the finished photo with the other layers and stay editable; positions and sizes follow the cropped frame, so text keeps its place at any export size. Opacity and blend mode are also in the Layers panel. Fonts: Schibsted Grotesk and Martian Mono (SIL Open Font License), bundled with the editor.
         {editing ? ' Drag text to move it; use the corner handle to resize and the round handle to rotate. Arrow keys move the selected text, Delete removes it.' : ''}
       </p>
     </div>

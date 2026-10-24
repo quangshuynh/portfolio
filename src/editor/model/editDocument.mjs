@@ -16,10 +16,13 @@ export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // the three inputs by role, merge settings) and the HDR tone controls; version 5 the
 // Detail controls; version 6 geometry (`geometry`, see pipeline/geometry.mjs); version 7 the
 // creative controls and text overlays (`overlays`, see model/overlays.mjs); version 8 the digital
-// creative controls (pipeline/digital.mjs) and the Filter Library record (`filter`). Older
-// versions read unchanged (Detail, geometry, creative neutral, no text, no filter); older
-// editors reject newer files instead of silently dropping settings.
-export const DOCUMENT_VERSION = 8;
+// creative controls (pipeline/digital.mjs) and the Filter Library record (`filter`); version 9
+// the layer stack (`layers`, see model/layers.mjs), which replaces `overlays`: older files' text
+// objects become text layers in the same order with the same ids. Older versions read
+// unchanged (Detail, geometry, creative neutral, no layers, no filter); older editors reject
+// newer files instead of silently dropping settings. Image layers name their source file
+// (SHA-256, name, size, format, dimensions), never its pixels.
+export const DOCUMENT_VERSION = 9;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).
@@ -110,11 +113,11 @@ function parseSource(source, index) {
   };
 }
 
-/** Settings from untrusted JSON: finite numbers, curves, a LUT reference, geometry and text overlays, all validated. */
+/** Settings from untrusted JSON: finite numbers, curves, a LUT reference, geometry and layers (or pre-v9 text overlays), all validated. */
 export function parseAdjustments(input) {
   const values = isObject(input) ? input : {};
   const numeric = Object.fromEntries(Object.entries(values).filter(([, value]) => typeof value === 'number' && Number.isFinite(value)));
-  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw, geometry: values.geometry, overlays: values.overlays, filter: values.filter });
+  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw, geometry: values.geometry, layers: values.layers, overlays: values.overlays, filter: values.filter });
 }
 
 /** Reads an edit file, refusing an oversized one before any of it is read into memory. */

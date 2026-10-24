@@ -9,7 +9,12 @@ import { GlRenderer, probeEditorContext } from '../pipeline/glRenderer.mjs';
 import { debugFlag, recordDiagnostic } from '../io/diagnostics.mjs';
 import { previewEdgeLimit } from '../io/files.mjs';
 import InspectView from './InspectView';
-import TextLayer from './TextLayer';
+import LayerHandles from './LayerHandles';
+import { visibleLayers } from '../model/layers.mjs';
+import { adjustmentParams, adjustmentPass, compositeImageSync, rasterPass } from '../pipeline/composite.mjs';
+import { layerMatrix, offsetMatrix } from '../pipeline/layerTransform.mjs';
+import { rasterizeTextLayer } from '../text/textRender.mjs';
+import { loadTextFonts } from '../text/fonts.mjs';
 
 const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 8;
@@ -50,6 +55,15 @@ function createCpuEngine(host, maxPreviewEdge) {
 const clampZoom = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 const NEUTRAL_GEOMETRY = neutralGeometry();
 const specKey = (spec) => (spec ? JSON.stringify([spec.matrix, spec.width, spec.height, spec.coverage, spec.background]) : '');
+// What a text sprite depends on (not opacity, blend mode, lock or name: the compositor applies those).
+const spriteKey = ({ opacity, blend, locked, name, visible, ...drawn }, out) => `${out.width}x${out.height}|${JSON.stringify(drawn)}`;
+
+/** The CPU rendering of a base frame with the layer passes composited over it (no-WebGL2 preview). */
+function withLayers(frame, passes) {
+  if (!passes?.length) return frame;
+  const copy = { width: frame.width, height: frame.height, data: new Uint8ClampedArray(frame.data) };
+  return compositeImageSync(copy, passes);
+}
 
 /**
  * What the viewer shows: the photo's geometry, or in Crop & Transform the whole
@@ -73,8 +87,13 @@ export function viewGeometry(geometry, mode, native) {
  * its geometry (crop, rotation, resize), so 100% is the export's pixel grid at original size.
  * :param transform: Crop & Transform mode ({ mode: 'crop' | 'corners', guide, onPreview,
  *   onCommit, onSet, onApply, onCancel }) or null
+ * :param layerTool: the layer handles' props (LayerHandles), with `interactive`, or null
+ * :param layerRasters: { get(layer, canvasSize) → raster or null while it loads (then `version`
+ *   changes), version } for image layers; `lutFor(settings)` finds a layer's LUT
+ * Layers are composited over the photo (GPU passes, or on the CPU without WebGL2); they are
+ * not shown in Original, on the "before" side of Split, while cropping or in 1:1 Detail.
  */
-export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, text = null }) {
+export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, layerTool = null, layerRasters = null, lutFor = () => null }) {
   const stageRef = useRef(null);
   const canvasHostRef = useRef(null);
   const engineRef = useRef(null);
@@ -99,6 +118,18 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   const [view, setView] = useState({ fit: true, zoom: 1, x: 0, y: 0 });
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const dragRef = useRef(null);
+  // Text layer sprites at the preview's size, by what they draw; fonts load once text is used.
+  const spritesRef = useRef(new Map());
+  const [fontsReady, setFontsReady] = useState(false);
+  const [layersLoading, setLayersLoading] = useState(0);
+  const [layersShown, setLayersShown] = useState(0);
+  const hasText = adjustments.layers.some((layer) => layer.type === 'text');
+  useEffect(() => {
+    if (!hasText || fontsReady) return undefined;
+    let alive = true;
+    loadTextFonts().catch(() => {}).then(() => { if (alive) setFontsReady(true); });
+    return () => { alive = false; };
+  }, [hasText, fontsReady]);
 
   // A fresh canvas per engine: a canvas that tried WebGL2 cannot fall back to 2D.
   useLayoutEffect(() => {
@@ -123,6 +154,10 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       }
     }
     engineRef.current = engine;
+    // The shown preview's pixels (output frame, top row first) for the local browser checks.
+    window.__photoEditorPreview = {
+      read: () => (engine.kind === 'webgl2' ? engine.renderer.snapshot() : (({ width, height }) => ({ width, height, data: engine.context.getImageData(0, 0, width, height).data }))(engine.context.canvas)),
+    };
     setCanvas(element);
     setEngineKind(engine.kind);
     window.__editorStartup?.stage(`preview engine: ${engine.kind}${engine.kind === 'cpu' ? ` (${reason})` : ''}`);
@@ -149,6 +184,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       engine.renderer?.dispose();
       element.remove();
       engineRef.current = null;
+      delete window.__photoEditorPreview;
     };
   }, [onEngine]);
 
@@ -233,7 +269,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     const split = splitRef.current;
     if (engine.kind === 'webgl2') {
       const before = request.raw ? deriveParams(neutralAdjustments(), { raw: request.raw }) : null;
-      if (!engine.renderer.lost) engine.renderer.render(request.params, { split, before, rendered: frame });
+      if (!engine.renderer.lost) engine.renderer.render(request.params, { split, before, rendered: frame, layers: request.layers?.gpu });
       return;
     }
     const out = request.warp ?? image;
@@ -243,7 +279,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     const { context } = engine;
     if (context.canvas.width !== out.width || context.canvas.height !== out.height) Object.assign(context.canvas, { width: out.width, height: out.height });
     if (frame.width === out.width && frame.height === out.height) {
-      context.putImageData(new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height), 0, 0);
+      context.putImageData(new ImageData(new Uint8ClampedArray(withLayers(frame, request.layers?.cpu).data), frame.width, frame.height), 0, 0);
     } else {
       const scratch = document.createElement('canvas');
       scratch.width = frame.width;
@@ -251,6 +287,10 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       scratch.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height), 0, 0);
       context.clearRect(0, 0, out.width, out.height);
       context.drawImage(scratch, 0, 0, out.width, out.height);
+      if (request.layers?.cpu?.length) {
+        const scaled = context.getImageData(0, 0, out.width, out.height);
+        context.putImageData(new ImageData(withLayers(scaled, request.layers.cpu).data, out.width, out.height), 0, 0);
+      }
     }
     if (before) context.putImageData(new ImageData(new Uint8ClampedArray(before.data), out.width, out.height), 0, 0, 0, 0, sourceWidth, out.height);
   }, [cpuBefore]);
@@ -322,7 +362,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       if (id === job.latest && proxyRef.current === image) {
         const { canvas: target } = engine.context;
         if (target.width !== out.width || target.height !== out.height) Object.assign(target, { width: out.width, height: out.height });
-        engine.context.putImageData(new ImageData(new Uint8ClampedArray(rendered.data), out.width, out.height), 0, 0);
+        engine.context.putImageData(new ImageData(new Uint8ClampedArray(withLayers({ ...out, data: rendered.data }, params.layers?.cpu).data), out.width, out.height), 0, 0);
         if (sourceWidth > 0) engine.context.putImageData(new ImageData(new Uint8ClampedArray(before.data), out.width, out.height), 0, 0, 0, 0, sourceWidth, out.height);
         performance.mark?.('pe-cpu-frame');
       }
@@ -353,6 +393,50 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   // So are the CPU-only digital effects (capture, channel shift).
   const renderAdjustments = useMemo(() => (transformMode ? { ...adjustments, ...neutralGroup('detail'), ...CPU_ONLY_OFF } : adjustments), [adjustments, transformMode]);
 
+  // Layer passes at the preview canvas's size: text sprites drawn here, image rasters from
+  // `layerRasters` (skipped until loaded), adjustment layers with their derived parameters.
+  const showLayers = !transformMode && compare !== 'original';
+  const buildLayers = useCallback((out) => {
+    if (!showLayers) return null;
+    const shown = visibleLayers(adjustments.layers);
+    if (!shown.length) return null;
+    const cpu = [];
+    const gpu = [];
+    const keys = new Set();
+    let loading = 0;
+    for (const layer of shown) {
+      if (layer.type === 'adjustment') {
+        const pass = adjustmentPass(layer, lutFor(layer.settings));
+        if (layer.settings.lut && !pass.lut) continue; // eslint-disable-line no-continue
+        cpu.push(pass);
+        gpu.push({ ...pass, params: adjustmentParams(pass) });
+        continue; // eslint-disable-line no-continue
+      }
+      let raster;
+      let matrix;
+      if (layer.type === 'text') {
+        if (!fontsReady) { loading += 1; continue; } // eslint-disable-line no-continue
+        const key = spriteKey(layer, out);
+        keys.add(key);
+        if (!spritesRef.current.has(key)) spritesRef.current.set(key, rasterizeTextLayer(layer, out));
+        raster = spritesRef.current.get(key);
+        if (!raster) continue; // eslint-disable-line no-continue
+        matrix = offsetMatrix(raster.x, raster.y);
+      } else {
+        raster = layerRasters?.get(layer, out) ?? null;
+        if (!raster) { loading += 1; continue; } // eslint-disable-line no-continue
+        matrix = layerMatrix(layer, out, raster);
+      }
+      const pass = rasterPass(layer, raster, matrix, out);
+      if (!pass.bounds) continue; // eslint-disable-line no-continue
+      cpu.push(pass);
+      gpu.push({ ...pass, key: `${layer.id}:${raster.width}x${raster.height}` });
+    }
+    // Sprites of text no longer shown are dropped.
+    for (const key of spritesRef.current.keys()) if (!keys.has(key)) spritesRef.current.delete(key);
+    return { cpu, gpu, loading };
+  }, [showLayers, adjustments.layers, layerRasters, fontsReady, lutFor]);
+
   // Render on the next frame with the latest values; intermediate values are dropped.
   // Never with another photo's settings: wait until this photo's proxy is loaded.
   const raw = photo?.raw ?? null;
@@ -364,13 +448,18 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       const values = renderAdjustments;
       const params = deriveParams(values, { lut, raw });
       if (engine.kind === 'webgl2' && !engine.renderer.lost) engine.renderer.setGeometry(previewSpec);
+      const out = previewSpec ? { width: previewSpec.width, height: previewSpec.height } : { width: proxy.width, height: proxy.height };
+      const layers = buildLayers(out);
+      setLayersLoading(layers?.loading ?? 0);
+      setLayersShown(layers?.cpu.length ?? 0);
       if (params.cpuOnly) {
         // Spatial Detail: the CPU renders the frame (draft, then final); a split or
         // compare change alone repaints the last frame.
         const key = `${photo.id}|${JSON.stringify(values)}|${params.lutActive ? lut.sha256 : ''}|${specKey(previewSpec)}`;
         const job = detailJobRef.current;
         const nativeSize = plan.identity ? native : plan.native;
-        const request = { key, image: proxyRef.current, adjustments: values, params, lut: params.lutActive ? lut : null, raw, warp: previewSpec, nativeWidth: nativeSize.width, nativeHeight: nativeSize.height, generation: job.generation };
+        const request = { key, image: proxyRef.current, adjustments: values, params, lut: params.lutActive ? lut : null, raw, warp: previewSpec, nativeWidth: nativeSize.width, nativeHeight: nativeSize.height, generation: job.generation, layers };
+        // The frame's key leaves out layers: a layer change alone repaints the last frame under the new layers.
         if (job.key === key && job.frame && job.image === proxyRef.current && !job.pending && !job.busy) paintDetail(job.frame, request);
         else runDetail(request);
         return;
@@ -391,14 +480,14 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         const before = raw ? deriveParams(neutralAdjustments(), { raw }) : null;
         if (!engine.renderer.lost) {
           engine.renderer.setCreative({ nativeWidth: nativeSize.width, nativeHeight: nativeSize.height, glow });
-          engine.renderer.render(params, { split: splitFraction, before });
+          engine.renderer.render(params, { split: splitFraction, before, layers: layers?.gpu });
         }
       } else {
-        drawCpu({ ...params, neutral: params.neutral, adjustments: values, lutData: params.lutActive ? lut : null, split: splitFraction, raw, warp: previewSpec, nativeSize: { nativeWidth: nativeSize.width, nativeHeight: nativeSize.height } });
+        drawCpu({ ...params, neutral: params.neutral && !layers?.cpu.length, adjustments: values, lutData: params.lutActive ? lut : null, split: splitFraction, raw, warp: previewSpec, nativeSize: { nativeWidth: nativeSize.width, nativeHeight: nativeSize.height }, layers });
       }
     });
     return () => cancelAnimationFrame(frameRef.current);
-  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec, glowVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec, glowVersion, buildLayers, layerRasters?.version]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -518,7 +607,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   const splitX = offsetX + displayWidth * split;
 
   return (
-    <div className="pe-viewer">
+    <div className="pe-viewer" data-layers-shown={layersShown}>
       <div
         ref={stageRef}
         className="pe-stage-area"
@@ -536,20 +625,18 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
           hidden={!proxy}
           style={{ width: displayWidth, height: displayHeight, transform: `translate(${offsetX}px, ${offsetY}px)` }}
         />
-        {text && proxy && proxy.id === photo?.id && !transform && !inspect && compare !== 'original' && (adjustments.overlays.length > 0 || text.interactive) && (
-          <TextLayer
-            overlays={adjustments.overlays}
+        {layerTool?.interactive && proxy && proxy.id === photo?.id && !transform && !inspect && compare !== 'original' && (
+          <LayerHandles
+            layers={adjustments.layers}
             box={{ x: offsetX, y: offsetY, width: displayWidth, height: displayHeight }}
             output={{ width: sourceWidth, height: sourceHeight }}
-            stage={stageSize}
-            clip={compare === 'split' ? split : 0}
-            interactive={text.interactive}
-            selectedId={text.selectedId}
-            onSelect={text.onSelect}
-            onPreview={text.onPreview}
-            onCommit={text.onCommit}
-            onApply={text.onApply}
-            onEdit={text.onEdit}
+            selectedId={layerTool.selectedId}
+            freeResize={layerTool.freeResize}
+            onSelect={layerTool.onSelect}
+            onPreview={layerTool.onPreview}
+            onCommit={layerTool.onCommit}
+            onApply={layerTool.onApply}
+            onEdit={layerTool.onEdit}
           />
         )}
         {proxy && compare === 'split' && (
@@ -617,6 +704,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         {proxy && !plan.identity && !transform && <span className="pe-readout-note mono" data-output-size>{plan.native.width}×{plan.native.height} px</span>}
         {transform && deriveParams(adjustments).cpuOnly && <span className="pe-readout-note">Detail, low resolution, JPEG and channel shift are not previewed while cropping</span>}
         {engineKind === 'cpu' && <span className="pe-readout-note">CPU preview (WebGL2 unavailable)</span>}
+        {proxy && showLayers && layersLoading > 0 && <span className="pe-readout-note" role="status" data-layers-loading>Loading {layersLoading} layer{layersLoading === 1 ? '' : 's'}…</span>}
         {proxy && detailQuality && (
           <span
             className="pe-readout-note"

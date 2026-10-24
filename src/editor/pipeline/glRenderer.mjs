@@ -7,13 +7,17 @@
 // engine) and drawn from that frame here; only the "before" side still runs the shader.
 // The creative stage runs here; it needs the photo's native output size (grain scale) and,
 // for bloom and halation, the glow map computed on the CPU (setCreative).
+// Layers (compositeShader.mjs): with visible layers the photo is drawn into an RGBA8
+// framebuffer, each layer is one pass between two such framebuffers (an adjustment layer is
+// first run through this shader in direct mode), and the result is copied to the canvas.
 
 import { CURVE_TABLE_SIZE } from './curves.mjs';
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './shader.mjs';
+import { COMPOSITE_SHADER, COPY_SHADER } from './compositeShader.mjs';
 import { FINE_SEED, grainScale } from './creative.mjs';
 import { noiseCell } from './digital.mjs';
 
-const UNIFORMS = ['uSource', 'uWhiteBalanceActive', 'uWhiteBalance', 'uExposureGain', 'uToneActive', 'uContrast',
+const UNIFORMS = ['uSource', 'uDirect', 'uWhiteBalanceActive', 'uWhiteBalance', 'uExposureGain', 'uToneActive', 'uContrast',
   'uHighlights', 'uShadows', 'uWhites', 'uBlacks', 'uVibrance', 'uSaturation', 'uNeutral',
   'uRaw', 'uRawSource', 'uRawGain', 'uRawMatrix', 'uRawWhite', 'uRolloffWhite', 'uRolloffKnee', 'uShadowLift', 'uHdr', 'uHdrSource',
   'uBaseNeutral', 'uCurvesActive', 'uCurveActive', 'uCurves', 'uHslActive', 'uHslHue', 'uHslSat', 'uHslLum',
@@ -32,8 +36,10 @@ function opaqueRgba({ kind, data }) {
   return true;
 }
 
-// Texture units: the photo, the curve table, the 3D LUT, a RAW photo, a merged HDR, the glow map, soft focus.
-const UNIT = { source: 0, curves: 1, lut: 2, raw: 3, hdr: 4, glow: 5, diffuse: 6 };
+// Texture units: the photo, the curve table, the 3D LUT, a RAW photo, a merged HDR, the glow map, soft focus,
+// and for layer passes the layer (or adjusted composite) and the composite so far.
+const UNIT = { source: 0, curves: 1, lut: 2, raw: 3, hdr: 4, glow: 5, diffuse: 6, layer: 7, backdrop: 8 };
+const COMPOSITE_UNIFORMS = ['uBackdrop', 'uLayer', 'uAdjust', 'uMatrix', 'uOutputSize', 'uScale', 'uOpaque', 'uOpacity', 'uMode'];
 
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
@@ -79,6 +85,34 @@ function compile(gl, type, source) {
   return shader;
 }
 
+function link(gl, fragmentSource) {
+  const program = gl.createProgram();
+  const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
+  const fragment = compile(gl, gl.FRAGMENT_SHADER, fragmentSource);
+  gl.attachShader(program, vertex);
+  gl.attachShader(program, fragment);
+  gl.bindAttribLocation(program, 0, 'aPosition');
+  gl.linkProgram(program);
+  gl.deleteShader(vertex);
+  gl.deleteShader(fragment);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(`Shader link failed: ${gl.getProgramInfoLog(program)}`);
+  return program;
+}
+
+/** An RGBA8 texture read with texelFetch (NEAREST, clamped), optionally filled with straight RGBA8 rows. */
+function rgbaTexture(gl, width, height, data = null) {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  const pixels = data && (data instanceof Uint8Array ? data : new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+  [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER].forEach((name) => gl.texParameteri(gl.TEXTURE_2D, name, gl.NEAREST));
+  [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T].forEach((name) => gl.texParameteri(gl.TEXTURE_2D, name, gl.CLAMP_TO_EDGE));
+  return texture;
+}
+
 /**
  * Tries to create a WebGL2 context suitable for the editor.
  * :returns: { gl, reason } where gl is null and reason says why when it is unsuitable.
@@ -114,16 +148,7 @@ export class GlRenderer {
     this.canvas = canvas;
     this.gl = gl;
     this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-    const program = gl.createProgram();
-    const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
-    const fragment = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
-    gl.attachShader(program, vertex);
-    gl.attachShader(program, fragment);
-    gl.bindAttribLocation(program, 0, 'aPosition');
-    gl.linkProgram(program);
-    gl.deleteShader(vertex);
-    gl.deleteShader(fragment);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(`Shader link failed: ${gl.getProgramInfoLog(program)}`);
+    const program = link(gl, FRAGMENT_SHADER);
     this.program = program;
     this.uniforms = Object.fromEntries(UNIFORMS.map((name) => [name, gl.getUniformLocation(program, name)]));
     this.vao = gl.createVertexArray();
@@ -167,6 +192,10 @@ export class GlRenderer {
     this.hdr = false;
     this.renderedTexture = null;
     this.geometry = null;
+    // Layer compositing, created when a photo first shows layers.
+    this.compositor = null;
+    this.targets = [];
+    this.layerTextures = new Map();
   }
 
   /**
@@ -296,22 +325,147 @@ export class GlRenderer {
    *   { width, height, data } (the Detail preview) drawn instead of the pipeline, scaled
    *   to the canvas when it is smaller
    */
-  render(params, { split = 0, before = null, rendered = null } = {}) {
+  render(params, { split = 0, before = null, rendered = null, layers = null } = {}) {
     const { gl } = this;
     if (!this.texture) return;
-    gl.viewport(0, 0, this.outWidth, this.outHeight);
+    this.last = [params, { split, before, rendered, layers }];
+    const width = this.outWidth;
+    const height = this.outHeight;
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
-    if (rendered) this.draw({ ...params, neutral: true }, this.uploadRendered(rendered));
-    else this.draw(params);
+    if (layers?.length) {
+      this.composite(params, rendered, layers);
+    } else {
+      gl.viewport(0, 0, width, height);
+      if (rendered) this.draw({ ...params, neutral: true }, this.uploadRendered(rendered));
+      else this.draw(params);
+    }
     // Pixel x is "before" when its centre lies left of the split, (x + 0.5) / width < split.
-    const columns = Math.min(this.outWidth, Math.max(0, Math.ceil(split * this.outWidth - 0.5)));
+    const columns = Math.min(width, Math.max(0, Math.ceil(split * width - 0.5)));
     if (columns > 0) {
+      gl.useProgram(this.program);
       gl.enable(gl.SCISSOR_TEST);
-      gl.scissor(0, 0, columns, this.outHeight);
+      gl.scissor(0, 0, columns, height);
       this.draw(before ?? { ...params, neutral: true });
       gl.disable(gl.SCISSOR_TEST);
     }
+  }
+
+  /**
+   * Draws the photo into a framebuffer, applies each layer pass (composite.mjs raster passes
+   * with a `key`, adjustment passes with derived `params`) and copies the result to the canvas.
+   */
+  composite(params, rendered, layers) {
+    const { gl } = this;
+    const width = this.outWidth;
+    const height = this.outHeight;
+    const c = this.ensureCompositor();
+    const targets = this.ensureTargets(width, height, layers.some(({ kind }) => kind === 'adjust') ? 3 : 2);
+    gl.viewport(0, 0, width, height);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, targets[0].framebuffer);
+    gl.useProgram(this.program);
+    if (rendered) this.draw({ ...params, neutral: true }, this.uploadRendered(rendered));
+    else this.draw(params);
+    let [current, next] = targets;
+    const used = new Set();
+    for (const pass of layers) {
+      let layerTexture;
+      if (pass.kind === 'adjust') {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, targets[2].framebuffer);
+        gl.useProgram(this.program);
+        this.draw(pass.params, current.texture, true);
+        layerTexture = targets[2].texture;
+      } else {
+        layerTexture = this.layerTexture(pass);
+        used.add(pass.key);
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, next.framebuffer);
+      gl.useProgram(c.program);
+      const u = c.uniforms;
+      gl.activeTexture(gl.TEXTURE0 + UNIT.backdrop);
+      gl.bindTexture(gl.TEXTURE_2D, current.texture);
+      gl.uniform1i(u.uBackdrop, UNIT.backdrop);
+      gl.activeTexture(gl.TEXTURE0 + UNIT.layer);
+      gl.bindTexture(gl.TEXTURE_2D, layerTexture);
+      gl.uniform1i(u.uLayer, UNIT.layer);
+      gl.uniform1i(u.uAdjust, pass.kind === 'adjust' ? 1 : 0);
+      gl.uniformMatrix3fv(u.uMatrix, true, new Float32Array(pass.matrix ?? IDENTITY));
+      gl.uniform2f(u.uOutputSize, width, height);
+      gl.uniform1f(u.uScale, pass.scale ?? 1);
+      gl.uniform1i(u.uOpaque, pass.opaque ? 1 : 0);
+      gl.uniform1f(u.uOpacity, pass.opacity);
+      gl.uniform1i(u.uMode, pass.mode);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      [current, next] = [next, current];
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.useProgram(c.copy);
+    gl.activeTexture(gl.TEXTURE0 + UNIT.backdrop);
+    gl.bindTexture(gl.TEXTURE_2D, current.texture);
+    gl.uniform1i(c.frame, UNIT.backdrop);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.activeTexture(gl.TEXTURE0);
+    // Rasters of layers no longer shown are released.
+    for (const [key, entry] of this.layerTextures) {
+      if (!used.has(key)) { gl.deleteTexture(entry.texture); this.layerTextures.delete(key); }
+    }
+  }
+
+  ensureCompositor() {
+    if (this.compositor) return this.compositor;
+    const { gl } = this;
+    const program = link(gl, COMPOSITE_SHADER);
+    const copy = link(gl, COPY_SHADER);
+    this.compositor = {
+      program,
+      uniforms: Object.fromEntries(COMPOSITE_UNIFORMS.map((name) => [name, gl.getUniformLocation(program, name)])),
+      copy,
+      frame: gl.getUniformLocation(copy, 'uFrame'),
+    };
+    return this.compositor;
+  }
+
+  /** `count` RGBA8 framebuffers of the output size (made or resized as needed). */
+  ensureTargets(width, height, count) {
+    const { gl } = this;
+    if (this.targets.length && (this.targets[0].width !== width || this.targets[0].height !== height)) this.releaseTargets();
+    while (this.targets.length < count) {
+      gl.activeTexture(gl.TEXTURE0 + UNIT.layer);
+      const texture = rgbaTexture(gl, width, height);
+      const framebuffer = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('This GPU cannot render layers into a framebuffer.');
+      this.targets.push({ texture, framebuffer, width, height });
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return this.targets;
+  }
+
+  releaseTargets() {
+    const { gl } = this;
+    this.targets.forEach(({ texture, framebuffer }) => { gl.deleteFramebuffer(framebuffer); gl.deleteTexture(texture); });
+    this.targets = [];
+  }
+
+  /** The texture of a raster pass, uploaded once per raster. */
+  layerTexture({ key, raster }) {
+    const cached = this.layerTextures.get(key);
+    if (cached?.raster === raster) return cached.texture;
+    const { gl } = this;
+    if (cached) gl.deleteTexture(cached.texture);
+    if (raster.width > this.maxTextureSize || raster.height > this.maxTextureSize) throw new Error(`A layer of ${raster.width}×${raster.height} exceeds this GPU's ${this.maxTextureSize}px texture limit.`);
+    gl.activeTexture(gl.TEXTURE0 + UNIT.layer);
+    const texture = rgbaTexture(gl, raster.width, raster.height, raster.data);
+    this.layerTextures.set(key, { texture, raster });
+    return texture;
+  }
+
+  /** Frees the layer framebuffers and rasters (while no layer is shown). */
+  releaseLayers() {
+    this.releaseTargets();
+    this.layerTextures.forEach(({ texture }) => this.gl.deleteTexture(texture));
+    this.layerTextures.clear();
   }
 
   /** Uploads a CPU-rendered RGBA8 frame into its own texture (linear filtering for scaling). */
@@ -331,14 +485,18 @@ export class GlRenderer {
     return this.renderedTexture;
   }
 
-  /** :param frame: a texture drawn as is (neutral) instead of the photo's source */
-  draw(params, frame = null) {
+  /**
+   * :param frame: a texture drawn as is (neutral) instead of the photo's source, or with
+   *   `direct` the composite an adjustment layer's `params` apply to
+   */
+  draw(params, frame = null, direct = false) {
     const { gl, uniforms: u } = this;
     const raw = this.raw && !frame;
     const hdr = this.hdr && !frame;
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, frame ?? (raw || hdr ? this.sourcePlaceholder : this.texture));
     gl.uniform1i(u.uSource, 0);
+    gl.uniform1i(u.uDirect, direct ? 1 : 0);
     gl.activeTexture(gl.TEXTURE0 + UNIT.raw);
     gl.bindTexture(gl.TEXTURE_2D, raw ? this.texture : this.rawPlaceholder);
     gl.uniform1i(u.uRawSource, UNIT.raw);
@@ -398,7 +556,7 @@ export class GlRenderer {
     gl.activeTexture(gl.TEXTURE0 + UNIT.lut);
     gl.bindTexture(gl.TEXTURE_3D, this.lutTexture);
     gl.uniform1i(u.uLut, UNIT.lut);
-    this.setCreativeUniforms(frame ? null : params.creative);
+    this.setCreativeUniforms(frame && !direct ? null : params.creative);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
@@ -483,6 +641,11 @@ export class GlRenderer {
     return flipped;
   }
 
+  /** The frame last drawn, drawn again and read back (browser checks; never sent anywhere). */
+  snapshot() {
+    return this.last && this.texture ? { width: this.outWidth, height: this.outHeight, data: this.readPixels(...this.last) } : null;
+  }
+
   releaseSource() {
     this.uploaded = null;
     if (this.texture) this.gl.deleteTexture(this.texture);
@@ -496,6 +659,7 @@ export class GlRenderer {
   /** Frees the texture and shrinks the drawing buffer while no photo is shown. */
   clear() {
     this.releaseSource();
+    this.releaseLayers();
     this.geometry = null;
     this.canvas.width = 1;
     this.canvas.height = 1;
@@ -504,6 +668,8 @@ export class GlRenderer {
   dispose() {
     const { gl } = this;
     this.releaseSource();
+    this.releaseLayers();
+    if (this.compositor) { gl.deleteProgram(this.compositor.program); gl.deleteProgram(this.compositor.copy); }
     gl.deleteTexture(this.curveTexture);
     gl.deleteTexture(this.lutTexture);
     gl.deleteTexture(this.glowTexture);

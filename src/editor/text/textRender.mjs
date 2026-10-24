@@ -1,7 +1,8 @@
-// Text overlay layout and drawing, shared by the preview (an overlay canvas over the photo)
-// and the export (sprites rasterised at the export's resolution and drawn over the encoded
-// canvas). Layout is computed in the output's own pixels, so the text box is the same in the
-// preview, at any zoom and at any export size; only the rasterisation resolution differs.
+// Text layer layout and drawing, shared by the preview and the export: rasterizeTextLayer draws
+// a layer into a sprite at the render's own resolution (the preview canvas, or the export size),
+// which the layer compositor (pipeline/composite.mjs) places one pixel to one pixel. Layout is
+// computed in the output's own pixels, so the text box is the same in the preview, at any zoom
+// and at any export size; only the rasterisation resolution differs.
 // Each object is drawn as a layer: outline, then fill, then the layer over the target with
 // the object's opacity and shadow, so the outline and fill never double their alpha.
 
@@ -65,16 +66,18 @@ function extras(overlay, fontPx) {
   return { outline, shadow };
 }
 
-/** Corners of the overlay's ink rectangle (plus `pad`), rotated, in output pixels. */
+/** Corners of the overlay's ink rectangle (plus `pad`), mirrored by its flips and rotated, in output pixels. */
 function corners(overlay, layout, width, height, pad) {
   const cx = overlay.x * width;
   const cy = overlay.y * height;
   const angle = (overlay.rotation * Math.PI) / 180;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
+  const fx = overlay.flipH ? -1 : 1;
+  const fy = overlay.flipV ? -1 : 1;
   const { left, top, right, bottom } = layout.bounds;
   return [[left - pad, top - pad], [right + pad, top - pad], [right + pad, bottom + pad], [left - pad, bottom + pad]]
-    .map(([x, y]) => [cx + x * cos - y * sin, cy + x * sin + y * cos]);
+    .map(([x, y]) => [cx + x * fx * cos - y * fy * sin, cy + x * fx * sin + y * fy * cos]);
 }
 
 /** The text box (unrotated layout box) and its rotated corners, in output pixels, for hit areas and handles. */
@@ -107,6 +110,7 @@ export function paintText(target, overlay, view) {
   const context = layer.getContext('2d');
   context.setTransform(scale, 0, 0, scale, offsetX + overlay.x * width * scale - x0, offsetY + overlay.y * height * scale - y0);
   context.rotate((overlay.rotation * Math.PI) / 180);
+  if (overlay.flipH || overlay.flipV) context.scale(overlay.flipH ? -1 : 1, overlay.flipV ? -1 : 1);
   context.font = fontString(overlay, layout.fontPx);
   context.textAlign = 'left';
   context.textBaseline = 'middle';
@@ -141,27 +145,26 @@ export function paintText(target, overlay, view) {
 }
 
 /**
- * Rasterises overlays for an export of `width` × `height`: one sprite per object, just
- * large enough for its ink, outline and shadow and cut to the output, at the export's own
- * resolution. :returns: [{ bitmap: ImageBitmap, x, y }] in z-order
+ * Rasterises a text layer for a render of `width` × `height` as straight RGBA8: a sprite just
+ * large enough for its ink, outline and shadow, cut to the canvas, drawn at full opacity (the
+ * compositor applies the layer's opacity and blend mode to text and shadow together).
+ * :returns: { x, y, width, height, data } in canvas pixels, or null when nothing is drawn
  */
-export async function rasterizeOverlays(overlays, { width, height }) {
-  const sprites = [];
-  for (const overlay of overlays) {
-    if (!overlay.text.trim() || overlay.opacity <= 0) continue;
-    const layout = layoutText(overlay, width, height);
-    const { outline, shadow } = extras(overlay, layout.fontPx);
-    const points = corners(overlay, layout, width, height, outline + shadow + 2);
-    const x0 = Math.max(0, Math.floor(Math.min(...points.map(([x]) => x))));
-    const y0 = Math.max(0, Math.floor(Math.min(...points.map(([, y]) => y))));
-    const x1 = Math.min(width, Math.ceil(Math.max(...points.map(([x]) => x))));
-    const y1 = Math.min(height, Math.ceil(Math.max(...points.map(([, y]) => y))));
-    if (x1 <= x0 || y1 <= y0) continue;
-    const canvas = createLayer(x1 - x0, y1 - y0);
-    paintText(canvas.getContext('2d'), overlay, { scale: 1, offsetX: -x0, offsetY: -y0, width, height });
-    sprites.push({ bitmap: await createImageBitmap(canvas), x: x0, y: y0 });
-    canvas.width = 0;
-    canvas.height = 0;
-  }
-  return sprites;
+export function rasterizeTextLayer(layer, { width, height }) {
+  if (!layer.text.trim()) return null;
+  const layout = layoutText(layer, width, height);
+  const { outline, shadow } = extras(layer, layout.fontPx);
+  const points = corners(layer, layout, width, height, outline + shadow + 2);
+  const x0 = Math.max(0, Math.floor(Math.min(...points.map(([x]) => x))));
+  const y0 = Math.max(0, Math.floor(Math.min(...points.map(([, y]) => y))));
+  const x1 = Math.min(width, Math.ceil(Math.max(...points.map(([x]) => x))));
+  const y1 = Math.min(height, Math.ceil(Math.max(...points.map(([, y]) => y))));
+  if (x1 <= x0 || y1 <= y0) return null;
+  const canvas = createLayer(x1 - x0, y1 - y0);
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  paintText(context, { ...layer, opacity: 1 }, { scale: 1, offsetX: -x0, offsetY: -y0, width, height });
+  const { data } = context.getImageData(0, 0, x1 - x0, y1 - y0);
+  canvas.width = 0;
+  canvas.height = 0;
+  return { x: x0, y: y0, width: x1 - x0, height: y1 - y0, data };
 }
