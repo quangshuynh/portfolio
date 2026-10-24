@@ -29,6 +29,7 @@
     "check:editor:detail": "node scripts/check-editor-detail.mjs",
     "check:editor:batch": "node scripts/check-editor-batch.mjs",
     "check:editor:raw-stability": "node scripts/check-editor-raw-stability.mjs",
+    "check:editor:memory": "node scripts/check-editor-memory.mjs",
     "cms": "node cms/server.mjs",
     "assets:refresh": "node scripts/refresh-project-assets.mjs",
     "test:hero:browser": "node scripts/check-hero-browser.mjs",

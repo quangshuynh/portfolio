@@ -50,6 +50,14 @@ describe('viewer bar', () => {
   });
 });
 
+describe('touch targets', () => {
+  test('touch screens get about 44 px buttons and a larger slider thumb', () => {
+    const coarse = editorCss.match(/@media \(pointer: coarse\) \{([\s\S]*?)\n\}/)?.[1] ?? '';
+    expect(coarse).toMatch(/\.pe-button, \.pe-text-button, \.pe-icon-button[^{]*\{ min-height: 2\.75rem; \}/);
+    expect(coarse).toMatch(/\.pe-range::-webkit-slider-thumb \{ width: 22px; height: 22px;/);
+  });
+});
+
 describe('troubleshooting switches', () => {
   afterEach(() => window.history.replaceState({}, '', '/'));
 
@@ -168,7 +176,11 @@ describe('export panel', () => {
     const onCancel = vi.fn();
     const running = { ...photo, exportStatus: { state: 'running', stage: 'rendering', fraction: 0.4 } };
     const { rerender } = render(<ExportPanel settings={settings} photo={running} dispatch={vi.fn()} onExport={vi.fn()} onCancel={onCancel} unsupportedFormats={[]} />);
-    expect(screen.getByText('Rendering 40%')).toHaveAttribute('role', 'status');
+    // The live region names the stage only, so screen readers are not told every percent.
+    const stage = screen.getByText('Rendering');
+    expect(stage).toHaveAttribute('role', 'status');
+    expect(stage.parentElement).toHaveTextContent('Rendering 40%');
+    expect(screen.getByRole('progressbar', { name: 'Export progress' })).toHaveAttribute('value', '0.4');
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onCancel).toHaveBeenCalled();
     rerender(<ExportPanel settings={settings} photo={{ ...photo, exportStatus: { state: 'error', message: 'This browser cannot encode WebP.' } }} dispatch={vi.fn()} onExport={vi.fn()} onCancel={onCancel} unsupportedFormats={[]} />);

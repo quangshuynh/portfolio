@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import {
   BUILT_IN_PRESETS, PRESET_GROUPS, PresetError, changedPresetGroups, cleanPresetName, createPreset,
-  parsePresetFile, serializePresets, uniquePresetName, MAX_PRESETS,
+  readPresetFile, serializePresets, uniquePresetName, MAX_PRESETS,
 } from '../model/presets.mjs';
 
 /**
@@ -61,7 +61,7 @@ export default function PresetPanel({ adjustments, disabled, dispatch, userPrese
   };
   const importFile = async (file) => {
     try {
-      const incoming = parsePresetFile(await file.text());
+      const incoming = await readPresetFile(file);
       const room = MAX_PRESETS - userPresets.length;
       if (room <= 0) throw new PresetError(`You can keep up to ${MAX_PRESETS} presets.`);
       const added = [];

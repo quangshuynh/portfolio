@@ -27,7 +27,8 @@ navigation).
 | `src/editor/io/detailPool.mjs` | Detail exports rendered in bands on several render workers. |
 | `src/editor/model/sync.mjs` | Batch plans: sync groups and compatibility, paste, presets, LUTs and reset on several photos. Selection and batch undo are in `editorState.mjs`. |
 | `src/editor/batch/` | Batch export: queue (`exportBatch`), names (`batchNames`), ZIP parts (`zipArchive`, client-zip). |
-| `scripts/check-editor-batch.mjs`, `check-editor-raw-stability.mjs` | `npm run check:editor:batch` (batch flow, ZIP integrity, genuine ARW with `BATCH_FIXTURE_DIR`); `npm run check:editor:raw-stability` (WebKit LibRaw crash reproduction). |
+| `scripts/check-editor-batch.mjs`, `check-editor-raw-stability.mjs` | `npm run check:editor:batch` (batch flow, ZIP integrity, genuine ARW with `BATCH_FIXTURE_DIR`); `npm run check:editor:raw-stability` (WebKit LibRaw crash regression check; fails on any crash). |
+| `scripts/check-editor-memory.mjs` | `npm run check:editor:memory`: two identical cycles of the heavy workflows (import, switching, RAW exports, HDR merge and cancel, ZIP cancel and retry, remove all) with genuine files from `MEMORY_FIXTURE_DIR`; working set, page heap and live workers after each step (Chromium, Windows). |
 | `src/editor/pipeline/shader.mjs`, `glRenderer.mjs` | WebGL2 preview: GLSL mirror of `spec.mjs`, constants injected from it. |
 | `src/editor/model/` | Adjustment registry, bounded undo history, reducer, edit document. |
 | `src/editor/io/` | Header parsing, limits and filenames, decoding, the image worker. |
@@ -47,7 +48,14 @@ The route is `EDITOR_ROUTE` in `src/seo/site.mjs`: its own static HTML,
 `noindex`, kept out of `ROUTES` and the sitemap until the owner decides to
 index it, with a CSP meta tag (`connect-src 'self'`, inline scripts by hash).
 The page is a lazy chunk; the gallery and homepage never load editor code
-(tested in `src/seo/build.test.js`).
+(tested in `src/seo/build.test.js`). On Vercel, `/assets/*` (every file content-hashed,
+tested) is served `public, max-age=31536000, immutable`, so repeat visits do not
+revalidate the editor chunks, workers or the 1.4 MB LibRaw wasm; the HTML pages keep
+`max-age=0, must-revalidate`. Workers and wasm are served as `application/javascript` and
+`application/wasm` (checked on production).
+
+Touch screens (`pointer: coarse`) get 44 px buttons and a larger slider thumb; export
+progress announces stage changes only (the percentage is on the progress bar).
 
 ## Pipeline
 
@@ -160,9 +168,12 @@ export vs the Node reference with the same LibRaw build: 0.
 
 **Memory and isolation.** LibRaw runs only in RAW workers, never on the page. Each
 job gets a fresh worker, ended afterwards or on cancel, which is what frees the
-wasm heap. At most two run at once (one on phones and devices reporting ≤ 4 GB);
-previews go before exports, exports before imports, and a newer preview cancels the
-older one. Imports decode half size only; nothing is decoded at full size before
+wasm heap. One runs at a time on every device (peak: one LibRaw heap; importing three
+ARWs takes 3.7 s instead of 3.2 s with two); previews go before exports, exports before
+imports, and a newer preview cancels the older one. LibRaw is instantiated after the file
+header is checked and before the whole file is read (see [Known issues](#known-issues)).
+If it cannot start (too little memory for its heap, or a compile failure) the import says
+so and JPEG, PNG and WebP keep working. Imports decode half size only; nothing is decoded at full size before
 an export. Removing a photo cancels its import. A worker that dies mid-job is
 reported as out of memory. The full decode cannot be tiled with this wrapper
 (LibRaw holds the whole image); the stages after it are banded and seam-free
@@ -177,9 +188,8 @@ and workers (`npm run check:editor:raw`):
 | Firefox 142 | 2.3 s | 2.1 s | 17.8 s | 930 → 1740 MB |
 | WebKit 26 (Playwright, Windows) | 1.0 s | 1.0 s | 6.1 s | 690 → 1555 MB |
 
-Playwright's Windows WebKit intermittently crashes the page when a LibRaw worker starts
-after another was ended ("mprotect failed: 487"); reproduction and measurements in
-[Known issues](#known-issues). Not seen in Chromium or Firefox; not caused by WebGL. Safari on macOS and iOS is **not verified**; test on a
+The Playwright Windows WebKit crash of Intervals 5–8 is mitigated, not gone (see
+[Known issues](#known-issues)). Safari on macOS and iOS is **not verified**; test on a
 real iPhone before relying on it. iOS canvases cap at about 16.7 MP, so a 24 MP
 export fails there with the existing message (choose a smaller size). Not measured
 on an M1 MacBook Air.
@@ -276,9 +286,9 @@ After a second merge of the same files Chromium settled at 1.05–1.12 GB and Fi
 1.15–1.28 GB (the first merge stays in the workspace, so some growth is expected); after
 export both returned to about their post-merge level. Phones are **not verified** (full-size
 HDR export there is blocked by the memory budget; previews use the 2048–3072 px proxy).
-Playwright's Windows WebKit crashes in about half of the HDR exports from RAW, always
-while a new LibRaw worker starts (see [Known issues](#known-issues); nine LibRaw jobs per
-export make it likely); not reproduced with HDR code alone, nor in Chromium or Firefox.
+Playwright's Windows WebKit still crashes in most HDR exports from RAW (3 of 4 export
+steps with `HDR_WEBKIT_EXPORT=1` in Interval 9) while a LibRaw worker starts and the HDR
+worker holds the merge (see [Known issues](#known-issues)); not seen in Chromium or Firefox.
 Safari on macOS and iOS is not verified.
 
 **Real-world validation** (A7 III, Windows i7-9700; genuine-file tests and the browser step
@@ -314,7 +324,12 @@ ghosts), outdoor scenes, Firefox and WebKit timings for genuine files.
 - **Export**: a dedicated worker re-decodes the original at the chosen size
   (never upscaled) into one canvas, then reads, renders and writes it back in
   256-row bands with progress, and encodes that canvas. No full-resolution copy
-  or second canvas is held. Cancelling terminates the worker. One export runs at
+  or second canvas is held. Cancelling terminates the worker. On desktops (band
+  workers, see [Detail](#detail)) an edited photo is instead decoded to the page and
+  its 256-row bands rendered by up to four workers with the same per-pixel code,
+  bit for bit equal (tested): 24 MP camera JPEG 2.5 → 1.1 s (+0.2 GB peak), A7 III
+  ARW 5.6 → 3.9 s (peak 1.42 → 1.14 GB, LibRaw's heap is freed before rendering);
+  Chromium, heavy tone and colour edits without Detail. One export runs at
   a time. JPEG output is flattened onto white in linear light. Metadata (EXIF,
   GPS) is not copied. If the browser cannot encode the format, or cannot hold a
   canvas of the export size (iOS Safari caps canvases at about 16.7 MP), the
@@ -579,7 +594,7 @@ RAWs, ZIP parts above 1 GB.
   export panel say which LUT is missing; export is blocked until the same file
   is imported again (then every photo using it resolves) or the LUT is removed.
 - Parsing is `JSON.parse` plus validation: wrong type or version, more than
-  4 MB or 500 photos is rejected; values and curve points are clamped,
+  4 MB (checked from the file size before reading it; presets likewise at 1 MB) or 500 photos is rejected; values and curve points are clamped,
   malformed curves and LUT references become neutral, unknown keys dropped.
 - Entries match reimported files by SHA-256, or by name and size without a
   hash. Unmatched entries wait and apply when the same file is imported.
@@ -640,6 +655,16 @@ line and reason; nothing is reinterpreted. LUTs are kept for the session only
 
 ## Memory and performance
 
+**Heavy workflows** (`npm run check:editor:memory`, Chromium, genuine `DSC09640–42` ARW +
+JPG; working set of all browser processes after a forced collection): two identical cycles
+of import, 6 switches, two full-size RAW exports with Detail, a cancelled and a finished
+Merge HDR, Detail on the merge, a ZIP cancelled after one photo and then complete, and
+removing everything. Final Interval 9 build: baseline 724 MB; peak 2.7–2.8 GB (the ZIP of
+six photos incl. the HDR, 42 s, was 47–49 s); empty workspace after cycle 1 / cycle 2:
+1186 / 1207 MB, 1138 MB 35 s later (21 MB growth between identical cycles; before the
+viewer stopped keeping the last photo's frames, 1318 / 1328 MB on a 779 MB baseline); live
+workers back to 0. The rest above baseline is memory the allocators keep and download Blobs (revoked 30 s after each download starts).
+
 Measured with `npm run check:editor`, headless Chromium on the development
 machine (Windows, desktop GPU), two 6000×4000 JPEGs:
 
@@ -662,7 +687,7 @@ the last row varies. The baseline itself varies by a few hundred MB between
 runs; compare deltas.
 
 Bounds: thumbnails only (320 px) for inactive photos; at most two decoded
-proxies (LRU); one GPU texture plus a 16 KB curve table and one LUT texture;
+proxies (LRU), and the viewer drops frames cached for a photo once it is not shown; one GPU texture plus a 16 KB curve table and one LUT texture;
 one export worker at a time, holding one canvas and one 256-row band; the CPU
 fallback preview keeps its proxy and up to two LUTs in its worker instead of
 receiving them each frame; a newer proxy decode terminates the older one.
@@ -741,41 +766,41 @@ Safari cannot encode WebP (the option is disabled when the browser cannot).
 - Zoom past the proxy (about 170% of the source width for 24 MP) is upscaled.
 - Thumbnails re-render on the main thread (about 7 ms each, throttled).
 - Main-thread image tasks (no worker canvas) pause the page briefly while decoding.
-- Exports with every per-pixel stage on (curves, HSL, LUT, no Detail) still run on one CPU
-  thread (about 10 s at 24 MP on a desktop; phones several times longer); only Detail
-  exports use band workers.
+- Phones, ≤ 4 GB devices and CPUs with fewer than four threads export on one CPU thread
+  (no band workers), so heavy edits take several times longer there.
 - Pinch-zoom works with two pointers on the preview; it has not been tried on a
   physical phone.
 
-- **Playwright's Windows WebKit crashes when a LibRaw worker starts after the first one was
-  ended** (Interval 5–7 "mprotect failed"). Reproduced without the editor UI by
-  `npm run check:editor:raw-stability` (production RAW worker, genuine A7 III ARWs,
-  WebKit 26 on Windows, trials of 9 decodes in a fresh browser):
+- **Playwright Windows WebKit LibRaw crash: mitigated in Interval 9, not gone.** The web content process
+  died (Playwright `crash`, "mprotect failed: 487" in Interval 5–7) when a RAW worker created
+  LibRaw's shared wasm memory (256 MB initial, 2 GB maximum) **after** it had read the whole
+  file into an ArrayBuffer, once an earlier RAW worker had ended, or while another RAW worker
+  was decoding. Bisected with worker bundles that differ in one step (A7 III ARWs, trials of
+  9 decodes in a fresh WebKit 26, Windows):
 
-  | Pattern | Trials crashed |
+  | Worker (fresh per job, one at a time) | Crashed |
   | --- | --- |
-  | Fresh worker per job, as the editor (half-size decodes) | 6/10, 8/10 (two runs) |
-  | … two at once · full decodes · two full at once · iPhone 13 emulation | 7/10 · 5/10 · 7/10 · 6/10 |
-  | … 1 s / 5 s between ending a worker and starting the next | 4/10 / 6/10 |
-  | … plus an idle worker that only instantiated LibRaw · with two full decodes | 7/10 · 8/10 |
-  | One reused worker (half · full decodes, 180 in total) | 0/10 · 0/10 |
-  | First worker kept alive after its decode, the other 8 fresh | 0/10 |
-  | One job per browser | 0/10 |
+  | Production worker (Interval 8), three runs | 3/10, 5/10, 6/10 |
+  | Same code read through Playwright routing, as a classic worker | 6/10, 12/20 |
+  | LibRaw calls inline, instantiated first; with `self.close()`; 512 MB initial memory; 36 MB results transferred or copied; no LibRaw at all | 0/10 each |
+  | Editor `decodeRaw` + `sniffRaw` (read file, then instantiate) | 8/15 |
+  | Inline calls, read file then instantiate · `decodeRaw`, instantiate then read | **7/15 · 0/15** |
+  | Shared wasm memory held on the page · plain memory held · worker reused while jobs keep coming | 1/10 each · 7/10 · 0/10 |
 
-  Every failure is the web content process dying (Playwright `crash`; workers run in that
-  process): no worker `error` event, no error reply from LibRaw, no page exception, no
-  harness timeout. Logged steps put it at the start of a new worker right after another was
-  ended, nearly always the second worker of the process, never during a decode. So it is
-  not caused by Detail, concurrency, decode size, memory growth, emulation or timing (the
-  Interval 7 "bundle" correlation was chance at these rates). It looks like the WebKit
-  Windows port's handling of a released wasm memory reservation; the evidence points
-  upstream (WebKit/Playwright's Windows build), not at LibRaw or editor code. Chromium and
-  Firefox never crash in the same harness (0 of 40 trials, including two full decodes at once). Not changed in the product: reusing RAW workers
-  avoids it here, but would keep each worker's grown LibRaw heap (up to about 700 MB) alive,
-  which is a real risk on iPhones, and real Safari is not known to be affected (not tested).
-  Limits that stay: one RAW decoder at a time on phones and ≤ 4 GB devices, batch exports one
-  at a time, Detail band workers never run LibRaw. Browser checks that decode several RAWs in
-  Playwright WebKit can still fail this way; such a failure shows as `page crashed`.
+  Fix: `rawTasks.mjs` checks the size and the header (256 KB), instantiates LibRaw, and only
+  then reads the file; no memory is kept and workers are still ended after each job.
+  `npm run check:editor:raw-stability` on the fixed production build, 20 trials each: one
+  decoder at a time with half-size, full-size and iPhone 13 emulated decodes **0/20, 0/20,
+  0/20**; two decoders at once still 12/20 and 14/20, so the editor runs one RAW decoder at
+  a time (also the memory target). It still happens when LibRaw starts while other workers
+  are busy with large buffers: a fresh worker warmed while the page fills 100 MB crashed
+  8/15 (100 MB page allocations *between* jobs: 0/15), and full-size HDR exports from RAW
+  crashed in 3 of 4 WebKit runs of `check:editor:hdr` (so `HDR_WEBKIT_EXPORT` stays
+  opt-in). Only keeping LibRaw workers alive avoided it, which would keep up to about
+  700 MB per worker; that is not done for a test-browser defect. Chromium and Firefox never
+  crashed. It looks like a
+  defect in the Windows WebKit port's handling of shared wasm memory; Safari on macOS and
+  iOS has not been tested, so it is not known whether it is affected.
 - Detail previews render on one CPU thread (exports use band workers): see
   [Detail](#detail). A multi-pass WebGL2 Detail preview is not built. 1:1 inspection is not
   available for merged HDR photos.

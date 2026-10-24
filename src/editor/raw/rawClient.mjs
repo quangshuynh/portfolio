@@ -1,26 +1,26 @@
 // Page side of RAW processing. Every job gets a fresh RAW worker that is terminated when
-// the job ends or is cancelled, so the decoder's wasm heap is always returned. Jobs
-// wait in one queue that runs at most `rawConcurrency()` decoders at once (one on
-// phones and low-memory devices): previews first, then exports, then imports.
+// the job ends or is cancelled, so the decoder's wasm heap is always returned. Jobs wait
+// in one queue that runs one decoder at a time (each needs 300–800 MB while it runs, so
+// the peak is one LibRaw heap): previews first, then exports, then imports.
 
 import { WorkerCancelled, createWorkerClient } from '../io/workerClient.mjs';
 import { assertCanvasWorks, createCanvas, encodeCanvas } from '../io/decode.mjs';
 import { exportDimensions } from '../io/files.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { recordDiagnostic } from '../io/diagnostics.mjs';
-import { renderDetailParallel } from '../io/detailPool.mjs';
+import { renderDetailParallel, renderPixelsParallel } from '../io/detailPool.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 
 const PRIORITY = { decode: 0, region: 0, export: 1, develop: 1, inspect: 2 };
 
-/** Concurrent RAW decoders for this device: each can need 300–800 MB while it runs. */
-export function rawConcurrency(win = globalThis) {
+/** Phones and devices reporting ≤ 4 GB: no full-size RAW decode for 1:1, smaller ZIP parts. */
+export function constrainedDevice(win = globalThis) {
   const memory = win.navigator?.deviceMemory;
   let phone = false;
   try {
     phone = Boolean(win.matchMedia?.('(pointer: coarse)').matches) && Math.max(win.screen?.width ?? 0, win.screen?.height ?? 0) <= 1024;
   } catch { /* treat as a desktop */ }
-  return phone || (typeof memory === 'number' && memory <= 4) ? 1 : 2;
+  return phone || (typeof memory === 'number' && memory <= 4);
 }
 
 const spawnRawWorker = () => new Worker(new URL('./rawWorker.mjs', import.meta.url), { type: 'module' });
@@ -42,7 +42,7 @@ function rawError(error) {
  * Creates a RAW job queue.
  * :param options: { spawn, limit } worker factory and concurrency (tests pass fakes)
  */
-export function createRawQueue({ spawn = spawnRawWorker, limit = rawConcurrency() } = {}) {
+export function createRawQueue({ spawn = spawnRawWorker, limit = 1 } = {}) {
   const waiting = [];
   let running = 0;
 
@@ -104,9 +104,10 @@ export function createRawQueue({ spawn = spawnRawWorker, limit = rawConcurrency(
 
 /**
  * Exports a RAW photo: the worker develops it at the export size and sends 8-bit
- * bands, which are written into one canvas here and encoded. With Detail settings and
- * `detailWorkers`, the worker returns the developed linear image instead (its LibRaw heap
- * is freed at once) and the bands are rendered by that many render workers.
+ * bands, which are written into one canvas here and encoded. With `detailWorkers` (band
+ * workers, desktops), the worker returns the developed linear image instead (its LibRaw
+ * heap is freed at once) and the bands, with or without Detail, are rendered by that many
+ * render workers.
  * :param queue: createRawQueue() result
  * :param onStart: receives the job, so the caller can cancel it
  * :returns: { blob, width, height, source: 'full' | 'half', timings }
@@ -118,7 +119,8 @@ export async function exportRaw(queue, { file, raw, adjustments, lut, settings }
   const canvas = createCanvas(size.width, size.height);
   const context = canvas.getContext('2d', { colorSpace: 'srgb' });
   assertCanvasWorks(context, size.width, size.height);
-  if (detailWorkers > 0 && deriveParams(adjustments, { lut, raw }).detailActive) {
+  if (detailWorkers > 0) {
+    const render = deriveParams(adjustments, { lut, raw }).detailActive ? renderDetailParallel : renderPixelsParallel;
     const started = performance.now();
     const signal = { cancelled: false };
     const develop = queue.run('develop', { file, raw, width: size.width, height: size.height });
@@ -126,7 +128,7 @@ export async function exportRaw(queue, { file, raw, adjustments, lut, settings }
     onProgress({ stage: 'decoding', fraction: 0 });
     const image = await develop.promise;
     const decodedAt = performance.now();
-    await renderDetailParallel(image, { adjustments, lut, raw, nativeWidth: raw.width, nativeHeight: raw.height }, {
+    await render(image, { adjustments, lut, raw, nativeWidth: raw.width, nativeHeight: raw.height }, {
       workers: detailWorkers,
       signal,
       spawn: spawnRender,
@@ -142,7 +144,7 @@ export async function exportRaw(queue, { file, raw, adjustments, lut, settings }
       width: size.width,
       height: size.height,
       source: image.width === raw.width ? 'full' : 'half',
-      timings: { decode: decodedAt - started, render: renderedAt - decodedAt, encode: performance.now() - renderedAt, detailWorkers },
+      timings: { decode: decodedAt - started, render: renderedAt - decodedAt, encode: performance.now() - renderedAt, bandWorkers: detailWorkers },
     };
   }
   const job = queue.run('export', { file, raw, adjustments, lut, settings }, {

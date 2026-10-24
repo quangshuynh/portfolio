@@ -32,6 +32,12 @@ describe('production build at the site root', () => {
   beforeAll(async () => { outDir = await buildSite('/'); }, 60_000);
   afterAll(() => outDir && rmSync(outDir, { recursive: true, force: true }));
 
+  test('names every emitted asset by its content, so Vercel can cache /assets/ as immutable', () => {
+    const files = readdirSync(join(outDir, 'assets'));
+    expect(files.length).toBeGreaterThan(0);
+    files.forEach((name) => expect(name).toMatch(/-[A-Za-z0-9_-]{8}\.[a-z0-9]+$/));
+  });
+
   test('writes a static HTML page for every route and a 404 page', () => {
     [...ROUTES, NOT_FOUND_ROUTE].forEach(({ file }) => expect(existsSync(join(outDir, file))).toBe(true));
   });
@@ -232,6 +238,11 @@ describe('Vercel routing', () => {
       expect(source).not.toMatch(/\(\.\*\)|:path\*|\/\*$/);
       ['/sitemap.xml', '/robots.txt', '/missing-page'].forEach((path) => expect(source).not.toBe(path));
     });
+  });
+
+  test('caches only content-hashed assets as immutable', () => {
+    const immutable = (config.headers ?? []).filter(({ headers }) => headers.some(({ key, value }) => key === 'Cache-Control' && /immutable/.test(value)));
+    expect(immutable.map(({ source }) => source)).toEqual(['/assets/(.*)']);
   });
 
   test('serves every route and redirects its non-canonical twin', () => {

@@ -147,9 +147,12 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     return () => { cancelled = true; };
   }, [photo?.id, photo?.status, loadProxy, canvas]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Release the GPU texture when no photo is shown.
+  // Release the GPU texture when no photo is shown, and frames cached for another proxy:
+  // they would keep that photo's pixels (tens of MB for a RAW) alive after it left.
   useEffect(() => {
     if (!proxy) engineRef.current?.renderer?.clear();
+    if (cpuBeforeRef.current.image !== proxyRef.current) Object.assign(cpuBeforeRef.current, { image: null, data: null });
+    if (detailJobRef.current.image !== proxyRef.current) Object.assign(detailJobRef.current, { frame: null, image: null, key: null });
   }, [proxy]);
 
   const splitFraction = compare === 'original' ? 1 : compare === 'split' ? split : 0;

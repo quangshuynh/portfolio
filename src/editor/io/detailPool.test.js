@@ -1,5 +1,8 @@
 // @vitest-environment node
-import { detailWorkerCount, renderDetailParallel } from './detailPool.mjs';
+import { detailWorkerCount, renderDetailParallel, renderPixelsParallel } from './detailPool.mjs';
+import { renderRawRgba8, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
+import { normalizeAdjustments } from '../model/adjustments.mjs';
+import { lookLut } from '../dev/lutFixtures.mjs';
 import { runTask } from './imageTasks.mjs';
 import { renderDetailImage } from '../pipeline/detailRenderer.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
@@ -60,6 +63,42 @@ async function parallel(image, settings, workers) {
   return { out, log, progress };
 }
 
+describe('parallel rendering without Detail', () => {
+  const look = lookLut(9);
+  const EDIT = normalizeAdjustments({
+    exposure: 0.4, contrast: 25, highlights: -30, shadows: 20, temperature: 15, vibrance: 20, saturation: -10,
+    curves: { master: [[0, 8], [128, 140], [255, 250]], red: [[0, 0], [255, 240]] },
+    hsl: { blue: { hue: 10, saturation: -20, luminance: 15 } },
+    lut: { sha256: look.sha256 ?? 'f'.repeat(64), name: 'look.cube', title: 'Look', size: 9 }, lutIntensity: 70,
+  });
+  const run = async (image, settings, workers) => {
+    const out = new Uint8ClampedArray(image.width * image.height * 4);
+    const log = [];
+    await renderPixelsParallel(image, settings, { workers, spawn: () => fakeWorker(log), onBand: ({ row, data }) => out.set(data, row * image.width * 4) });
+    return { out, log };
+  };
+
+  test('equals the one-thread export renderer bit for bit (RGBA with transparency, JPEG flattening)', async () => {
+    const image = rgbaImage(301, 700, { alpha: true });
+    const params = deriveParams(EDIT, { lut: look });
+    expect(params).toMatchObject({ lutActive: true, detailActive: false, neutral: false });
+    expect(params.postActive).toBe(true);
+    const { out, log } = await run(image, { adjustments: EDIT, lut: look }, 3);
+    expect(Buffer.compare(Buffer.from(out), Buffer.from(renderRgba8(image.data, params)))).toBe(0);
+    expect(log.filter((type) => type === 'pixelBegin')).toHaveLength(3);
+    expect(log.filter((type) => type === 'terminate')).toHaveLength(3);
+    const flat = (await run(image, { adjustments: EDIT, lut: look, flattenAlpha: true }, 2)).out;
+    expect(Buffer.compare(Buffer.from(flat), Buffer.from(renderRgba8(image.data, params, { flattenAlpha: true })))).toBe(0);
+  });
+
+  test('equals it for RAW data', async () => {
+    const image = rawImage(240, 600);
+    const { out } = await run(image, { adjustments: EDIT, raw: RAW_INFO, lut: look }, 4);
+    expect(Buffer.compare(Buffer.from(out), Buffer.from(renderRawRgba8(image.data, deriveParams(EDIT, { raw: RAW_INFO, lut: look }))))).toBe(0);
+    expect(new Set(out.filter((_, i) => i % 4 === 1)).size).toBeGreaterThan(50);
+  });
+});
+
 describe('parallel Detail rendering', () => {
   test('equals the one-thread render bit for bit (RGBA with transparency, JPEG flattening)', async () => {
     const image = rgbaImage(301, 700, { alpha: true });
@@ -96,6 +135,18 @@ describe('parallel Detail rendering', () => {
     await expect(run).rejects.toMatchObject({ code: 'cancelled' });
     expect(bands.length).toBeLessThan(8);
     expect(log.filter((type) => type === 'terminate')).toHaveLength(2);
+  });
+
+  test('ends the workers already started when a later one cannot start', async () => {
+    const log = [];
+    let spawned = 0;
+    const spawn = () => {
+      spawned += 1;
+      if (spawned === 3) throw new Error('Worker blocked');
+      return fakeWorker(log);
+    };
+    await expect(renderDetailParallel(rgbaImage(16, 8), { adjustments: { ...SETTINGS } }, { workers: 3, onBand: () => {}, spawn })).rejects.toThrow('Worker blocked');
+    expect(log.filter((entry) => entry === 'terminate')).toHaveLength(2);
   });
 
   test('phones, low-memory devices and few cores keep the one-thread export', () => {

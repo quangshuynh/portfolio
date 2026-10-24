@@ -15,7 +15,7 @@ import {
 import { decodeRaw, downsampleRaw } from './rawDecoder.mjs';
 import { isTiff, sniffRaw } from './rawFormat.mjs';
 import { createRawHandlers, needsFullDecode } from './rawTasks.mjs';
-import { createRawQueue } from './rawClient.mjs';
+import { constrainedDevice, createRawQueue } from './rawClient.mjs';
 import { ROLLOFF_KNEE, deriveParams, developRaw, highlightRolloff } from '../pipeline/spec.mjs';
 import { encodeSrgb8, renderRawRgba8, renderRgba8 } from '../pipeline/cpuRenderer.mjs';
 import { neutralAdjustments, normalizeAdjustments } from '../model/adjustments.mjs';
@@ -274,6 +274,45 @@ describe('RAW worker tasks', () => {
     expect(needsFullDecode(info, { width: 33, height: 25 })).toBe(true);
   });
 
+  // Creating LibRaw's shared wasm memory after the whole file had been read crashed
+  // Playwright's Windows WebKit (docs/photography-editor.md, Known issues).
+  test('every task instantiates LibRaw after reading only the header, before the whole file', async () => {
+    const bytes = createSyntheticDng({ scene });
+    const { info } = decodeRaw(Module, bytes, { format: 'dng' });
+    const order = [];
+    const file = {
+      size: bytes.length,
+      slice: (start, end) => ({ arrayBuffer: async () => { order.push('header'); return bytes.slice(start, end).buffer; } }),
+      arrayBuffer: async () => { order.push('file'); return bytes.slice().buffer; },
+    };
+    const tracked = createRawHandlers(async () => { order.push('libraw'); return Module; });
+    const settings = { format: 'png', resize: { mode: 'original' } };
+    const runs = {
+      inspect: () => tracked.inspect({ file, thumbnailEdge: 16 }, () => {}),
+      decode: () => tracked.decode({ file, maxEdge: 64 }),
+      develop: () => tracked.develop({ file, raw: info, width: 64, height: 48 }),
+      region: () => tracked.region({ file, raw: info, rect: { x: 0, y: 0, width: 16, height: 16 } }),
+      export: () => tracked.export({ file, raw: info, adjustments: neutralAdjustments(), settings }, () => {}),
+    };
+    for (const [name, run] of Object.entries(runs)) {
+      order.length = 0;
+      await run();
+      expect(order, name).toEqual(['header', 'libraw', 'file']);
+    }
+    order.length = 0;
+    await expect(tracked.decode({ file: { ...file, size: 0 }, maxEdge: 64 })).rejects.toMatchObject({ code: 'corrupt' });
+    expect(order).toEqual([]);
+  });
+
+  test('a decoder that cannot start gives an actionable error, not the raw abort text', async () => {
+    const file = dngFile(createSyntheticDng({ scene }));
+    const failing = (message) => createRawHandlers(async () => { throw new Error(message); });
+    await expect(failing('Aborted(RangeError: Out of memory: Cannot allocate Wasm memory for new instance)').decode({ file, maxEdge: 64 }))
+      .rejects.toMatchObject({ code: 'memory', message: expect.stringMatching(/not enough free memory to start the RAW decoder/) });
+    await expect(failing('Aborted(CompileError: WebAssembly.instantiate())').decode({ file, maxEdge: 64 }))
+      .rejects.toMatchObject({ code: 'decoder', message: expect.stringMatching(/could not start in this browser .*Reload the page/) });
+  });
+
   test('export refuses a file that no longer matches the imported one', async () => {
     const { info } = decodeRaw(Module, createSyntheticDng(), { format: 'dng' });
     await expect(handlers.export({ file: dngFile(createSyntheticDng({ width: 32, height: 32 })), raw: info, adjustments: neutralAdjustments(), settings: { format: 'png', resize: { mode: 'original' } } }, vi.fn()))
@@ -322,6 +361,23 @@ describe('RAW job queue', () => {
     await second.promise;
     await flush();
     expect(queue.running).toBe(0);
+  });
+
+  test('runs one decoder at a time by default, on every device', async () => {
+    const { spawn, started } = fakeWorkers();
+    const queue = createRawQueue({ spawn });
+    queue.run('inspect', {});
+    queue.run('decode', {});
+    queue.run('develop', {});
+    expect(started).toHaveLength(1);
+    expect(queue.waiting).toBe(2);
+  });
+
+  test('phones and low-memory devices are constrained (no full-size decode for 1:1)', () => {
+    const desktop = { navigator: { deviceMemory: 8 }, matchMedia: () => ({ matches: false }), screen: { width: 1920, height: 1080 } };
+    expect(constrainedDevice(desktop)).toBe(false);
+    expect(constrainedDevice({ ...desktop, navigator: { deviceMemory: 4 } })).toBe(true);
+    expect(constrainedDevice({ ...desktop, matchMedia: () => ({ matches: true }), screen: { width: 390, height: 844 } })).toBe(true);
   });
 
   test('cancel removes a waiting job or ends a running worker', async () => {

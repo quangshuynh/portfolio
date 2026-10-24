@@ -114,6 +114,12 @@ export function parseAdjustments(input) {
   return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw });
 }
 
+/** Reads an edit file, refusing an oversized one before any of it is read into memory. */
+export async function readEditDocumentFile(file) {
+  if (file.size > MAX_DOCUMENT_BYTES) throw new EditDocumentError('The edit file is larger than 4 MB.');
+  return parseEditDocument(await file.text());
+}
+
 /**
  * Parses and validates a saved document. Unknown fields are ignored; out-of-range
  * adjustment values are clamped. Throws EditDocumentError with a readable message.
