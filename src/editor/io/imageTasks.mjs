@@ -7,8 +7,9 @@ import { prepareRender, renderImage, renderRawRgba8, renderRgba8 } from '../pipe
 import { computeImageGuide, createAreaAccumulator, guideSize, guideSource, prepareDetailRender, renderDetailImage, renderDetailRows, rowsHaveAlpha } from '../pipeline/detailRenderer.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { groupKeys, normalizeAdjustments } from '../model/adjustments.mjs';
-import { decodeToCanvas, decodeToRgba, encodeCanvas, inspectFile } from './decode.mjs';
-import { exportDimensions, proxyDimensions } from './files.mjs';
+import { assertCanvasWorks, createCanvas, decodeToCanvas, decodeToRgba, encodeCanvas, inspectFile } from './decode.mjs';
+import { exportGeometry, proxyDimensions } from './files.mjs';
+import { finishRows, warpImage, warpRows, warpSpec } from '../pipeline/warp.mjs';
 import { FORMATS } from './imageHeader.mjs';
 import { LutError, MAX_CUBE_BYTES, parseCube } from '../pipeline/lut.mjs';
 import { contentHash } from './hash.mjs';
@@ -18,7 +19,7 @@ export const EXPORT_BAND_ROWS = 256;
 
 // CPU preview cache: the current proxy and the last few LUTs, so each render sends
 // only settings instead of copying the proxy (about 45 MB at 4096 px) every time.
-const renderCache = { key: null, source: null, luts: new Map(), detail: null };
+const renderCache = { key: null, source: null, luts: new Map(), detail: null, warped: null };
 const MAX_CACHED_LUTS = 2;
 const stale = (what) => Object.assign(new Error(`The preview ${what} is not loaded here.`), { code: `stale-${what}` });
 
@@ -68,7 +69,7 @@ function renderDetailPreview(image, params, adjustments, { edge, nativeWidth, na
  * overwritten, so each band keeps a copy of its last `halo` source rows for the next.
  * Holds one band plus two halos of pixels besides the canvas.
  */
-export async function exportDetailBands(context, size, prepared, native, settings, progress, signal) {
+export async function exportDetailBands(context, size, prepared, native, settings, progress, signal, spec = null) {
   const { width, height } = size;
   const small = guideSize(size);
   const accumulator = createAreaAccumulator(undefined, width, height, small.width, small.height);
@@ -92,11 +93,33 @@ export async function exportDetailBands(context, size, prepared, native, setting
     source.set(context.getImageData(0, row, width, bottom - row, { colorSpace: 'srgb' }).data, (row - top) * width * 4);
     const band = new ImageData(width, rows);
     renderDetailRows({ width, height: bottom - top, data: source, y0: top }, detail, row, row + rows, band.data, { flattenAlpha: settings.format === 'jpeg' });
+    finishRows(spec, band.data, row, rows, settings.format === 'jpeg');
     above = source.subarray(Math.max(0, row + rows - top - halo) * width * 4, (row + rows - top) * width * 4).slice();
     context.putImageData(band, 0, row);
     progress({ stage: 'rendering', fraction: (row + rows) / height });
     if (signal.yield) await signal.yield();
   }
+}
+
+/**
+ * The cached proxy warped for a preview geometry (the latest one only). Detail caches
+ * (guide, downscaled sizes) belong to the warped image, so they are dropped with it.
+ */
+function warpedPreview(warp) {
+  const key = JSON.stringify([warp.matrix, warp.width, warp.height]);
+  if (renderCache.warped?.key !== key) {
+    renderCache.warped = { key, image: warpImage(renderCache.source, warp.matrix, warp) };
+    renderCache.detail = null;
+  }
+  return renderCache.warped.image;
+}
+
+/** A warp spec for a render of another size of the same output (the Detail preview is downscaled). */
+export function scaledSpec(warp, out) {
+  const sx = warp.width / out.width;
+  const sy = warp.height / out.height;
+  const m = warp.matrix;
+  return { ...warp, matrix: [m[0] * sx, m[1] * sy, m[2], m[3] * sx, m[4] * sy, m[5], m[6] * sx, m[7] * sy, m[8]], width: out.width, height: out.height, scale: warp.scale * Math.max(sx, sy) };
 }
 
 // Parallel Detail export (detailPool.mjs): each helper worker keeps the render context of
@@ -176,17 +199,25 @@ export const handlers = {
     return { result: { header, sha256, thumbnail }, transfer: [thumbnail.data.buffer] };
   },
 
-  async decode({ file, header, width, height }) {
-    const image = await decodeToRgba(file, header, { width, height });
+  /** Decodes at a size; with `warp` (warpSpec for that size), returns the warped output instead. */
+  async decode({ file, header, width, height, warp = null }) {
+    let image = await decodeToRgba(file, header, { width, height });
+    if (warp) image = warpImage(image, warp.matrix, warp);
     return { result: image, transfer: [image.data.buffer] };
+  },
+
+  /** Warps an in-memory image (a RAW development before a band export). */
+  async warp({ image, warp }) {
+    const warped = warpImage(image, warp.matrix, warp);
+    return { result: warped, transfer: [warped.data.buffer] };
   },
 
   /**
    * CPU preview render. `source` and `lut.data` are sent only when not cached here.
    * `raw` is the photo's RAW colour info when the source is a RAW proxy.
    */
-  async render({ key, source, adjustments, lut, raw = null, detail = null }) {
-    if (source) Object.assign(renderCache, { key, source, detail: null });
+  async render({ key, source, adjustments, lut, raw = null, detail = null, warp = null }) {
+    if (source) Object.assign(renderCache, { key, source, detail: null, warped: null });
     else if (!key || renderCache.key !== key) throw stale('source');
     if (lut?.data) {
       renderCache.luts.set(lut.sha256, lut);
@@ -194,13 +225,15 @@ export const handlers = {
     }
     const lutData = lut ? renderCache.luts.get(lut.sha256) : null;
     if (lut && !lutData) throw stale('lut');
-    const image = renderCache.source;
+    const image = warp ? warpedPreview(warp) : renderCache.source;
     const params = deriveParams(adjustments, { lut: lutData, raw });
     if (detail && params.detailActive) {
       const rendered = renderDetailPreview(image, params, adjustments, detail);
+      if (warp) finishRows(scaledSpec(warp, rendered), rendered.data, 0, rendered.height, false);
       return { result: rendered, transfer: [rendered.data.buffer] };
     }
     const data = renderImage(image, params);
+    finishRows(warp, data, 0, image.height, false);
     return { result: { width: image.width, height: image.height, data }, transfer: [data.buffer] };
   },
 
@@ -227,21 +260,47 @@ export const handlers = {
   async export({ file, header, adjustments, lut = null, settings }, progress, signal = {}) {
     const started = performance.now();
     const format = FORMATS[settings.format];
-    const size = exportDimensions({ width: header.displayWidth, height: header.displayHeight }, settings.resize);
+    const native = { width: header.displayWidth, height: header.displayHeight };
+    const geometry = exportGeometry(adjustments.geometry, native, settings.resize);
+    const size = geometry.output;
+    const flatten = settings.format === 'jpeg';
     progress({ stage: 'decoding', fraction: 0 });
-    const { canvas, context } = await decodeToCanvas(file, header, size);
+    let { canvas, context } = await decodeToCanvas(file, header, geometry.decode);
+    let spec = null;
+    if (!geometry.identity) {
+      // Geometry: the decoded original is read once, the decode canvas released, and the
+      // output canvas filled with the warped pixels band by band.
+      spec = warpSpec(geometry.plan, size, geometry.decode);
+      const { data } = context.getImageData(0, 0, geometry.decode.width, geometry.decode.height, { colorSpace: 'srgb' });
+      canvas.width = 1;
+      canvas.height = 1;
+      const source = { ...geometry.decode, data };
+      canvas = createCanvas(size.width, size.height);
+      context = canvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
+      assertCanvasWorks(context, size.width, size.height);
+      for (let row = 0; row < size.height; row += EXPORT_BAND_ROWS) {
+        if (signal.cancelled) throw cancelled();
+        const rows = Math.min(EXPORT_BAND_ROWS, size.height - row);
+        const band = new ImageData(size.width, rows);
+        warpRows(source, spec.matrix, size.width, row, row + rows, band.data);
+        context.putImageData(band, 0, row);
+        progress({ stage: 'decoding', fraction: (row + rows) / size.height });
+        if (signal.yield) await signal.yield();
+      }
+    }
     const decodedAt = performance.now();
     progress({ stage: 'rendering', fraction: 0 });
     const params = deriveParams(adjustments, { lut });
     const prepared = prepareRender(params);
     if (params.detailActive) {
-      await exportDetailBands(context, size, prepared, { width: header.displayWidth, height: header.displayHeight }, settings, progress, signal);
+      await exportDetailBands(context, size, prepared, geometry.identity ? native : geometry.plan.native, settings, progress, signal, spec);
     } else for (let row = 0; row < size.height; row += EXPORT_BAND_ROWS) {
       if (signal.cancelled) throw cancelled();
       const rows = Math.min(EXPORT_BAND_ROWS, size.height - row);
       const band = context.getImageData(0, row, size.width, rows, { colorSpace: 'srgb' });
       // JPEG has no alpha: composite onto white here rather than leave it to the encoder.
-      renderRgba8(band.data, prepared, { target: band.data, flattenAlpha: settings.format === 'jpeg' });
+      renderRgba8(band.data, prepared, { target: band.data, flattenAlpha: flatten });
+      finishRows(spec, band.data, row, rows, flatten);
       context.putImageData(band, 0, row);
       progress({ stage: 'rendering', fraction: (row + rows) / size.height });
       // Lets a main-thread run paint progress and see a cancel between bands.

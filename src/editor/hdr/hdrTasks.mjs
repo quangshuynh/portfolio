@@ -7,6 +7,7 @@ import { prepareRender, renderRawRgba8, renderRgba8 } from '../pipeline/cpuRende
 import { guideSource, prepareDetailRender, renderDetailRows, rowsHaveAlpha } from '../pipeline/detailRenderer.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { proxyDimensions } from '../io/files.mjs';
+import { finishRows, warpImage } from '../pipeline/warp.mjs';
 import { HdrError, analyzeBracket, createFusionMerge, createRadianceMerge } from './hdrMerge.mjs';
 
 export const HDR_BAND_ROWS = 256;
@@ -94,11 +95,13 @@ export const handlers = {
    * :param payload: { adjustments, raw (radiance: reference RAW info with hdrWhite), lut,
    *   flattenAlpha, native } where `native` is the merged photo's full size (Detail scale)
    */
-  async render({ adjustments, raw = null, lut = null, flattenAlpha = false, native = null }, progress) {
+  async render({ adjustments, raw = null, lut = null, flattenAlpha = false, native = null, warp = null }, progress) {
     if (!session) throw new HdrError('state', 'No HDR export is in progress.');
     const mergedAt = performance.now();
-    const image = session.merge.finish();
+    let image = session.merge.finish();
     session.merge = null;
+    // Geometry: the merge (the three sources and their analysis untouched) is warped to the output.
+    if (warp) image = warpImage(image, warp.matrix, warp);
     const merged = performance.now();
     const params = deriveParams(adjustments, { lut, raw: session.analysis.mode === 'radiance' ? raw : null });
     const prepared = prepareRender(params);
@@ -119,6 +122,7 @@ export const handlers = {
         data = image.data.slice(row * width * 4, (row + rows) * width * 4);
         renderRgba8(data, prepared, { target: data, flattenAlpha });
       }
+      finishRows(warp, data, row, rows, flattenAlpha);
       progress({ stage: 'rendering', fraction: (row + rows) / height, band: { row, rows, data } });
     }
     session = null;

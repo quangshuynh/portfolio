@@ -5,7 +5,8 @@
 
 import { WorkerCancelled, createImageWorker, createWorkerClient } from '../io/workerClient.mjs';
 import { assertCanvasWorks, createCanvas, encodeCanvas } from '../io/decode.mjs';
-import { exportDimensions, proxyDimensions } from '../io/files.mjs';
+import { exportGeometry, proxyDimensions } from '../io/files.mjs';
+import { warpSpec } from '../pipeline/warp.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { cropAt } from './hdrAlign.mjs';
 import { exposureStops } from './hdrMetadata.mjs';
@@ -96,16 +97,30 @@ export async function mergePreview(inputs, { mode, reference, settings, maxEdge,
   }
 }
 
-/** Export geometry: decoded frame size, output (cropped) size, and whether RAW needs a full demosaic. */
-export function hdrExportGeometry(inputs, analysis, resize) {
+/**
+ * Export sizes: decoded frame size, merged (alignment-cropped) size, output size, the
+ * photo's geometry plan, and whether RAW needs a full demosaic. Without geometry the
+ * output is the merged image itself; with geometry the merge is made at the size the warp
+ * needs and warped to the output.
+ */
+export function hdrExportGeometry(inputs, analysis, resize, geometry = null) {
   const full = bracketSize(inputs);
   const cropFull = cropAt(analysis.crop, full.width, full.height);
-  const out = exportDimensions(cropFull, resize);
-  const scale = out.scaled ? out.width / cropFull.width : 1;
+  const sizes = exportGeometry(geometry, cropFull, resize);
+  const scale = sizes.decode.width === cropFull.width && sizes.decode.height === cropFull.height ? 1 : sizes.decode.width / cropFull.width;
   const frame = scale === 1 ? full : { width: Math.round(full.width * scale), height: Math.round(full.height * scale) };
   const crop = cropAt(analysis.crop, frame.width, frame.height);
   const fullDecode = Boolean(inputs[0].raw) && (frame.width > Math.floor(full.width / 2) || frame.height > Math.floor(full.height / 2));
-  return { full, frame, output: { width: crop.width, height: crop.height }, native: { width: cropFull.width, height: cropFull.height }, fullDecode };
+  const merged = { width: crop.width, height: crop.height };
+  return {
+    full,
+    frame,
+    merged,
+    output: sizes.identity ? merged : sizes.output,
+    native: sizes.identity ? { width: cropFull.width, height: cropFull.height } : sizes.plan.native,
+    plan: sizes.identity ? null : sizes.plan,
+    fullDecode,
+  };
 }
 
 /**
@@ -114,12 +129,15 @@ export function hdrExportGeometry(inputs, analysis, resize) {
  * Chromium: a 6024×4024 RAW merge exported at full size peaked about 1.6 GB above the
  * page's baseline (docs/photography-editor.md).
  */
-export function hdrExportMegabytes(mode, { frame, output, fullDecode }) {
+export function hdrExportMegabytes(mode, { frame, merged = null, output, fullDecode, plan = null }) {
   const framePixels = frame.width * frame.height;
+  const mergedPixels = merged ? merged.width * merged.height : output.width * output.height;
   const outPixels = output.width * output.height;
   const mb = (bytes) => bytes / (1024 * 1024);
-  if (mode === 'radiance') return Math.round(mb(outPixels * (16 + 4) + framePixels * 6 * 2) + (fullDecode ? 850 : 200));
-  return Math.round(mb(outPixels * 50 + framePixels * 4 * 2));
+  // Geometry warps the finished merge into a second image of the output size.
+  const warped = plan ? outPixels * (mode === 'radiance' ? 12 : 4) : 0;
+  if (mode === 'radiance') return Math.round(mb(mergedPixels * 16 + outPixels * 4 + warped + framePixels * 6 * 2) + (fullDecode ? 850 : 200));
+  return Math.round(mb(mergedPixels * 46 + outPixels * 4 + warped + framePixels * 4 * 2));
 }
 
 /** Memory an HDR export may use on this device, in MB. */
@@ -137,11 +155,11 @@ export function hdrMemoryBudget(win = globalThis) {
  * Whether an export fits this device, and otherwise the largest long edge that does.
  * :returns: { megabytes, fits, suggestion: long edge in px or null }
  */
-export function checkHdrExport(mode, inputs, analysis, resize, budget = hdrMemoryBudget()) {
-  const megabytes = hdrExportMegabytes(mode, hdrExportGeometry(inputs, analysis, resize));
+export function checkHdrExport(mode, inputs, analysis, resize, budget = hdrMemoryBudget(), geometry = null) {
+  const megabytes = hdrExportMegabytes(mode, hdrExportGeometry(inputs, analysis, resize, geometry));
   if (megabytes <= budget) return { megabytes, fits: true, suggestion: null };
   const suggestion = [6000, 5000, 4096, 3600, 3072, 2560, 2048, 1600, 1200]
-    .find((longEdge) => hdrExportMegabytes(mode, hdrExportGeometry(inputs, analysis, { mode: 'long-edge', longEdge })) <= budget) ?? null;
+    .find((longEdge) => hdrExportMegabytes(mode, hdrExportGeometry(inputs, analysis, { mode: 'long-edge', longEdge }, geometry)) <= budget) ?? null;
   return { megabytes, fits: false, suggestion };
 }
 
@@ -154,8 +172,8 @@ export function checkHdrExport(mode, inputs, analysis, resize, budget = hdrMemor
  */
 export async function exportHdr(inputs, analysis, { adjustments, raw, lut, settings }, { rawQueue, job, spawn = spawnHdrWorker, onProgress = () => {} }) {
   const format = FORMATS[settings.format];
-  const geometry = hdrExportGeometry(inputs, analysis, settings.resize);
-  const { frame, output } = geometry;
+  const geometry = hdrExportGeometry(inputs, analysis, settings.resize, adjustments.geometry);
+  const { frame, output, merged: mergedSize } = geometry;
   const canvas = createCanvas(output.width, output.height);
   const context = canvas.getContext('2d', { colorSpace: 'srgb' });
   assertCanvasWorks(context, output.width, output.height);
@@ -163,7 +181,9 @@ export async function exportHdr(inputs, analysis, { adjustments, raw, lut, setti
   const client = job.track(createWorkerClient(spawn()));
   try {
     const begun = await client.call('begin', { analysis, frames: inputs.map(frameInfo), size: frame });
-    if (begun.width !== output.width || begun.height !== output.height) throw new Error('The merge size does not match the export size.');
+    if (begun.width !== mergedSize.width || begun.height !== mergedSize.height) throw new Error('The merge size does not match the export size.');
+    // Geometry: the worker warps the finished merge to the output before rendering.
+    const warp = geometry.plan ? warpSpec(geometry.plan, output, begun) : null;
     for (const [index, input] of inputs.entries()) {
       onProgress({ stage: 'decoding', index, fraction: index / inputs.length });
       const image = await decodeInput(input, frame, { rawQueue, job, type: 'export' });
@@ -172,7 +192,7 @@ export async function exportHdr(inputs, analysis, { adjustments, raw, lut, setti
       await client.call('add', { index, image }, { transfer: [image.data.buffer] });
     }
     const merged = performance.now();
-    const result = await client.call('render', { adjustments, raw, lut, flattenAlpha: settings.format === 'jpeg', native: geometry.native }, {
+    const result = await client.call('render', { adjustments, raw, lut, flattenAlpha: settings.format === 'jpeg', native: geometry.native, warp }, {
       onProgress: ({ band, ...progress }) => {
         if (band) context.putImageData(new ImageData(band.data, output.width, band.rows), 0, band.row);
         onProgress(progress);

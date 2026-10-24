@@ -14,8 +14,9 @@ import { computeImageGuide, createAreaAccumulator, guideSize, rowsHaveAlpha } fr
 import { detailHalo } from '../pipeline/detail.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { assertCanvasWorks, createCanvas, encodeCanvas } from './decode.mjs';
-import { exportDimensions } from './files.mjs';
+import { exportGeometry } from './files.mjs';
 import { FORMATS } from './imageHeader.mjs';
+import { finishRows, warpSpec } from '../pipeline/warp.mjs';
 
 export const DETAIL_POOL_BAND_ROWS = 256;
 const MAX_DETAIL_WORKERS = 4;
@@ -139,19 +140,25 @@ export function renderPixelsParallel(image, { adjustments, lut = null, raw = nul
 export async function exportImageInBands(decoder, { file, header, adjustments, lut = null, settings }, { workers, onProgress = () => {}, signal, spawn }) {
   const started = performance.now();
   const format = FORMATS[settings.format];
-  const size = exportDimensions({ width: header.displayWidth, height: header.displayHeight }, settings.resize);
+  const native = { width: header.displayWidth, height: header.displayHeight };
+  const geometry = exportGeometry(adjustments.geometry, native, settings.resize);
+  const size = geometry.output;
+  const flatten = settings.format === 'jpeg';
   const canvas = createCanvas(size.width, size.height);
   const context = canvas.getContext('2d', { colorSpace: 'srgb' });
   assertCanvasWorks(context, size.width, size.height);
   onProgress({ stage: 'decoding', fraction: 0 });
-  const image = await decoder.call('decode', { file, header, width: size.width, height: size.height });
+  // With geometry the decoder warps in its worker, so only the output reaches the page.
+  const spec = geometry.identity ? null : warpSpec(geometry.plan, size, geometry.decode);
+  const image = await decoder.call('decode', { file, header, ...geometry.decode, warp: spec });
   const decodedAt = performance.now();
   const render = deriveParams(adjustments, { lut }).detailActive ? renderDetailParallel : renderPixelsParallel;
-  await render(image, { adjustments, lut, nativeWidth: header.displayWidth, nativeHeight: header.displayHeight, flattenAlpha: settings.format === 'jpeg' }, {
+  const nativeSize = geometry.identity ? native : geometry.plan.native;
+  await render(image, { adjustments, lut, nativeWidth: nativeSize.width, nativeHeight: nativeSize.height, flattenAlpha: flatten }, {
     workers,
     signal,
     spawn,
-    onBand: ({ row, rows, data }) => context.putImageData(new ImageData(data, size.width, rows), 0, row),
+    onBand: ({ row, rows, data }) => context.putImageData(new ImageData(finishRows(spec, data, row, rows, flatten), size.width, rows), 0, row),
     onProgress: (fraction) => onProgress({ stage: 'rendering', fraction }),
   });
   onProgress({ stage: 'encoding', fraction: 1 });
