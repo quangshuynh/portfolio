@@ -97,7 +97,8 @@ try {
     const page = await context.newPage();
     const outside = [];
     const errors = [];
-    page.on('request', (request) => { if (!request.url().startsWith(origin) && !/^(data|blob):/.test(request.url())) outside.push(request.url()); });
+    // Any loopback port counts as local (Vite's client retries its disabled HMR socket on 24678).
+    page.on('request', (request) => { if (!/^(data|blob):/.test(request.url()) && new URL(request.url()).hostname !== '127.0.0.1') outside.push(request.url()); });
     page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
     page.on('pageerror', (error) => errors.push(error.message));
     const result = { run: run.id, steps: {} };
@@ -184,11 +185,12 @@ try {
         await noSideScroll();
       });
       await step('a published photograph: public image only, approved image queued for publication', async () => {
-        const published = (await api(page, 'GET', '/api/workspace')).json.catalog.photographs.find(({ status }) => status === 'published').id;
+        const published = (await api(page, 'GET', '/api/workspace')).json.catalog.photographs.filter(({ status }) => status === 'published')[RUNS.indexOf(run)].id;
         await page.goto(`${origin}/admin/photography/editor/?photo=${published}`);
         await page.locator('.cms-host__note', { hasText: '2200 px' }).waitFor({ timeout: 60_000 });
         await poll(() => page.locator('.cms-host__status').textContent(), (text) => /No treatment saved/.test(text), 'ready');
         await page.waitForSelector('.pe-photo[data-status=ready]', { state: 'attached', timeout: 60_000 });
+        // Each run takes its own published photograph, so runs never see another's treatment.
         // Edit it: one recipe application is enough to differ from the live image.
         const toggle = page.locator('.pe-section[data-section-id=recipes] .pe-section__toggle');
         if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
@@ -239,7 +241,7 @@ try {
           await page.locator('.cms-host').waitFor();
           await page.waitForSelector('.pe-photo[data-status=ready]', { state: 'attached', timeout: 60_000 });
           await page.setInputFiles('.cms-host input[type=file]', RAW_FILES.slice(0, 3));
-          await poll(() => page.$$eval('.pe-photo[data-status=ready]', (items) => items.length), (count) => count === 3, 'three exposures', 600_000);
+          await poll(() => page.$$eval('.pe-photo--list[data-status=ready]', (items) => items.length), (count) => count === 3, 'three exposures', 600_000);
           await page.click('.pe-library__actions button:has-text("Merge HDR")');
           const dialog = page.locator('.pe-dialog[role=dialog]');
           for (let i = 0; i < 3; i += 1) await dialog.locator('.pe-bracket__workspace button:not([disabled])').first().click();
@@ -255,7 +257,7 @@ try {
           return { size: `${json.treatment.render.width}×${json.treatment.render.height}`, name: json.treatment.render.file };
         });
       }
-      assert.deepEqual(outside, [], 'requests outside 127.0.0.1');
+      assert.deepEqual(outside, [], `requests outside 127.0.0.1: ${outside.slice(0, 3).join(', ')}`);
       const relevant = errors.filter((text) => !/favicon|Failed to load resource: the server responded with a status of 404/.test(text));
       assert.deepEqual(relevant, [], 'console errors');
     } catch (error) {
