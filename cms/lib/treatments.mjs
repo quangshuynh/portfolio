@@ -10,8 +10,11 @@
 //
 // Record: { format, version, photoId, revision, updatedAt, attached: [source], document,
 // documentHash, status: none|draft|approved|rejected, render, approved: { document,
-// documentHash, render, approvedAt } }. `approved` is what publication uses; the working
-// document may be newer (draft) or rejected while the approved one still stands.
+// documentHash, render, approvedAt }, restore, history }. `approved` is what publication uses;
+// the working document may be newer (draft) or rejected while the approved one still stands.
+// `restore` (after Remove approved treatment): the original's derivatives, made from the
+// original source with the public pipeline and staged under renders/<id>/<sha16>/, which the
+// next publication puts back. `history`: removals, for the record.
 import { createHash, randomBytes } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { link, mkdir, open, readdir, rename, rm, stat, unlink } from 'node:fs/promises';
@@ -361,7 +364,7 @@ export async function approveTreatment(dir, id, revision) {
   if (!treatment.document) throw new TreatmentError('no-treatment', 'There is no treatment to approve.', 409);
   if (!renderIsFresh(treatment)) throw new TreatmentError('stale-render', 'Render the current treatment before approving it, so the approved image is exactly what you reviewed.', 409);
   const approved = { document: treatment.document, documentHash: treatment.documentHash, render: treatment.render, approvedAt: new Date().toISOString() };
-  return writeTreatment(dir, id, revision, { ...treatment, status: 'approved', approved });
+  return writeTreatment(dir, id, revision, { ...treatment, status: 'approved', approved, restore: null });
 }
 
 /** Rejects the working treatment; an earlier approved treatment still stands. */
@@ -371,6 +374,48 @@ export async function rejectTreatment(dir, id, revision) {
   return writeTreatment(dir, id, revision, { ...treatment, status: 'rejected' });
 }
 
+/**
+ * Removes the approved treatment so the photograph returns to its original appearance at the
+ * next publication. The original's gallery and viewer images are generated now from the
+ * original source (uploaded original or camera-library file, JPEG/PNG/WebP) with the public
+ * pipeline and staged; nothing public changes until a publication pull request is merged.
+ * The working document is kept as a draft (or as it was), so the edit can be approved again.
+ * :param sources: editingSources() of the photograph
+ */
+export async function removeApprovedTreatment(dir, id, revision, sources) {
+  const treatment = await readTreatment(dir, id);
+  if (!treatment.approved) throw new TreatmentError('no-approved', 'There is no approved treatment to remove.', 409);
+  if (revision !== treatment.revision) throw new TreatmentError('stale-revision', 'The treatment changed in another tab; reload to see the latest version.', 409, { current: treatment.revision });
+  const original = sources.find((source) => (source.kind === 'original' || source.kind === 'library') && source.available && ['jpeg', 'png', 'webp'].includes(source.format));
+  if (!original) {
+    throw new TreatmentError('no-original', 'The original image is not available (only the public image, an attached RAW, or a missing library file), so the original appearance cannot be regenerated. Upload or reconnect the original JPEG first.', 409);
+  }
+  const root = path.join(paths(dir).renders, id);
+  const folder = original.sha256.slice(0, 16);
+  const final = path.join(root, folder);
+  const { galleryFilename, viewerFilename } = derivativeFilenames(id);
+  if (!(await exists(path.join(final, viewerFilename)))) {
+    const scratch = path.join(root, `.restore-${randomBytes(6).toString('hex')}`);
+    try {
+      await mkdir(scratch, { recursive: true });
+      await createDerivative(original.file, path.join(scratch, galleryFilename), DERIVATIVE_SIZES.gallery.dimensions, DERIVATIVE_SIZES.gallery.quality);
+      await createDerivative(original.file, path.join(scratch, viewerFilename), DERIVATIVE_SIZES.viewer.dimensions, DERIVATIVE_SIZES.viewer.quality);
+      await rm(final, { recursive: true, force: true });
+      await rename(scratch, final);
+    } finally {
+      await rm(scratch, { recursive: true, force: true }).catch(() => {});
+    }
+  }
+  const describeImage = async (name) => {
+    const { width, height } = await sharp(path.join(final, name)).metadata();
+    return { width, height, sha256: await fileHash(path.join(final, name)) };
+  };
+  const now = new Date().toISOString();
+  const restore = { folder, source: { kind: original.kind, sha256: original.sha256 }, gallery: await describeImage(galleryFilename), viewer: await describeImage(viewerFilename), requestedAt: now };
+  const history = [...(treatment.history ?? []), { action: 'remove-approved', at: now, documentHash: treatment.approved.documentHash, approvedAt: treatment.approved.approvedAt }];
+  return writeTreatment(dir, id, revision, { ...treatment, approved: null, restore, history, status: treatment.status === 'approved' ? 'draft' : treatment.status });
+}
+
 /** Drops the working treatment: back to the approved one, or to no treatment at all. */
 export async function discardTreatment(dir, id, revision) {
   const treatment = await readTreatment(dir, id);
@@ -378,6 +423,13 @@ export async function discardTreatment(dir, id, revision) {
   return writeTreatment(dir, id, revision, approved
     ? { ...treatment, document: approved.document, documentHash: approved.documentHash, render: approved.render, status: 'approved' }
     : { ...treatment, document: null, documentHash: null, render: null, status: 'none' });
+}
+
+/** Absolute path of a staged original image of a removed treatment (gallery or viewer), or null. */
+export function restoreImage(dir, id, restore, which) {
+  if (!restore || !/^[0-9a-f]{16}$/.test(restore.folder)) return null;
+  const name = derivativeFilenames(id)[`${which}Filename`];
+  return name ? path.join(paths(dir).renders, id, restore.folder, name) : null;
 }
 
 /** Absolute path of a staged image of a render (`file`, gallery or viewer), or null. */
@@ -400,7 +452,7 @@ async function collectGarbage(dir) {
   }
   for (const id of await readdir(p.renders).catch(() => [])) {
     if (!ID.test(id)) continue;
-    const keep = new Set([treatments[id]?.render?.folder, treatments[id]?.approved?.render?.folder].filter(Boolean));
+    const keep = new Set([treatments[id]?.render?.folder, treatments[id]?.approved?.render?.folder, treatments[id]?.restore?.folder].filter(Boolean));
     for (const folder of await readdir(path.join(p.renders, id)).catch(() => [])) {
       if (!folder.startsWith('.') && !keep.has(folder)) await rm(path.join(p.renders, id, folder), { recursive: true, force: true });
     }
@@ -412,6 +464,7 @@ export function treatmentSummary(treatment) {
   return {
     status: treatment.status,
     hasApproved: Boolean(treatment.approved),
+    restorePending: Boolean(!treatment.approved && treatment.restore),
     renderFresh: renderIsFresh(treatment),
     attached: treatment.attached.length,
     revision: treatment.revision,

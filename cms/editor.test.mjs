@@ -214,6 +214,28 @@ describe('treatments', () => {
     expect(readdirSync(path.join(fixture.workspace, 'renders', id))).toEqual([state.treatment.render.folder]);
   });
 
+  test('the comparison original is the camera original; remove-approved needs the current revision', async () => {
+    const { id } = await uploadDraft();
+    const state = (await describe_(id)).json;
+    expect(state.original).toBe('source');
+    const original = await call('GET', `/api/editor/photos/${id}/images/original`);
+    expect(original.status).toBe(200);
+    expect(original.headers['content-type']).toBe('image/jpeg');
+    expect(original.headers['cache-control']).toBe('private, no-store');
+    expect(readdirSync(path.join(fixture.workspace, 'cache', 'originals'))).toEqual([`${id}-${state.sources[0].sha256.slice(0, 16)}-viewer.jpg`]);
+    expect((await review(id, 'remove-approved')).json.error.code).toBe('no-approved');
+    await save(id, documentFor(state.sources[0], { exposure: 0.2 }));
+    await render(id, await photograph({ color: { r: 200, g: 10, b: 10 } }));
+    await review(id, 'approve');
+    const stale = await call('POST', `/api/editor/photos/${id}/remove-approved`, { body: { revision: 0 } });
+    expect(stale.status).toBe(409);
+    expect(stale.json.error.code).toBe('stale-revision');
+    const removed = (await review(id, 'remove-approved')).json;
+    expect(removed.treatment).toMatchObject({ approved: null, status: 'draft' });
+    expect(removed.treatment.restore.viewer.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(removed.approvedLive).toBe(false);
+  });
+
   test('a treatment without an approval discards to nothing', async () => {
     const { id } = await uploadDraft();
     await save(id, documentFor((await describe_(id)).json.sources[0], { exposure: 0.2 }));

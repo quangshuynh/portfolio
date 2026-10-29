@@ -13,7 +13,7 @@ import { createGit } from './git.mjs';
 import { preparePublication, resolveBase } from './publish.mjs';
 import { approvedImageChanges } from './treatment-publish.mjs';
 import {
-  approveTreatment, attachSource, canonicalDocument, editingSources, readTreatment, rejectTreatment, saveTreatment, storeRender,
+  approveTreatment, attachSource, canonicalDocument, editingSources, readTreatment, rejectTreatment, removeApprovedTreatment, saveTreatment, storeRender,
 } from './treatments.mjs';
 import { ingestUpload } from './uploads.mjs';
 import { initWorkspace, readWorkspace, saveCatalog } from './workspace.mjs';
@@ -112,4 +112,39 @@ test('a render changed on disk after approval stops publication', async () => {
   const { writeFileSync } = await import('node:fs');
   writeFileSync(`${fixture.workspace}/renders/alpha/${treatment.approved.render.folder}/alpha-viewer.jpg`, await photograph({ width: 10, height: 10 }));
   await expect(preparePublication({ git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true })).rejects.toMatchObject({ code: 'render-missing' });
+});
+
+test('removing an approved treatment stages the original images for the next publication', async () => {
+  const workspace = await readWorkspace(fixture.workspace);
+  const { record } = await ingestUpload(fixture.workspace, { filename: 'pier.jpg', bytes: await photograph({ color: { r: 60, g: 120, b: 180 } }) }, workspace.catalog);
+  await saveCatalog(fixture.workspace, addDraft(workspace.catalog, { ...record, caption: 'Pier', alt: 'A pier' }), workspace.revision);
+  const approved = await treat(record.id);
+  const fresh = await readWorkspace(fixture.workspace);
+  await saveCatalog(fixture.workspace, setStatus(fresh.catalog, [record.id], 'published'), fresh.revision);
+  const sources = await editingSources({ workspaceDir: fixture.workspace, record, treatment: approved });
+
+  await expect(removeApprovedTreatment(fixture.workspace, record.id, approved.revision - 1, sources)).rejects.toMatchObject({ code: 'stale-revision' });
+  const removed = await removeApprovedTreatment(fixture.workspace, record.id, approved.revision, sources);
+  expect(removed).toMatchObject({ approved: null, status: 'draft', restore: { source: { kind: 'original', sha256: sources[0].sha256 }, viewer: { width: 1600 } } });
+  expect(removed.document).toEqual(approved.document);
+  expect(removed.history).toEqual([expect.objectContaining({ action: 'remove-approved', documentHash: approved.documentHash, approvedAt: approved.approved.approvedAt })]);
+  await expect(removeApprovedTreatment(fixture.workspace, record.id, removed.revision, sources)).rejects.toMatchObject({ code: 'no-approved' });
+
+  const state = await preparePublication({ git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });
+  const viewer = sha256(show(state.branch, `src/assets/photography/generated/${record.id}-viewer.jpg`));
+  expect(viewer).toBe(removed.restore.viewer.sha256);
+  expect(viewer).not.toBe(approved.approved.render.viewer.sha256);
+  expect(tree(state.branch).some((file) => /sources|renders|treatments|quangedit/i.test(file))).toBe(false);
+  // Approving again replaces the restore.
+  const again = await approveTreatment(fixture.workspace, record.id, removed.revision);
+  expect(again.restore).toBeNull();
+});
+
+test('without the original file an approved treatment cannot be removed', async () => {
+  const treatment = await treat('alpha');
+  const { catalog } = await readWorkspace(fixture.workspace);
+  const sources = await editingSources({ workspaceDir: fixture.workspace, record: catalog.photographs.find((photo) => photo.id === 'alpha'), treatment: { ...treatment, attached: [] }, derivativesDir: `${fixture.repo}/src/assets/photography/generated` });
+  expect(sources[0].kind).toBe('derivative');
+  await expect(removeApprovedTreatment(fixture.workspace, 'alpha', treatment.revision, sources)).rejects.toMatchObject({ code: 'no-original' });
+  expect((await readTreatment(fixture.workspace, 'alpha')).approved).not.toBeNull();
 });
