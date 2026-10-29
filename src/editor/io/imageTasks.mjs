@@ -227,7 +227,7 @@ export const handlers = {
    * pass, the raster rows they read (`raster.top` onward).
    */
   async compositeRows({ pass, raster = null, rows, width, y0, y1 }) {
-    if (pass.kind === 'adjust') adjustRows(rows, pass, prepareRender(adjustmentParams(pass)));
+    if (pass.kind === 'adjust') adjustRows(rows, pass, prepareRender(adjustmentParams(pass)), { width, y0 });
     else compositeRasterRows(rows, width, y0, y1, { ...pass, raster });
     return { result: rows, transfer: [rows.buffer] };
   },

@@ -30,6 +30,8 @@ import { rasterizeTextLayer } from '../text/textRender.mjs';
 import { createImageLayer, createAdjustmentLayer, insertLayer, layerAdjustments, layerLabel, settingsNeutral, visibleLayers } from '../model/layers.mjs';
 import { rasterSize } from '../pipeline/layerTransform.mjs';
 import { composeLayers } from '../io/composeLayers.mjs';
+import { visibleLocals } from '../model/masks.mjs';
+import { imageMaskMap } from '../pipeline/mask.mjs';
 import { createRasterCache } from './layerRasters.mjs';
 import LayersPanel, { newLayerId } from './LayersPanel';
 import { thumbnailSource } from './filterThumbs.mjs';
@@ -807,9 +809,10 @@ function EditorWorkspace() {
     const resource = resources.current.get(target.id);
     const values = target.history.present;
     const lut = values.lut ? lutsRef.current.get(values.lut.sha256) : null;
-    // Layers: composited over the rendered photo before encoding (io/composeLayers.mjs).
+    // Local adjustments and layers: applied over the rendered photo before encoding (io/composeLayers.mjs).
     const layerCancel = { cancelled: false };
-    const compose = visibleLayers(values.layers).length ? async (context, { size, signal, onProgress: progress }) => {
+    const native = { width: target.width, height: target.height };
+    const compose = visibleLayers(values.layers).length || visibleLocals(values.local).length ? async (context, { size, signal, onProgress: progress }) => {
       if (values.layers.some((layer) => layer.type === 'text')) await loadTextFonts();
       const merged = { get cancelled() { return layerCancel.cancelled || Boolean(signal?.cancelled); } };
       await composeLayers(context, values.layers, {
@@ -817,6 +820,9 @@ function EditorWorkspace() {
         loadRaster: (layer, canvasSize) => exportLayerRaster(layer, canvasSize, merged),
         rasterizeText: rasterizeTextLayer,
         lutFor: (layerSettings) => (layerSettings?.lut ? lutsRef.current.get(layerSettings.lut.sha256) ?? null : null),
+        local: values.local,
+        imageMap: (canvas) => imageMaskMap(exportGeometry(values.geometry, native, { mode: 'original' }).plan, canvas, native),
+        native: exportGeometry(values.geometry, native, { mode: 'original' }).output,
         workers: detailWorkerCount(),
         signal: merged,
         onProgress: progress,

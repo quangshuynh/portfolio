@@ -24,8 +24,9 @@ describe('migration of earlier documents', () => {
     expect(document.version).toBe(version);
     document.photos.forEach((photo, i) => {
       const before = parsedByV8[version][i];
-      const { layers, ...rest } = photo.adjustments;
+      const { layers, local, ...rest } = photo.adjustments;
       const { overlays, ...expected } = before;
+      expect(local).toEqual([]);
       // Everything else (base photo settings, RAW, HDR tone, geometry, creative, filter, LUT) is unchanged.
       expect(rest).toEqual(expected);
       // Text objects become text layers: same ids, order (z-order), content and appearance.

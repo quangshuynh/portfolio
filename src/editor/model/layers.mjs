@@ -19,10 +19,18 @@
 // Locked layers keep their content, transform, opacity, blend mode and settings: only
 // visibility, the lock itself and the name change, and they cannot be deleted. They can
 // still be reordered and duplicated (the copy is unlocked).
+//
+// A layer may have a `mask` (model/masks.mjs): image layers in their own box ('layer' space,
+// so the mask moves with them), text and adjustment layers on the canvas. The key is absent
+// when a layer has no mask, as in version 9 documents.
 
 import { DEFAULT_OUTLINE, DEFAULT_SHADOW, TEXT_LIMITS, normalizeTextOverlay } from './overlays.mjs';
 import { ADJUSTMENTS, groupIsNeutral, normalizeAdjustments } from './adjustments.mjs';
 import { CURVE_CHANNELS, isNeutralCurve } from '../pipeline/curves.mjs';
+import { MASK_LIMITS, normalizeMask } from './masks.mjs';
+
+/** The space of a layer type's mask. */
+export const layerMaskSpace = (type) => (type === 'image' ? 'layer' : 'canvas');
 
 export const LAYER_TYPES = Object.freeze(['image', 'text', 'adjustment']);
 
@@ -153,7 +161,14 @@ function common(input) {
 }
 
 /** One layer from untrusted input, or null when it is not a valid layer. Values are clamped. */
-export function normalizeLayer(input) {
+export function normalizeLayer(input, budget = { points: MASK_LIMITS.photoPoints }) {
+  const layer = normalizeLayerFields(input);
+  if (!layer || !isObject(input.mask)) return layer;
+  const mask = normalizeMask(input.mask, layerMaskSpace(layer.type), budget);
+  return mask ? { ...layer, mask } : layer;
+}
+
+function normalizeLayerFields(input) {
   if (!isObject(input) || !validId(input.id) || !LAYER_TYPES.includes(input.type)) return null;
   if (input.type === 'text') {
     const text = normalizeTextOverlay(input);
@@ -186,13 +201,13 @@ export const textLayerFromOverlay = (overlay) => (isObject(overlay) && (overlay.
  * type and in total. `legacyOverlays` (documents before version 9) become text layers in
  * their order when there is no `layers` list.
  */
-export function normalizeLayers(input, legacyOverlays = undefined) {
+export function normalizeLayers(input, legacyOverlays = undefined, budget = { points: MASK_LIMITS.photoPoints }) {
   const list = Array.isArray(input) ? input : Array.isArray(legacyOverlays) ? legacyOverlays.map(textLayerFromOverlay) : [];
   const seen = new Set();
   const counts = { image: 0, text: 0, adjustment: 0 };
   const out = [];
   for (const entry of list.slice(0, LAYER_LIMITS.layers * 2)) {
-    const layer = normalizeLayer(entry);
+    const layer = normalizeLayer(entry, budget);
     if (!layer || seen.has(layer.id) || counts[layer.type] >= LAYER_LIMITS[layer.type]) continue;
     seen.add(layer.id);
     counts[layer.type] += 1;
@@ -229,7 +244,9 @@ export function updateLayer(layers, id, patch) {
   return layers.map((layer) => {
     if (layer.id !== id) return layer;
     const allowed = layer.locked ? Object.fromEntries(Object.entries(patch).filter(([key]) => LOCK_FREE.has(key))) : patch;
-    return normalizeLayer({ ...layer, ...allowed, id: layer.id, type: layer.type }) ?? layer;
+    const next = { ...layer, ...allowed, id: layer.id, type: layer.type };
+    if (next.mask === null) delete next.mask;
+    return normalizeLayer(next) ?? layer;
   });
 }
 

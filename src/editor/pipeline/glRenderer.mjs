@@ -38,8 +38,8 @@ function opaqueRgba({ kind, data }) {
 
 // Texture units: the photo, the curve table, the 3D LUT, a RAW photo, a merged HDR, the glow map, soft focus,
 // and for layer passes the layer (or adjusted composite) and the composite so far.
-const UNIT = { source: 0, curves: 1, lut: 2, raw: 3, hdr: 4, glow: 5, diffuse: 6, layer: 7, backdrop: 8 };
-const COMPOSITE_UNIFORMS = ['uBackdrop', 'uLayer', 'uAdjust', 'uMatrix', 'uOutputSize', 'uScale', 'uOpaque', 'uOpacity', 'uMode'];
+const UNIT = { source: 0, curves: 1, lut: 2, raw: 3, hdr: 4, glow: 5, diffuse: 6, layer: 7, backdrop: 8, mask: 9 };
+const COMPOSITE_UNIFORMS = ['uBackdrop', 'uLayer', 'uAdjust', 'uMatrix', 'uOutputSize', 'uScale', 'uOpaque', 'uOpacity', 'uMode', 'uMask', 'uMasked'];
 
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
@@ -108,6 +108,19 @@ function rgbaTexture(gl, width, height, data = null) {
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
   const pixels = data && (data instanceof Uint8Array ? data : new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+  [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER].forEach((name) => gl.texParameteri(gl.TEXTURE_2D, name, gl.NEAREST));
+  [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T].forEach((name) => gl.texParameteri(gl.TEXTURE_2D, name, gl.CLAMP_TO_EDGE));
+  return texture;
+}
+
+/** A single-channel 8-bit texture (mask coverage codes), sampled with texelFetch. */
+function r8Texture(gl, width, height, data) {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, width, height, 0, gl.RED, gl.UNSIGNED_BYTE, data instanceof Uint8Array ? data : new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
   [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER].forEach((name) => gl.texParameteri(gl.TEXTURE_2D, name, gl.NEAREST));
   [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T].forEach((name) => gl.texParameteri(gl.TEXTURE_2D, name, gl.CLAMP_TO_EDGE));
   return texture;
@@ -196,6 +209,8 @@ export class GlRenderer {
     this.compositor = null;
     this.targets = [];
     this.layerTextures = new Map();
+    // Mask coverage (R8) of masked passes, by the pass's mask key.
+    this.maskTextures = new Map();
   }
 
   /**
@@ -368,6 +383,7 @@ export class GlRenderer {
     else this.draw(params);
     let [current, next] = targets;
     const used = new Set();
+    const usedMasks = new Set();
     for (const pass of layers) {
       let layerTexture;
       if (pass.kind === 'adjust') {
@@ -395,6 +411,11 @@ export class GlRenderer {
       gl.uniform1i(u.uOpaque, pass.opaque ? 1 : 0);
       gl.uniform1f(u.uOpacity, pass.opacity);
       gl.uniform1i(u.uMode, pass.mode);
+      gl.activeTexture(gl.TEXTURE0 + UNIT.mask);
+      gl.bindTexture(gl.TEXTURE_2D, pass.mask ? this.maskTexture(pass.mask) : this.maskPlaceholder());
+      gl.uniform1i(u.uMask, UNIT.mask);
+      gl.uniform1i(u.uMasked, pass.mask ? 1 : 0);
+      if (pass.mask) usedMasks.add(pass.mask.key);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       [current, next] = [next, current];
     }
@@ -409,6 +430,26 @@ export class GlRenderer {
     for (const [key, entry] of this.layerTextures) {
       if (!used.has(key)) { gl.deleteTexture(entry.texture); this.layerTextures.delete(key); }
     }
+    for (const [key, entry] of this.maskTextures) {
+      if (!usedMasks.has(key)) { gl.deleteTexture(entry.texture); this.maskTextures.delete(key); }
+    }
+  }
+
+  /** The R8 coverage texture of a pass's mask ({ key, raster }), uploaded once per raster. */
+  maskTexture({ key, raster }) {
+    const cached = this.maskTextures.get(key);
+    if (cached?.raster === raster) return cached.texture;
+    const { gl } = this;
+    if (cached) gl.deleteTexture(cached.texture);
+    const texture = r8Texture(gl, raster.width, raster.height, raster.data);
+    this.maskTextures.set(key, { texture, raster });
+    return texture;
+  }
+
+  /** A 1 × 1 texture bound to the mask unit by unmasked passes. */
+  maskPlaceholder() {
+    this.emptyMask ??= r8Texture(this.gl, 1, 1, new Uint8Array([255]));
+    return this.emptyMask;
   }
 
   ensureCompositor() {
@@ -466,6 +507,8 @@ export class GlRenderer {
     this.releaseTargets();
     this.layerTextures.forEach(({ texture }) => this.gl.deleteTexture(texture));
     this.layerTextures.clear();
+    this.maskTextures.forEach(({ texture }) => this.gl.deleteTexture(texture));
+    this.maskTextures.clear();
   }
 
   /** Uploads a CPU-rendered RGBA8 frame into its own texture (linear filtering for scaling). */
@@ -677,6 +720,7 @@ export class GlRenderer {
     gl.deleteTexture(this.rawPlaceholder);
     gl.deleteTexture(this.hdrPlaceholder);
     gl.deleteTexture(this.sourcePlaceholder);
+    if (this.emptyMask) gl.deleteTexture(this.emptyMask);
     gl.deleteBuffer(this.buffer);
     gl.deleteVertexArray(this.vao);
     gl.deleteProgram(this.program);

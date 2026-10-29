@@ -8,7 +8,8 @@
 // imported .cube LUT by content hash, or null), `raw` (white balance of a RAW
 // photo's development; ignored for JPEG, PNG and WebP) and `geometry` (crop, rotation,
 // flips, perspective, stretch and resize; pipeline/geometry.mjs) and `layers` (image, text and
-// adjustment layers composited over the finished photo; model/layers.mjs) and `filter` (which Filter Library
+// adjustment layers composited over the finished photo; model/layers.mjs) and `local` (masked local adjustments
+// over the finished photo, below the layers; model/masks.mjs) and `filter` (which Filter Library
 // filter set the Creative group, and at what strength; model/filters.mjs). The `hdr` controls only act on
 // merged RAW HDR photos. Creative controls (pipeline/creative.mjs) carry a `section` for the
 // panel, and `scales` when a look's intensity scales them from neutral.
@@ -18,6 +19,7 @@ import { MAX_LUT_SIZE, MIN_LUT_SIZE } from '../pipeline/lut.mjs';
 import { compactGeometry, geometryEqual, geometryNeutral, neutralGeometry, normalizeGeometry } from '../pipeline/geometry.mjs';
 import { DAYLIGHT_KELVIN, RAW_KELVIN, RAW_TINT, WHITE_BALANCE_MODES } from '../raw/rawColor.mjs';
 import { compactLayers, layersEqual, normalizeLayers, textLayers } from './layers.mjs';
+import { MASK_LIMITS, compactLocals, localsEqual, normalizeLocalAdjustments } from './masks.mjs';
 
 /** Colour ranges for HSL, with their hue centres in degrees (HSV hue of sRGB values). */
 export const HSL_RANGES = Object.freeze([
@@ -146,6 +148,7 @@ export const ADJUSTMENT_GROUPS = Object.freeze([
   { id: 'creative', label: 'Creative' },
   { id: 'text', label: 'Text' },
   { id: 'layers', label: 'Layers' },
+  { id: 'masks', label: 'Masks' },
   { id: 'raw', label: 'RAW' },
   { id: 'hdr', label: 'HDR' },
 ].map(Object.freeze));
@@ -219,6 +222,7 @@ export function neutralAdjustments() {
     raw: { ...RAW_DEFAULTS },
     geometry: neutralGeometry(),
     layers: [],
+    local: [],
     filter: null,
   };
 }
@@ -226,6 +230,9 @@ export function neutralAdjustments() {
 /** Fills missing keys with neutral values and clamps the rest; unknown keys are dropped. */
 export function normalizeAdjustments(input = {}) {
   const source = input !== null && typeof input === 'object' ? input : {};
+  // Brush points allowed for the whole photo, shared by local adjustments and layer masks.
+  const budget = { points: MASK_LIMITS.photoPoints };
+  const local = normalizeLocalAdjustments(source.local, budget);
   return {
     ...Object.fromEntries(ADJUSTMENTS.map(({ key, default: value }) => [
       key,
@@ -236,7 +243,8 @@ export function normalizeAdjustments(input = {}) {
     raw: normalizeRawSettings(source.raw),
     geometry: normalizeGeometry(source.geometry),
     // Documents before version 9 kept text in `overlays`; they become text layers.
-    layers: normalizeLayers(source.layers, source.overlays),
+    layers: normalizeLayers(source.layers, source.overlays, budget),
+    local,
     filter: normalizeFilterRef(source.filter),
   };
 }
@@ -246,7 +254,7 @@ const lutRefsEqual = (a, b) => (a === null || b === null ? a === b : a.sha256 ==
 
 export const adjustmentsEqual = (a, b) => ADJUSTMENT_KEYS.every((key) => a[key] === b[key])
   && curvesEqual(a.curves, b.curves) && lutRefsEqual(a.lut, b.lut) && rawEqual(a.raw ?? RAW_DEFAULTS, b.raw ?? RAW_DEFAULTS)
-  && geometryEqual(a.geometry ?? NEUTRAL_GEOMETRY, b.geometry ?? NEUTRAL_GEOMETRY) && layersEqual(a.layers ?? [], b.layers ?? []) && filterRefsEqual(a.filter ?? null, b.filter ?? null);
+  && geometryEqual(a.geometry ?? NEUTRAL_GEOMETRY, b.geometry ?? NEUTRAL_GEOMETRY) && layersEqual(a.layers ?? [], b.layers ?? []) && localsEqual(a.local ?? [], b.local ?? []) && filterRefsEqual(a.filter ?? null, b.filter ?? null);
 
 const numericNeutral = (adjustments, keys) => keys.every((key) => (adjustments[key] ?? byKey.get(key).default) === byKey.get(key).default);
 
@@ -261,6 +269,7 @@ export function groupIsNeutral(adjustments, group) {
   if (group === 'geometry') return geometryNeutral(adjustments.geometry ?? NEUTRAL_GEOMETRY);
   if (group === 'text') return !textLayers(adjustments.layers ?? []).length;
   if (group === 'layers') return !adjustments.layers?.length;
+  if (group === 'masks') return !adjustments.local?.length;
   return numericNeutral(adjustments, groupKeys(group));
 }
 
@@ -276,6 +285,7 @@ export function neutralGroup(group, current = null) {
   if (group === 'raw') patch.raw = neutral.raw;
   if (group === 'geometry') patch.geometry = neutral.geometry;
   if (group === 'layers') patch.layers = [];
+  if (group === 'masks') patch.local = [];
   if (group === 'text') patch.layers = (current?.layers ?? []).filter((layer) => layer.type !== 'text' || layer.locked);
   if (group === 'creative') patch.filter = null;
   return patch;
@@ -306,6 +316,7 @@ export function compactAdjustments(adjustments) {
   const geometry = compactGeometry(a.geometry);
   if (geometry) out.geometry = geometry;
   if (a.layers.length) out.layers = compactLayers(a.layers);
+  if (a.local.length) out.local = compactLocals(a.local);
   if (a.filter) out.filter = a.filter;
   return out;
 }

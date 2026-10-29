@@ -1,0 +1,450 @@
+[
+ {
+  "exposure": 0.3,
+  "contrast": 0,
+  "highlights": 0,
+  "shadows": 0,
+  "whites": 0,
+  "blacks": 0,
+  "temperature": 0,
+  "tint": 0,
+  "vibrance": 0,
+  "saturation": 0,
+  "redHue": 0,
+  "redSaturation": 0,
+  "redLuminance": 0,
+  "orangeHue": 0,
+  "orangeSaturation": 0,
+  "orangeLuminance": 0,
+  "yellowHue": 0,
+  "yellowSaturation": 0,
+  "yellowLuminance": 0,
+  "greenHue": 0,
+  "greenSaturation": 0,
+  "greenLuminance": 0,
+  "aquaHue": 0,
+  "aquaSaturation": 0,
+  "aquaLuminance": 0,
+  "blueHue": 0,
+  "blueSaturation": 0,
+  "blueLuminance": 0,
+  "purpleHue": 0,
+  "purpleSaturation": 0,
+  "purpleLuminance": 0,
+  "magentaHue": 0,
+  "magentaSaturation": 0,
+  "magentaLuminance": 0,
+  "texture": 0,
+  "clarity": 20,
+  "dehaze": 0,
+  "sharpening": 0,
+  "luminanceNoise": 0,
+  "colorNoise": 0,
+  "rawTemperature": 5500,
+  "rawTint": 0,
+  "hdrHighlights": 50,
+  "hdrShadows": 0,
+  "bleachAmount": 0,
+  "bleachContrast": 50,
+  "bleachDesaturation": 60,
+  "bleachProtect": 30,
+  "fade": 0,
+  "fadeHighlights": 0,
+  "fadeShadowTint": 0,
+  "fadeShadowHue": 210,
+  "fadeHighlightTint": 0,
+  "fadeHighlightHue": 45,
+  "grainAmount": 0,
+  "grainSize": 35,
+  "grainRoughness": 50,
+  "grainSeed": 0,
+  "bloomAmount": 0,
+  "bloomRadius": 40,
+  "bloomThreshold": 60,
+  "halationAmount": 0,
+  "halationRadius": 30,
+  "halationThreshold": 60,
+  "halationHue": 15,
+  "vignetteAmount": 0,
+  "vignetteMidpoint": 50,
+  "vignetteRoundness": 0,
+  "vignetteFeather": 50,
+  "gradeShadowsHue": 220,
+  "gradeShadowsSat": 0,
+  "gradeShadowsLum": 0,
+  "gradeMidtonesHue": 30,
+  "gradeMidtonesSat": 0,
+  "gradeMidtonesLum": 0,
+  "gradeHighlightsHue": 45,
+  "gradeHighlightsSat": 0,
+  "gradeHighlightsLum": 0,
+  "gradeGlobalHue": 30,
+  "gradeGlobalSat": 0,
+  "gradeGlobalLum": 0,
+  "gradeBalance": 0,
+  "gradeBlending": 50,
+  "sensorColor": 0,
+  "cameraResponse": 0,
+  "highlightClip": 0,
+  "noiseAmount": 0,
+  "noiseColor": 50,
+  "captureResolution": 0,
+  "pixelEdges": 0,
+  "jpegAmount": 0,
+  "quantizeAmount": 0,
+  "quantizeDither": 0,
+  "chromaticAberration": 0,
+  "channelShift": 0,
+  "channelShiftAngle": 0,
+  "diffusionAmount": 0,
+  "diffusionRadius": 40,
+  "lutIntensity": 100,
+  "curves": {
+   "master": [
+    [
+     0,
+     0
+    ],
+    [
+     255,
+     255
+    ]
+   ],
+   "red": [
+    [
+     0,
+     0
+    ],
+    [
+     255,
+     255
+    ]
+   ],
+   "green": [
+    [
+     0,
+     0
+    ],
+    [
+     255,
+     255
+    ]
+   ],
+   "blue": [
+    [
+     0,
+     0
+    ],
+    [
+     255,
+     255
+    ]
+   ]
+  },
+  "lut": null,
+  "raw": {
+   "whiteBalance": "as-shot"
+  },
+  "geometry": {
+   "quarterTurns": 0,
+   "flipH": false,
+   "flipV": false,
+   "angle": 3,
+   "perspective": {
+    "vertical": 0,
+    "horizontal": 0
+   },
+   "quad": null,
+   "stretch": {
+    "x": 100,
+    "y": 100
+   },
+   "crop": {
+    "x": 0.1,
+    "y": 0.1,
+    "width": 0.8,
+    "height": 0.8
+   },
+   "aspect": "free",
+   "constrain": true,
+   "background": "transparent",
+   "resize": null
+  },
+  "layers": [
+   {
+    "id": "img1",
+    "type": "image",
+    "name": "",
+    "visible": true,
+    "locked": false,
+    "opacity": 0.8,
+    "blend": "multiply",
+    "source": {
+     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+     "name": "overlay.png",
+     "size": 2048,
+     "format": "png",
+     "width": 640,
+     "height": 480
+    },
+    "x": 0.5,
+    "y": 0.5,
+    "width": 0.8,
+    "height": 0.6,
+    "rotation": 12,
+    "flipH": false,
+    "flipV": false,
+    "settings": {
+     "exposure": 0.5,
+     "contrast": 0,
+     "highlights": 0,
+     "shadows": 0,
+     "whites": 0,
+     "blacks": 0,
+     "temperature": 0,
+     "tint": 0,
+     "vibrance": 0,
+     "saturation": 0,
+     "redHue": 0,
+     "redSaturation": 0,
+     "redLuminance": 0,
+     "orangeHue": 0,
+     "orangeSaturation": 0,
+     "orangeLuminance": 0,
+     "yellowHue": 0,
+     "yellowSaturation": 0,
+     "yellowLuminance": 0,
+     "greenHue": 0,
+     "greenSaturation": 0,
+     "greenLuminance": 0,
+     "aquaHue": 0,
+     "aquaSaturation": 0,
+     "aquaLuminance": 0,
+     "blueHue": 0,
+     "blueSaturation": 0,
+     "blueLuminance": 0,
+     "purpleHue": 0,
+     "purpleSaturation": 0,
+     "purpleLuminance": 0,
+     "magentaHue": 0,
+     "magentaSaturation": 0,
+     "magentaLuminance": 0,
+     "bleachAmount": 0,
+     "bleachContrast": 50,
+     "bleachDesaturation": 60,
+     "bleachProtect": 30,
+     "fade": 0,
+     "fadeHighlights": 0,
+     "fadeShadowTint": 0,
+     "fadeShadowHue": 210,
+     "fadeHighlightTint": 0,
+     "fadeHighlightHue": 45,
+     "gradeShadowsHue": 220,
+     "gradeShadowsSat": 0,
+     "gradeShadowsLum": 0,
+     "gradeMidtonesHue": 30,
+     "gradeMidtonesSat": 0,
+     "gradeMidtonesLum": 0,
+     "gradeHighlightsHue": 45,
+     "gradeHighlightsSat": 0,
+     "gradeHighlightsLum": 0,
+     "gradeGlobalHue": 30,
+     "gradeGlobalSat": 0,
+     "gradeGlobalLum": 0,
+     "gradeBalance": 0,
+     "gradeBlending": 50,
+     "sensorColor": 0,
+     "cameraResponse": 0,
+     "highlightClip": 0,
+     "quantizeAmount": 0,
+     "lutIntensity": 100,
+     "curves": {
+      "master": [
+       [
+        0,
+        0
+       ],
+       [
+        255,
+        255
+       ]
+      ],
+      "red": [
+       [
+        0,
+        0
+       ],
+       [
+        255,
+        255
+       ]
+      ],
+      "green": [
+       [
+        0,
+        0
+       ],
+       [
+        255,
+        255
+       ]
+      ],
+      "blue": [
+       [
+        0,
+        0
+       ],
+       [
+        255,
+        255
+       ]
+      ]
+     },
+     "lut": null
+    }
+   },
+   {
+    "id": "txt1",
+    "type": "text",
+    "name": "",
+    "visible": true,
+    "locked": false,
+    "opacity": 1,
+    "blend": "normal",
+    "text": "Hello",
+    "font": "sans",
+    "weight": 700,
+    "italic": false,
+    "size": 0.08,
+    "x": 0.3,
+    "y": 0.7,
+    "rotation": 0,
+    "scale": 1,
+    "color": "#ffeeaa",
+    "align": "center",
+    "outline": null,
+    "shadow": null,
+    "flipH": false,
+    "flipV": false
+   },
+   {
+    "id": "adj1",
+    "type": "adjustment",
+    "name": "",
+    "visible": true,
+    "locked": false,
+    "opacity": 0.6,
+    "blend": "soft-light",
+    "settings": {
+     "exposure": 0,
+     "contrast": 20,
+     "highlights": 0,
+     "shadows": 0,
+     "whites": 0,
+     "blacks": 0,
+     "temperature": 0,
+     "tint": 0,
+     "vibrance": 0,
+     "saturation": -40,
+     "redHue": 0,
+     "redSaturation": 0,
+     "redLuminance": 0,
+     "orangeHue": 0,
+     "orangeSaturation": 0,
+     "orangeLuminance": 0,
+     "yellowHue": 0,
+     "yellowSaturation": 0,
+     "yellowLuminance": 0,
+     "greenHue": 0,
+     "greenSaturation": 0,
+     "greenLuminance": 0,
+     "aquaHue": 0,
+     "aquaSaturation": 0,
+     "aquaLuminance": 0,
+     "blueHue": 0,
+     "blueSaturation": 0,
+     "blueLuminance": 0,
+     "purpleHue": 0,
+     "purpleSaturation": 0,
+     "purpleLuminance": 0,
+     "magentaHue": 0,
+     "magentaSaturation": 0,
+     "magentaLuminance": 0,
+     "bleachAmount": 0,
+     "bleachContrast": 50,
+     "bleachDesaturation": 60,
+     "bleachProtect": 30,
+     "fade": 0,
+     "fadeHighlights": 0,
+     "fadeShadowTint": 0,
+     "fadeShadowHue": 210,
+     "fadeHighlightTint": 0,
+     "fadeHighlightHue": 45,
+     "gradeShadowsHue": 220,
+     "gradeShadowsSat": 0,
+     "gradeShadowsLum": 0,
+     "gradeMidtonesHue": 30,
+     "gradeMidtonesSat": 0,
+     "gradeMidtonesLum": 0,
+     "gradeHighlightsHue": 45,
+     "gradeHighlightsSat": 0,
+     "gradeHighlightsLum": 0,
+     "gradeGlobalHue": 30,
+     "gradeGlobalSat": 0,
+     "gradeGlobalLum": 0,
+     "gradeBalance": 0,
+     "gradeBlending": 50,
+     "sensorColor": 0,
+     "cameraResponse": 0,
+     "highlightClip": 0,
+     "quantizeAmount": 0,
+     "lutIntensity": 100,
+     "curves": {
+      "master": [
+       [
+        0,
+        0
+       ],
+       [
+        255,
+        255
+       ]
+      ],
+      "red": [
+       [
+        0,
+        0
+       ],
+       [
+        255,
+        255
+       ]
+      ],
+      "green": [
+       [
+        0,
+        0
+       ],
+       [
+        255,
+        255
+       ]
+      ],
+      "blue": [
+       [
+        0,
+        0
+       ],
+       [
+        255,
+        255
+       ]
+      ]
+     },
+     "lut": null
+    }
+   }
+  ],
+  "filter": null
+ }
+]

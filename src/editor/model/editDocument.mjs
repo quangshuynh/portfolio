@@ -21,8 +21,10 @@ export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // objects become text layers in the same order with the same ids. Older versions read
 // unchanged (Detail, geometry, creative neutral, no layers, no filter); older editors reject
 // newer files instead of silently dropping settings. Image layers name their source file
-// (SHA-256, name, size, format, dimensions), never its pixels.
-export const DOCUMENT_VERSION = 9;
+// (SHA-256, name, size, format, dimensions), never its pixels. Version 10 added masks
+// (model/masks.mjs): `local` adjustments and a layer's optional `mask`, as geometry and stroke
+// paths, never bitmaps; version 9 files read with no masks.
+export const DOCUMENT_VERSION = 10;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).
@@ -113,11 +115,11 @@ function parseSource(source, index) {
   };
 }
 
-/** Settings from untrusted JSON: finite numbers, curves, a LUT reference, geometry and layers (or pre-v9 text overlays), all validated. */
+/** Settings from untrusted JSON: finite numbers, curves, a LUT reference, geometry, layers (or pre-v9 text overlays) and local adjustments, all validated. */
 export function parseAdjustments(input) {
   const values = isObject(input) ? input : {};
   const numeric = Object.fromEntries(Object.entries(values).filter(([, value]) => typeof value === 'number' && Number.isFinite(value)));
-  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw, geometry: values.geometry, layers: values.layers, overlays: values.overlays, filter: values.filter });
+  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw, geometry: values.geometry, layers: values.layers, overlays: values.overlays, local: values.local, filter: values.filter });
 }
 
 /** Reads an edit file, refusing an oversized one before any of it is read into memory. */

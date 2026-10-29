@@ -1,6 +1,7 @@
 // Layer compositing parity (dev server only): the WebGL2 passes (glRenderer.composite) against
 // the CPU reference (composite.mjs) for every blend mode, transforms, alpha and adjustment
-// layers, and the CPU reference against the browser's own canvas blend modes (an independent
+// layers, masked passes (gradients, brush strokes, inverted and layer-space masks, local
+// adjustments), and the CPU reference against the browser's own canvas blend modes (an independent
 // implementation of the same W3C formulas). Results land on window.layerParityResult for
 // scripts/check-editor-layers.mjs.
 import { BLEND_MODES, createAdjustmentLayer, normalizeLayer } from '../model/layers.mjs';
@@ -11,6 +12,10 @@ import { adjustmentParams, adjustmentPass, compositeImageSync, rasterPass } from
 import { layerMatrix, offsetMatrix } from '../pipeline/layerTransform.mjs';
 import { normalizeAdjustments } from '../model/adjustments.mjs';
 import { lookLut } from './lutFixtures.mjs';
+import { canvasMaskMap, imageMaskMap, layerMaskMap, rasterizeMask } from '../pipeline/mask.mjs';
+import { localPasses } from '../pipeline/composite.mjs';
+import { createBrush, createLinear, createRadial, normalizeMask, splitLocalSettings } from '../model/masks.mjs';
+import { geometryPlan, normalizeGeometry } from '../pipeline/geometry.mjs';
 
 const W = 96;
 const H = 64;
@@ -70,6 +75,20 @@ function cases() {
       rasterPass(above, r, layerMatrix(above, canvas, r), canvas),
     ],
   });
+  // Masked passes: the preview's precomputed coverage (as the viewer passes it).
+  const withRaster = (def, map) => ({ def, map, key: JSON.stringify(def), raster: rasterizeMask(def, map, canvas) });
+  const strokes = [{ mode: 'add', radius: 0.12, hardness: 0.4, opacity: 0.9, points: [[0.1, 0.2], [0.5, 0.7, 0.6], [0.9, 0.3]] }, { mode: 'erase', radius: 0.05, hardness: 1, opacity: 1, points: [[0.5, 0.65]] }];
+  const canvasMask = normalizeMask({ base: 'none', components: [createLinear('g', { x0: 0.2, y0: 0, x1: 0.8, y1: 1, feather: 0.5 }), createBrush('b', { strokes }), createRadial('r', { op: 'subtract', rx: 0.15, ry: 0.1, rotation: 30 })] }, 'canvas');
+  for (const blend of ['normal', 'multiply', 'color']) {
+    const l = imageLayer({ blend });
+    const m = normalizeMask({ base: 'all', invert: blend === 'multiply', components: [createRadial('r', { x: 0.4, rx: 0.3, ry: 0.2, feather: 0.7 })] }, 'layer');
+    out.push({ name: `masked image ${blend}`, passes: [rasterPass(l, r, layerMatrix(l, canvas, r), canvas, withRaster(m, layerMaskMap(layerMatrix(l, canvas, r), r)))] });
+  }
+  out.push({ name: 'masked adjustment (gradient, brush, subtract)', passes: [adjustmentPass({ ...createAdjustmentLayer('A', { exposure: -1.2, saturation: 40 }), blend: 'soft-light', opacity: 0.85 }, null, withRaster(canvasMask, canvasMaskMap(canvas)))] });
+  const native = { width: 192, height: 128 };
+  const plan = geometryPlan(normalizeGeometry({ angle: 9, crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 }, perspective: { vertical: 15, horizontal: 0 } }), native);
+  const local = { id: 'L', amount: 0.8, settings: { exposure: 0.8, temperature: -30, blueSaturation: -60 }, mask: normalizeMask({ components: [createLinear('sky', { x0: 0.5, y0: 0.1, x1: 0.5, y1: 0.6 }), createRadial('r', { x: 0.7, y: 0.6, rx: 0.2, ry: 0.15 })] }, 'image') };
+  out.push({ name: 'local adjustment (image space under geometry)', passes: localPasses(local, withRaster(local.mask, imageMaskMap(plan, canvas, native)), native, splitLocalSettings(local.settings)) });
   return out;
 }
 

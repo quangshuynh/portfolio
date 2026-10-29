@@ -297,12 +297,12 @@ describe('creative settings and text in presets, sync and documents', () => {
     expect(withText.items[0].changed).toEqual(expect.arrayContaining(['creative', 'layers']));
   });
 
-  test('documents (version 9) keep creative values and editable text layers; older versions open without them', () => {
+  test('documents (version 9 and later) keep creative values and editable text layers; older versions open without them', () => {
     const photo = { name: 'a.jpg', size: 1, lastModified: 0, sha256: null, format: 'jpeg', width: 10, height: 10, adjustments: values };
     const text = serializeEditDocument(createEditDocument([photo], {}, new Date(0)));
     const saved = JSON.parse(text);
     expect(saved.version).toBe(DOCUMENT_VERSION);
-    expect(DOCUMENT_VERSION).toBe(9);
+    expect(DOCUMENT_VERSION).toBeGreaterThanOrEqual(9);
     expect(saved.photos[0].adjustments.layers[1]).toMatchObject({ id: 'b', text: 'Two', color: '#ff0000', shadow: { blur: 0.2 } });
     const read = parseEditDocument(text).photos[0].adjustments;
     expect(read).toMatchObject({ bleachAmount: 40, grainSeed: 9 });

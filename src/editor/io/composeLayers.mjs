@@ -1,19 +1,23 @@
 // Layers in an export: after the photo (the background) has been rendered into the export
-// canvas, its pixels are read once and every visible layer is composited over them, bottom to
-// top, then written back before encoding. Layers are prepared one at a time: an image layer's
+// canvas, its pixels are read once, the photo's local adjustments are applied through their
+// masks, and every visible layer is composited over them, bottom to top, then written back
+// before encoding. Masks are evaluated band by band at the export's size (pipeline/mask.mjs). Layers are prepared one at a time: an image layer's
 // source is decoded (and developed) at the size it needs, used for its pass and released before
 // the next, so at most one layer raster is held besides the canvas and its copy.
 //
 // On desktops each pass is split into 256-row bands on a small pool of render workers (a band
 // carries its canvas rows and only the raster rows it reads); phones run the passes on the page,
 // yielding between bands. Every band is computed by composite.mjs from the same numbers, so the
-// result is the same bit for bit either way (tested).
+// result is the same bit for bit either way (tested). Detail passes of local adjustments read
+// neighbouring rows and run on the page, band by band, yielding between bands.
 
 import { createWorkerClient, WorkerCancelled } from './workerClient.mjs';
-import { COMPOSITE_BAND_ROWS, adjustmentPass, compositeImage, rasterPass } from '../pipeline/composite.mjs';
+import { COMPOSITE_BAND_ROWS, adjustmentPass, compositeImage, localPasses, rasterPass } from '../pipeline/composite.mjs';
 import { layerMatrix, offsetMatrix } from '../pipeline/layerTransform.mjs';
 import { sourceRows } from '../pipeline/warp.mjs';
 import { visibleLayers } from '../model/layers.mjs';
+import { maskActive, splitLocalSettings, visibleLocals } from '../model/masks.mjs';
+import { canvasMaskMap, layerMaskMap } from '../pipeline/mask.mjs';
 
 const spawnRenderWorker = () => new Worker(new URL('./imageWorker.mjs', import.meta.url), { type: 'module' });
 const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -26,15 +30,25 @@ const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
  * :param lutFor: settings => LUT data or null
  */
 export async function preparePass(layer, size, { loadRaster, rasterizeText, lutFor }) {
-  if (layer.type === 'adjustment') return adjustmentPass(layer, lutFor(layer.settings));
+  const mask = maskActive(layer.mask) ? layer.mask : null;
+  if (layer.type === 'adjustment') return adjustmentPass(layer, lutFor(layer.settings), mask && { def: mask, map: canvasMaskMap(size) });
   if (layer.type === 'text') {
     const sprite = rasterizeText(layer, size);
-    return sprite ? rasterPass(layer, sprite, offsetMatrix(sprite.x, sprite.y), size) : null;
+    return sprite ? rasterPass(layer, sprite, offsetMatrix(sprite.x, sprite.y), size, mask && { def: mask, map: canvasMaskMap(size) }) : null;
   }
   const raster = await loadRaster(layer, size);
-  const pass = rasterPass(layer, raster, layerMatrix(layer, size, raster), size);
+  const matrix = layerMatrix(layer, size, raster);
+  const pass = rasterPass(layer, raster, matrix, size, mask && { def: mask, map: layerMaskMap(matrix, raster) });
   return pass.bounds ? pass : null;
 }
+
+/**
+ * The passes of a photo's local adjustments at an export of `size`.
+ * :param imageMap: size => maskMap of the photo's own space at that canvas size (mask.imageMaskMap)
+ * :param native: the canvas at full resolution (Detail radii)
+ */
+export const prepareLocalPasses = (locals, size, { imageMap, native }) => visibleLocals(locals)
+  .flatMap((local) => localPasses(local, { def: local.mask, map: imageMap(size) }, native, splitLocalSettings(local.settings)));
 
 /** One pass on `clients` render workers, band by band. */
 async function passInBands(image, pass, clients, signal) {
@@ -66,23 +80,25 @@ async function passInBands(image, pass, clients, signal) {
 }
 
 /**
- * Composites `layers` over the rendered background in `context` (a 2D canvas context of the
- * export size), in place.
+ * Applies the photo's local adjustments and composites `layers` over the rendered background in
+ * `context` (a 2D canvas context of the export size), in place.
  * :param options: { size, loadRaster, rasterizeText, lutFor, workers, spawn, signal, onProgress }
+ *   and for local adjustments { local, imageMap, native } (see prepareLocalPasses)
  */
-export async function composeLayers(context, layers, { size, loadRaster, rasterizeText, lutFor, workers = 0, spawn = spawnRenderWorker, signal = { cancelled: false }, onProgress = () => {} }) {
-  const shown = visibleLayers(layers);
+export async function composeLayers(context, layers, { size, loadRaster, rasterizeText, lutFor, local = [], imageMap = null, native = size, workers = 0, spawn = spawnRenderWorker, signal = { cancelled: false }, onProgress = () => {} }) {
+  const locals = imageMap ? prepareLocalPasses(local, size, { imageMap, native }) : [];
+  const shown = [...locals.map((pass) => ({ pass })), ...visibleLayers(layers).map((layer) => ({ layer }))];
   if (!shown.length) return;
   const image = context.getImageData(0, 0, size.width, size.height);
   const clients = [];
   try {
     for (let i = 0; i < workers; i += 1) clients.push(createWorkerClient(spawn()));
-    for (const [index, layer] of shown.entries()) {
+    for (const [index, entry] of shown.entries()) {
       if (signal.cancelled) throw new WorkerCancelled();
       onProgress({ stage: 'compositing', fraction: index / shown.length, layer: index + 1, layers: shown.length });
-      let pass = await preparePass(layer, size, { loadRaster, rasterizeText, lutFor });
+      let pass = entry.pass ?? await preparePass(entry.layer, size, { loadRaster, rasterizeText, lutFor });
       if (!pass) continue; // eslint-disable-line no-continue
-      if (clients.length) {
+      if (clients.length && pass.kind !== 'detail') {
         await passInBands(image, pass, clients, signal);
       } else {
         await compositeImage(image, [pass], { cancelled: () => signal.cancelled, onBand: nextTick });
