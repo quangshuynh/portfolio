@@ -148,61 +148,118 @@ export function compositeRasterRows(rows, canvasWidth, y0, y1, pass) {
 export function adjustRows(rows, pass, prepared, { width = 0, y0 = 0 } = {}) {
   const pixels = rows.length / 4;
   const mask = pass.mask ? passMask(pass, width, y0, y0 + pixels / width) : null;
-  const adjusted = renderRgba8(rows, prepared);
-  for (let p = 0; p < pixels; p += 1) adjustPixel(pass.mode, rows, p * 4, adjusted, p * 4, mask ? pass.opacity * (mask[p] / 255) : pass.opacity);
+  if (!mask) {
+    const adjusted = renderRgba8(rows, prepared);
+    for (let p = 0; p < pixels; p += 1) adjustPixel(pass.mode, rows, p * 4, adjusted, p * 4, pass.opacity);
+    return rows;
+  }
+  // Masked: only the box the mask covers is rendered. Pixels are independent and a pixel with
+  // no coverage is left as it is (adjustPixel at opacity 0), so the result is unchanged.
+  const box = maskBox(mask, width);
+  if (!box) return rows;
+  const w = box.x1 - box.x0;
+  const part = new Uint8ClampedArray(w * (box.y1 - box.y0) * 4);
+  for (let y = box.y0; y < box.y1; y += 1) part.set(rows.subarray((y * width + box.x0) * 4, (y * width + box.x1) * 4), (y - box.y0) * w * 4);
+  const adjusted = renderRgba8(part, prepared);
+  for (let y = box.y0; y < box.y1; y += 1) {
+    for (let x = box.x0; x < box.x1; x += 1) {
+      const p = y * width + x;
+      adjustPixel(pass.mode, rows, p * 4, adjusted, ((y - box.y0) * w + x - box.x0) * 4, pass.opacity * (mask[p] / 255));
+    }
+  }
   return rows;
 }
 
+/** Rows and columns where a band's mask codes are non-zero ({ x0, x1, y0, y1 }, band-relative), or null. */
+export function maskBox(mask, width) {
+  let x0 = width;
+  let x1 = 0;
+  let y0 = -1;
+  let y1 = 0;
+  for (let p = 0; p < mask.length; p += 1) {
+    if (!mask[p]) continue; // eslint-disable-line no-continue
+    const x = p % width;
+    const y = (p - x) / width;
+    if (x < x0) x0 = x;
+    if (x >= x1) x1 = x + 1;
+    if (y0 < 0) y0 = y;
+    y1 = y + 1;
+  }
+  return y0 < 0 ? null : { x0, x1, y0, y1 };
+}
+
+
+/**
+ * The render options of a Detail pass over a whole canvas: its guide (from the whole backdrop)
+ * and transparency, computed once; a band worker given these renders exactly as the page does.
+ */
+export function detailPassOptions(image, pass) {
+  const { width, height, data } = image;
+  const plain = { width, height, data };
+  const prepared = deriveParams(pass.adjustments);
+  const guide = prepareDetailRender(prepared, { width, height, nativeWidth: pass.native.width, nativeHeight: pass.native.height, guideImage: guideSource(plain) }).guide;
+  return { width, height, nativeWidth: pass.native.width, nativeHeight: pass.native.height, guide, transparent: rowsHaveAlpha(plain, 0, height) };
+}
+
+export const prepareDetailPass = (pass, options) => prepareDetailRender(deriveParams(pass.adjustments), options);
+
+/**
+ * One band [row, last) of a Detail pass, mixed back through its mask: the band's new rows
+ * (RGBA8), or null when the mask covers none of it. `image` holds the unchanged backdrop's rows
+ * from `image.y0` (default 0), covering the band and the halo. Only the rows and columns the mask
+ * covers are rendered; the renderer's output does not depend on which rows are asked for.
+ */
+export function detailBandRows(image, context, pass, row, last) {
+  const { width } = image;
+  const top = image.y0 ?? 0;
+  const mask = passMask(pass, width, row, last);
+  const box = mask ? maskBox(mask, width) : { x0: 0, x1: width, y0: 0, y1: last - row };
+  if (!box) return null;
+  const w = box.x1 - box.x0;
+  const rendered = new Uint8ClampedArray((box.y1 - box.y0) * w * 4);
+  renderDetailRows(image, context, row + box.y0, row + box.y1, rendered, { columns: [box.x0, box.x1] });
+  const rows = image.data.slice((row - top) * width * 4, (last - top) * width * 4);
+  for (let y = box.y0; y < box.y1; y += 1) {
+    for (let x = box.x0; x < box.x1; x += 1) {
+      const p = y * width + x;
+      adjustPixel(0, rows, p * 4, rendered, ((y - box.y0) * w + x - box.x0) * 4, mask ? pass.opacity * (mask[p] / 255) : pass.opacity);
+    }
+  }
+  return rows;
+}
+
+/**
+ * Writes finished Detail bands into `data` once no band still to be read needs their rows:
+ * every band reads the unchanged backdrop from `row − halo`, so a result waits until the next
+ * band to be read starts at or below its last row.
+ */
+export function detailWriter(data, width, halo) {
+  const pending = [];
+  return {
+    add(row, last, rows) { if (rows) pending.push({ row, last, rows }); pending.sort((a, b) => a.row - b.row); },
+    flush(readFrom) {
+      for (let i = 0; i < pending.length;) {
+        if (pending[i].last <= readFrom) { data.set(pending[i].rows, pending[i].row * width * 4); pending.splice(i, 1); } else i += 1;
+      }
+    },
+  };
+}
 
 function* detailBands(canvas, pass, bandRows) {
   // A plain view: the Detail renderer copies its source with object spread, which would drop
   // the prototype getters of a canvas's ImageData.
   const { width, height, data } = canvas;
   const image = { width, height, data };
-  const context = prepareDetailRender(deriveParams(pass.adjustments), {
-    width,
-    height,
-    nativeWidth: pass.native.width,
-    nativeHeight: pass.native.height,
-    guideImage: guideSource(image),
-    transparent: rowsHaveAlpha(image, 0, height),
-  });
-  const pending = [];
-  const flush = (before) => {
-    while (pending.length && pending[0].last <= before) {
-      const band = pending.shift();
-      data.set(band.rows, band.row * width * 4);
-    }
-  };
+  const context = prepareDetailPass(pass, detailPassOptions(image, pass));
+  const writer = detailWriter(data, width, context.halo);
   for (let row = 0; row < height; row += bandRows) {
     const last = Math.min(height, row + bandRows);
-    // Only the columns the mask covers in this band are rendered (none: the band is unchanged).
-    const mask = passMask(pass, width, row, last);
-    let [x0, x1] = [0, width];
-    if (mask) {
-      [x0, x1] = [width, 0];
-      for (let p = 0; p < mask.length; p += 1) {
-        if (mask[p]) { const x = p % width; if (x < x0) x0 = x; if (x >= x1) x1 = x + 1; }
-      }
-    }
-    if (x1 > x0) {
-      const w = x1 - x0;
-      const rendered = new Uint8ClampedArray((last - row) * w * 4);
-      renderDetailRows(image, context, row, last, rendered, { columns: [x0, x1] });
-      const rows = data.slice(row * width * 4, last * width * 4);
-      for (let y = 0; y < last - row; y += 1) {
-        for (let x = x0; x < x1; x += 1) {
-          const p = y * width + x;
-          adjustPixel(0, rows, p * 4, rendered, (y * w + x - x0) * 4, mask ? pass.opacity * (mask[p] / 255) : pass.opacity);
-        }
-      }
-      pending.push({ row, last, rows });
-    }
+    writer.add(row, last, detailBandRows(image, context, pass, row, last));
     // The next band reads the backdrop from `last − halo`: rows above that are final.
-    flush(last - context.halo);
+    writer.flush(last - context.halo);
     yield last / height;
   }
-  flush(Infinity);
+  writer.flush(Infinity);
 }
 
 /**

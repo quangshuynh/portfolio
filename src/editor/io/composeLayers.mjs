@@ -9,10 +9,14 @@
 // carries its canvas rows and only the raster rows it reads); phones run the passes on the page,
 // yielding between bands. Every band is computed by composite.mjs from the same numbers, so the
 // result is the same bit for bit either way (tested). Detail passes of local adjustments read
-// neighbouring rows and run on the page, band by band, yielding between bands.
+// neighbouring rows: the page computes the guide once, then the bands (each with its halo of
+// unchanged backdrop rows) run on the same workers, and a band's result is written back only
+// once no band still to be sent reads its rows. Phones run them on the page, band by band.
 
 import { createWorkerClient, WorkerCancelled } from './workerClient.mjs';
-import { COMPOSITE_BAND_ROWS, adjustmentPass, compositeImage, localPasses, rasterPass } from '../pipeline/composite.mjs';
+import {
+  COMPOSITE_BAND_ROWS, adjustmentPass, compositeImage, detailPassOptions, detailWriter, localPasses, prepareDetailPass, rasterPass,
+} from '../pipeline/composite.mjs';
 import { layerMatrix, offsetMatrix } from '../pipeline/layerTransform.mjs';
 import { sourceRows } from '../pipeline/warp.mjs';
 import { visibleLayers } from '../model/layers.mjs';
@@ -79,6 +83,38 @@ async function passInBands(image, pass, clients, signal) {
   await Promise.all(clients.map(lane));
 }
 
+/** A local adjustment's Detail pass on `clients` render workers (see the comment at the top). */
+async function detailInBands(image, pass, clients, signal) {
+  const { width, height, data } = image;
+  const options = detailPassOptions(image, pass);
+  const { halo } = prepareDetailPass(pass, options);
+  const job = `${Date.now()}-${Math.random()}`;
+  await Promise.all(clients.map((client) => client.call('localDetailBegin', { job, pass, options })));
+  const writer = detailWriter(data, width, halo);
+  const bands = [];
+  for (let row = 0; row < height; row += COMPOSITE_BAND_ROWS) bands.push(row);
+  let next = 0;
+  // The first backdrop row a band not yet sent will read.
+  const readFrom = () => (next < bands.length ? bands[next] - halo : Infinity);
+  const lane = async (client) => {
+    while (next < bands.length) {
+      if (signal.cancelled) throw new WorkerCancelled();
+      const row = bands[next];
+      next += 1;
+      const last = Math.min(height, row + COMPOSITE_BAND_ROWS);
+      const top = Math.max(0, row - halo);
+      const bottom = Math.min(height, last + halo);
+      const slice = data.slice(top * width * 4, bottom * width * 4);
+      const rows = await client.call('localDetailRows', { job, source: { width, height: bottom - top, y0: top, data: slice }, row, last }, { transfer: [slice.buffer] });
+      if (signal.cancelled) throw new WorkerCancelled();
+      writer.add(row, last, rows);
+      writer.flush(readFrom());
+    }
+  };
+  await Promise.all(clients.map(lane));
+  writer.flush(Infinity);
+}
+
 /**
  * Applies the photo's local adjustments and composites `layers` over the rendered background in
  * `context` (a 2D canvas context of the export size), in place.
@@ -98,7 +134,9 @@ export async function composeLayers(context, layers, { size, loadRaster, rasteri
       onProgress({ stage: 'compositing', fraction: index / shown.length, layer: index + 1, layers: shown.length });
       let pass = entry.pass ?? await preparePass(entry.layer, size, { loadRaster, rasterizeText, lutFor });
       if (!pass) continue; // eslint-disable-line no-continue
-      if (clients.length && pass.kind !== 'detail') {
+      if (clients.length && pass.kind === 'detail') {
+        await detailInBands(image, pass, clients, signal);
+      } else if (clients.length) {
         await passInBands(image, pass, clients, signal);
       } else {
         await compositeImage(image, [pass], { cancelled: () => signal.cancelled, onBand: nextTick });

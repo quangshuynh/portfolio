@@ -16,7 +16,7 @@ import { LutError, MAX_CUBE_BYTES, parseCube } from '../pipeline/lut.mjs';
 import { contentHash } from './hash.mjs';
 import { renderRegion, warpedRegionSource } from '../pipeline/detailRegion.mjs';
 import { decodeSize, geometryPlan, normalizeGeometry } from '../pipeline/geometry.mjs';
-import { adjustRows, adjustmentParams, compositeRasterRows } from '../pipeline/composite.mjs';
+import { adjustRows, adjustmentParams, compositeRasterRows, detailBandRows, prepareDetailPass } from '../pipeline/composite.mjs';
 
 export const EXPORT_BAND_ROWS = 256;
 
@@ -139,6 +139,8 @@ export function scaledSpec(warp, out) {
 // Parallel Detail export (detailPool.mjs): each helper worker keeps the render context of
 // the current job (settings, guide) and renders the bands of rows it is sent.
 const detailJobs = new Map();
+// Local adjustments' Detail passes (io/composeLayers.mjs): the pass and its prepared render, by job.
+const localDetailJobs = new Map();
 // 1:1 inspection: the crop and guide source of the region being inspected.
 const regionCache = { key: null, kept: null };
 
@@ -226,6 +228,20 @@ export const handlers = {
    * One band of a layer pass (io/composeLayers.mjs): canvas rows [y0, y1) and, for a raster
    * pass, the raster rows they read (`raster.top` onward).
    */
+  async localDetailBegin({ job, pass, options }) {
+    localDetailJobs.clear();
+    localDetailJobs.set(job, { pass, context: prepareDetailPass(pass, options) });
+    return { result: true };
+  },
+
+  /** One band of a local adjustment's Detail pass (composite.detailBandRows), or null when its mask misses the band. */
+  async localDetailRows({ job, source, row, last }) {
+    const entry = localDetailJobs.get(job);
+    if (!entry) throw stale('local detail');
+    const rows = detailBandRows(source, entry.context, entry.pass, row, last);
+    return rows ? { result: rows, transfer: [rows.buffer] } : { result: null };
+  },
+
   async compositeRows({ pass, raster = null, rows, width, y0, y1 }) {
     if (pass.kind === 'adjust') adjustRows(rows, pass, prepareRender(adjustmentParams(pass)), { width, y0 });
     else compositeRasterRows(rows, width, y0, y1, { ...pass, raster });
