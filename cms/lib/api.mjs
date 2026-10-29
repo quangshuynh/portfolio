@@ -7,8 +7,11 @@ import { addDraft, stableIdentityErrors, workspaceProblems } from './catalog-ops
 import { summarizeChanges } from './changes.mjs';
 import { GitError, redact } from './git.mjs';
 import { GitHubError } from './github.mjs';
+import { createEditorRoutes } from './editor-api.mjs';
 import { mergeCatalogs } from './merge.mjs';
 import { PublishError, preparePublication, publicationStatus, resolveBase } from './publish.mjs';
+import { approvedImageChanges } from './treatment-publish.mjs';
+import { TreatmentError, listTreatments, treatmentSummary } from './treatments.mjs';
 import { MAX_UPLOAD_BYTES, UploadError, ingestUpload } from './uploads.mjs';
 import { WorkspaceError, paths, readWorkspace, saveCatalog, setBase, writePublication } from './workspace.mjs';
 
@@ -61,7 +64,7 @@ function structuralErrors(catalog) {
   return errors;
 }
 
-export function createApi({ repoDir, workspaceDir, git, github, githubSource, remote, baseBranch, offline, onCatalogChanged = () => {} }) {
+export function createApi({ repoDir, workspaceDir, libraryDir = null, git, github, githubSource, remote, baseBranch, offline, onCatalogChanged = () => {} }) {
   // One mutation at a time, so two quick saves cannot interleave.
   let queue = Promise.resolve();
   const exclusive = (action) => {
@@ -73,6 +76,9 @@ export function createApi({ repoDir, workspaceDir, git, github, githubSource, re
   async function state() {
     const workspace = await readWorkspace(workspaceDir);
     const submitted = workspace.publication?.submittedCatalog;
+    const treatments = await listTreatments(workspaceDir);
+    const publishedNow = workspace.catalog.photographs.filter(({ status }) => status === 'published').map(({ id }) => id);
+    const images = await approvedImageChanges({ git, commit: workspace.meta.baseCommit, workspaceDir, ids: publishedNow }).catch(() => []);
     return {
       catalog: workspace.catalog,
       base: workspace.base,
@@ -81,6 +87,9 @@ export function createApi({ repoDir, workspaceDir, git, github, githubSource, re
       baseCommit: workspace.meta.baseCommit,
       problems: workspaceProblems(workspace.catalog, { base: workspace.base }),
       summary: summarizeChanges(workspace.base, workspace.catalog),
+      // Approved QuangEdit images that publication would replace (published photographs only).
+      images: images.map(({ id }) => id),
+      treatments: Object.fromEntries(Object.entries(treatments).map(([id, treatment]) => [id, treatmentSummary(treatment)])),
       publication: workspace.publication && { ...workspace.publication, submittedCatalog: undefined },
       submittedUnchanged: Boolean(submitted && submitted === serializeCatalog(workspace.catalog)),
       uploads: Object.keys(workspace.originals).length,
@@ -187,8 +196,17 @@ export function createApi({ repoDir, workspaceDir, git, github, githubSource, re
     throw new HttpError(404, 'not-found', 'No such image.');
   }
 
+  const editorRoutes = createEditorRoutes({ repoDir, workspaceDir, libraryDir, git, exclusive, readJsonBody, sendJson });
+
   return async function handleApi(request, response, url) {
     try {
+      if (url.pathname.startsWith('/api/editor/')) {
+        const handled = await editorRoutes(request, response, url);
+        if (handled !== null) {
+          if (request.method !== 'GET') onCatalogChanged();
+          return handled;
+        }
+      }
       if (request.method === 'GET' && url.pathname.startsWith('/api/images/')) {
         return await serveImage(response, decodeURIComponent(url.pathname.slice('/api/images/'.length)));
       }
@@ -208,12 +226,18 @@ export function sendJson(response, status, body) {
 
 const STATUS_BY_CODE = {
   'stale-revision': 409, busy: 409, 'already-open': 409, conflict: 409, nothing: 409, invalid: 422, assets: 422,
-  'draft-leak': 500, 'missing-original': 422, 'base-missing-catalog': 409, 'unexpected-changes': 500,
+  'draft-leak': 500, 'missing-original': 422, 'base-missing-catalog': 409, 'unexpected-changes': 500, 'render-missing': 422,
 };
 
 export function sendError(response, error) {
+  // A failure while a file was streaming: the status line is gone, so end the response.
+  if (response.headersSent) {
+    console.error(redact(error.stack ?? error.message));
+    response.destroy();
+    return;
+  }
   const known = error instanceof HttpError || error instanceof WorkspaceError || error instanceof PublishError
-    || error instanceof UploadError || error instanceof GitHubError || error instanceof GitError;
+    || error instanceof UploadError || error instanceof GitHubError || error instanceof GitError || error instanceof TreatmentError;
   // GitHub failures are reported as 502 so the browser never mistakes them for its own
   // session expiring (401).
   const fromGitHub = error instanceof GitHubError;

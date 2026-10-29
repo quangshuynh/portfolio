@@ -4,6 +4,7 @@
 import { catalogErrors, publicPhotographs } from '../../scripts/photography-catalog.mjs';
 import { readGeneratedManifest } from '../../scripts/photography-catalog-files.mjs';
 import { publicationCatalog } from './catalog-ops.mjs';
+import { listTreatments } from './treatments.mjs';
 import { readWorkspace } from './workspace.mjs';
 
 export const imageUrl = (filename) => `/api/images/${encodeURIComponent(filename)}`;
@@ -35,6 +36,15 @@ export async function loadPreview(workspaceDir, { manifestFile } = {}) {
     } else missing.push(id);
   }
   if (missing.length) return { collection: null, errors: missing.map((id) => `"${id}" has no images yet; upload it again.`) };
+  // Approved QuangEdit renders show as they would be published.
+  const treatments = await listTreatments(workspaceDir);
+  generated.forEach((entry, index) => {
+    const render = treatments[entry.id]?.approved?.render;
+    if (!render) return;
+    generated[index] = { ...entry, galleryWidth: render.gallery.width, galleryHeight: render.gallery.height, viewerWidth: render.viewer.width, viewerHeight: render.viewer.height };
+    assetUrls[entry.galleryFilename] = `/api/editor/photos/${entry.id}/images/approved-gallery?v=${render.sha256.slice(0, 16)}`;
+    assetUrls[entry.viewerFilename] = `/api/editor/photos/${entry.id}/images/approved-viewer?v=${render.sha256.slice(0, 16)}`;
+  });
   return {
     errors: [],
     collection: {

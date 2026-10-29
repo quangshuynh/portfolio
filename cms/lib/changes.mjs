@@ -89,6 +89,9 @@ export function pullRequestBody(summary, workspace, { baseRef, baseCommit }) {
   add(`Edited (${summary.edited.length})`, summary.edited.length
     && summary.edited.map(({ id, fields }) => `- \`${id}\`: ${fields.join(', ')}`).join('\n'));
   add(`Reordered (${summary.moved.length})`, summary.moved.length && list(summary.moved));
+  add(`New images from QuangEdit (${summary.images?.length ?? 0})`, summary.images?.length && `${list(summary.images, caption)}
+
+Approved treatments rendered from the originals; same file names, so links are unchanged.`);
   add('Featured', summary.featured && `Before: ${summary.featured.before.join(', ') || 'none'}\nAfter: ${summary.featured.after.join(', ') || 'none'}`);
   add('Hero', summary.hero && `\`${summary.hero.before}\` → \`${summary.hero.after}\``);
   add('Collections', summary.collections && `Before: ${summary.collections.before.join(', ')}\nAfter: ${summary.collections.after.join(', ')}`);

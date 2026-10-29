@@ -10,6 +10,7 @@
 //   preview/generated/    gallery and viewer derivatives of uploads
 //   preview/manifest.json generated records for those derivatives
 //   publication.json      the pending or last pull request
+//   treatments/, sources/, renders/  QuangEdit treatments and their staged renders (treatments.mjs)
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -47,6 +48,9 @@ export const paths = (dir) => ({
   previewManifest: path.join(dir, 'preview', 'manifest.json'),
   publication: path.join(dir, 'publication.json'),
   lock: path.join(dir, 'publish.lock'),
+  treatments: path.join(dir, 'treatments'),
+  sources: path.join(dir, 'sources'),
+  renders: path.join(dir, 'renders'),
 });
 
 export const revisionOf = (text) => createHash('sha256').update(text).digest('hex').slice(0, 16);
@@ -151,10 +155,20 @@ export async function withPublishLock(dir, action) {
 export async function cleanInterruptedUploads(dir) {
   const p = paths(dir);
   const removed = [];
-  for (const name of await readdir(p.originals).catch(() => [])) {
-    if (name.startsWith('.incoming-')) {
-      await rm(path.join(p.originals, name), { force: true });
-      removed.push(name);
+  for (const folder of [p.originals, p.sources]) {
+    for (const name of await readdir(folder).catch(() => [])) {
+      if (name.startsWith('.incoming-')) {
+        await rm(path.join(folder, name), { force: true });
+        removed.push(name);
+      }
+    }
+  }
+  for (const id of await readdir(p.renders).catch(() => [])) {
+    for (const name of await readdir(path.join(p.renders, id)).catch(() => [])) {
+      if (name.startsWith('.incoming-') || name.startsWith('.render-')) {
+        await rm(path.join(p.renders, id, name), { recursive: true, force: true });
+        removed.push(name);
+      }
     }
   }
   return removed;

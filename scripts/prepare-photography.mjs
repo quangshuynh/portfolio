@@ -11,6 +11,7 @@ import {
   catalogPath,
   readCatalog,
 } from './photography-catalog-files.mjs';
+import { DERIVATIVE_SIZES, createDerivative } from './photography-derivatives.mjs';
 import { photographLibraryPaths } from './photography-sources.mjs';
 import { derivativeFilenames, normalizeCamera, parseExifTimestamp } from './photography-utils.mjs';
 
@@ -139,17 +140,6 @@ async function hasGps(sourcePath) {
   }
 }
 
-async function createDerivative(sourcePath, destination, dimensions, quality) {
-  await sharp(sourcePath)
-    .rotate()
-    .resize({ ...dimensions, fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality, mozjpeg: true })
-    .toFile(destination);
-  const metadata = await sharp(destination).metadata();
-  if (metadata.exif || metadata.xmp || metadata.iptc) throw new Error(`Metadata was not stripped from ${path.basename(destination)}`);
-  return { width: metadata.width, height: metadata.height, bytes: (await stat(destination)).size };
-}
-
 async function resolveSources(records, { sourceDirectory, libraryDirectory }) {
   let flatFiles = null;
   if (records.some((record) => !record.libraryPath)) {
@@ -220,8 +210,8 @@ async function main() {
     const exif = await extractExif(sourcePath);
     const gpsPresent = await hasGps(sourcePath);
     const { galleryFilename, viewerFilename } = derivativeFilenames(override.id);
-    const gallery = await createDerivative(sourcePath, path.join(outputDirectory, galleryFilename), { width: 900, height: 1200 }, 82);
-    const viewer = await createDerivative(sourcePath, path.join(outputDirectory, viewerFilename), { width: 2200, height: 1800 }, 88);
+    const gallery = await createDerivative(sourcePath, path.join(outputDirectory, galleryFilename), DERIVATIVE_SIZES.gallery.dimensions, DERIVATIVE_SIZES.gallery.quality);
+    const viewer = await createDerivative(sourcePath, path.join(outputDirectory, viewerFilename), DERIVATIVE_SIZES.viewer.dimensions, DERIVATIVE_SIZES.viewer.quality);
     const publicMetadata = normalizeExif(exif, captureTimeZone);
     generatedById.set(override.id, {
       id: override.id,
