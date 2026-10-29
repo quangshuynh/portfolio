@@ -31,6 +31,8 @@ navigation).
 | `scripts/check-editor-filters.mjs` | `npm run check:editor:filters`: library, thumbnails, search, switching latency, strength, compare, undo, PNG exports of digital filters against the Node reference, batch filter and ZIP, phones, CPU preview, 24 MP; genuine JPEG, ARW and merged HDR with `FILTER_FIXTURE_DIR`. |
 | `src/editor/model/overlays.mjs`, `src/editor/text/` | Text fields (schema, validation) and their fonts, layout and drawing (`rasterizeTextLayer`). UI: `ui/TextPanel.jsx`. |
 | `src/editor/model/layers.mjs`, `pipeline/blend.mjs`, `composite.mjs`, `layerTransform.mjs`, `compositeShader.mjs` | Layers (Interval 12): stack schema, limits, migration, operations; W3C blend modes; CPU compositor and its GLSL mirror; layer placement. Export orchestration `io/composeLayers.mjs`; UI `ui/LayersPanel.jsx`, `ui/LayerHandles.jsx`, preview rasters `ui/layerRasters.mjs`; parity page `dev/layerParity.html`. |
+| `src/editor/model/masks.mjs`, `pipeline/mask.mjs` | Masks and local adjustments (Interval 13): schema, limits, editing helpers; per-pixel coverage and mask maps. UI `ui/MaskPanel.jsx`, `ui/MaskTool.jsx`; passes in `composite.mjs` (`localPasses`, `passMask`, Detail passes). |
+| `scripts/check-editor-masks.mjs` | `npm run check:editor:masks`: masked-pass parity, the Masks panel and on-photo tools, PNG exports against the Node reference (with geometry and masked layers), save and reopen, phones, CPU preview, 24 MP; genuine ARW and merged HDR with `MASK_FIXTURE_DIR`. |
 | `scripts/check-editor-layers.mjs` | `npm run check:editor:layers`: GPU/CPU and canvas parity of every blend mode, the Layers panel flow, PNG exports against the Node reference, text placement, reload and reconnect, batch ZIP, phones, CPU preview, 24 MP; genuine JPEG/RAW layers over RAW and over merged HDR with `LAYER_FIXTURE_DIR`. |
 | `scripts/check-editor-creative.mjs` | `npm run check:editor:creative`: looks and effects, PNG exports against the Node reference, text placement in preview and exports, paste and ZIP, phones, CPU preview, 24 MP; genuine ARW and merged HDR with `CREATIVE_FIXTURE_DIR`. |
 | `scripts/check-editor-geometry.mjs` | `npm run check:editor:geometry`: crop tool (pointer, touch, keyboard), PNG exports against the Node reference, batch resize, 24 MP timing; genuine ARW and merged HDR with `GEOMETRY_FIXTURE_DIR`. |
@@ -812,6 +814,118 @@ the RAW queue (one decoder at a time), so a RAW layer appears after its half-siz
 Repeated project switching with layers was not measured separately; the raster cache is bounded
 (8 rasters, 384 MB) and cleared when the workspace empties. No physical iPhone was tested.
 
+## Masks and local adjustments
+
+**Using them** (Masks panel, below Layers; Adjust tab on phones). **New local adjustment →
+Brush, Linear or Radial** adds an empty local adjustment with that tool on: paint, or drag on the
+photo to place the gradient (+ Brush, + Linear, + Radial add a component without a pointer).
+While a local adjustment is selected, the Adjust panel shows only **its** Light, Color, HSL and
+Detail (labelled "local …"); select it again to edit the photo. With an image, text or
+adjustment layer selected, **Add mask to "…"** gives it a mask (starts as "Everything selected":
+paint Erase or subtract to hide). For the selected mask: Amount (local adjustments), Mask on
+(layer masks), Invert mask, Start with nothing/everything, Density, overlay (tint colour or the
+mask in greyscale), the component list (add or subtract, invert/"Outside", opacity, feather,
+duplicate, delete, turn off), numeric X, Y, angle and transition (linear) or radii and angle
+(radial). On the photo: brush (size, hardness, stroke opacity, Paint/Erase, Alt erases while
+held, pen pressure narrows strokes; a ring shows the brush), drag to create a gradient, drag its
+handles (linear: start = full effect, end = none, centre moves; radial: centre, both radii,
+rotation). Gradient centres are focusable: arrow keys move them (Shift: larger steps), Delete
+removes. Keys: M tool on/off, O overlay, X paint/erase, [ ] brush size, Esc ends the tool.
+While a tool is on, one pointer paints or drags (the photo does not pan, the page does not
+scroll); a second touch cancels the stroke; turn the tool off to pan or pinch. Handles are 44 px
+on touch screens. Every stroke or drag is one undo step.
+
+**Model** (`model/masks.mjs`, plain data in the photo's settings). A mask is
+`{ space, base, enabled, invert, opacity, components }`; a component is a brush (`strokes`), a
+`linear` (`x0, y0` full → `x1, y1` none, `feather` 0 = straight ramp … 1 = smooth curve) or a
+`radial` (`x, y`, radii `rx, ry`, `rotation`, `feather` = share of the radius that fades), each
+with `id`, `name`, `enabled`, `op` (`add`: m + c − m·c; `subtract`: m·(1 − c)), `invert`,
+`opacity`, applied in order from `base` (0 or 1); the mask's invert and density apply last, so
+combining is deterministic. A stroke is `{ mode: add|erase, radius, hardness, opacity, points:
+[[x, y, pressure]…] }`: capsules along the path (no gaps however far apart the points are), a
+pixel's coverage within one stroke is its maximum (a stroke does not build up over itself),
+strokes combine like components. Pressure scales the radius (0.2–1 ×; mice and touch use 1).
+Flow is not implemented. Points are recorded every 1.5 screen px or 15% of the radius, so a long
+stroke is a few hundred points (about 25 bytes each).
+
+| Owner | Space (coordinates) | Follows |
+| --- | --- | --- |
+| Local adjustment (`adjustments.local`) | `image`: the photo as imported, before Crop & Transform | the photo's content through crop, rotation, flips, perspective, stretch and resize |
+| Adjustment and text layer (`layer.mask`) | `canvas`: the output frame | the composition, as layer positions do |
+| Image layer (`layer.mask`) | `layer`: the layer's own box | the layer when it moves, rotates or flips |
+
+Positions are fractions of the space's width and height (gradients may start outside it,
+−2…3); radii in units of its short edge, so circles stay round. Screen, zoom and pan are only
+used to convert the pointer into these units. A local adjustment is `{ id, name, enabled,
+amount, mask, settings }`; `settings` holds non-neutral Light, Color, HSL and Detail values.
+Limits: 16 local adjustments, 16 components per mask, 400 strokes, 2000 points per stroke and
+40 000 brush points per photo (local adjustments first, then layer masks), which keeps edit
+documents within 4 MB. Imported masks are validated like every other setting: unknown types,
+bad ids and non-numbers are dropped or defaulted, coordinates and radii clamped, and the space
+is the owner's whatever the file says.
+
+**Rendering** (`pipeline/mask.mjs`, `composite.mjs`). A mask is evaluated per canvas pixel: its
+centre is mapped into the mask's space (a homography: identity, the geometry's output → source
+matrix, or the layer matrix), shapes are evaluated there, and the coverage is stored as 8-bit
+codes. It scales a raster pass's alpha (`αs` = alpha × edge coverage × opacity × mask) or an
+adjustment's opacity per pixel, so blend modes, layer opacity and transparent edges behave as
+without a mask. Hard edges are antialiased over one canvas pixel. Local adjustments are passes
+directly above the finished photo and below the layers, in list order: the Detail settings as a
+Detail pass (`detailRenderer.mjs` with only those settings, its guide from the composite so far),
+then Light, Color and HSL through the adjustment-layer renderer, both mixed back by mask ×
+amount. They act on the 8-bit finished photo (after its global settings, including Creative
+grain and vignette), like adjustment layers, not on the linear RAW or HDR data. Neutral settings,
+amount 0 and empty masks add no pass. Preview: the GPU reads a mask texture computed by the same
+code on the page (exactly the CPU's codes); a local adjustment with Detail switches the preview to
+the CPU renderer (draft, then final, labelled). Exports evaluate masks band by band at the
+export's size; Detail passes read a halo of rows around each band from the unchanged composite
+and render only the rows and columns their mask covers, so tiles have no seams. While the brush
+paints, the edited mask keeps its finished strokes' coverage and the stroke being drawn, so each
+new point costs only its own segment (bounded to two components, released when the brush is put
+away). Clipping masks (a layer clipped to the one below) are **not built**: they would need
+nested passes and a second alpha source per pass, and no control is shown for them.
+
+**Projects.** Version 10 documents add `local` and `layer.mask`; version 9 files open unchanged
+(tested with a document written by the Interval 12 editor). Masks are geometry and paths, never
+bitmaps. Presets never contain masks or local adjustments; Paste never copies them; **Sync…**
+copies **Local gradients** only when ticked: linear and radial components with their settings
+(brush components are dropped, and a local adjustment left with nothing is not copied); **Layers**
+copies layer masks with the stack. A local adjustment's `settings` are kept apart from its
+`mask`, so reusable values can be applied without touching a photo's masks or layers.
+
+**Accuracy and measurements** (`npm run check:editor:masks`; Windows i7-9700, headless
+Playwright, Chromium on SwiftShader):
+
+- **Parity**: masked passes (an image layer masked in its own space in three blend modes, an
+  adjustment layer masked by a gradient, brush strokes and a subtracted radial, a local adjustment
+  under crop, rotation and perspective): raster passes 0 codes, adjustment passes ≤ 1 code from the
+  CPU reference in Chromium 141, Firefox 142 and WebKit 26.
+- **Exports** equal the Node reference **exactly** in all six environments (Chromium, Firefox,
+  WebKit, iPhone 13 and Pixel 7 emulation, no WebGL2): a gradient dragged while zoomed, a
+  brush with an erase stroke, a radial with Clarity; then geometry with a masked Multiply
+  adjustment layer, a masked image layer and a fourth local adjustment. Saving, reloading and
+  reopening gives the same masks and the same pixels. A 24 MP PNG with a Dehaze gradient and a
+  Clarity/Sharpening radial equals the reference (Chromium), so band boundaries leave no seams.
+- **Genuine** (A7 III ARW, DSC09640): a sky gradient, a radial with Clarity and a brush; every
+  sampled pixel farther than the Clarity halo from all three masks is unchanged (0 of 710 207 in
+  Chromium; 0 of 488 474 in Firefox, with geometry). A masked text layer (erase stroke) and a
+  merged RAW HDR (DSC09640–42) with a local gradient (exposure, Dehaze) export in Chromium.
+
+| | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- |
+| Gradient drag · brush move to painted frame (median, 600×400) | 84–133 · 150 ms | 40–55 · 46 ms | 93 · 79 ms |
+| Local Clarity to the final CPU frame (600×400) | 270–330 ms | 205–210 ms | 258 ms |
+| 24 MP, Dehaze gradient + Clarity radial: export · peak · after | 25 s (PNG) · 1.76 GB · 1.36 GB | 22 s (JPEG) · 1.90 GB · 1.40 GB | 20 s (JPEG) · 1.94 GB · 1.26 GB |
+| Genuine ARW (6024×4024) with three local adjustments: PNG export · peak | 14.8 s · 1.89 GB | 22.2 s · 2.44 GB (geometry, 5420×3419) | not run (LibRaw crash) |
+| Merged RAW HDR + local gradient: JPEG export · peak | 24.3 s · 2.48 GB | not run | not run |
+
+Mask evaluation (Node, same machine): a linear or radial over a 2048×1365 preview 80–90 ms; a
+400-point brush stroke 232 ms from scratch and 34 ms per new point while painting (p95 38 ms).
+Single-thread local Detail at 24 MP: 2.1 s (Clarity radial) to 3.8 s (Dehaze over a half-frame
+gradient). Phones (emulation): brush frames 80 ms (iPhone 13) and 150 ms (Pixel 7), list rows and
+handles 44 px, no sideways scroll, no global `overflow: hidden`; touch painting does not pan.
+Without WebGL2 the brush frame is 69 ms. RAW decoder concurrency is unchanged (one at a time).
+
 ## Batch editing
 
 **Selection** (library list and filmstrip). The active photo is the one shown and edited,
@@ -941,6 +1055,9 @@ RAWs, ZIP parts above 1 GB.
 - Values are relative to neutral (LUT intensity defaults to 100). The ten
   Interval 3 controls are always written; other controls, curves and the LUT
   only when they change something. Missing keys are neutral.
+- Version 10 added masks (see [Masks and local adjustments](#masks-and-local-adjustments)):
+  `local` (local adjustments) and an optional `mask` on layers, stored as geometry and stroke
+  paths, never bitmaps. Version 9 files open unchanged with none.
 - Version 9 replaced `overlays` with `layers` (see [Layers](#layers)): image layers store
   `source: { sha256, name, size, format, width, height }`, never pixels; settings are compacted
   like the photo's. Older files' text objects become text layers (same ids and order).
@@ -1181,11 +1298,20 @@ Safari cannot encode WebP (the option is disabled when the browser cannot).
   crashed. It looks like a
   defect in the Windows WebKit port's handling of shared wasm memory; Safari on macOS and
   iOS has not been tested, so it is not known whether it is affected.
-- Layers (Interval 12): no masks, clipping, groups or smart objects; Detail, grain, vignette and
+- Layers (Interval 12): no clipping masks, groups or smart objects; Detail, grain, vignette and
   geometry apply to the Background only (not over the layers); 1:1 Detail, thumbnails and the
   Filter Library show the photo without layers; layer previews of RAW sources wait for the RAW
   queue; in the preview a layer is as sharp as the preview canvas (4096 px at most). Merged HDR
   photos cannot be image layers (only the Background).
+- Masks (Interval 13): local adjustments act on the finished 8-bit photo (after its global
+  settings, Creative grain and vignette included), not on linear RAW or HDR data, so strong
+  local exposure cannot recover clipped highlights; local Detail previews on one CPU thread and
+  exports on the page thread (band by band, only where its mask covers); no flow (strokes do
+  not build up within themselves), no feathering of a whole mask after combining (gradients have
+  feather, brushes hardness), no clipping masks, no component renaming in the UI; 1:1 Detail,
+  thumbnails and the Filter Library show the photo without masks; touch was tested with
+  synthetic pointer events in emulation and pen pressure only by unit tests of the coverage, not on a
+  physical iPhone or pen tablet.
 - Geometry is manual: no automatic straightening, lens or camera-profile correction; no
   upscaling; Detail is not previewed while the crop tool is open; perspective corners stay
   inside the frame. Geometry adds the warp to exports (see
@@ -1203,7 +1329,9 @@ at render time), local and exportable at full resolution. Not built yet:
 | Feature | Where it goes |
 | --- | --- |
 | More RAW formats (NEF, then CR2/CR3, RAF, ORF) | LibRaw decodes them already; add the maker to `sniffRaw`, then genuine fixtures and `rawFixtures.test.js` cases before claiming support. X-Trans (RAF) needs checking against `checkDecodable`. |
-| Brushes, masks, gradients, local adjustments | Per-layer masks multiply `αs` in `composite.mjs` and the composite shader; brush masks need a stored raster or stroke list (outside the JSON document, like sources). Clipping masks and groups would nest passes. |
+| Clipping masks, layer groups | Nested passes: a clipped layer's `αs` also multiplied by the alpha of the layer below (a second alpha source per pass in `composite.mjs` and the shader). |
+| AI subject or sky selection | A new mask component type whose coverage comes from a computed map; the combine rules in `pipeline/mask.mjs` stay. |
+| Local adjustments in linear light | Evaluating masks inside the base stage (RAW/HDR linear data) instead of on the finished 8-bit photo; needs the mask in the shader's source space. |
 | Canvas-level effects over layers | Vignette, grain and geometry over the whole composite need the spatial renderer on the composited canvas (halo bands per pass). |
 | Retouching, healing | Spatial; the tiled renderer and halo bands in `detailRenderer.mjs`. |
 | Faster export | Band workers (`detailPool.mjs`) for non-Detail exports and Detail previews; per-pixel stages are independent per band too. |

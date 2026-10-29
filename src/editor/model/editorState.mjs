@@ -12,6 +12,7 @@
 import { adjustmentsEqual, clampAdjustment, neutralAdjustments, neutralGroup, normalizeAdjustments } from './adjustments.mjs';
 import { presetPatch } from './presets.mjs';
 import { layerAdjustments, normalizeLayerSettings, updateLayer } from './layers.mjs';
+import { normalizeLocalSettings } from './masks.mjs';
 import * as history from './history.mjs';
 import { DEFAULT_EXPORT_SETTINGS, normalizeExportSettings } from './editDocument.mjs';
 
@@ -73,9 +74,16 @@ const updateHistory = (state, change) => {
 };
 
 // An edit of the active photo's settings or, with `layerId`, of that image or adjustment
-// layer's colour settings: the panels edit a layer exactly as they edit the photo. Keys a
-// layer cannot hold are dropped; a locked layer is left as it is.
-function retarget(present, layerId, change) {
+// layer's colour settings, or with `localId` of that local adjustment's settings: the panels
+// edit a layer or a local adjustment exactly as they edit the photo. Keys it cannot hold are
+// dropped; a locked layer is left as it is.
+function retarget(present, { layerId, localId }, change) {
+  if (localId) {
+    const local = present.local.find(({ id }) => id === localId);
+    if (!local) return present;
+    const settings = normalizeLocalSettings(change(normalizeAdjustments(local.settings)));
+    return { ...present, local: present.local.map((entry) => (entry.id === localId ? { ...entry, settings } : entry)) };
+  }
   if (!layerId) return change(present);
   const layer = present.layers.find(({ id }) => id === layerId);
   if (!layer?.settings || layer.locked) return present;
@@ -83,7 +91,7 @@ function retarget(present, layerId, change) {
 }
 
 export function editorReducer(state, action) {
-  const target = (h, change) => retarget(h.present, action.layerId, change);
+  const target = (h, change) => retarget(h.present, action, change);
   switch (action.type) {
     case 'photosAdded': {
       const added = action.photos.map((photo) => ({
@@ -190,7 +198,7 @@ export function editorReducer(state, action) {
       return updateHistory(state, (h) => history.apply(
         h,
         target(h, (a) => ({ ...a, [action.key]: clampAdjustment(action.key, action.value) })),
-        { coalesceKey: action.coalesce ? `${action.layerId ?? ''}:${action.key}` : null, now: action.now },
+        { coalesceKey: action.coalesce ? `${action.layerId ?? action.localId ?? ''}:${action.key}` : null, now: action.now },
       ));
     case 'resetAdjustment':
       return updateHistory(state, (h) => history.apply(h, target(h, (a) => ({ ...a, [action.key]: neutralAdjustments()[action.key] }))));

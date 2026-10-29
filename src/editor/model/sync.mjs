@@ -13,10 +13,14 @@
 // Layers (image, text, adjustment) belong to one photo's composition: they are copied only when
 // Layers is ticked in Sync (paste never copies them) and then replace the target's whole stack;
 // an image or adjustment layer's colour settings are never part of the colour groups.
+// Local adjustments (masks) are copied only when "Local gradients" is ticked: their linear and
+// radial gradients and settings replace the target's local adjustments; brush strokes follow
+// one photo's content and are never copied (a brush-only adjustment is left out).
 
 import { adjustmentsEqual, groupKeys, neutralAdjustments, normalizeAdjustments } from './adjustments.mjs';
 import { presetPatch } from './presets.mjs';
 import { filterPatch } from './filters.mjs';
+import { gradientLocals } from './masks.mjs';
 
 /** Kinds of source a group needs on both sides. */
 const developed = (photo) => Boolean(photo?.raw);
@@ -46,7 +50,8 @@ export const SYNC_GROUPS = Object.freeze([
     needs: 'photos with the same proportions',
     compatible: (source, photo) => sameProportions(source.proportions ?? null, proportions(photo)),
   },
-  { id: 'layers', label: 'Layers (whole stack)', keys: [], structured: 'layers' },
+  { id: 'layers', label: 'Layers (whole stack, with their masks)', keys: [], structured: 'layers' },
+  { id: 'localGradients', label: 'Local gradients (masks without brush strokes)', keys: [], structured: 'local', reuse: gradientLocals },
 ].map(Object.freeze));
 const groupById = new Map(SYNC_GROUPS.map((group) => [group.id, group]));
 
@@ -67,7 +72,7 @@ export function groupPatch(source, groups, target = neutralAdjustments()) {
     const group = groupById.get(id);
     if (!group) throw new Error(`Unknown sync group: ${id}`);
     group.keys.forEach((key) => { patch[key] = values[key]; });
-    if (group.structured) patch[group.structured] = values[group.structured];
+    if (group.structured) patch[group.structured] = group.reuse ? group.reuse(values[group.structured]) : values[group.structured];
     if (group.geometry) {
       const base = patch.geometry ?? normalizeAdjustments(target).geometry;
       patch.geometry = { ...base, ...Object.fromEntries(group.geometry.map((part) => [part, values.geometry[part]])) };

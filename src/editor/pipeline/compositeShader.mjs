@@ -3,7 +3,9 @@
 // and either a layer raster (row 0 = top, sampled through the canvas → raster matrix with
 // warp.mjs's Catmull-Rom arithmetic) or, for an adjustment layer, the composite after the main
 // shader applied the layer's settings. The result is rounded to codes exactly as the CPU does,
-// so every pass starts from the same 8-bit values on both.
+// so every pass starts from the same 8-bit values on both. A masked pass also reads its mask's
+// coverage codes (an R8 texture, row 0 = top, computed by pipeline/mask.mjs), which scale the
+// layer's alpha or the adjustment's opacity as composite.mjs does.
 
 import { POSITION_GRID, ROUNDING_BIAS } from './warp.mjs';
 
@@ -23,6 +25,8 @@ uniform float uScale;
 uniform bool uOpaque;
 uniform float uOpacity;
 uniform int uMode;
+uniform sampler2D uMask;
+uniform bool uMasked;
 out vec4 outColor;
 
 const float POSITION_GRID = ${f(POSITION_GRID)};
@@ -126,10 +130,12 @@ vec4 stored(vec3 color, float alpha) {
 void main() {
   ivec2 at = ivec2(gl_FragCoord.xy);
   vec4 backdrop = codes(texelFetch(uBackdrop, at, 0)) / 255.0;
+  float masked = uOpacity;
+  if (uMasked) masked = uOpacity * (codes(texelFetch(uMask, ivec2(at.x, int(uOutputSize.y) - 1 - at.y), 0)).r / 255.0);
   if (uAdjust) {
-    if (uOpacity <= 0.0) { outColor = backdrop; return; }
+    if (masked <= 0.0) { outColor = backdrop; return; }
     vec3 adjusted = codes(texelFetch(uLayer, at, 0)).rgb / 255.0;
-    outColor = stored(backdrop.rgb + uOpacity * (blendRgb(backdrop.rgb, adjusted) - backdrop.rgb), backdrop.a);
+    outColor = stored(backdrop.rgb + masked * (blendRgb(backdrop.rgb, adjusted) - backdrop.rgb), backdrop.a);
     return;
   }
   // Canvas pixel centre in image coordinates (row 0 at the top), as composite.mjs.
@@ -140,7 +146,7 @@ void main() {
   float coverage = clamp(d / uScale + 0.5, 0.0, 1.0);
   if (coverage <= 0.0) { outColor = backdrop; return; }
   vec4 source = sampleLayer(position);
-  float alpha = source.a / 255.0 * coverage * uOpacity;
+  float alpha = source.a / 255.0 * coverage * masked;
   if (alpha <= 0.0) { outColor = backdrop; return; }
   vec3 cs = source.rgb / 255.0;
   vec3 mixed = blendRgb(backdrop.rgb, cs);

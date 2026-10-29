@@ -1,0 +1,118 @@
+{
+  "type": "quanghuynh.photo-editor.edits",
+  "version": 9,
+  "savedAt": "1970-01-01T00:00:00.000Z",
+  "exportSettings": {
+    "format": "jpeg",
+    "quality": 0.92,
+    "resize": {
+      "mode": "original",
+      "longEdge": 3840,
+      "maxWidth": 3840,
+      "maxHeight": 3840
+    },
+    "suffix": "-quangedit"
+  },
+  "photos": [
+    {
+      "source": {
+        "name": "v9.jpg",
+        "size": 1000,
+        "lastModified": 1,
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "format": "jpeg",
+        "width": 1200,
+        "height": 800,
+        "orientation": 1
+      },
+      "adjustments": {
+        "exposure": 0.3,
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "temperature": 0,
+        "tint": 0,
+        "vibrance": 0,
+        "saturation": 0,
+        "clarity": 20,
+        "geometry": {
+          "angle": 3,
+          "crop": {
+            "x": 0.1,
+            "y": 0.1,
+            "width": 0.8,
+            "height": 0.8
+          }
+        },
+        "layers": [
+          {
+            "id": "img1",
+            "type": "image",
+            "name": "",
+            "visible": true,
+            "locked": false,
+            "opacity": 0.8,
+            "blend": "multiply",
+            "source": {
+              "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "name": "overlay.png",
+              "size": 2048,
+              "format": "png",
+              "width": 640,
+              "height": 480
+            },
+            "x": 0.5,
+            "y": 0.5,
+            "width": 0.8,
+            "height": 0.6,
+            "rotation": 12,
+            "flipH": false,
+            "flipV": false,
+            "settings": {
+              "exposure": 0.5
+            }
+          },
+          {
+            "id": "txt1",
+            "type": "text",
+            "name": "",
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blend": "normal",
+            "text": "Hello",
+            "font": "sans",
+            "weight": 700,
+            "italic": false,
+            "size": 0.08,
+            "x": 0.3,
+            "y": 0.7,
+            "rotation": 0,
+            "scale": 1,
+            "color": "#ffeeaa",
+            "align": "center",
+            "outline": null,
+            "shadow": null,
+            "flipH": false,
+            "flipV": false
+          },
+          {
+            "id": "adj1",
+            "type": "adjustment",
+            "name": "",
+            "visible": true,
+            "locked": false,
+            "opacity": 0.6,
+            "blend": "soft-light",
+            "settings": {
+              "contrast": 20,
+              "saturation": -40
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -7,7 +7,7 @@ import { BUILT_IN_LOOKS } from './looks.mjs';
 import { adjustmentSpec, clampAdjustment, compactAdjustments, groupKeys, normalizeAdjustments } from './adjustments.mjs';
 import { applyPreset, createPreset, parsePreset } from './presets.mjs';
 import { changedGroups, groupPatch, planFilter } from './sync.mjs';
-import { createEditDocument, parseEditDocument, serializeEditDocument } from './editDocument.mjs';
+import { DOCUMENT_VERSION, createEditDocument, parseEditDocument, serializeEditDocument } from './editDocument.mjs';
 import { createTextOverlay } from './overlays.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { renderAnyImage } from '../pipeline/detailRenderer.mjs';
@@ -158,7 +158,7 @@ describe('documents and per-viewer lists', () => {
     const photo = { name: 'a.jpg', size: 10, lastModified: 1, sha256: null, format: 'jpeg', width: 300, height: 200, orientation: 1, history: { present: adjustments }, adjustments };
     const text = serializeEditDocument(createEditDocument([photo], {}, new Date(0)));
     const saved = JSON.parse(text);
-    expect(saved.version).toBe(9);
+    expect(saved.version).toBe(DOCUMENT_VERSION);
     expect(saved.photos[0].adjustments).toMatchObject({ captureResolution: 77, pixelEdges: 100, filter: { id: 'filter:pixelated', strength: 90 } });
     const [restored] = parseEditDocument(text).photos;
     expect(normalizeAdjustments(restored.adjustments)).toMatchObject({ captureResolution: 77, filter: { id: 'filter:pixelated', strength: 90 } });

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } 
 import { activePhoto, editorReducer, initialEditorState, selectedPhotos } from '../model/editorState.mjs';
 import { canRedo, canUndo } from '../model/history.mjs';
 import { createEditDocument, parseEditDocument, readEditDocumentFile, serializeEditDocument } from '../model/editDocument.mjs';
-import { adjustmentsEqual, isNeutral, neutralAdjustments } from '../model/adjustments.mjs';
+import { adjustmentsEqual, isNeutral, neutralAdjustments, normalizeAdjustments } from '../model/adjustments.mjs';
 import { ASPECT_PRESETS, GeometryError, constrainGeometry, geometryEqual, parseAspect, setAspect, swapAspect, turnGeometry } from '../pipeline/geometry.mjs';
 import { TURN_LEFT, TURN_RIGHT, aspectBase, aspectChoices } from './GeometryPanel';
 import { DEFAULT_SYNC_GROUPS, planSync, sourceKind } from '../model/sync.mjs';
@@ -27,11 +27,14 @@ import { appHref } from '../../util/navigation';
 import { createTextOverlay } from '../model/overlays.mjs';
 import { loadTextFonts } from '../text/fonts.mjs';
 import { rasterizeTextLayer } from '../text/textRender.mjs';
-import { createImageLayer, createAdjustmentLayer, insertLayer, layerAdjustments, layerLabel, settingsNeutral, visibleLayers } from '../model/layers.mjs';
+import { createImageLayer, createAdjustmentLayer, insertLayer, layerAdjustments, layerLabel, settingsNeutral, updateLayer, visibleLayers } from '../model/layers.mjs';
 import { rasterSize } from '../pipeline/layerTransform.mjs';
 import { composeLayers } from '../io/composeLayers.mjs';
+import { visibleLocals } from '../model/masks.mjs';
+import { imageMaskMap } from '../pipeline/mask.mjs';
 import { createRasterCache } from './layerRasters.mjs';
 import LayersPanel, { newLayerId } from './LayersPanel';
+import MaskPanel, { DEFAULT_BRUSH, DEFAULT_OVERLAY } from './MaskPanel';
 import { thumbnailSource } from './filterThumbs.mjs';
 import AdjustPanel from './AdjustPanel';
 import BatchDialog from './BatchDialog';
@@ -211,6 +214,14 @@ function EditorWorkspace() {
   const [layerToolOn, setLayerToolOn] = useState(false);
   // The layer the panels edit (null: the Background, the photo itself).
   const [activeLayer, setActiveLayer] = useState(null);
+  // Masks: the selected local adjustment, whether the selected layer's mask is edited, the
+  // selected mask component, the tool on the photo, the brush and the overlay.
+  const [activeLocal, setActiveLocal] = useState(null);
+  const [layerMaskOn, setLayerMaskOn] = useState(false);
+  const [maskComponent, setMaskComponent] = useState(null);
+  const [maskTool, setMaskTool] = useState(null);
+  const [brush, setBrush] = useState(DEFAULT_BRUSH);
+  const [maskOverlay, setMaskOverlay] = useState(DEFAULT_OVERLAY);
   const [freeResize, setFreeResize] = useState(false);
   // Image layer sources imported as layers only (by SHA-256); workspace photos serve as sources too.
   const layerFiles = useRef(new Map());
@@ -547,7 +558,7 @@ function EditorWorkspace() {
     if (mode && !transformStart.current) transformStart.current = geometryRef.current;
     if (!mode) { dispatch({ type: 'commitAdjustment' }); transformStart.current = null; }
     setTransformMode(mode);
-    if (mode) { setInspecting(false); setLayerToolOn(false); }
+    if (mode) { setInspecting(false); setLayerToolOn(false); setMaskTool(null); }
   }, []);
   const applyTransform = useCallback(() => openTransform(null), [openTransform]);
   const cancelTransform = useCallback(() => {
@@ -643,12 +654,60 @@ function EditorWorkspace() {
   // The panels edit the selected image or adjustment layer's colour settings, else the photo.
   const targetLayer = ready && activeLayer ? adjustments.layers.find((layer) => layer.id === activeLayer && layer.settings) ?? null : null;
   const targetId = targetLayer?.id ?? null;
-  const panelAdjustments = useMemo(() => (targetLayer ? layerAdjustments(targetLayer.settings) : adjustments), [targetLayer, adjustments]);
-  const panelDispatch = useCallback((action) => dispatch(targetId && LAYER_TARGETED.has(action.type) && !action.patch?.layers ? { ...action, layerId: targetId } : action), [targetId]);
+  const targetLocal = ready && activeLocal ? adjustments.local.find((local) => local.id === activeLocal) ?? null : null;
+  const localId = targetLocal?.id ?? null;
+  const panelAdjustments = useMemo(() => (targetLocal ? normalizeAdjustments(targetLocal.settings) : targetLayer ? layerAdjustments(targetLayer.settings) : adjustments), [targetLocal, targetLayer, adjustments]);
+  const panelDispatch = useCallback((action) => {
+    if (!LAYER_TARGETED.has(action.type) || action.patch?.layers || action.patch?.local) return dispatch(action);
+    if (localId) return dispatch({ ...action, localId });
+    return dispatch(targetId ? { ...action, layerId: targetId } : action);
+  }, [targetId, localId]);
   const lutTarget = useRef(null);
   lutTarget.current = targetId;
   // A layer that no longer exists (undo, another photo) is no longer selected.
   useEffect(() => { if (activeLayer && ready && !adjustments.layers.some((layer) => layer.id === activeLayer)) setActiveLayer(null); }, [activeLayer, ready, adjustments.layers]);
+  useEffect(() => { if (activeLocal && ready && !adjustments.local.some((local) => local.id === activeLocal)) { setActiveLocal(null); setMaskTool(null); } }, [activeLocal, ready, adjustments.local]);
+
+  // The mask being edited: the selected local adjustment's, or the selected layer's.
+  const maskLayer = ready && activeLayer ? adjustments.layers.find((layer) => layer.id === activeLayer) ?? null : null;
+  const maskTarget = targetLocal ? { kind: 'local', local: targetLocal } : layerMaskOn && maskLayer?.mask ? { kind: 'layer', layer: maskLayer } : null;
+  const maskTargetRef = useRef(maskTarget);
+  maskTargetRef.current = maskTarget;
+  useEffect(() => { if (!maskTarget) setMaskTool(null); }, [Boolean(maskTarget)]); // eslint-disable-line react-hooks/exhaustive-deps
+  // `mask` (null removes a layer's mask) as a settings patch of the active photo.
+  const maskPatch = useCallback((mask, localPatch = null) => {
+    const present = activePhoto(stateRef.current)?.history.present;
+    const target = maskTargetRef.current;
+    if (!present) return null;
+    if (target?.kind === 'local' || (localPatch && activeLocal)) {
+      const id = target?.local.id ?? activeLocal;
+      return { local: present.local.map((local) => (local.id === id ? { ...local, ...localPatch, ...(mask ? { mask } : {}) } : local)) };
+    }
+    const layerId = target?.layer.id ?? activeLayer;
+    return layerId ? { layers: updateLayer(present.layers, layerId, { mask }) } : null;
+  }, [activeLocal, activeLayer]);
+  const applyMask = useCallback((mask, coalesceKey = null) => { const patch = maskPatch(mask); if (patch) dispatch({ type: 'applySettings', patch, coalesceKey }); }, [maskPatch]);
+  const previewMask = useCallback((mask, localPatch = null) => { const patch = maskPatch(mask, localPatch); if (patch) dispatch({ type: 'previewSettings', patch }); }, [maskPatch]);
+  const selectLocal = useCallback((id, componentId = null) => {
+    setActiveLocal(id);
+    setMaskComponent(componentId);
+    if (id) { setActiveLayer(null); setLayerMaskOn(false); setLayerToolOn(false); } else setMaskTool(null);
+  }, []);
+  const chooseMaskTool = useCallback((value) => {
+    if (transformMode) return;
+    setMaskTool(value);
+    if (value) { setLayerToolOn(false); setInspecting(false); }
+  }, [transformMode]);
+  const removeMaskComponent = useCallback((id) => {
+    const target = maskTargetRef.current;
+    if (!target) return;
+    const mask = target.kind === 'local' ? target.local.mask : target.layer.mask;
+    applyMask({ ...mask, components: mask.components.filter((c) => c.id !== id) });
+    setMaskComponent(null);
+  }, [applyMask]);
+  const maskSpace = maskTarget?.kind === 'layer' && maskTarget.layer.type === 'image'
+    ? { width: maskTarget.layer.source.width, height: maskTarget.layer.source.height }
+    : maskTarget?.kind === 'local' ? { width: photo.width, height: photo.height } : canvasSize;
 
   const insertAboveActive = useCallback((layer, message) => {
     const target = activePhoto(stateRef.current);
@@ -689,6 +748,10 @@ function EditorWorkspace() {
   }, [insertAboveActive]);
   const selectLayer = useCallback((id) => {
     setActiveLayer(id);
+    setActiveLocal(null);
+    setLayerMaskOn(false);
+    setMaskComponent(null);
+    setMaskTool(null);
     const layer = id && activePhoto(stateRef.current)?.history.present.layers.find((item) => item.id === id);
     if (layer && (layer.type === 'image' || layer.type === 'text') && !transformMode) setLayerToolOn(true);
   }, [transformMode]);
@@ -807,9 +870,10 @@ function EditorWorkspace() {
     const resource = resources.current.get(target.id);
     const values = target.history.present;
     const lut = values.lut ? lutsRef.current.get(values.lut.sha256) : null;
-    // Layers: composited over the rendered photo before encoding (io/composeLayers.mjs).
+    // Local adjustments and layers: applied over the rendered photo before encoding (io/composeLayers.mjs).
     const layerCancel = { cancelled: false };
-    const compose = visibleLayers(values.layers).length ? async (context, { size, signal, onProgress: progress }) => {
+    const native = { width: target.width, height: target.height };
+    const compose = visibleLayers(values.layers).length || visibleLocals(values.local).length ? async (context, { size, signal, onProgress: progress }) => {
       if (values.layers.some((layer) => layer.type === 'text')) await loadTextFonts();
       const merged = { get cancelled() { return layerCancel.cancelled || Boolean(signal?.cancelled); } };
       await composeLayers(context, values.layers, {
@@ -817,6 +881,9 @@ function EditorWorkspace() {
         loadRaster: (layer, canvasSize) => exportLayerRaster(layer, canvasSize, merged),
         rasterizeText: rasterizeTextLayer,
         lutFor: (layerSettings) => (layerSettings?.lut ? lutsRef.current.get(layerSettings.lut.sha256) ?? null : null),
+        local: values.local,
+        imageMap: (canvas) => imageMaskMap(exportGeometry(values.geometry, native, { mode: 'original' }).plan, canvas, native),
+        native: exportGeometry(values.geometry, native, { mode: 'original' }).output,
         workers: detailWorkerCount(),
         signal: merged,
         onProgress: progress,
@@ -1137,6 +1204,17 @@ function EditorWorkspace() {
   textKeyRef.current = ready && !transformMode ? () => setLayerToolOn((on) => !on) : null;
   const layerToolRef = useRef(false);
   layerToolRef.current = layerToolOn;
+  // Mask shortcuts: M tool, O overlay, X paint/erase, [ ] brush size.
+  const maskKeyRef = useRef(null);
+  maskKeyRef.current = ready && !transformMode && maskTarget ? (key) => {
+    if (key === 'm') chooseMaskTool(maskTool ? null : 'brush');
+    else if (key === 'o') setMaskOverlay((value) => ({ ...value, show: !value.show }));
+    else if (key === 'x' && maskTool === 'brush') setBrush((value) => ({ ...value, mode: value.mode === 'erase' ? 'add' : 'erase' }));
+    else if ((key === '[' || key === ']') && maskTool === 'brush') setBrush((value) => ({ ...value, radius: Math.min(0.5, Math.max(0.002, value.radius * (key === ']' ? 1.2 : 1 / 1.2))) }));
+    else if (key === 'escape' && maskTool) chooseMaskTool(null);
+    else return false;
+    return true;
+  } : null;
   const dialogOpenRef = useRef(false);
   dialogOpenRef.current = Boolean(batchDialog || exportDialogOpen);
   // Keyboard shortcuts. Text fields keep their own undo and arrow keys.
@@ -1158,6 +1236,7 @@ function EditorWorkspace() {
       }
       if (mod || event.altKey || isControl(event.target) || hdrOpenRef.current) return;
       if (event.key === 'Escape' && transformRef.current) { event.preventDefault(); transformRef.current(); return; }
+      if (maskKeyRef.current?.(key)) { event.preventDefault(); return; }
       if (event.key === 'Escape' && layerToolRef.current) { event.preventDefault(); setLayerToolOn(false); return; }
       if (event.key === 'Escape' && !dialogOpenRef.current) { dispatch({ type: 'clearSelection' }); setSelecting(false); return; }
       if (event.key === '\\') setCompare((value) => (value === 'original' ? 'edited' : 'original'));
@@ -1402,6 +1481,21 @@ function EditorWorkspace() {
             onApply: (layers, coalesceKey = null) => dispatch({ type: 'applySettings', patch: { layers }, coalesceKey }),
             onEdit: (id) => { setActiveLayer(id); setMobilePanel('adjust'); setTextFocus((count) => count + 1); },
           } : null}
+          maskTool={maskTarget && !transformMode ? {
+            owner: maskTarget.kind === 'local' ? { kind: 'local' } : { kind: 'layer', layer: maskTarget.layer },
+            mask: maskTarget.kind === 'local' ? maskTarget.local.mask : maskTarget.layer.mask,
+            editable: !(maskTarget.kind === 'layer' && maskTarget.layer.locked),
+            interactive: Boolean(maskTool),
+            overlay: maskOverlay,
+            tool: maskTool,
+            brush,
+            selectedId: maskComponent,
+            newId: newLayerId,
+            onSelect: setMaskComponent,
+            onPreview: (mask) => previewMask(mask),
+            onCommit: (mask, coalesceKey = null) => applyMask(mask, coalesceKey),
+            onRemove: removeMaskComponent,
+          } : null}
           layerRasters={layerRasters}
           lutFor={lutFor}
         />
@@ -1510,10 +1604,33 @@ function EditorWorkspace() {
             onFreeResize={setFreeResize}
           />
           <input ref={layerInputRef} type="file" accept={ACCEPT} hidden data-layer-input onChange={(event) => { onLayerFile(event.target.files[0]); event.target.value = ''; }} />
+          <MaskPanel
+            disabled={!ready}
+            locals={ready ? adjustments.local : []}
+            layer={maskLayer}
+            target={maskTarget}
+            space={ready ? maskSpace : null}
+            selectedId={maskComponent}
+            onSelect={setMaskComponent}
+            onSelectLocal={selectLocal}
+            onSelectLayerMask={(on) => { setLayerMaskOn(on); setMaskComponent(null); if (on) setLayerToolOn(false); else setMaskTool(null); }}
+            tool={maskTool}
+            onTool={chooseMaskTool}
+            brush={brush}
+            onBrush={setBrush}
+            overlay={maskOverlay}
+            onOverlay={setMaskOverlay}
+            onApplyLocals={(local, coalesceKey = null) => dispatch({ type: 'applySettings', patch: { local }, coalesceKey })}
+            onApplyMask={applyMask}
+            onPreviewMask={previewMask}
+            onCommit={() => dispatch({ type: 'commitAdjustment' })}
+            newId={newLayerId}
+            onEditSettings={() => setMobilePanel('adjust')}
+          />
           <AdjustPanel
             adjustments={panelAdjustments}
-            layer={targetLayer ? { label: layerLabel(targetLayer), adjustment: targetLayer.type === 'adjustment' } : null}
-            disabled={!ready || Boolean(targetLayer?.locked)}
+            layer={targetLocal ? { label: targetLocal.name || 'Local adjustment', local: true } : targetLayer ? { label: layerLabel(targetLayer), adjustment: targetLayer.type === 'adjustment' } : null}
+            disabled={!ready || (!targetLocal && Boolean(targetLayer?.locked))}
             dispatch={panelDispatch}
             lut={{ library: [...luts.values()], onImport: importLut, status: lutStatus }}
             presets={{ userPresets, onChange: changePresets, onPreview: targetLayer ? () => {} : setPresetPreview, onDownload: downloadBlob, newId }}

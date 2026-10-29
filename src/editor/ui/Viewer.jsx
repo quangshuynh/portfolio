@@ -11,8 +11,11 @@ import { previewEdgeLimit } from '../io/files.mjs';
 import InspectView from './InspectView';
 import LayerHandles from './LayerHandles';
 import { visibleLayers } from '../model/layers.mjs';
-import { adjustmentParams, adjustmentPass, compositeImageSync, rasterPass } from '../pipeline/composite.mjs';
+import { adjustmentParams, adjustmentPass, compositeImageSync, localPasses, rasterPass } from '../pipeline/composite.mjs';
 import { layerMatrix, offsetMatrix } from '../pipeline/layerTransform.mjs';
+import { maskActive, splitLocalSettings, visibleLocals } from '../model/masks.mjs';
+import { canvasMaskMap, imageMaskMap, layerMaskMap, maskMapKey, rasterizeMask } from '../pipeline/mask.mjs';
+import MaskTool from './MaskTool';
 import { rasterizeTextLayer } from '../text/textRender.mjs';
 import { loadTextFonts } from '../text/fonts.mjs';
 
@@ -58,6 +61,36 @@ const specKey = (spec) => (spec ? JSON.stringify([spec.matrix, spec.width, spec.
 // What a text sprite depends on (not opacity, blend mode, lock or name: the compositor applies those).
 const spriteKey = ({ opacity, blend, locked, name, visible, ...drawn }, out) => `${out.width}x${out.height}|${JSON.stringify(drawn)}`;
 
+/** A frame at `out` size (Detail frames are rendered at most DETAIL_FINAL_EDGE px). */
+function scaleFrame(frame, out) {
+  if (frame.width === out.width && frame.height === out.height) return frame;
+  const scratch = document.createElement('canvas');
+  scratch.width = frame.width;
+  scratch.height = frame.height;
+  scratch.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height), 0, 0);
+  const target = document.createElement('canvas');
+  target.width = out.width;
+  target.height = out.height;
+  const context = target.getContext('2d', { willReadFrequently: true });
+  context.drawImage(scratch, 0, 0, out.width, out.height);
+  return { width: out.width, height: out.height, data: context.getImageData(0, 0, out.width, out.height).data };
+}
+
+const hasDetailPass = (passes) => Boolean(passes?.some(({ kind }) => kind === 'detail'));
+
+/**
+ * The map of a mask's owner at a canvas of `out` size: a local adjustment's mask is in the
+ * photo's own space (through its geometry `plan`), an image layer's in its box, others on the canvas.
+ */
+export function ownerMaskMap(owner, out, plan, native) {
+  if (owner.kind === 'local') return imageMaskMap(plan, out, native);
+  if (owner.layer.type === 'image') {
+    const box = { width: owner.layer.source.width, height: owner.layer.source.height };
+    return layerMaskMap(layerMatrix(owner.layer, out, box), box);
+  }
+  return canvasMaskMap(out);
+}
+
 /** The CPU rendering of a base frame with the layer passes composited over it (no-WebGL2 preview). */
 function withLayers(frame, passes) {
   if (!passes?.length) return frame;
@@ -91,9 +124,13 @@ export function viewGeometry(geometry, mode, native) {
  * :param layerRasters: { get(layer, canvasSize) → raster or null while it loads (then `version`
  *   changes), version } for image layers; `lutFor(settings)` finds a layer's LUT
  * Layers are composited over the photo (GPU passes, or on the CPU without WebGL2); they are
- * not shown in Original, on the "before" side of Split, while cropping or in 1:1 Detail.
+ * not shown in Original, on the "before" side of Split, while cropping or in 1:1 Detail. Local
+ * adjustments are applied below the layers in the same way; their Detail settings switch the
+ * preview to the CPU renderer (draft, then final).
+ * :param maskTool: the mask being edited ({ owner: { kind: 'local' } | { kind: 'layer', layer },
+ *   mask, interactive, overlay: { show, color, view: 'overlay' | 'mask' }, and MaskTool's props }) or null
  */
-export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, layerTool = null, layerRasters = null, lutFor = () => null }) {
+export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, layerTool = null, maskTool = null, layerRasters = null, lutFor = () => null }) {
   const stageRef = useRef(null);
   const canvasHostRef = useRef(null);
   const engineRef = useRef(null);
@@ -120,6 +157,9 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   const dragRef = useRef(null);
   // Text layer sprites at the preview's size, by what they draw; fonts load once text is used.
   const spritesRef = useRef(new Map());
+  // Mask coverage at the preview's size, by mask and map (only those the last frame used are kept).
+  const masksRef = useRef(new Map());
+  const overlayRef = useRef(null);
   const [fontsReady, setFontsReady] = useState(false);
   const [layersLoading, setLayersLoading] = useState(0);
   const [layersShown, setLayersShown] = useState(0);
@@ -269,7 +309,14 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     const split = splitRef.current;
     if (engine.kind === 'webgl2') {
       const before = request.raw ? deriveParams(neutralAdjustments(), { raw: request.raw }) : null;
-      if (!engine.renderer.lost) engine.renderer.render(request.params, { split, before, rendered: frame, layers: request.layers?.gpu });
+      if (engine.renderer.lost) return;
+      // Local Detail runs on the CPU: then every pass is composited there, at the canvas's size.
+      if (hasDetailPass(request.layers?.cpu)) {
+        const composited = withLayers(scaleFrame(frame, request.warp ?? image), request.layers.cpu);
+        engine.renderer.render({ ...request.params, neutral: true }, { split, before, rendered: composited });
+        return;
+      }
+      engine.renderer.render(request.params, { split, before, rendered: frame, layers: request.layers?.gpu });
       return;
     }
     const out = request.warp ?? image;
@@ -396,17 +443,43 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   // Layer passes at the preview canvas's size: text sprites drawn here, image rasters from
   // `layerRasters` (skipped until loaded), adjustment layers with their derived parameters.
   const showLayers = !transformMode && compare !== 'original';
+  // While the brush paints, the mask being edited keeps its strokes' coverage (mask.mjs), so each
+  // new point costs only its own segment; the buffers are released when the brush is put away.
+  const painting = Boolean(maskTool?.interactive && maskTool.tool === 'brush');
+  const paintCacheRef = useRef(new Map());
+  useEffect(() => { if (!painting) paintCacheRef.current.clear(); }, [painting]);
+  const maskCoverage = useCallback((def, map, out, keys) => {
+    const key = `${out.width}x${out.height}|${maskMapKey(map)}|${JSON.stringify(def)}`;
+    keys.add(key);
+    if (!masksRef.current.has(key)) masksRef.current.set(key, rasterizeMask(def, map, out, painting && def === maskTool.mask ? paintCacheRef.current : null));
+    return { def, map, key, raster: masksRef.current.get(key) };
+  }, [painting, maskTool?.mask]); // eslint-disable-line react-hooks/exhaustive-deps
+  const overlayMask = maskTool?.overlay?.show && showLayers ? maskTool : null;
   const buildLayers = useCallback((out) => {
-    if (!showLayers) return null;
-    const shown = visibleLayers(adjustments.layers);
-    if (!shown.length) return null;
+    const maskKeys = new Set();
+    const keepMasks = () => { for (const key of masksRef.current.keys()) if (!maskKeys.has(key)) masksRef.current.delete(key); };
+    // The overlay's coverage, kept while it is shown.
+    const overlay = overlayMask ? maskCoverage(overlayMask.mask, ownerMaskMap(overlayMask.owner, out, plan, native), out, maskKeys) : null;
+    const shown = showLayers ? visibleLayers(adjustments.layers) : [];
+    const locals = showLayers ? visibleLocals(adjustments.local) : [];
+    if (!shown.length && !locals.length) { keepMasks(); return overlay ? { cpu: [], gpu: [], loading: 0, overlay } : null; }
     const cpu = [];
     const gpu = [];
     const keys = new Set();
     let loading = 0;
+    if (locals.length) {
+      const map = imageMaskMap(plan, out, native);
+      for (const local of locals) {
+        for (const pass of localPasses(local, maskCoverage(local.mask, map, out, maskKeys), plan.native, splitLocalSettings(local.settings))) {
+          cpu.push(pass);
+          gpu.push(pass.kind === 'adjust' ? { ...pass, params: adjustmentParams(pass) } : pass);
+        }
+      }
+    }
+    const layerMask = (layer, map) => (maskActive(layer.mask) ? maskCoverage(layer.mask, map, out, maskKeys) : null);
     for (const layer of shown) {
       if (layer.type === 'adjustment') {
-        const pass = adjustmentPass(layer, lutFor(layer.settings));
+        const pass = adjustmentPass(layer, lutFor(layer.settings), layerMask(layer, canvasMaskMap(out)));
         if (layer.settings.lut && !pass.lut) continue; // eslint-disable-line no-continue
         cpu.push(pass);
         gpu.push({ ...pass, params: adjustmentParams(pass) });
@@ -427,15 +500,36 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         if (!raster) { loading += 1; continue; } // eslint-disable-line no-continue
         matrix = layerMatrix(layer, out, raster);
       }
-      const pass = rasterPass(layer, raster, matrix, out);
+      const pass = rasterPass(layer, raster, matrix, out, layerMask(layer, layer.type === 'image' ? layerMaskMap(matrix, raster) : canvasMaskMap(out)));
       if (!pass.bounds) continue; // eslint-disable-line no-continue
       cpu.push(pass);
       gpu.push({ ...pass, key: `${layer.id}:${raster.width}x${raster.height}` });
     }
-    // Sprites of text no longer shown are dropped.
+    // Sprites of text and masks no longer shown are dropped.
     for (const key of spritesRef.current.keys()) if (!keys.has(key)) spritesRef.current.delete(key);
-    return { cpu, gpu, loading };
-  }, [showLayers, adjustments.layers, layerRasters, fontsReady, lutFor]);
+    keepMasks();
+    return { cpu, gpu, loading, overlay };
+  }, [showLayers, adjustments.layers, adjustments.local, layerRasters, fontsReady, lutFor, overlayMask, plan, native, maskCoverage]);
+
+  // The selected mask over the photo: its coverage tinted (or as greyscale) on a 2D canvas.
+  const drawOverlay = useCallback((overlay) => {
+    const element = overlayRef.current;
+    if (!element) return;
+    if (!overlay) { element.width = 0; return; }
+    const { width, height, data } = overlay.raster;
+    if (element.width !== width || element.height !== height) Object.assign(element, { width, height });
+    const context = element.getContext('2d');
+    const image = context.createImageData(width, height);
+    const view = overlayMask?.overlay.view ?? 'overlay';
+    const hex = /^#[0-9a-f]{6}$/i.test(overlayMask?.overlay.color ?? '') ? overlayMask.overlay.color : '#ff3b30';
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    for (let p = 0; p < width * height; p += 1) {
+      const v = data[p];
+      if (view === 'mask') image.data.set([v, v, v, 255], p * 4);
+      else image.data.set([r, g, b, Math.round(v * 0.55)], p * 4);
+    }
+    context.putImageData(image, 0, 0);
+  }, [overlayMask?.overlay.view, overlayMask?.overlay.color]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Render on the next frame with the latest values; intermediate values are dropped.
   // Never with another photo's settings: wait until this photo's proxy is loaded.
@@ -449,13 +543,15 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       const params = deriveParams(values, { lut, raw });
       if (engine.kind === 'webgl2' && !engine.renderer.lost) engine.renderer.setGeometry(previewSpec);
       const out = previewSpec ? { width: previewSpec.width, height: previewSpec.height } : { width: proxy.width, height: proxy.height };
-      const layers = buildLayers(out);
+      let layers = buildLayers(out);
       setLayersLoading(layers?.loading ?? 0);
       setLayersShown(layers?.cpu.length ?? 0);
-      if (params.cpuOnly) {
+      drawOverlay(layers?.overlay ?? null);
+      if (layers && !layers.cpu.length) layers = null;
+      if (params.cpuOnly || hasDetailPass(layers?.cpu)) {
         // Spatial Detail: the CPU renders the frame (draft, then final); a split or
         // compare change alone repaints the last frame.
-        const key = `${photo.id}|${JSON.stringify(values)}|${params.lutActive ? lut.sha256 : ''}|${specKey(previewSpec)}`;
+        const key = `${photo.id}|${JSON.stringify({ ...values, layers: null, local: null })}|${params.lutActive ? lut.sha256 : ''}|${specKey(previewSpec)}`;
         const job = detailJobRef.current;
         const nativeSize = plan.identity ? native : plan.native;
         const request = { key, image: proxyRef.current, adjustments: values, params, lut: params.lutActive ? lut : null, raw, warp: previewSpec, nativeWidth: nativeSize.width, nativeHeight: nativeSize.height, generation: job.generation, layers };
@@ -487,7 +583,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       }
     });
     return () => cancelAnimationFrame(frameRef.current);
-  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec, glowVersion, buildLayers, layerRasters?.version]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec, glowVersion, buildLayers, drawOverlay, layerRasters?.version]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -625,6 +721,30 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
           hidden={!proxy}
           style={{ width: displayWidth, height: displayHeight, transform: `translate(${offsetX}px, ${offsetY}px)` }}
         />
+        <canvas
+          ref={overlayRef}
+          className="pe-mask-overlay"
+          aria-hidden="true"
+          data-view={overlayMask?.overlay.view}
+          hidden={!overlayMask || !proxy}
+          style={{ width: displayWidth, height: displayHeight, transform: `translate(${offsetX}px, ${offsetY}px)` }}
+        />
+        {maskTool?.editable && proxy && proxy.id === photo?.id && !transform && !inspect && compare !== 'original' && (
+          <MaskTool
+            mask={maskTool.mask}
+            map={ownerMaskMap(maskTool.owner, { width: sourceWidth, height: sourceHeight }, plan, native)}
+            box={{ x: offsetX, y: offsetY, width: displayWidth, height: displayHeight }}
+            output={{ width: sourceWidth, height: sourceHeight }}
+            tool={maskTool.interactive ? maskTool.tool : null}
+            brush={maskTool.brush}
+            selectedId={maskTool.selectedId}
+            newId={maskTool.newId}
+            onSelect={maskTool.onSelect}
+            onPreview={maskTool.onPreview}
+            onCommit={maskTool.onCommit}
+            onRemove={maskTool.onRemove}
+          />
+        )}
         {layerTool?.interactive && proxy && proxy.id === photo?.id && !transform && !inspect && compare !== 'original' && (
           <LayerHandles
             layers={adjustments.layers}
