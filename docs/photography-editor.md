@@ -881,10 +881,15 @@ amount 0 and empty masks add no pass. Preview: the GPU reads a mask texture comp
 code on the page (exactly the CPU's codes); a local adjustment with Detail switches the preview to
 the CPU renderer (draft, then final, labelled). Exports evaluate masks band by band at the
 export's size; Detail passes read a halo of rows around each band from the unchanged composite
-and render only the rows and columns their mask covers, so tiles have no seams. While the brush
-paints, the edited mask keeps its finished strokes' coverage and the stroke being drawn, so each
-new point costs only its own segment (bounded to two components, released when the brush is put
-away). Clipping masks (a layer clipped to the one below) are **not built**: they would need
+and render only the rows and columns their mask covers, so tiles have no seams. On desktops the
+page computes a Detail pass's guide once and its bands run on the render workers (each with its
+halo of unchanged rows; a result is written back only when no band still to be sent reads its
+rows); masked adjustment passes render only the box their mask covers. While the brush paints,
+the edited mask keeps its finished strokes' coverage, each component's coverage and the codes,
+so a new point recomputes only the box its segment touches (a dirty rectangle); any other change
+(a new stroke, a moved gradient, undo) evaluates in full. Masks of more than six components skip
+the cache; it holds two brush components and is released when the brush is put away. All three
+give the same codes and pixels as before (tested, `pipeline/localPerf.test.js`). Clipping masks (a layer clipped to the one below) are **not built**: they would need
 nested passes and a second alpha source per pass, and no control is shown for them.
 
 **Projects.** Version 10 documents add `local` and `layer.mask`; version 9 files open unchanged
@@ -927,6 +932,24 @@ Single-thread local Detail at 24 MP: 2.1 s (Clarity radial) to 3.8 s (Dehaze ove
 gradient). Phones (emulation): brush frames 80 ms (iPhone 13) and 150 ms (Pixel 7), list rows and
 handles 44 px, no sideways scroll, no global `overflow: hidden`; touch painting does not pan.
 Without WebGL2 the brush frame is 69 ms. RAW decoder concurrency is unchanged (one at a time).
+
+**Interval 15** (same machine, 2026-10-29; Chromium rows are one run each of
+`check:editor:masks` on `main` and on this branch, genuine files from `2026-10-23 hdr`):
+
+| | Before | After |
+| --- | --- | --- |
+| Brush, per new point, 2048×1365 (Node, median · p95) | 32 · 37 ms; 69 · 78 ms with a radial in the mask | 1.0 · 1.8 ms; 1.1 · 1.9 ms |
+| Masked exposure pass, 24 MP, gradient over 40% (Node, one thread) | 2.70 s | 2.00 s |
+| 24 MP PNG, Dehaze gradient + Clarity radial (Chromium) · peak | 26.4 s · 1.72 GB | 19.1 s · 1.84 GB |
+| Genuine ARW, three local adjustments · peak | 15.0 s · 1.87 GB | 10.9 s · 1.78 GB |
+| Merged RAW HDR + local gradient · peak | 24.1 s · 2.51 GB | 20.7 s · 2.37 GB |
+| Brush move to painted frame · gradient drag · local Detail preview (Chromium, 600×400) | 153 · 101 · 293 ms | 150 · 149 · 351 ms |
+
+Every export still equals the Node reference exactly. The 24 MP peak rises about 115 MB (band
+copies held by the Detail workers). In the browser the brush frame did not change: mask maths was
+no longer its cost; the rest (React update, mask texture upload, the headless software GPU) was not
+profiled further. The gradient-drag and Detail-preview rows moved with single-run noise only (those
+paths do not use the changed code on the GPU preview); treat them as unchanged until repeated.
 
 ## Batch editing
 
@@ -1382,6 +1405,13 @@ Safari cannot encode WebP (the option is disabled when the browser cannot).
   available for merged HDR photos.
 
 ## Extension points
+
+**Host** (Interval 15): `EditorApp` takes an optional `host` (`{ title, backHref, backLabel,
+privacyNote, load(), Panel }`). The public route passes none. The local photography CMS
+(`cms/admin/editorHost.jsx`, served only by the CMS) uses it to load a photograph's source and
+saved edit document, save treatments and upload a full-resolution render (`HOST_RENDER_SETTINGS`:
+JPEG 95, original size). With a host nothing is autosaved to `localStorage`. See
+[photography-cms.md](photography-cms.md#editing-in-quangedit).
 
 Every future feature stays non-destructive (settings in the edit document, applied
 at render time), local and exportable at full resolution. Not built yet:

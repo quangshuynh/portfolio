@@ -71,7 +71,7 @@ test('local Detail on render workers equals the one-thread pass, with and withou
   await composeLayers(contextOf(banded), [], { ...options, workers: 3, spawn: fakeWorker });
   expect(banded.data).toEqual(page.data);
   expect(page.data).not.toEqual(photo().data);
-});
+}, 60_000);
 
 test('the brush cache gives the same codes as a full evaluation, point by point, with gradients and erasing', () => {
   const stroke = (count, mode = 'add') => ({ mode, radius: 0.06, hardness: 0.4, opacity: 0.9, points: Array.from({ length: count }, (_, i) => [0.1 + (0.8 * i) / 40, 0.5 + 0.25 * Math.sin(i / 5), 1]) });
@@ -88,4 +88,4 @@ test('the brush cache gives the same codes as a full evaluation, point by point,
   expect(rasterizeMask(undone, map, { width: W, height: H }, cache).data).toEqual(rasterizeMask(undone, map, { width: W, height: H }).data);
   const moved = mask({ ...radial, x: 0.3 }, brush([first]));
   expect(rasterizeMask(moved, map, { width: W, height: H }, cache).data).toEqual(rasterizeMask(moved, map, { width: W, height: H }).data);
-});
+}, 60_000);

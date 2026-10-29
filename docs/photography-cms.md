@@ -117,6 +117,57 @@ The Publish view keeps four states apart:
 
 A pull request being open does not mean anything is live.
 
+## Editing in QuangEdit
+
+Interval 15, 2026-10-29. The full public editor (RAW, HDR, Detail, LUTs, filters,
+recipes, geometry, layers, masks) opens CMS photographs; nothing is a second editor.
+
+1. In the details panel, **Edit in QuangEdit** opens
+   `/admin/photography/editor/?photo=<id>` on the CMS server, with the photograph's
+   source and its saved treatment (applied when the file, matched by SHA-256, has
+   loaded).
+2. Edit as usual. Presets, the Filter Library, `.cube` LUTs, Copy/Paste settings and
+   recipes work as on the public page: an assistant's recipe JSON is pasted, reviewed
+   and applied only on Apply; a recipe's missing LUT is shown and must be reimported
+   with the same SHA-256. Recipes saved in the public editor are kept per site, so
+   export and import them to use them here.
+3. **Save treatment** stores the edit privately. **Render for portfolio** renders the
+   full resolution from the original (JPEG 95, never resized), then generates the
+   gallery and viewer images with the public pipeline (`scripts/photography-derivatives.mjs`:
+   sizes, mozjpeg, no metadata). The master is named `<source>-quangedit.jpg`
+   (`<reference>-HDR-quangedit.jpg` for a merge).
+4. **Review in CMS**: original and edited under a split slider, the settings, and
+   three separate states: treatment (draft, approved, rejected), render (up to date
+   or not), photograph (draft or published). **Approve for publication** needs an
+   up-to-date render. **Reject** keeps the proposal for reference; **Revert to
+   approved** or **Discard treatment** drops it.
+5. Publish as usual. Save treatment ≠ approve ≠ publish: nothing changes on the
+   live site until the publication pull request is merged.
+
+**Sources**, best first, never copied twice and never modified:
+
+| Source | When |
+| --- | --- |
+| Attached (Attach source… in the editor: JPEG, PNG, WebP, Sony ARW, DNG; up to three for an HDR merge) | stored once by SHA-256 in `sources/`, or referenced in `originals/` |
+| Uploaded original | drafts uploaded to the CMS |
+| Camera library | `--library-dir` set and the photograph listed in `scripts/photography-sources.mjs`: read in place |
+| Public 2200 px image | nothing else: editing works and is labelled as limited; a render is never larger |
+
+A treatment made from another file than the current source is kept and flagged
+("made from a different file"), never applied to the wrong pixels. A missing or
+moved source is reported, falling back to the public image with that reason.
+
+**Treatment record** (`treatments/<id>.json`, version 1): photograph id, attached
+sources, the canonical edit document (version 10, validated by the editor's own
+parser, one photo, at most 4 MB, no pixels), its hash, status, the current render
+(file, SHA-256, sizes, the document hash it was made from) and the approved
+snapshot publication uses. Saves are atomic and revision-checked; a failed render
+never touches the treatment. Renders live in `renders/<id>/<sha16>/`; unreferenced
+renders and attached files are removed when a treatment changes.
+
+**Not built:** returning a published photograph to its unedited image (approve a
+neutral treatment instead); automatic HDD discovery or AI selection.
+
 ## What publication changes
 
 Only these paths, in a branch cut from the current `origin/main`:
@@ -129,6 +180,10 @@ Only these paths, in a branch cut from the current `origin/main`:
   published photographs from their private originals, and deleted for
   withdrawn ones. Deletion happens only in the branch; the live site keeps
   serving them until the merge. The 14 orphan derivatives are never touched.
+  A published photograph with an **approved QuangEdit treatment** whose staged
+  images differ from the base gets them under its existing names, so URLs and
+  `/photography/#slug` links do not change; its manifest entry keeps the
+  original's capture metadata and only its sizes change.
 
 Anything else in the diff, or any draft's ID, source file or derivative,
 stops publication before anything is committed.
@@ -150,6 +205,7 @@ stops publication before anything is committed.
 | Private drafts | The workspace is outside the repository, so Vite, Git, builds, Vercel and Pages cannot see it. Draft images are served only by the authenticated local server, with `Cache-Control: private, no-store`. | yes |
 | Repository visibility | The repository is public. A pushed publication branch, and its Vercel preview deployment, make **its photographs public before merge**. That is why the branch contains only photographs you chose to publish. | documented |
 | GitHub Actions | No workflow was added. CI runs on pull requests from branches of this repository with the default read-only `GITHUB_TOKEN` and no secrets; deployment runs only on `main`. | audited |
+| QuangEdit routes | `/admin/photography/editor/` and `/api/editor/photos/<id>/…` sit behind the same session, Host, CSRF and origin checks. Ids must match `[A-Za-z0-9_-]+` and exist in the workspace catalog; sources are served by index, never by path, `private, no-store`; no response contains a filesystem path. Attached files: content-sniffed, 200 MB; renders: decoded in full, 200 MB, 120 MP. The editor host page and `/api/editor` exist only on the CMS server (build test). | yes |
 | Rate limiting | Not implemented. There is one local user, the token cannot be guessed, and failed sign-ins create nothing. | n/a |
 
 Trust boundary: anyone who can read your terminal, your browser profile on
@@ -206,6 +262,20 @@ use your git and GitHub credentials. The CMS adds no remote access.
   - malformed catalogs and identity changes;
   - uploads over HTTP, image path traversal;
   - offline publication limits.
+- `cms/editor.test.mjs` (QuangEdit, over HTTP): session, CSRF and origin on every
+  editor route; id and source-index traversal; no paths in responses; sources
+  (upload, attached RAW stored once, library read in place, moved file, public
+  image only); save and reopen with masks and geometry; stale revision; invalid
+  documents and another file's edits refused; render, approve, reject, revert,
+  discard; stale source after reattaching; HDR needing all three exposures.
+- `cms/lib/treatment-publish.test.mjs` (real git): an approved render replaces only
+  that photograph's two images and manifest sizes; draft treatments, rejected
+  proposals and draft photographs stay out; a new upload publishes its render with
+  the original's record; no RAW, render master or workspace file in the branch; a
+  render changed on disk stops publication.
+- `npm run check:cms:editor`: the flow in six browser environments (see
+  PROJECT_MAINTENANCE.md); on 2026-10-29 all passed, with a genuine A7 III ARW
+  (6024×4024) and a merged RAW HDR (6002×4018) in Chromium.
 - `cms/lib/github-preview.test.mjs`:
   - the GitHub client's auth, permission, validation and network errors;
   - deployment states, token resolution, redaction;
@@ -253,3 +323,8 @@ More screenshots:
   gallery without a viewer, as it does for any unknown slug.
 - The workspace is **not backed up automatically**, and the CMS has **one
   owner**: there is no multi-user locking beyond the revision check.
+- **QuangEdit in the CMS** is not checked on a physical iPhone (emulation only).
+  Saved recipes and presets of the public editor are per site (export/import them).
+  The original-versus-edited comparison overlays two images, so a crop shows them
+  misaligned. The CMS's Vite client retries its disabled HMR socket on loopback
+  port 24678 (harmless, never leaves the computer).
