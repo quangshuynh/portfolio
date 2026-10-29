@@ -114,6 +114,20 @@ export function viewGeometry(geometry, mode, native) {
   }
 }
 
+// Overlay pixels per mask code: tinted at 55% of the coverage, or the coverage as grey.
+const overlayTables = new Map();
+function overlayTable(view, hex) {
+  const key = `${view}${hex}`;
+  if (!overlayTables.has(key)) {
+    const table = new Uint32Array(256);
+    const bytes = new Uint8Array(table.buffer);
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    for (let v = 0; v < 256; v += 1) bytes.set(view === 'mask' ? [v, v, v, 255] : [r, g, b, Math.round(v * 0.55)], v * 4);
+    overlayTables.set(key, table);
+  }
+  return overlayTables.get(key);
+}
+
 /**
  * Centre workspace: the processed preview with zoom, pan and before/after.
  * Zoom is expressed in output pixels per CSS pixel (1 = 100%): pixels of the photo after
@@ -512,23 +526,35 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   }, [showLayers, adjustments.layers, adjustments.local, layerRasters, fontsReady, lutFor, overlayMask, plan, native, maskCoverage]);
 
   // The selected mask over the photo: its coverage tinted (or as greyscale) on a 2D canvas.
+  // While painting, only the box the new segment changed is redrawn (the raster's `change`
+  // says which version it follows); one ImageData is reused and codes map through a table.
+  const overlayDrawnRef = useRef(null);
   const drawOverlay = useCallback((overlay) => {
     const element = overlayRef.current;
     if (!element) return;
-    if (!overlay) { element.width = 0; return; }
-    const { width, height, data } = overlay.raster;
-    if (element.width !== width || element.height !== height) Object.assign(element, { width, height });
-    const context = element.getContext('2d');
-    const image = context.createImageData(width, height);
+    if (!overlay) { element.width = 0; overlayDrawnRef.current = null; return; }
+    const { raster } = overlay;
+    const { width, height, data, change } = raster;
     const view = overlayMask?.overlay.view ?? 'overlay';
     const hex = /^#[0-9a-f]{6}$/i.test(overlayMask?.overlay.color ?? '') ? overlayMask.overlay.color : '#ff3b30';
-    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-    for (let p = 0; p < width * height; p += 1) {
-      const v = data[p];
-      if (view === 'mask') image.data.set([v, v, v, 255], p * 4);
-      else image.data.set([r, g, b, Math.round(v * 0.55)], p * 4);
+    const last = overlayDrawnRef.current;
+    const sized = element.width === width && element.height === height;
+    const sameLook = Boolean(last && sized && last.view === view && last.hex === hex && last.image.width === width && last.image.height === height);
+    if (sameLook && last.raster === raster) return;
+    if (!sized) Object.assign(element, { width, height });
+    const context = element.getContext('2d');
+    const image = sameLook ? last.image : context.createImageData(width, height);
+    const follows = sameLook && change && last.change && change.from !== null && change.key === last.change.key && change.from === last.change.version;
+    const box = follows ? change.dirty : { x0: 0, y0: 0, x1: width, y1: height };
+    if (box) {
+      const table = overlayTable(view, hex);
+      const pixels = new Uint32Array(image.data.buffer);
+      for (let y = box.y0; y < box.y1; y += 1) {
+        for (let i = y * width + box.x0, end = y * width + box.x1; i < end; i += 1) pixels[i] = table[data[i]];
+      }
+      context.putImageData(image, 0, 0, box.x0, box.y0, box.x1 - box.x0, box.y1 - box.y0);
     }
-    context.putImageData(image, 0, 0);
+    overlayDrawnRef.current = { raster, change, view, hex, image };
   }, [overlayMask?.overlay.view, overlayMask?.overlay.color]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Render on the next frame with the latest values; intermediate values are dropped.

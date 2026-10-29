@@ -89,3 +89,35 @@ test('the brush cache gives the same codes as a full evaluation, point by point,
   const moved = mask({ ...radial, x: 0.3 }, brush([first]));
   expect(rasterizeMask(moved, map, { width: W, height: H }, cache).data).toEqual(rasterizeMask(moved, map, { width: W, height: H }).data);
 }, 60_000);
+
+test('a cached raster reports the box that changed, so redrawing only that box rebuilds the new codes', () => {
+  const stroke = (count) => ({ mode: 'add', radius: 0.05, hardness: 0.5, opacity: 1, points: Array.from({ length: count }, (_, i) => [0.1 + (0.8 * i) / 30, 0.4 + 0.2 * Math.sin(i / 4), 1]) });
+  const def = (count) => mask(linear, { ...component({ id: 'b' }), type: 'brush', strokes: [stroke(count)] });
+  const cache = new Map();
+  let shown = null;
+  let previous = null;
+  for (let count = 1; count <= 30; count += 1) {
+    const raster = rasterizeMask(def(count), map, { width: W, height: H }, cache);
+    const { change } = raster;
+    if (!previous) {
+      expect(change.from).toBeNull();
+      shown = raster.data.slice();
+    } else {
+      expect(change.from).toBe(previous.change.version);
+      // Only the dirty box is copied over what was shown before.
+      if (change.dirty) {
+        for (let y = change.dirty.y0; y < change.dirty.y1; y += 1) {
+          for (let x = change.dirty.x0; x < change.dirty.x1; x += 1) shown[y * W + x] = raster.data[y * W + x];
+        }
+        expect(change.dirty.x1 - change.dirty.x0).toBeLessThan(W);
+      }
+    }
+    expect(shown).toEqual(raster.data);
+    previous = raster;
+  }
+  // The same raster again: nothing changed. A different shape: everything.
+  expect(rasterizeMask(def(30), map, { width: W, height: H }, cache).change).toMatchObject({ dirty: null, from: previous.change.version });
+  const moved = rasterizeMask(mask({ ...linear, y1: 0.6 }, { ...component({ id: 'b' }), type: 'brush', strokes: [stroke(30)] }), map, { width: W, height: H }, cache);
+  expect(moved.change).toMatchObject({ from: null, dirty: { x0: 0, y0: 0, x1: W, y1: H } });
+  expect(rasterizeMask(def(5), map, { width: W, height: H }).change).toBeUndefined();
+});

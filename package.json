@@ -36,6 +36,7 @@
     "check:editor:layers": "node scripts/check-editor-layers.mjs",
     "check:editor:masks": "node scripts/check-editor-masks.mjs",
     "check:editor:recipes": "node scripts/check-editor-recipes.mjs",
+    "check:editor:brush": "node scripts/check-editor-brush.mjs",
     "recipe:reference": "node scripts/print-recipe-reference.mjs",
     "cms": "node cms/server.mjs",
     "assets:refresh": "node scripts/refresh-project-assets.mjs",
