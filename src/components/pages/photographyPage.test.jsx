@@ -47,6 +47,15 @@ beforeEach(() => {
 });
 
 
+// The editor route is a lazy chunk whose first evaluation (hundreds of modules
+// plus editor.css through jsdom's CSS parser) costs ~1.3 s in isolation and
+// several seconds under a full parallel run. Load it once here, under its own
+// budget, so the navigation test measures navigation rather than cold imports.
+beforeAll(async () => {
+  await import('./photoEditorPage');
+}, 30000);
+
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -653,7 +662,9 @@ test('the opening photograph is an existing photograph and opens in the existing
 test('a discreet link opens the photo editor in-app, without a page load', async () => {
   vi.stubGlobal('createImageBitmap', () => Promise.reject(new Error('not in jsdom')));
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((type) => (type === '2d' ? {} : null));
-  render(<App />);
+  // The export-format probe; jsdom has no encoder, so report PNG only.
+  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,');
+  const { unmount } = render(<App />);
 
   const link = await screen.findByRole('link', { name: 'Edit a photo' });
   expect(link).toHaveAttribute('href', '/photography/editor');
@@ -662,9 +673,12 @@ test('a discreet link opens the photo editor in-app, without a page load', async
 
   fireEvent.click(link);
   expect(getAppPathname(window.location.pathname)).toBe('/photography/editor');
-  // The editor is a lazy chunk; under a full parallel test run it can take over a second.
-  expect(await screen.findByRole('heading', { level: 1, name: 'Photo editor' }, { timeout: 5000 })).toBeInTheDocument();
+  // The chunk was evaluated in beforeAll, so this waits only for the route render.
+  expect(await screen.findByRole('heading', { level: 1, name: 'Photo editor' }, { timeout: 3000 })).toBeInTheDocument();
   expect(document.title).toBe('Photo Editor | Quang Huynh');
+  // Unmount while the canvas mocks are still installed, so editor cleanup never
+  // reaches jsdom's unimplemented canvas or updates state after the test.
+  unmount();
 });
 
 test('modified clicks on the editor link are left to the browser', async () => {
