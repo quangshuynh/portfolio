@@ -9,13 +9,13 @@ export default function Dialog({ title, onClose, busy = false, footer, children,
   const ref = useRef(null);
   useEffect(() => {
     const opener = document.activeElement;
-    ref.current?.querySelector('input, select, button:not([data-close])')?.focus();
+    ref.current?.querySelector('input, select, textarea, button:not([data-close])')?.focus();
     return () => opener?.focus?.();
   }, []);
   const onKeyDown = (event) => {
     if (event.key === 'Escape') { event.stopPropagation(); if (!busy) onClose(); return; }
     if (event.key !== 'Tab') return;
-    const focusable = [...ref.current.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), [href]')];
+    const focusable = [...ref.current.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [href]')];
     const first = focusable[0];
     const last = focusable.at(-1);
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }

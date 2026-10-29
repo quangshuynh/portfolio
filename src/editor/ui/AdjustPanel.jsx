@@ -8,6 +8,7 @@ import HdrPanel from './HdrPanel';
 import HslPanel from './HslPanel';
 import LutPanel from './LutPanel';
 import PresetPanel from './PresetPanel';
+import RecipePanel from './RecipePanel';
 import RawPanel from './RawPanel';
 import TextPanel from './TextPanel';
 
@@ -57,7 +58,7 @@ function Section({ id, title, open, onToggle, edited, onReset, resetDisabled, ch
  *   Tone Curve, LUT, the colour parts of Creative and Presets are shown; with `local: true` (a
  *   local adjustment) only Light, Color, HSL and Detail
  */
-export default function AdjustPanel({ adjustments, disabled, dispatch, lut, presets, raw = null, hdr = null, geometry = null, text = null, thumbnails = null, layer = null }) {
+export default function AdjustPanel({ adjustments, disabled, dispatch, lut, presets, recipes = null, raw = null, hdr = null, geometry = null, text = null, thumbnails = null, layer = null }) {
   const [open, setOpen] = useState(readOpenSections);
   // Editing a text's wording from the photo opens the Text section.
   useEffect(() => { if (text?.focusRequest) setOpen((current) => ({ ...current, text: true })); }, [text?.focusRequest]);
@@ -119,6 +120,7 @@ export default function AdjustPanel({ adjustments, disabled, dispatch, lut, pres
           {section('creative', 'Creative', <CreativePanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} onPreview={presets?.onPreview} presets={presets} thumbnails={thumbnails} layer={Boolean(layer)} />, { lazy: true })}
           {!layer && text && section('text', 'Text', <TextPanel layers={adjustments.layers} disabled={disabled} dispatch={dispatch} {...text} />, { lazy: true })}
           {section('presets', 'Presets', <PresetPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} {...presets} />, { reset: false, edited: false })}
+          {!layer && recipes && section('recipes', 'Recipes', <RecipePanel disabled={disabled} {...recipes} />, { reset: false, edited: false })}
         </>
       )}
     </section>

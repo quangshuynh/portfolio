@@ -5,14 +5,14 @@ const BATCH_VERBS = { apply: 'Applied', undo: 'Undid', redo: 'Redid' };
 
 /**
  * Selection and batch actions: selected count, select all/clear, the touch selection
- * mode, copy and paste of edits, sync, presets, filters, LUT and reset on the selection, batch
+ * mode, copy and paste of edits, sync, presets, filters, recipes, LUT and reset on the selection, batch
  * undo and Export selected. Nothing changes photos that are not selected.
  * :param props: selectedCount, readyCount, selecting, clipboard ({ name } | null),
  *   batches (state.batches), canEdit, busy, and the callbacks
  */
 export default function BatchPanel({
   selectedCount, readyCount, selecting, onToggleSelecting, onSelectAll, onClear,
-  clipboard, onCopy, onPaste, onOpen, onExport, batches, dispatch, canEdit, busy,
+  clipboard, onCopy, onPaste, onOpen, onOpenRecipe, onExport, batches, dispatch, canEdit, busy,
 }) {
   const many = selectedCount > 1;
   const undoEntry = batches.past.at(-1);
@@ -38,6 +38,7 @@ export default function BatchPanel({
         <button type="button" className="pe-button" onClick={() => onOpen('sync')} disabled={!canEdit || !many || busy} title="Copy chosen groups of the active photo's settings to the other selected photos">Sync…</button>
         <button type="button" className="pe-button" onClick={() => onOpen('preset')} disabled={!selectedCount || busy}>Preset…</button>
         <button type="button" className="pe-button" onClick={() => onOpen('filter')} disabled={!selectedCount || busy}>Filter…</button>
+        <button type="button" className="pe-button" onClick={onOpenRecipe} disabled={!selectedCount || busy || !onOpenRecipe} title="Paste or open a QuangEdit Recipe, review it, and apply it to the selected photos">Recipe…</button>
         <button type="button" className="pe-button" onClick={() => onOpen('lut')} disabled={!selectedCount || busy}>LUT…</button>
         <button type="button" className="pe-button" onClick={() => onOpen('reset')} disabled={!selectedCount || busy}>Reset…</button>
         <button type="button" className="pe-button pe-button--primary" onClick={onExport} disabled={!selectedCount}>Export {plural(selectedCount, 'photo')}…</button>

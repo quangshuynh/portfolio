@@ -259,6 +259,30 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-batch-plan__actions { display: flex; flex: none; gap: .2rem; }
 .pe-dialog__summary { flex: 1; margin: 0; min-width: 0; }
 
+/* ---------- QuangEdit Recipes ---------- */
+.pe-recipe__fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 0 .6rem; }
+.pe-recipe__groups { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0 .75rem; }
+.pe-recipe__groups legend { margin-bottom: .2rem; }
+.pe-recipe__quick { position: absolute; top: -1.65rem; right: 0; display: flex; gap: .4rem; }
+.pe-recipe__json { display: block; width: 100%; margin: .6rem 0 0; padding: .5rem; border: 1px solid var(--pe-line); border-radius: 4px; background: var(--pe-stage); color: var(--pe-text); font-size: .75rem; line-height: 1.45; resize: vertical; white-space: pre; overflow-wrap: normal; }
+.pe-recipe__json[aria-invalid='true'] { border-color: var(--pe-danger); }
+.pe-recipe__source summary { cursor: pointer; margin-top: .6rem; color: var(--pe-text-2); }
+.pe-recipe__errors ul { margin: .25rem 0 0; padding-left: 1.1rem; color: var(--pe-text-2); font-size: .75rem; }
+.pe-recipe__errors li { overflow-wrap: anywhere; }
+.pe-recipe__summary h3 { margin: .9rem 0 0; font-size: 1rem; overflow-wrap: anywhere; }
+.pe-recipe__summary .pe-note { margin: .2rem 0 0; overflow-wrap: anywhere; }
+.pe-recipe__missing { display: grid; gap: .4rem; justify-items: start; margin-top: .6rem; padding: .5rem; border-radius: 4px; box-shadow: inset 3px 0 0 var(--pe-danger); background: var(--pe-panel-2); }
+.pe-recipe__missing .pe-note { margin: 0; overflow-wrap: anywhere; }
+.pe-recipe__compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; margin-top: .9rem; }
+.pe-recipe__compare figure { display: grid; gap: .25rem; margin: 0; }
+.pe-recipe__compare .pe-thumb { width: 100%; height: auto; max-height: 14rem; object-fit: contain; background: var(--pe-stage); }
+.pe-recipe__compare figcaption { color: var(--pe-text-3); font-size: .75rem; text-align: center; }
+.pe-recipe__changes { width: 100%; margin-top: .75rem; border-collapse: collapse; font-size: .75rem; font-variant-numeric: tabular-nums; }
+.pe-recipe__changes th, .pe-recipe__changes td { padding: .2rem .35rem; border-bottom: 1px solid var(--pe-line); text-align: left; }
+.pe-recipe__changes thead th { color: var(--pe-text-3); font-weight: 500; }
+.pe-recipe__changes tbody th { font-weight: 400; color: var(--pe-text-2); }
+.pe-recipes .pe-preset__actions { flex-wrap: wrap; }
+
 /* ---------- stage ---------- */
 .pe-stage { grid-area: stage; position: relative; min-height: 0; background: var(--pe-stage); outline: none; }
 .pe-viewer { position: absolute; inset: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); }
@@ -592,6 +616,9 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
   .pe-bracket__frame { width: 3.5rem; height: 2.8rem; }
   .pe-bracket__actions { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; }
   .pe-dialog__foot .pe-button { min-height: 2.75rem; }
+  .pe-dialog--recipe .pe-dialog__foot { flex-wrap: wrap; }
+  .pe-dialog--recipe .pe-dialog__summary { flex-basis: 100%; }
+  .pe-recipe__fields { grid-template-columns: minmax(0, 1fr); }
   /* The selected count is in the Photos panel; the strip keeps its width for photos. */
   .pe-filmstrip__status { display: none; }
 }

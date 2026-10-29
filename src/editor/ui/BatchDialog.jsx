@@ -42,8 +42,6 @@ export default function BatchDialog({ mode, source, targets, presets = [], luts 
 
   const label = mode === 'sync' ? 'sync edits' : mode === 'preset' ? `preset ${preset?.name ?? ''}`.trim() : mode === 'filter' ? `filter ${filter?.name ?? ''}`.trim() : mode === 'lut' ? (lut ? `LUT ${lut.title || lut.name}` : 'LUT removal') : 'reset';
   const blocked = plan.errors.length > 0 || plan.changedCount === 0;
-  const byId = new Map(targets.map((photo) => [photo.id, photo]));
-
   return (
     <Dialog
       title={TITLES[mode]}
@@ -123,6 +121,19 @@ export default function BatchDialog({ mode, source, targets, presets = [], luts 
       )}
       {mode === 'reset' && <p className="pe-note">Every setting of the selected photos returns to neutral. RAW files are developed as shot again; merged photos keep their merge. Undo brings the settings back.</p>}
 
+      <PlanList plan={plan} targets={targets} thumbnailOf={thumbnailOf} lutFor={lutFor} />
+    </Dialog>
+  );
+}
+
+/**
+ * What a batch plan changes on each photo, with before/after thumbnails for the first
+ * PREVIEW_LIMIT (shared by the batch and recipe dialogs).
+ */
+export function PlanList({ plan, targets, thumbnailOf, lutFor }) {
+  const byId = new Map(targets.map((photo) => [photo.id, photo]));
+  return (
+    <>
       <ul className="pe-batch-plan" aria-label="Photos affected">
         {plan.items.map((item, index) => {
           const photo = byId.get(item.id);
@@ -147,6 +158,6 @@ export default function BatchDialog({ mode, source, targets, presets = [], luts 
         })}
       </ul>
       {plan.items.length > PREVIEW_LIMIT && <p className="pe-note">Before/after thumbnails for the first {PREVIEW_LIMIT}. Thumbnails do not show Detail, which needs the full image.</p>}
-    </Dialog>
+    </>
   );
 }
