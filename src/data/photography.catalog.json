@@ -59,29 +59,15 @@
       "featured": 2
     },
     {
-      "id": "shore-curve",
-      "slug": "shore-curve",
+      "id": "DSC09673",
+      "slug": "asters",
       "status": "published",
-      "sourceFilename": "DSC09234.JPG",
-      "caption": "Lakeshore",
-      "alt": "The edge of a lake curving away along an empty beach toward a tree line, under a fan of clouds at dusk",
+      "sourceFilename": "DSC09673.JPG",
+      "caption": "Asters",
+      "alt": "Purple asters with yellow centres in front of a blurred bank of red sumac leaves",
       "shape": "landscape",
-      "category": "Landscape",
-      "tags": [
-        "Dusk",
-        "Water"
-      ],
-      "featured": 7
-    },
-    {
-      "id": "suzuki-bandit",
-      "slug": "suzuki-bandit",
-      "status": "published",
-      "sourceFilename": "DSC00358.JPG",
-      "caption": "Suzuki Bandit",
-      "alt": "A red Suzuki Bandit motorcycle parked on its kickstand in front of autumn trees, two helmets resting on its mirrors",
-      "shape": "landscape",
-      "category": "Automotive"
+      "category": "Nature",
+      "featured": 5
     },
     {
       "id": "letchworth-gorge",
@@ -94,8 +80,76 @@
       "category": "Landscape",
       "tags": [
         "Water"
+      ]
+    },
+    {
+      "id": "shore-curve",
+      "slug": "shore-curve",
+      "status": "published",
+      "sourceFilename": "DSC09234.JPG",
+      "caption": "Lakeshore",
+      "alt": "The edge of a lake curving away along an empty beach toward a tree line, under a fan of clouds at dusk",
+      "shape": "landscape",
+      "category": "Landscape",
+      "tags": [
+        "Dusk",
+        "Water"
+      ]
+    },
+    {
+      "id": "DSC09654",
+      "slug": "ladder-and-skyline",
+      "status": "published",
+      "sourceFilename": "DSC09654.JPG",
+      "caption": "Ladder",
+      "alt": "A steel ladder rail at the edge of a riverside wall frames city towers and an arched bridge, with gulls resting along the concrete edge and grass in the foreground",
+      "shape": "portrait",
+      "category": "Places",
+      "tags": [
+        "Water"
       ],
-      "featured": 8
+      "featured": 6
+    },
+    {
+      "id": "suzuki-bandit",
+      "slug": "suzuki-bandit",
+      "status": "published",
+      "sourceFilename": "DSC00358.JPG",
+      "caption": "Suzuki Bandit",
+      "alt": "A red Suzuki Bandit motorcycle parked on its kickstand in front of autumn trees, two helmets resting on its mirrors",
+      "shape": "landscape",
+      "category": "Automotive"
+    },
+    {
+      "id": "DSC09923",
+      "slug": "red-shrub",
+      "status": "published",
+      "sourceFilename": "DSC09923.JPG",
+      "caption": "Red shrub",
+      "alt": "A round shrub of bright red autumn leaves on a gravel bed above a dry stone wall, under a blue sky",
+      "shape": "portrait",
+      "category": "Nature"
+    },
+    {
+      "id": "DSC09891",
+      "slug": "marsh",
+      "status": "published",
+      "sourceFilename": "DSC09891.JPG",
+      "caption": "Marsh",
+      "alt": "A wooded hillside in orange, red and green autumn colour above a field of golden cattails under a clear blue sky",
+      "shape": "landscape",
+      "category": "Landscape",
+      "featured": 7
+    },
+    {
+      "id": "DSC09587",
+      "slug": "stair-tower",
+      "status": "published",
+      "sourceFilename": "DSC09587.JPG",
+      "caption": "Stair tower",
+      "alt": "Looking up a blue steel stair tower with yellow-framed glass beside the red and white side of a building against a blue sky",
+      "shape": "portrait",
+      "category": "Places"
     },
     {
       "id": "aero-wheel",
@@ -118,6 +172,45 @@
       "category": "Nature"
     },
     {
+      "id": "red-sun",
+      "slug": "red-sun",
+      "status": "published",
+      "sourceFilename": "_DSC0012--3e197f2d.JPG",
+      "caption": "Red sun",
+      "alt": "A red sun setting behind bare tree branches above a dark city horizon",
+      "shape": "landscape",
+      "category": "Landscape",
+      "tags": [
+        "Dusk"
+      ]
+    },
+    {
+      "id": "DSC09713",
+      "slug": "gt2-rs-clubsport",
+      "status": "published",
+      "sourceFilename": "DSC09713.JPG",
+      "caption": "GT2 RS Clubsport",
+      "alt": "The rear wing and tail of a light blue Porsche 911 GT2 RS Clubsport in a workshop, backlit by sun through the open bay door",
+      "shape": "portrait",
+      "category": "Automotive",
+      "featured": 8
+    },
+    {
+      "id": "river-arch-bridge",
+      "slug": "river-arch-bridge",
+      "status": "published",
+      "sourceFilename": "DSC09339.JPG",
+      "caption": "Arch bridge",
+      "alt": "A white steel arch bridge lit at night over a dark river, downtown towers and a Five Star Bank sign behind its cables, its lights reflected in the rippled water",
+      "shape": "landscape",
+      "category": "Places",
+      "tags": [
+        "Night",
+        "Water"
+      ],
+      "featured": 4
+    },
+    {
       "id": "pier-light",
       "slug": "pier-light",
       "status": "published",
@@ -128,8 +221,17 @@
       "category": "Places",
       "tags": [
         "Water"
-      ],
-      "featured": 6
+      ]
+    },
+    {
+      "id": "DSC09766",
+      "slug": "pikachu-nova",
+      "status": "published",
+      "sourceFilename": "DSC09766.JPG",
+      "caption": "Pikachu Nova",
+      "alt": "A yellow Chevrolet Nova with its boot open, the lid painted with a Pikachu face and fitted with ears and a tail; licence plates are blurred",
+      "shape": "landscape",
+      "category": "Automotive"
     },
     {
       "id": "sun-between-trunks",
@@ -146,6 +248,16 @@
       ]
     },
     {
+      "id": "DSC09907",
+      "slug": "stone-arches",
+      "status": "published",
+      "sourceFilename": "DSC09907.JPG",
+      "caption": "Stone arches",
+      "alt": "Three arches outlined in rough grey stone blocks on a wall beneath a bridge, half in shadow, above a strip of water",
+      "shape": "landscape",
+      "category": "Places"
+    },
+    {
       "id": "_DSC0023",
       "slug": "_DSC0023",
       "status": "published",
@@ -154,6 +266,29 @@
       "alt": "A church spire rising between brick buildings at Cornell",
       "shape": "portrait",
       "category": "Places"
+    },
+    {
+      "id": "DSC09684",
+      "slug": "docks",
+      "status": "published",
+      "sourceFilename": "DSC09684.JPG",
+      "caption": "Docks",
+      "alt": "Rows of floating docks stretching across calm blue water toward a low wooded shore under a clear sky",
+      "shape": "landscape",
+      "category": "Landscape",
+      "tags": [
+        "Water"
+      ]
+    },
+    {
+      "id": "DSC09779",
+      "slug": "m3-badge",
+      "status": "published",
+      "sourceFilename": "DSC09779.JPG",
+      "caption": "BMW M3",
+      "alt": "The M3 badge and tail light on the bootlid of a blue BMW M3, with a row of parked cars and a grey building beyond",
+      "shape": "portrait",
+      "category": "Automotive"
     },
     {
       "id": "neon-window-blue-hour",
@@ -169,53 +304,37 @@
       ]
     },
     {
-      "id": "lamp-and-tower",
-      "slug": "lamp-and-tower",
+      "id": "DSC09809",
+      "slug": "rose-hips",
       "status": "published",
-      "sourceFilename": "DSC09311.JPG",
-      "caption": "Lamp and tower",
-      "alt": "A glass globe street lamp on a curled iron post, a lattice radio tower rising behind it under a blue sky with white clouds",
-      "shape": "portrait",
-      "category": "Places"
-    },
-    {
-      "id": "red-sun",
-      "slug": "red-sun",
-      "status": "published",
-      "sourceFilename": "_DSC0012--3e197f2d.JPG",
-      "caption": "Red sun",
-      "alt": "A red sun setting behind bare tree branches above a dark city horizon",
-      "shape": "landscape",
-      "category": "Landscape",
-      "tags": [
-        "Dusk"
-      ],
-      "featured": 5
-    },
-    {
-      "id": "DIBS2164",
-      "slug": "DIBS2164",
-      "status": "published",
-      "sourceFilename": "DIBS2164.JPG",
-      "caption": "On the grass",
-      "alt": "A small bird standing in vivid green grass at Cornell",
+      "sourceFilename": "DSC09809.JPG",
+      "caption": "Rose hips",
+      "alt": "A cluster of red rose hips on a thin branch among green and brown leaves against a blue sky",
       "shape": "portrait",
       "category": "Nature"
     },
     {
-      "id": "river-arch-bridge",
-      "slug": "river-arch-bridge",
+      "id": "DSC09622",
+      "slug": "reed-channel",
       "status": "published",
-      "sourceFilename": "DSC09339.JPG",
-      "caption": "Arch bridge",
-      "alt": "A white steel arch bridge lit at night over a dark river, downtown towers and a Five Star Bank sign behind its cables, its lights reflected in the rippled water",
+      "sourceFilename": "DSC09622.JPG",
+      "caption": "Reeds",
+      "alt": "A narrow channel of still water cutting through a dense stand of tall golden reeds, with autumn trees behind",
       "shape": "landscape",
-      "category": "Places",
+      "category": "Landscape",
       "tags": [
-        "Night",
         "Water"
-      ],
-      "featured": 4
+      ]
+    },
+    {
+      "id": "DSC09718",
+      "slug": "rb26",
+      "status": "published",
+      "sourceFilename": "DSC09718.JPG",
+      "caption": "RB26",
+      "alt": "The engine bay of a car with its bonnet up: a white RB26 cover, purple intake piping and braided hoses",
+      "shape": "portrait",
+      "category": "Automotive"
     },
     {
       "id": "waves-on-rocks",
@@ -241,58 +360,26 @@
       "category": "Nature"
     },
     {
-      "id": "IMG_0758",
-      "slug": "IMG_0758",
+      "id": "DSC09678",
+      "slug": "riverside-path",
       "status": "published",
-      "sourceFilename": "IMG_0758.JPG",
-      "caption": "Genesee River",
-      "alt": "A red metal bridge crossing the Genesee River",
-      "shape": "portrait",
-      "category": "Places"
-    },
-    {
-      "id": "orange-domes-close",
-      "slug": "orange-domes-close",
-      "status": "published",
-      "sourceFilename": "IMGP0717.JPG",
-      "caption": "Orange domes",
-      "alt": "Glossy orange half-domes receding in a line across a concrete floor beneath a covered walkway",
-      "shape": "portrait",
-      "category": "Places"
-    },
-    {
-      "id": "shoreline-gold-dusk",
-      "slug": "shoreline-gold-dusk",
-      "status": "published",
-      "sourceFilename": "_DSC9077.JPG",
-      "caption": "Shoreline",
-      "alt": "A band of wet sand catching gold light along a dark beach as waves roll in at dusk",
+      "sourceFilename": "DSC09678.JPG",
+      "caption": "Riverside path",
+      "alt": "A paved riverside path curving past red autumn shrubs toward city towers and a white arched bridge over the river",
       "shape": "landscape",
-      "category": "Landscape",
+      "category": "Places",
       "tags": [
-        "Dusk",
         "Water"
-      ],
-      "featured": 3
+      ]
     },
     {
-      "id": "bird-in-flight",
-      "slug": "bird-in-flight",
+      "id": "DSC09579",
+      "slug": "red-brick",
       "status": "published",
-      "sourceFilename": "_DSC0041.JPG",
-      "caption": "Take-off",
-      "alt": "A large bird silhouetted mid-flight above bare branches against a pale sky",
+      "sourceFilename": "DSC09579.JPG",
+      "caption": "Red brick",
+      "alt": "A red brick industrial building with towers, pipes and silver tanks above trees turning yellow at the edge of a gorge, under a blue sky",
       "shape": "portrait",
-      "category": "Nature"
-    },
-    {
-      "id": "YJMZ4301",
-      "slug": "YJMZ4301",
-      "status": "published",
-      "sourceFilename": "YJMZ4301.PNG",
-      "caption": "Blue Cactus",
-      "alt": "A colorful Blue Cactus sign on a brick street at the University of Rochester",
-      "shape": "landscape",
       "category": "Places"
     },
     {
@@ -310,27 +397,120 @@
       ]
     },
     {
-      "id": "mill-wheel",
-      "slug": "mill-wheel",
+      "id": "DSC00002",
+      "slug": "canal-reflection",
       "status": "published",
-      "sourceFilename": "DSC09155.JPG",
-      "caption": "Waterwheel",
-      "alt": "A weathered wooden waterwheel set in a narrow stone channel, overgrown with vines and leaves",
+      "sourceFilename": "DSC00002.JPG",
+      "caption": "Canal",
+      "alt": "A still canal between autumn banks reflecting the sky and a bridge in the distance",
       "shape": "portrait",
-      "category": "Places"
+      "category": "Landscape",
+      "tags": [
+        "Water"
+      ]
     },
     {
-      "id": "gull-in-surf",
-      "slug": "gull-in-surf",
+      "id": "DSC09763",
+      "slug": "nissan-silvia",
       "status": "published",
-      "sourceFilename": "DSC09435.JPG",
-      "caption": "Gull",
-      "alt": "A gull wading through shallow, deep blue water at the shoreline, a second gull farther along the edge, a line of small breaking waves curving past them",
+      "sourceFilename": "DSC09763.JPG",
+      "caption": "Nissan Silvia",
+      "alt": "A grey Nissan Silvia S15 on chrome multi-spoke wheels, seen low from the front corner in a parking lot, with people gathered on the grass behind it",
+      "shape": "landscape",
+      "category": "Automotive"
+    },
+    {
+      "id": "DSC09893",
+      "slug": "boardwalk",
+      "status": "published",
+      "sourceFilename": "DSC09893.JPG",
+      "caption": "Boardwalk",
+      "alt": "A long wooden boardwalk with black railings running straight across a marsh toward autumn-coloured hills under a blue sky",
       "shape": "portrait",
+      "category": "Landscape"
+    },
+    {
+      "id": "DSC09901",
+      "slug": "swans",
+      "status": "published",
+      "sourceFilename": "DSC09901.JPG",
+      "caption": "Swans",
+      "alt": "Two white swans on blue water beside a bank of reeds, one lifting its wings",
+      "shape": "landscape",
       "category": "Nature",
       "tags": [
         "Water"
       ]
+    },
+    {
+      "id": "DIBS2164",
+      "slug": "DIBS2164",
+      "status": "published",
+      "sourceFilename": "DIBS2164.JPG",
+      "caption": "On the grass",
+      "alt": "A small bird standing in vivid green grass at Cornell",
+      "shape": "portrait",
+      "category": "Nature"
+    },
+    {
+      "id": "DSC09967",
+      "slug": "three-pipes",
+      "status": "published",
+      "sourceFilename": "DSC09967.JPG",
+      "caption": "Pipes",
+      "alt": "Three large pipes with bolted flanges running side by side along a fenced walkway into a sunlit wood",
+      "shape": "landscape",
+      "category": "Places"
+    },
+    {
+      "id": "IMG_0758",
+      "slug": "IMG_0758",
+      "status": "published",
+      "sourceFilename": "IMG_0758.JPG",
+      "caption": "Genesee River",
+      "alt": "A red metal bridge crossing the Genesee River",
+      "shape": "portrait",
+      "category": "Places"
+    },
+    {
+      "id": "DSC09696",
+      "slug": "nissan-370z",
+      "status": "published",
+      "sourceFilename": "DSC09696.JPG",
+      "caption": "Nissan 370Z",
+      "alt": "A blue Nissan 370Z leading a line of cars along a roadside in low morning sun, with autumn trees and power lines beyond; licence plates are blurred",
+      "shape": "landscape",
+      "category": "Automotive"
+    },
+    {
+      "id": "orange-domes-close",
+      "slug": "orange-domes-close",
+      "status": "published",
+      "sourceFilename": "IMGP0717.JPG",
+      "caption": "Orange domes",
+      "alt": "Glossy orange half-domes receding in a line across a concrete floor beneath a covered walkway",
+      "shape": "portrait",
+      "category": "Places"
+    },
+    {
+      "id": "YJMZ4301",
+      "slug": "YJMZ4301",
+      "status": "published",
+      "sourceFilename": "YJMZ4301.PNG",
+      "caption": "Blue Cactus",
+      "alt": "A colorful Blue Cactus sign on a brick street at the University of Rochester",
+      "shape": "landscape",
+      "category": "Places"
+    },
+    {
+      "id": "DSC09912",
+      "slug": "rail-switch",
+      "status": "published",
+      "sourceFilename": "DSC09912.JPG",
+      "caption": "Switch",
+      "alt": "Railway tracks splitting at a switch beneath a road bridge, leading toward orange and red autumn trees",
+      "shape": "portrait",
+      "category": "Places"
     },
     {
       "id": "impreza-fence",
@@ -343,12 +523,35 @@
       "category": "Automotive"
     },
     {
-      "id": "colonnade-steps",
-      "slug": "colonnade-steps",
+      "id": "bird-in-flight",
+      "slug": "bird-in-flight",
       "status": "published",
-      "sourceFilename": "DSC09308.JPG",
-      "caption": "Colonnade",
-      "alt": "Wide stone steps climbing between two globe-topped columns toward a green-roofed colonnade on a grassy rise, under a deep blue sky",
+      "sourceFilename": "_DSC0041.JPG",
+      "caption": "Take-off",
+      "alt": "A large bird silhouetted mid-flight above bare branches against a pale sky",
+      "shape": "portrait",
+      "category": "Nature"
+    },
+    {
+      "id": "river-gorge",
+      "slug": "river-gorge",
+      "status": "published",
+      "sourceFilename": "DSC09193.JPG",
+      "caption": "River gorge",
+      "alt": "A river curving around a wooded island below a steep rock wall, a green truss bridge crossing behind it and a city skyline with a pointed-roof tower under a clear blue sky",
+      "shape": "landscape",
+      "category": "Landscape",
+      "tags": [
+        "Water"
+      ]
+    },
+    {
+      "id": "mill-wheel",
+      "slug": "mill-wheel",
+      "status": "published",
+      "sourceFilename": "DSC09155.JPG",
+      "caption": "Waterwheel",
+      "alt": "A weathered wooden waterwheel set in a narrow stone channel, overgrown with vines and leaves",
       "shape": "portrait",
       "category": "Places"
     },
@@ -366,17 +569,84 @@
       ]
     },
     {
-      "id": "river-gorge",
-      "slug": "river-gorge",
+      "id": "gull-in-surf",
+      "slug": "gull-in-surf",
       "status": "published",
-      "sourceFilename": "DSC09193.JPG",
-      "caption": "River gorge",
-      "alt": "A river curving around a wooded island below a steep rock wall, a green truss bridge crossing behind it and a city skyline with a pointed-roof tower under a clear blue sky",
-      "shape": "landscape",
-      "category": "Landscape",
+      "sourceFilename": "DSC09435.JPG",
+      "caption": "Gull",
+      "alt": "A gull wading through shallow, deep blue water at the shoreline, a second gull farther along the edge, a line of small breaking waves curving past them",
+      "shape": "portrait",
+      "category": "Nature",
       "tags": [
         "Water"
       ]
+    },
+    {
+      "id": "streaked-sky",
+      "slug": "streaked-sky",
+      "status": "published",
+      "sourceFilename": "DSC00280.JPG",
+      "caption": "Streaked sky",
+      "alt": "Gold-lit streaks of cloud across a deep blue evening sky above silhouetted street lights and trees",
+      "shape": "landscape",
+      "category": "Landscape",
+      "tags": [
+        "Dusk"
+      ]
+    },
+    {
+      "id": "DSC09692",
+      "slug": "lotus-emira",
+      "status": "published",
+      "sourceFilename": "DSC09692.JPG",
+      "caption": "Lotus Emira",
+      "alt": "A purple Lotus Emira parked at the edge of a road beside a guardrail and trees in low autumn sun",
+      "shape": "portrait",
+      "category": "Automotive"
+    },
+    {
+      "id": "colonnade-steps",
+      "slug": "colonnade-steps",
+      "status": "published",
+      "sourceFilename": "DSC09308.JPG",
+      "caption": "Colonnade",
+      "alt": "Wide stone steps climbing between two globe-topped columns toward a green-roofed colonnade on a grassy rise, under a deep blue sky",
+      "shape": "portrait",
+      "category": "Places"
+    },
+    {
+      "id": "DSC00266",
+      "slug": "DSC00266",
+      "status": "published",
+      "sourceFilename": "DSC00266.jpeg",
+      "caption": "Evening light",
+      "alt": "Golden sunset above open water with sunlight reflecting across the surface",
+      "shape": "landscape",
+      "category": "Landscape",
+      "tags": [
+        "Dusk",
+        "Water"
+      ]
+    },
+    {
+      "id": "DSC09790",
+      "slug": "race-bmw-lift",
+      "status": "published",
+      "sourceFilename": "DSC09790.JPG",
+      "caption": "On the lift",
+      "alt": "A BMW touring car in red, white and blue race livery parked on a two-post lift in a workshop, with a black coupe above it and an orange race car below",
+      "shape": "portrait",
+      "category": "Automotive"
+    },
+    {
+      "id": "PBTM8581",
+      "slug": "PBTM8581",
+      "status": "published",
+      "sourceFilename": "PBTM8581.PNG",
+      "caption": "Rush Rhees in winter",
+      "alt": "Rush Rhees Library framed by bare winter branches",
+      "shape": "landscape",
+      "category": "Places"
     },
     {
       "id": "_DSC0033",
@@ -387,6 +657,19 @@
       "alt": "Train tracks curving around a bend in the distance",
       "shape": "portrait",
       "category": "Places"
+    },
+    {
+      "id": "lamplit-chairs",
+      "slug": "lamplit-chairs",
+      "status": "published",
+      "sourceFilename": "DSC09346.JPG",
+      "caption": "Four chairs",
+      "alt": "Four Adirondack chairs, alternating blue and red, lined up beneath a glowing street lamp and a lamp-lit tree at night, seen from ground level across a paved path",
+      "shape": "landscape",
+      "category": "Places",
+      "tags": [
+        "Night"
+      ]
     },
     {
       "id": "downtown-rochester-dusk",
@@ -402,6 +685,19 @@
       ]
     },
     {
+      "id": "IMG_0846",
+      "slug": "IMG_0846",
+      "status": "published",
+      "sourceFilename": "IMG_0846.JPG",
+      "caption": "Subaru WRX",
+      "alt": "A white 2011 Subaru WRX parked in a driveway at night",
+      "shape": "landscape",
+      "category": "Automotive",
+      "tags": [
+        "Night"
+      ]
+    },
+    {
       "id": "IMGP0579",
       "slug": "IMGP0579",
       "status": "published",
@@ -412,17 +708,27 @@
       "category": "Nature"
     },
     {
-      "id": "streaked-sky",
-      "slug": "streaked-sky",
+      "id": "IMG_0811",
+      "slug": "IMG_0811",
       "status": "published",
-      "sourceFilename": "DSC00280.JPG",
-      "caption": "Streaked sky",
-      "alt": "Gold-lit streaks of cloud across a deep blue evening sky above silhouetted street lights and trees",
+      "sourceFilename": "IMG_0811.JPG",
+      "caption": "Lower Falls",
+      "alt": "A broad waterfall surrounded by summer greenery at Rochester Lower Falls",
       "shape": "landscape",
       "category": "Landscape",
       "tags": [
-        "Dusk"
+        "Water"
       ]
+    },
+    {
+      "id": "DSC09699",
+      "slug": "rays-wheel",
+      "status": "published",
+      "sourceFilename": "DSC09699.JPG",
+      "caption": "Rays wheel",
+      "alt": "Low view of the rear quarter of a grey-green coupe on a polished multi-spoke RAYS wheel beside a curb, under a pale blue sky",
+      "shape": "portrait",
+      "category": "Automotive"
     },
     {
       "id": "taughannock-falls",
@@ -441,154 +747,6 @@
       }
     },
     {
-      "id": "DSC00266",
-      "slug": "DSC00266",
-      "status": "published",
-      "sourceFilename": "DSC00266.jpeg",
-      "caption": "Evening light",
-      "alt": "Golden sunset above open water with sunlight reflecting across the surface",
-      "shape": "landscape",
-      "category": "Landscape",
-      "tags": [
-        "Dusk",
-        "Water"
-      ]
-    },
-    {
-      "id": "nissan-350z",
-      "slug": "nissan-350z",
-      "status": "published",
-      "sourceFilename": "DSC09322.JPG",
-      "caption": "Nissan 350Z",
-      "alt": "A light blue Nissan 350Z with an aftermarket front bumper at the edge of a lawn beside a row of townhouses, seen from a low angle under a cloudy blue sky",
-      "shape": "portrait",
-      "category": "Automotive"
-    },
-    {
-      "id": "PBTM8581",
-      "slug": "PBTM8581",
-      "status": "published",
-      "sourceFilename": "PBTM8581.PNG",
-      "caption": "Rush Rhees in winter",
-      "alt": "Rush Rhees Library framed by bare winter branches",
-      "shape": "landscape",
-      "category": "Places"
-    },
-    {
-      "id": "lamplit-chairs",
-      "slug": "lamplit-chairs",
-      "status": "published",
-      "sourceFilename": "DSC09346.JPG",
-      "caption": "Four chairs",
-      "alt": "Four Adirondack chairs, alternating blue and red, lined up beneath a glowing street lamp and a lamp-lit tree at night, seen from ground level across a paved path",
-      "shape": "landscape",
-      "category": "Places",
-      "tags": [
-        "Night"
-      ]
-    },
-    {
-      "id": "NTIO3912",
-      "slug": "NTIO3912",
-      "status": "published",
-      "sourceFilename": "NTIO3912.JPG",
-      "caption": "Stream",
-      "alt": "A narrow stream winding through a sunlit woodland at Cornell",
-      "shape": "portrait",
-      "category": "Nature",
-      "tags": [
-        "Water"
-      ]
-    },
-    {
-      "id": "sundown-streaked-clouds",
-      "slug": "sundown-streaked-clouds",
-      "status": "published",
-      "sourceFilename": "IMGP0594.JPG",
-      "caption": "Sundown",
-      "alt": "Streaked clouds lit orange above a lake at sundown, the shoreline trees in silhouette",
-      "shape": "portrait",
-      "category": "Landscape",
-      "tags": [
-        "Dusk",
-        "Water"
-      ]
-    },
-    {
-      "id": "TERM5977",
-      "slug": "TERM5977",
-      "status": "published",
-      "sourceFilename": "TERM5977.JPG",
-      "caption": "Stone and valley",
-      "alt": "A stone building overlooking a wide valley at Cornell",
-      "shape": "portrait",
-      "category": "Places"
-    },
-    {
-      "id": "IMG_0846",
-      "slug": "IMG_0846",
-      "status": "published",
-      "sourceFilename": "IMG_0846.JPG",
-      "caption": "Subaru WRX",
-      "alt": "A white 2011 Subaru WRX parked in a driveway at night",
-      "shape": "landscape",
-      "category": "Automotive",
-      "tags": [
-        "Night"
-      ]
-    },
-    {
-      "id": "harbor-golden-hour",
-      "slug": "harbor-golden-hour",
-      "status": "published",
-      "sourceFilename": "DSC09202.JPG",
-      "caption": "Golden hour",
-      "alt": "A white waterfront building and radio mast in late gold light, reflected in rippled blue water",
-      "shape": "portrait",
-      "category": "Places",
-      "tags": [
-        "Dusk",
-        "Water"
-      ]
-    },
-    {
-      "id": "IMG_0811",
-      "slug": "IMG_0811",
-      "status": "published",
-      "sourceFilename": "IMG_0811.JPG",
-      "caption": "Lower Falls",
-      "alt": "A broad waterfall surrounded by summer greenery at Rochester Lower Falls",
-      "shape": "landscape",
-      "category": "Landscape",
-      "tags": [
-        "Water"
-      ]
-    },
-    {
-      "id": "IMG_0776",
-      "slug": "IMG_0776",
-      "status": "published",
-      "sourceFilename": "IMG_0776.JPG",
-      "caption": "Last light",
-      "alt": "The sun meeting a dark lake at the horizon",
-      "shape": "portrait",
-      "category": "Landscape",
-      "tags": [
-        "Dusk",
-        "Water"
-      ]
-    },
-    {
-      "id": "red-arcs",
-      "slug": "red-arcs",
-      "status": "published",
-      "sourceFilename": "DSC09194.JPG",
-      "caption": "Red arcs",
-      "alt": "A row of curved red steel arcs and white posts beside a park path, a red-leaved maple rising behind them under a blue sky",
-      "shape": "portrait",
-      "category": "Places"
-    },
-    {
       "id": "afterglow-road",
       "slug": "afterglow-road",
       "status": "published",
@@ -603,6 +761,16 @@
       ]
     },
     {
+      "id": "nissan-350z",
+      "slug": "nissan-350z",
+      "status": "published",
+      "sourceFilename": "DSC09322.JPG",
+      "caption": "Nissan 350Z",
+      "alt": "A light blue Nissan 350Z with an aftermarket front bumper at the edge of a lawn beside a row of townhouses, seen from a low angle under a cloudy blue sky",
+      "shape": "portrait",
+      "category": "Automotive"
+    },
+    {
       "id": "beach-cloud-bank",
       "slug": "beach-cloud-bank",
       "status": "published",
@@ -613,6 +781,29 @@
       "category": "Landscape",
       "tags": [
         "Dusk",
+        "Water"
+      ]
+    },
+    {
+      "id": "DSC09803",
+      "slug": "painted-hood",
+      "status": "published",
+      "sourceFilename": "DSC09803.JPG",
+      "caption": "Painted hood",
+      "alt": "A white BMW E36 with its bonnet raised to show a painted green monster face, seen low from the front under pine trees and a blue sky",
+      "shape": "portrait",
+      "category": "Automotive"
+    },
+    {
+      "id": "NTIO3912",
+      "slug": "NTIO3912",
+      "status": "published",
+      "sourceFilename": "NTIO3912.JPG",
+      "caption": "Stream",
+      "alt": "A narrow stream winding through a sunlit woodland at Cornell",
+      "shape": "portrait",
+      "category": "Nature",
+      "tags": [
         "Water"
       ]
     },
@@ -630,15 +821,16 @@
       ]
     },
     {
-      "id": "IMG_0858",
-      "slug": "IMG_0858",
+      "id": "sundown-streaked-clouds",
+      "slug": "sundown-streaked-clouds",
       "status": "published",
-      "sourceFilename": "IMG_0858.JPG",
-      "caption": "Niagara Falls",
-      "alt": "A distant city skyline beyond a misty waterfall at Niagara Falls",
+      "sourceFilename": "IMGP0594.JPG",
+      "caption": "Sundown",
+      "alt": "Streaked clouds lit orange above a lake at sundown, the shoreline trees in silhouette",
       "shape": "portrait",
       "category": "Landscape",
       "tags": [
+        "Dusk",
         "Water"
       ]
     },
@@ -653,6 +845,112 @@
       "category": "Landscape",
       "tags": [
         "Dusk",
+        "Water"
+      ]
+    },
+    {
+      "id": "TERM5977",
+      "slug": "TERM5977",
+      "status": "published",
+      "sourceFilename": "TERM5977.JPG",
+      "caption": "Stone and valley",
+      "alt": "A stone building overlooking a wide valley at Cornell",
+      "shape": "portrait",
+      "category": "Places"
+    },
+    {
+      "id": "DSC00006",
+      "slug": "steel-truck",
+      "status": "published",
+      "sourceFilename": "DSC00006.JPG",
+      "caption": "Steel truck",
+      "alt": "A life-size pickup truck sculpture built from rusted steel plates on a gravel island in an empty parking lot, with a silver aircraft fuselage behind it",
+      "shape": "landscape",
+      "category": "Places"
+    },
+    {
+      "id": "harbor-golden-hour",
+      "slug": "harbor-golden-hour",
+      "status": "published",
+      "sourceFilename": "DSC09202.JPG",
+      "caption": "Golden hour",
+      "alt": "A white waterfront building and radio mast in late gold light, reflected in rippled blue water",
+      "shape": "portrait",
+      "category": "Places",
+      "tags": [
+        "Dusk",
+        "Water"
+      ]
+    },
+    {
+      "id": "DSC09836",
+      "slug": "huracan-sto",
+      "status": "published",
+      "sourceFilename": "DSC09836.JPG",
+      "caption": "Huracán STO",
+      "alt": "A gold Lamborghini Huracán STO with black lettering and yellow brake callipers, parked side-on on grass beside a traffic cone",
+      "shape": "landscape",
+      "category": "Automotive"
+    },
+    {
+      "id": "DSC09675",
+      "slug": "black-eyed-susans",
+      "status": "published",
+      "sourceFilename": "DSC09675.JPG",
+      "caption": "Black-eyed Susans",
+      "alt": "Yellow black-eyed Susan flowers with dark centres in bright sun against shadowed leaves",
+      "shape": "portrait",
+      "category": "Nature"
+    },
+    {
+      "id": "shoreline-gold-dusk",
+      "slug": "shoreline-gold-dusk",
+      "status": "published",
+      "sourceFilename": "_DSC9077.JPG",
+      "caption": "Shoreline",
+      "alt": "A band of wet sand catching gold light along a dark beach as waves roll in at dusk",
+      "shape": "landscape",
+      "category": "Landscape",
+      "tags": [
+        "Dusk",
+        "Water"
+      ],
+      "featured": 3
+    },
+    {
+      "id": "IMG_0776",
+      "slug": "IMG_0776",
+      "status": "published",
+      "sourceFilename": "IMG_0776.JPG",
+      "caption": "Last light",
+      "alt": "The sun meeting a dark lake at the horizon",
+      "shape": "portrait",
+      "category": "Landscape",
+      "tags": [
+        "Dusk",
+        "Water"
+      ]
+    },
+    {
+      "id": "DSC00009",
+      "slug": "nissan-figaro",
+      "status": "published",
+      "sourceFilename": "DSC00009.JPG",
+      "caption": "Nissan Figaro",
+      "alt": "A pale blue Nissan Figaro parked on gravel at the edge of a lawn beneath a maple with bright orange leaves, beside a red brick wall",
+      "shape": "landscape",
+      "category": "Automotive"
+    },
+    {
+      "id": "IMG_0858",
+      "slug": "IMG_0858",
+      "status": "published",
+      "sourceFilename": "IMG_0858.JPG",
+      "caption": "Niagara Falls",
+      "alt": "A distant city skyline beyond a misty waterfall at Niagara Falls",
+      "shape": "portrait",
+      "category": "Landscape",
+      "tags": [
         "Water"
       ]
     }
