@@ -451,5 +451,38 @@ export function parseRecipeLibrary(text) {
   });
 }
 
+/**
+ * Recipes from an imported file: one recipe, or a whole library exported from another editor
+ * (for example the public editor's library brought into the CMS editor, which runs on another
+ * origin and so never shares browser storage with it). A library is read strictly: every recipe
+ * must validate, or nothing is imported and each problem is listed. Libraries hold recipes
+ * only (no photos, file names or edit documents).
+ */
+export async function readRecipeImport(file) {
+  if (file.size > MAX_RECIPE_BYTES * MAX_RECIPES) throw new RecipeError(`The file is larger than ${(MAX_RECIPE_BYTES * MAX_RECIPES) / 1024 / 1024} MB.`);
+  const text = await file.text();
+  let data = null;
+  try { data = JSON.parse(text); } catch { /* parseRecipe reports it */ }
+  if (!isObject(data) || data.format !== RECIPE_LIBRARY_FORMAT) {
+    if (file.size > MAX_RECIPE_BYTES) throw new RecipeError(`The recipe file is larger than ${MAX_RECIPE_BYTES / 1024} KB.`);
+    return [parseRecipe(text)];
+  }
+  if (data.version !== RECIPE_VERSION || !Array.isArray(data.recipes)) throw new RecipeError(`This is not a version ${RECIPE_VERSION} recipe library.`);
+  if (!data.recipes.length) throw new RecipeError('The recipe library is empty.');
+  if (data.recipes.length > MAX_RECIPES) throw new RecipeError(`The library has more than ${MAX_RECIPES} recipes.`);
+  const errors = [];
+  const recipes = data.recipes.map((recipe, index) => {
+    try { return validateRecipe(recipe); } catch (error) {
+      errors.push(`Recipe ${index + 1}: ${error instanceof RecipeError ? error.errors[0] : error.message}`);
+      return null;
+    }
+  });
+  if (errors.length) throw new RecipeError(errors);
+  return recipes;
+}
+
+/** A file name for an exported library of recipes. */
+export const recipeLibraryFileName = () => 'quangedit-recipes.quangedit-recipes.json';
+
 /** A file name for an exported recipe: the name in lowercase words. */
 export const recipeFileName = (recipe) => `${(recipe.name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'recipe').slice(0, 60)}.quangedit-recipe.json`;

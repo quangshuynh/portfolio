@@ -247,6 +247,39 @@ describe('RecipePanel', () => {
   });
 });
 
+test('a whole library moves to another editor by export and import, validated strictly', async () => {
+  const saved = [parseRecipe(recipeText({ name: 'Soft Night' })), parseRecipe(recipeText({ name: 'Warm Day', adjustments: { color: { temperature: 20 } } }))].map((recipe, i) => ({ ...recipe, id: `local-${i}` }));
+  const onDownload = vi.fn();
+  const { unmount } = render(<RecipePanel recipes={saved} disabled={false} onChange={() => {}} onOpen={() => {}} onDownload={onDownload} newId={() => 'new'} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Export all…' }));
+  const [blob, name] = onDownload.mock.calls[0];
+  expect(name).toMatch(/\.quangedit-recipes\.json$/);
+  const text = await blob.text();
+  const library = JSON.parse(text);
+  expect(library).toMatchObject({ format: 'quangedit-recipe-library', version: 1 });
+  expect(library.recipes.map(({ name: n }) => n)).toEqual(['Soft Night', 'Warm Day']);
+  // Recipes only: no browser ids, photos, file names or edit documents.
+  expect(text).not.toMatch(/"id"|local-|"photos"|"source"|sha256/);
+  unmount();
+
+  // The other editor (here: one that already has a Soft Night) imports both.
+  let ids = 0;
+  const onChange = vi.fn();
+  render(<RecipePanel recipes={[{ ...saved[0], id: 'cms-0' }]} disabled={false} onChange={onChange} onOpen={() => {}} onDownload={() => {}} newId={() => `cms-${(ids += 1)}`} />);
+  const input = screen.getByLabelText('Import recipe');
+  await act(async () => fireEvent.change(input, { target: { files: [new File([text], name)] } }));
+  await waitFor(() => expect(onChange).toHaveBeenCalled());
+  expect(onChange.mock.calls[0][0].map(({ name: n }) => n)).toEqual(['Soft Night', 'Soft Night (2)', 'Warm Day']);
+  expect(screen.getByRole('status')).toHaveTextContent('Imported 2 recipes.');
+
+  // One invalid recipe rejects the whole library, naming it.
+  const bad = JSON.stringify({ ...library, recipes: [library.recipes[0], { ...library.recipes[1], adjustments: { light: { notAControl: 1 } } }] });
+  onChange.mockClear();
+  await act(async () => fireEvent.change(input, { target: { files: [new File([bad], 'bad.json')] } }));
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/^Recipe 2:/));
+  expect(onChange).not.toHaveBeenCalled();
+});
+
 test('the batch panel opens the recipe dialog for the selection', () => {
   const onOpenRecipe = vi.fn();
   render(<BatchPanel readyCount={3} selectedCount={2} selecting={false} onToggleSelecting={() => {}} onSelectAll={() => {}} onClear={() => {}} clipboard={null} onCopy={() => {}} onPaste={() => {}} onOpen={() => {}} onOpenRecipe={onOpenRecipe} onExport={() => {}} batches={{ past: [], future: [], last: null }} dispatch={() => {}} canEdit busy={false} />);

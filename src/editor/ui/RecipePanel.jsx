@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { cleanPresetName, uniquePresetName } from '../model/presets.mjs';
-import { MAX_RECIPES, RecipeError, readRecipeFile, recipeFileName, recipeGroupLabel, recipeGroups, serializeRecipe } from '../model/recipes.mjs';
+import { MAX_RECIPES, RecipeError, readRecipeImport, recipeFileName, recipeGroupLabel, recipeGroups, recipeLibraryFileName, serializeRecipe, serializeRecipeLibrary } from '../model/recipes.mjs';
 
 // The library's id is this browser's handle, not part of the recipe.
 const withoutId = ({ id, ...recipe }) => recipe;
@@ -41,13 +41,17 @@ export default function RecipePanel({ recipes = [], disabled, onChange, onOpen, 
     setMessage({ tone: 'info', text: `Deleted ${recipe.name}.` });
   };
   const exportOne = (saved) => onDownload(new Blob([serializeRecipe(withoutId(saved))], { type: 'application/json' }), recipeFileName(saved));
+  // Every recipe, without this browser's ids: for another editor (another browser, or the CMS
+  // editor, whose storage is separate from the public editor's).
+  const exportAll = () => onDownload(new Blob([serializeRecipeLibrary(recipes.map(withoutId))], { type: 'application/json' }), recipeLibraryFileName());
   const importFile = async (file) => {
     try {
-      if (recipes.length >= MAX_RECIPES) throw new RecipeError(`You can keep up to ${MAX_RECIPES} recipes.`);
-      const recipe = await readRecipeFile(file);
-      const saved = { ...recipe, id: newId(), name: uniquePresetName(recipe.name, recipes) };
-      onChange([...recipes, saved]);
-      setMessage({ tone: 'info', text: `Imported ${saved.name}. Choose it to review and apply it.` });
+      const incoming = await readRecipeImport(file);
+      if (recipes.length + incoming.length > MAX_RECIPES) throw new RecipeError(`You can keep up to ${MAX_RECIPES} recipes.`);
+      const added = [];
+      for (const recipe of incoming) added.push({ ...recipe, id: newId(), name: uniquePresetName(recipe.name, [...recipes, ...added]) });
+      onChange([...recipes, ...added]);
+      setMessage({ tone: 'info', text: added.length === 1 ? `Imported ${added[0].name}. Choose it to review and apply it.` : `Imported ${added.length} recipes. Choose one to review and apply it.` });
     } catch (error) {
       const errors = error instanceof RecipeError ? error.errors : ['The recipe file could not be read.'];
       setMessage({ tone: 'error', text: errors.length > 1 ? `${errors[0]} (and ${errors.length - 1} more; open it with Paste settings to see all)` : errors[0] });
@@ -92,8 +96,10 @@ export default function RecipePanel({ recipes = [], disabled, onChange, onOpen, 
           ))}
         </ul>
       ) : <p className="pe-note">None yet. Save one from Copy settings or Paste settings; recipes are kept in this browser only.</p>}
+      <p className="pe-note">Recipes stay in this browser and this editor. To use them elsewhere (the CMS editor keeps its own library), Export all here and Import recipes there.</p>
       <div className="pe-presets__actions">
-        <button type="button" className="pe-text-button" onClick={() => importRef.current?.click()}>Import recipe…</button>
+        <button type="button" className="pe-text-button" onClick={() => importRef.current?.click()}>Import recipes…</button>
+        <button type="button" className="pe-text-button" disabled={!recipes.length} onClick={exportAll}>Export all…</button>
         <input ref={importRef} type="file" accept="application/json,.json" hidden aria-label="Import recipe" onChange={(event) => { const [file] = event.target.files; event.target.value = ''; if (file) importFile(file); }} />
       </div>
       {message && <p className={`pe-note${message.tone === 'error' ? ' pe-note--error' : ''}`} role={message.tone === 'error' ? 'alert' : 'status'}>{message.text}</p>}
