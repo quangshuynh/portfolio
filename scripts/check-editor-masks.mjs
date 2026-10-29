@@ -11,7 +11,7 @@
 // files) Chromium exports a RAW with a sky gradient, radial and brush and checks that every pixel
 // outside the mask is unchanged, adds a masked text layer, and merges a RAW HDR with a local
 // adjustment; Firefox exports a RAW with geometry and masks.
-// Usage: npm run check:editor:masks (MASK_RUNS=chromium,…; MASK_SKIP_PARITY=1)
+// Usage: npm run check:editor:masks (MASK_RUNS=chromium,…; MASK_SKIP_PARITY=1; MASK_PARITY_ONLY=1)
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -277,6 +277,10 @@ async function runOne(run, files) {
     await page.setInputFiles('input[type=file][accept="application/json,.json"]:not([aria-label])', file);
     return savedWhen(name, (v) => JSON.stringify(v.local ?? []) === JSON.stringify(normalizeAdjustments(document.photos[0].adjustments).local), 'document applied');
   };
+  const openDetail = async () => {
+    const toggle = page.locator('.pe-panel--adjust .pe-section__toggle', { hasText: /^Detail/ });
+    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  };
   const twoFrames = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   // Stage coordinates of a point of the photo (fractions of the shown output frame).
   const photoPoint = async (u, v) => {
@@ -342,8 +346,7 @@ async function runOne(run, files) {
     await step('radial with Clarity previews on the CPU (draft, then final)', async () => {
       await newLocal('Radial');
       await drag(await photoPoint(0.7, 0.4), await photoPoint(0.85, 0.4), 4);
-      const detail = page.locator('.pe-panel--adjust .pe-section__toggle', { hasText: /^Detail/ });
-      if (await detail.getAttribute('aria-expanded') !== 'true') await detail.click();
+      await openDetail();
       await setValue('Clarity', '60');
       const started = Date.now();
       await poll(() => page.evaluate(() => document.querySelector('[data-detail-preview]')?.dataset.detailPreview), (q) => q === 'final', 'Detail preview', 120_000);
@@ -378,8 +381,8 @@ async function runOne(run, files) {
     });
     await step('save edits, reload, reopen: same masks and the same export', async () => {
       const before = await saved('masks-base.png');
-      await tab(1);
-      const [edits] = await Promise.all([page.waitForEvent('download'), page.locator('button', { hasText: 'Save edits' }).first().click()]);
+      await tab(3);
+      const [edits] = await Promise.all([page.waitForEvent('download'), page.locator('button:visible', { hasText: 'Save edits' }).first().click()]);
       const text = readFileSync(await edits.path(), 'utf8');
       const document = JSON.parse(text);
       assert.equal(document.version, DOCUMENT_VERSION);
@@ -438,7 +441,7 @@ async function runOne(run, files) {
         await drag(await photoPoint(0.2, 0.5), await photoPoint(0.6, 0.5), 8);
         const after = await page.locator('.pe-canvas-host').boundingBox();
         assert.deepEqual([after.x, after.y], [view.x, view.y], 'the photo panned while painting');
-        await savedWhen('masks-base.png', (v) => v.local.at(-1).mask.components[0]?.strokes.length === 1, 'touch stroke');
+        await savedWhen('masks-base.png', (v) => v.local.at(-1).mask.components[0]?.strokes?.length === 1, 'touch stroke');
         const layout = await page.evaluate(() => ({
           overflow: document.documentElement.scrollWidth - window.innerWidth,
           clipped: ['html', 'body'].filter((tag) => getComputedStyle(document.querySelector(tag)).overflow === 'hidden'),
@@ -485,9 +488,8 @@ async function runOne(run, files) {
       await step('genuine RAW: sky gradient, radial and brush; pixels outside the masks unchanged', async () => {
         await importFiles([raw], run.large ? 3 : 2);
         await select(name);
-        const meta = (await page.$eval(`.pe-photo--list button.pe-photo__select[aria-label^="${name}"]`, (b) => b.closest('li').querySelector('.mono')?.textContent)) ?? '';
-        const [width, height] = meta.match(/(\d+)\s*×\s*(\d+)/)?.slice(1).map(Number) ?? [0, 0];
-        assert.ok(width > 1000, `photo size ${meta}`);
+        await setValue('Exposure', '0.05');
+        const { width, height } = await poll(() => page.evaluate(([key, file]) => JSON.parse(localStorage.getItem(key) ?? 'null')?.photos.find((p) => p.source.name === file)?.source ?? null, [AUTOSAVE_KEY, name]), (s) => s?.width > 1000, 'source size');
         const geometry = run.genuine === 'geometry' ? { angle: -3, crop: { x: 0.05, y: 0.05, width: 0.9, height: 0.85 } } : undefined;
         const local = [
           createLocalAdjustment('sky', { settings: { exposure: -0.7, highlights: -40, temperature: -15 }, mask: { components: [createLinear('s', { x0: 0.5, y0: 0, x1: 0.5, y1: 0.45 })] } }),
@@ -553,6 +555,7 @@ async function runOne(run, files) {
             await newLocal('Linear');
             await drag(await photoPoint(0.5, 0.02), await photoPoint(0.5, 0.4), 4);
             await setValue('Exposure', '-0.6');
+            await openDetail();
             await setValue('Dehaze', '15');
             const stop = sampler(profile);
             const started = Date.now();
@@ -590,6 +593,7 @@ async function main() {
       if (!item.ok) failures.push(item.browser);
     }
   }
+  if (process.env.MASK_PARITY_ONLY) { rmSync(work, { recursive: true, force: true }); if (failures.length) process.exitCode = 1; return; }
   await build({ root, logLevel: 'silent', configFile: path.join(root, 'vite.config.mjs') });
   const server = await preview({ root, configFile: path.join(root, 'vite.config.mjs'), preview: { port: PORT, strictPort: true }, logLevel: 'silent' });
   try {

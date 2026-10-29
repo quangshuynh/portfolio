@@ -379,3 +379,12 @@ test('the painting cache gives the same coverage as a fresh evaluation at every 
   check([done]);
   check([done, { ...first, points: [[0.2, 0.8], [0.6, 0.85]] }]);
 });
+
+test('an export cancelled during a local Detail pass stops between bands', async () => {
+  const local = { id: 'L', amount: 1, settings: { clarity: 50 }, mask: mask([createLinear('g', { x0: 0, y0: 0, x1: 0, y1: 1 })], {}, 'image') };
+  const image = noise(40, 60);
+  const passes = localPasses(local, { def: local.mask, map: canvasMaskMap(image) }, image, splitLocalSettings(local.settings));
+  let bands = 0;
+  await expect(compositeImage(image, passes, { bandRows: 8, onBand: () => { bands += 1; }, cancelled: () => bands >= 2 })).rejects.toMatchObject({ code: 'cancelled' });
+  expect(bands).toBe(2);
+});
