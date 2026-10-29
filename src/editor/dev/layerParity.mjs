@@ -84,11 +84,11 @@ function cases() {
     const m = normalizeMask({ base: 'all', invert: blend === 'multiply', components: [createRadial('r', { x: 0.4, rx: 0.3, ry: 0.2, feather: 0.7 })] }, 'layer');
     out.push({ name: `masked image ${blend}`, passes: [rasterPass(l, r, layerMatrix(l, canvas, r), canvas, withRaster(m, layerMaskMap(layerMatrix(l, canvas, r), r)))] });
   }
-  out.push({ name: 'masked adjustment (gradient, brush, subtract)', passes: [adjustmentPass({ ...createAdjustmentLayer('A', { exposure: -1.2, saturation: 40 }), blend: 'soft-light', opacity: 0.85 }, null, withRaster(canvasMask, canvasMaskMap(canvas)))] });
+  out.push({ name: 'adjust masked (gradient, brush, subtract)', passes: [adjustmentPass({ ...createAdjustmentLayer('A', { exposure: -1.2, saturation: 40 }), blend: 'soft-light', opacity: 0.85 }, null, withRaster(canvasMask, canvasMaskMap(canvas)))] });
   const native = { width: 192, height: 128 };
   const plan = geometryPlan(normalizeGeometry({ angle: 9, crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 }, perspective: { vertical: 15, horizontal: 0 } }), native);
   const local = { id: 'L', amount: 0.8, settings: { exposure: 0.8, temperature: -30, blueSaturation: -60 }, mask: normalizeMask({ components: [createLinear('sky', { x0: 0.5, y0: 0.1, x1: 0.5, y1: 0.6 }), createRadial('r', { x: 0.7, y: 0.6, rx: 0.2, ry: 0.15 })] }, 'image') };
-  out.push({ name: 'local adjustment (image space under geometry)', passes: localPasses(local, withRaster(local.mask, imageMaskMap(plan, canvas, native)), native, splitLocalSettings(local.settings)) });
+  out.push({ name: 'adjust local (image space under geometry)', passes: localPasses(local, withRaster(local.mask, imageMaskMap(plan, canvas, native)), native, splitLocalSettings(local.settings)) });
   return out;
 }
 

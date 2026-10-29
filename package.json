@@ -34,6 +34,7 @@
     "check:editor:creative": "node scripts/check-editor-creative.mjs",
     "check:editor:filters": "node scripts/check-editor-filters.mjs",
     "check:editor:layers": "node scripts/check-editor-layers.mjs",
+    "check:editor:masks": "node scripts/check-editor-masks.mjs",
     "cms": "node cms/server.mjs",
     "assets:refresh": "node scripts/refresh-project-assets.mjs",
     "test:hero:browser": "node scripts/check-hero-browser.mjs",

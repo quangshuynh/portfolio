@@ -153,16 +153,12 @@ export function adjustRows(rows, pass, prepared, { width = 0, y0 = 0 } = {}) {
   return rows;
 }
 
-/** Mixes Detail-rendered rows into `rows` (backdrop rows from y0) through the pass's mask and opacity. */
-function mixRows(rows, rendered, pass, width, y0) {
-  const pixels = rows.length / 4;
-  const mask = passMask(pass, width, y0, y0 + pixels / width);
-  for (let p = 0; p < pixels; p += 1) adjustPixel(0, rows, p * 4, rendered, p * 4, mask ? pass.opacity * (mask[p] / 255) : pass.opacity);
-  return rows;
-}
 
-function* detailBands(image, pass, bandRows) {
-  const { width, height, data } = image;
+function* detailBands(canvas, pass, bandRows) {
+  // A plain view: the Detail renderer copies its source with object spread, which would drop
+  // the prototype getters of a canvas's ImageData.
+  const { width, height, data } = canvas;
+  const image = { width, height, data };
   const context = prepareDetailRender(deriveParams(pass.adjustments), {
     width,
     height,
@@ -180,9 +176,28 @@ function* detailBands(image, pass, bandRows) {
   };
   for (let row = 0; row < height; row += bandRows) {
     const last = Math.min(height, row + bandRows);
-    const rendered = new Uint8ClampedArray((last - row) * width * 4);
-    renderDetailRows(image, context, row, last, rendered);
-    pending.push({ row, last, rows: mixRows(data.slice(row * width * 4, last * width * 4), rendered, pass, width, row) });
+    // Only the columns the mask covers in this band are rendered (none: the band is unchanged).
+    const mask = passMask(pass, width, row, last);
+    let [x0, x1] = [0, width];
+    if (mask) {
+      [x0, x1] = [width, 0];
+      for (let p = 0; p < mask.length; p += 1) {
+        if (mask[p]) { const x = p % width; if (x < x0) x0 = x; if (x >= x1) x1 = x + 1; }
+      }
+    }
+    if (x1 > x0) {
+      const w = x1 - x0;
+      const rendered = new Uint8ClampedArray((last - row) * w * 4);
+      renderDetailRows(image, context, row, last, rendered, { columns: [x0, x1] });
+      const rows = data.slice(row * width * 4, last * width * 4);
+      for (let y = 0; y < last - row; y += 1) {
+        for (let x = x0; x < x1; x += 1) {
+          const p = y * width + x;
+          adjustPixel(0, rows, p * 4, rendered, (y * w + x - x0) * 4, mask ? pass.opacity * (mask[p] / 255) : pass.opacity);
+        }
+      }
+      pending.push({ row, last, rows });
+    }
     // The next band reads the backdrop from `last − halo`: rows above that are final.
     flush(last - context.halo);
     yield last / height;

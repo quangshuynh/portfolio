@@ -84,58 +84,136 @@ function canvasBox(inverse, box, region) {
   };
 }
 
+const strokePoints = (stroke, map) => {
+  const short = Math.min(map.width, map.height);
+  return stroke.points.map(([x, y, p]) => [x * map.width, y * map.height, Math.max(1e-6, pressureRadius(stroke.radius * short, p))]);
+};
+const union = (a, b) => (!a ? b : !b ? a : { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) });
+
 /**
- * Adds one stroke to a brush component's coverage `comp` (the region's pixels, row-major).
+ * Paints a stroke's segments from segment `from` into `buffer` (the region's pixels, row-major).
  * A stroke is a chain of capsules whose radius follows the pen pressure; its coverage at a
  * pixel is the largest any capsule gives, so a stroke never builds up over itself.
+ * :returns: the canvas box painted, or null
  */
-function addStroke(stroke, map, inverse, region, comp) {
-  const short = Math.min(map.width, map.height);
-  const pts = stroke.points.map(([x, y, p]) => [x * map.width, y * map.height, Math.max(1e-6, pressureRadius(stroke.radius * short, p))]);
-  const reach = Math.max(...pts.map(([, , r]) => r));
-  const all = canvasBox(inverse, {
-    x0: Math.min(...pts.map(([x]) => x)) - reach, y0: Math.min(...pts.map(([, y]) => y)) - reach,
-    x1: Math.max(...pts.map(([x]) => x)) + reach, y1: Math.max(...pts.map(([, y]) => y)) + reach,
-  }, region);
-  if (all.x1 <= all.x0 || all.y1 <= all.y0) return;
-  const bw = all.x1 - all.x0;
-  const buffer = new Float32Array(bw * (all.y1 - all.y0));
+function paintStroke(stroke, pts, from, map, inverse, region, buffer) {
   const m = map.matrix;
+  const rw = region.x1 - region.x0;
   const hardEdge = 1 - stroke.hardness;
-  const segments = pts.length === 1 ? [[pts[0], pts[0]]] : pts.slice(1).map((b, i) => [pts[i], b]);
-  for (const [a, b] of segments) {
+  const segments = Math.max(1, pts.length - 1);
+  let painted = null;
+  for (let k = Math.max(0, from); k < segments; k += 1) {
+    const a = pts[k];
+    const b = pts[Math.min(k + 1, pts.length - 1)];
     const r = Math.max(a[2], b[2]);
-    const box = canvasBox(inverse, { x0: Math.min(a[0], b[0]) - r, y0: Math.min(a[1], b[1]) - r, x1: Math.max(a[0], b[0]) + r, y1: Math.max(a[1], b[1]) + r }, all);
+    const box = canvasBox(inverse, { x0: Math.min(a[0], b[0]) - r, y0: Math.min(a[1], b[1]) - r, x1: Math.max(a[0], b[0]) + r, y1: Math.max(a[1], b[1]) + r }, region);
+    if (box.x1 <= box.x0 || box.y1 <= box.y0) continue; // eslint-disable-line no-continue
+    painted = union(painted, box);
     const dx = b[0] - a[0];
     const dy = b[1] - a[1];
     const length2 = dx * dx + dy * dy;
+    const r2 = r * r;
     for (let y = box.y0; y < box.y1; y += 1) {
       const cy = y + 0.5;
+      const row = (y - region.y0) * rw - region.x0;
       for (let x = box.x0; x < box.x1; x += 1) {
+        const i = row + x;
+        if (buffer[i] >= 1) continue; // eslint-disable-line no-continue
         const cx = x + 0.5;
         const w = m[6] * cx + m[7] * cy + m[8];
         const sx = (m[0] * cx + m[1] * cy + m[2]) / w;
         const sy = (m[3] * cx + m[4] * cy + m[5]) / w;
         const t = length2 > 0 ? Math.min(1, Math.max(0, ((sx - a[0]) * dx + (sy - a[1]) * dy) / length2)) : 0;
+        const ex = sx - a[0] - dx * t;
+        const ey = sy - a[1] - dy * t;
+        const d2 = ex * ex + ey * ey;
+        if (d2 >= r2) continue; // eslint-disable-line no-continue
         const radius = a[2] + (b[2] - a[2]) * t;
-        const q = Math.hypot(sx - a[0] - dx * t, sy - a[1] - dy * t) / radius;
+        const q = Math.sqrt(d2) / radius;
         if (q >= 1) continue; // eslint-disable-line no-continue
         const cov = falloff(q, Math.min(1, Math.max(hardEdge, map.scale / radius)));
-        const i = (y - all.y0) * bw + x - all.x0;
         if (cov > buffer[i]) buffer[i] = cov;
       }
     }
   }
+  return painted;
+}
+
+/** Combines a painted stroke (`buffer` inside `box`) into a brush component's coverage; `clear` empties the buffer there. */
+function applyStroke(stroke, buffer, box, region, comp, clear) {
   const rw = region.x1 - region.x0;
   const erase = stroke.mode === 'erase';
-  for (let y = all.y0; y < all.y1; y += 1) {
-    for (let x = all.x0; x < all.x1; x += 1) {
-      const c = buffer[(y - all.y0) * bw + x - all.x0] * stroke.opacity;
-      if (c <= 0) continue; // eslint-disable-line no-continue
+  for (let y = box.y0; y < box.y1; y += 1) {
+    for (let x = box.x0; x < box.x1; x += 1) {
       const i = (y - region.y0) * rw + x - region.x0;
+      const c = buffer[i] * stroke.opacity;
+      if (clear) buffer[i] = 0;
+      if (c <= 0) continue; // eslint-disable-line no-continue
       comp[i] = erase ? comp[i] * (1 - c) : comp[i] + c - comp[i] * c;
     }
   }
+}
+
+const sameStrokeStart = (live, stroke) => live.mode === stroke.mode && live.radius === stroke.radius && live.hardness === stroke.hardness
+  && live.opacity === stroke.opacity && live.count <= stroke.points.length
+  && live.points.slice(0, live.count).every((p, i) => p[0] === stroke.points[i][0] && p[1] === stroke.points[i][1] && p[2] === stroke.points[i][2]);
+
+/**
+ * A brush component's coverage over the region. With a `cache` (a Map the caller keeps, e.g. the
+ * preview while painting), the coverage of every stroke but the last is kept, and the last stroke
+ * keeps its painted buffer while it only grows, so each new point costs only its own segment.
+ * The result is the same as without the cache.
+ */
+function brushCoverage(component, map, inverse, region, n, cache) {
+  const { strokes } = component;
+  if (!cache) {
+    const comp = new Float32Array(n);
+    const scratch = new Float32Array(n);
+    for (const stroke of strokes) {
+      const box = paintStroke(stroke, strokePoints(stroke, map), 0, map, inverse, region, scratch);
+      if (box) applyStroke(stroke, scratch, box, region, comp, true);
+    }
+    return comp;
+  }
+  const key = `${component.id}|${maskMapKey(map)}|${region.x0},${region.y0},${region.x1},${region.y1}`;
+  let entry = cache.get(key);
+  if (!entry) {
+    // Two components at most (three canvas-size buffers each): the one being painted and one more.
+    if (cache.size >= 2) cache.delete(cache.keys().next().value);
+    entry = { prefix: [], prefixComp: new Float32Array(n), scratch: new Float32Array(n), live: null };
+    cache.set(key, entry);
+  }
+  const last = strokes.length - 1;
+  let k = 0;
+  while (k < entry.prefix.length && k < last && entry.prefix[k] === strokes[k]) k += 1;
+  if (k < entry.prefix.length) {
+    entry.prefix = [];
+    entry.prefixComp.fill(0);
+    k = 0;
+  }
+  for (; k < last; k += 1) {
+    const stroke = strokes[k];
+    // The stroke just finished: its painted buffer is reused when it is the same stroke.
+    const live = entry.live && sameStrokeStart(entry.live, stroke) && entry.live.count === stroke.points.length ? entry.live : null;
+    const box = live ? live.box : paintStroke(stroke, strokePoints(stroke, map), 0, map, inverse, region, entry.scratch);
+    if (box) applyStroke(stroke, live ? live.buffer : entry.scratch, box, region, entry.prefixComp, true);
+    if (live) entry.live = null;
+    entry.prefix.push(stroke);
+  }
+  const comp = entry.prefixComp.slice();
+  if (last < 0) return comp;
+  const stroke = strokes[last];
+  let { live } = entry;
+  const continues = live && sameStrokeStart(live, stroke);
+  if (!continues) {
+    live = { buffer: live?.buffer ?? new Float32Array(n), box: null, count: 0 };
+    live.buffer.fill(0);
+  }
+  const box = paintStroke(stroke, strokePoints(stroke, map), continues ? live.count - 1 : 0, map, inverse, region, live.buffer);
+  Object.assign(live, { box: union(live.box, box), count: stroke.points.length, points: stroke.points, mode: stroke.mode, radius: stroke.radius, hardness: stroke.hardness, opacity: stroke.opacity });
+  entry.live = live;
+  if (live.box) applyStroke(stroke, live.buffer, live.box, region, comp, false);
+  return comp;
 }
 
 /**
@@ -143,7 +221,7 @@ function addStroke(stroke, map, inverse, region, comp) {
  * (row-major, `width` per row).
  * :param map: maskMap() for the canvas being rendered
  */
-export function maskRows(mask, map, width, y0, y1, { x0 = 0, out = new Uint8ClampedArray(width * Math.max(0, y1 - y0)) } = {}) {
+export function maskRows(mask, map, width, y0, y1, { x0 = 0, out = new Uint8ClampedArray(width * Math.max(0, y1 - y0)), cache = null } = {}) {
   const n = width * Math.max(0, y1 - y0);
   const region = { x0, y0, x1: x0 + width, y1 };
   const acc = new Float32Array(n).fill(mask.base === 'all' ? 1 : 0);
@@ -155,8 +233,7 @@ export function maskRows(mask, map, width, y0, y1, { x0 = 0, out = new Uint8Clam
     const { invert, opacity } = component;
     if (component.type === 'brush') {
       if (!component.strokes.length && !invert) continue; // eslint-disable-line no-continue
-      const comp = new Float32Array(n);
-      for (const stroke of component.strokes) addStroke(stroke, map, inverse, region, comp);
+      const comp = brushCoverage(component, map, inverse, region, n, cache);
       for (let i = 0; i < n; i += 1) {
         const c = (invert ? 1 - comp[i] : comp[i]) * opacity;
         acc[i] = subtract ? acc[i] * (1 - c) : acc[i] + c - acc[i] * c;
@@ -182,5 +259,8 @@ export function maskRows(mask, map, width, y0, y1, { x0 = 0, out = new Uint8Clam
   return out;
 }
 
-/** Coverage of a whole canvas of `size` ({ width, height, data } with one code per pixel). */
-export const rasterizeMask = (mask, map, size) => ({ width: size.width, height: size.height, data: maskRows(mask, map, size.width, 0, size.height) });
+/**
+ * Coverage of a whole canvas of `size` ({ width, height, data } with one code per pixel).
+ * :param cache: a Map kept by the caller for strokes being painted (see brushCoverage), or null
+ */
+export const rasterizeMask = (mask, map, size, cache = null) => ({ width: size.width, height: size.height, data: maskRows(mask, map, size.width, 0, size.height, { cache }) });

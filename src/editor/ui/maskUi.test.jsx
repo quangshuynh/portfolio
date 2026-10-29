@@ -57,21 +57,26 @@ function PanelHarness({ layer = null, spy = () => {} }) {
 const state = () => JSON.parse(screen.getByTestId('state').textContent);
 
 describe('Masks panel', () => {
-  test('a new local adjustment starts with its component selected and the matching tool on', () => {
+  const newLocal = (type) => {
+    fireEvent.click(within(screen.getByRole('group', { name: 'New local adjustment' })).getByRole('button', { name: type }));
+    if (type !== 'Brush') fireEvent.click(screen.getByRole('button', { name: `+ ${type}` }));
+  };
+
+  test('a new local adjustment starts empty with the matching tool on; + Linear adds a gradient without a pointer', () => {
     render(<PanelHarness />);
     fireEvent.click(within(screen.getByRole('group', { name: 'New local adjustment' })).getByRole('button', { name: 'Linear' }));
-    const { locals, tool } = state();
-    expect(locals).toHaveLength(1);
-    expect(locals[0].mask).toMatchObject({ space: 'image', base: 'none' });
-    expect(locals[0].mask.components[0].type).toBe('linear');
-    expect(tool).toBe('linear');
+    expect(state().locals[0].mask).toMatchObject({ space: 'image', base: 'none', components: [] });
+    expect(state().tool).toBe('linear');
+    expect(screen.getByText('Drag on the photo to place the linear gradient.')).toHaveAttribute('role', 'status');
+    fireEvent.click(screen.getByRole('button', { name: '+ Linear' }));
+    expect(state().locals[0].mask.components[0].type).toBe('linear');
     expect(screen.getByRole('button', { name: /^Linear gradient 1/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('spinbutton', { name: 'Angle (degrees)' })).toBeInTheDocument();
   });
 
   test('components: add, subtract, invert, duplicate, delete; mask invert; amount', () => {
     render(<PanelHarness />);
-    fireEvent.click(within(screen.getByRole('group', { name: 'New local adjustment' })).getByRole('button', { name: 'Radial' }));
+    newLocal('Radial');
     fireEvent.click(screen.getByRole('button', { name: '+ Brush' }));
     expect(state().locals[0].mask.components.map(({ type }) => type)).toEqual(['radial', 'brush']);
     fireEvent.click(screen.getByRole('button', { name: /^Radial gradient 1/ }));
@@ -90,7 +95,7 @@ describe('Masks panel', () => {
 
   test('gradient fields are numeric alternatives to dragging', () => {
     render(<PanelHarness />);
-    fireEvent.click(within(screen.getByRole('group', { name: 'New local adjustment' })).getByRole('button', { name: 'Radial' }));
+    newLocal('Radial');
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Width (radius, % of short edge)' }), { target: { value: '45' } });
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Angle (degrees)' }), { target: { value: '30' } });
     expect(state().locals[0].mask.components[0]).toMatchObject({ rx: 0.45, rotation: 30 });

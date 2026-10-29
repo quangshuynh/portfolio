@@ -343,3 +343,39 @@ describe('exports', () => {
     expect(banded.data).toEqual(whole.data);
   });
 });
+
+test('a Detail pass over a canvas ImageData (prototype getters) renders like a plain image', () => {
+  class FakeImageData {
+    #data;
+    constructor(image) { this.#data = image.data; this.w = image.width; this.h = image.height; }
+    get width() { return this.w; }
+    get height() { return this.h; }
+    get data() { return this.#data; }
+  }
+  const local = { id: 'L', amount: 1, settings: { clarity: 60 }, mask: mask([createRadial('r')], {}, 'image') };
+  const passes = (image) => localPasses(local, { def: local.mask, map: canvasMaskMap(image) }, image, splitLocalSettings(local.settings));
+  const plain = compositeImageSync(noise(40, 30), passes({ width: 40, height: 30 }));
+  const wrapped = new FakeImageData(noise(40, 30));
+  compositeImageSync(wrapped, passes(wrapped));
+  expect(wrapped.data).toEqual(plain.data);
+});
+
+test('the painting cache gives the same coverage as a fresh evaluation at every step', () => {
+  const size = { width: 90, height: 70 };
+  const map = canvasMaskMap(size);
+  const cache = new Map();
+  const first = { mode: 'add', radius: 0.1, hardness: 0.4, opacity: 0.8, points: [] };
+  const second = { mode: 'erase', radius: 0.05, hardness: 0.9, opacity: 1, points: [] };
+  const check = (strokes) => {
+    const m = mask([createBrush('b', { strokes: strokes.filter((s) => s.points.length) }), createRadial('r', { op: 'subtract', rx: 0.1, ry: 0.1 })]);
+    expect(rasterizeMask(m, map, size, cache).data).toEqual(rasterizeMask(m, map, size).data);
+    return m;
+  };
+  let m;
+  for (let i = 0; i < 12; i += 1) m = check([{ ...first, points: [...first.points, ...Array.from({ length: i + 1 }, (_, k) => [0.1 + k * 0.07, 0.3 + 0.03 * k])] }]);
+  const done = m.components[0].strokes[0];
+  for (let i = 0; i < 6; i += 1) m = check([done, { ...second, points: Array.from({ length: i + 1 }, (_, k) => [0.5 + k * 0.03, 0.4]) }]);
+  // Undo the second stroke, then paint another one.
+  check([done]);
+  check([done, { ...first, points: [[0.2, 0.8], [0.6, 0.85]] }]);
+});

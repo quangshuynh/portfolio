@@ -443,12 +443,17 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   // Layer passes at the preview canvas's size: text sprites drawn here, image rasters from
   // `layerRasters` (skipped until loaded), adjustment layers with their derived parameters.
   const showLayers = !transformMode && compare !== 'original';
+  // While the brush paints, the mask being edited keeps its strokes' coverage (mask.mjs), so each
+  // new point costs only its own segment; the buffers are released when the brush is put away.
+  const painting = Boolean(maskTool?.interactive && maskTool.tool === 'brush');
+  const paintCacheRef = useRef(new Map());
+  useEffect(() => { if (!painting) paintCacheRef.current.clear(); }, [painting]);
   const maskCoverage = useCallback((def, map, out, keys) => {
     const key = `${out.width}x${out.height}|${maskMapKey(map)}|${JSON.stringify(def)}`;
     keys.add(key);
-    if (!masksRef.current.has(key)) masksRef.current.set(key, rasterizeMask(def, map, out));
+    if (!masksRef.current.has(key)) masksRef.current.set(key, rasterizeMask(def, map, out, painting && def === maskTool.mask ? paintCacheRef.current : null));
     return { def, map, key, raster: masksRef.current.get(key) };
-  }, []);
+  }, [painting, maskTool?.mask]); // eslint-disable-line react-hooks/exhaustive-deps
   const overlayMask = maskTool?.overlay?.show && showLayers ? maskTool : null;
   const buildLayers = useCallback((out) => {
     const maskKeys = new Set();

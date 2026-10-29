@@ -36,12 +36,12 @@ export default function MaskPanel({
   const component = mask?.components.find((c) => c.id === selectedId) ?? null;
   useEffect(() => setRenaming(false), [target?.kind, target?.local?.id]);
 
+  // A new local adjustment starts empty with the tool on: the first stroke or drag on the photo
+  // makes its first component (+ Brush, + Linear, + Radial add one without a pointer).
   const addLocal = (type) => {
     const id = newId('local');
-    const componentId = newId(type);
-    const local = createLocalAdjustment(id, { mask: { components: [newComponent(type, componentId)] } });
-    onApplyLocals([...locals, local]);
-    onSelectLocal(id, componentId);
+    onApplyLocals([...locals, createLocalAdjustment(id)]);
+    onSelectLocal(id);
     onTool(type);
   };
   const patchLocal = (patch, coalesceKey = null) => onApplyLocals(locals.map((l) => (l.id === target.local.id ? { ...l, ...patch } : l)), coalesceKey);
@@ -129,6 +129,7 @@ export default function MaskPanel({
           </div>
         )}
         {!target && !locals.length && <p className="pe-note">Add a local adjustment, then paint or drag on the photo where it should apply.</p>}
+        {mask && !mask.components.length && tool && <p className="pe-note" role="status">{tool === 'brush' ? 'Paint on the photo.' : `Drag on the photo to place the ${tool} gradient.`}</p>}
         {target && mask && (
           <div className="pe-masks__props" role="group" aria-label={target.kind === 'local' ? 'Local adjustment' : 'Layer mask'}>
             {locked && <p className="pe-note" role="status">The layer is locked: unlock it to edit its mask.</p>}

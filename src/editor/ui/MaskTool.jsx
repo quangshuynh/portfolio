@@ -238,8 +238,8 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
       const length = Math.hypot(dx, dy) || 1;
       const nx = (-dy / length) * 4000;
       const ny = (dx / length) * 4000;
-      const line = (p, dashed) => <line key={`${component.id}-${p.x}-${dashed}`} x1={p.x - nx} y1={p.y - ny} x2={p.x + nx} y2={p.y + ny} data-selected={isSelected || undefined} strokeDasharray={dashed ? '6 4' : undefined} />;
-      shapes.push(line(a, false), line({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, true), line(b, false));
+      const line = (name, p, dashed) => <line key={`${component.id}-${name}`} x1={p.x - nx} y1={p.y - ny} x2={p.x + nx} y2={p.y + ny} data-selected={isSelected || undefined} strokeDasharray={dashed ? '6 4' : undefined} />;
+      shapes.push(line('start', a, false), line('centre', { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, true), line('end', b, false));
       if (isSelected) handles.push(handle(component, 'start', a, 'Start (full effect)'), handle(component, 'end', b, 'End (no effect)'));
       handles.push(focusable(component, label, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }));
     } else {
