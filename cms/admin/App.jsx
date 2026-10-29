@@ -32,7 +32,14 @@ export default function App() {
   const [filters, setFilters] = useState({ query: '', status: 'all', category: 'all' });
   const [layout, setLayout] = useState('grid');
   const [selection, setSelection] = useState(() => new Set());
-  const [activeId, setActiveId] = useState(null);
+  // #photo=<id> or #review=<id> (links back from QuangEdit) opens that photograph's details.
+  const hashId = () => window.location.hash.match(/^#(?:photo|review)=([A-Za-z0-9_-]+)$/)?.[1] ?? null;
+  const [activeId, setActiveId] = useState(hashId);
+  useEffect(() => {
+    const onHash = () => { const id = hashId(); if (id) { setActiveId(id); setView('library'); } };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [notice, setNotice] = useState(null);
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || 'dark');
@@ -133,6 +140,7 @@ export default function App() {
               onToggle={toggle}
               onOpen={setActiveId}
               onMove={(id, index) => run((current) => movePhotograph(current, id, index))}
+              treatments={server.treatments}
             />
           </>
         )}
@@ -144,7 +152,8 @@ export default function App() {
 
       {view === 'library' && active && (
         <DetailsPanel record={active} catalog={catalog} base={server.base} generated={server.generated}
-          problems={derived.problems} run={run} onClose={() => setActiveId(null)} />
+          problems={derived.problems} run={run} onClose={() => setActiveId(null)}
+          beforeLeave={ws.flush} onNotice={setNotice} onTreatmentChanged={() => ws.refresh().catch(() => {})} />
       )}
       <UploadPanel
         open={uploadOpen}

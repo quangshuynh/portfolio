@@ -37,6 +37,39 @@ export const api = {
   signOut: () => fetch('/api/session/sign-out', { method: 'POST', headers: { 'X-CMS-Request': '1' } }),
 };
 
+// QuangEdit treatments (cms/lib/editor-api.mjs).
+const editorPath = (id, rest = '') => `/api/editor/photos/${encodeURIComponent(id)}${rest ? `/${rest}` : ''}`;
+export const editorUrl = (id) => `/admin/photography/editor/?photo=${encodeURIComponent(id)}`;
+export const treatmentImageUrl = (id, which, version = '') => `${editorPath(id, `images/${which}`)}${version ? `?v=${encodeURIComponent(version)}` : ''}`;
+
+async function sendBinary(method, url, blob) {
+  let response;
+  try {
+    response = await fetch(url, { method, credentials: 'same-origin', headers: { 'X-CMS-Request': '1', 'Content-Type': 'application/octet-stream' }, body: blob });
+  } catch {
+    throw new ApiError(0, { code: 'offline', message: 'The CMS server is not reachable. Is `npm run cms` still running?' });
+  }
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new ApiError(response.status, data?.error);
+  return data;
+}
+
+export const treatments = {
+  describe: (id) => request('GET', editorPath(id)),
+  async source(id, index) {
+    const response = await fetch(editorPath(id, `sources/${index}`), { credentials: 'same-origin' });
+    if (!response.ok) throw new ApiError(response.status, (await response.json().catch(() => null))?.error);
+    return response.blob();
+  },
+  attach: (id, file, revision) => sendBinary('POST', `${editorPath(id, 'sources')}?filename=${encodeURIComponent(file.name)}&revision=${revision}`, file),
+  clearSources: (id, revision) => request('POST', editorPath(id, 'sources/clear'), { revision }),
+  save: (id, document, revision) => request('PUT', editorPath(id, 'treatment'), { document, revision }),
+  render: (id, blob, { name, documentHash, revision }) => sendBinary('PUT', `${editorPath(id, 'render')}?name=${encodeURIComponent(name)}&documentHash=${documentHash}&revision=${revision}`, blob),
+  approve: (id, revision) => request('POST', editorPath(id, 'approve'), { revision }),
+  reject: (id, revision) => request('POST', editorPath(id, 'reject'), { revision }),
+  discard: (id, revision) => request('POST', editorPath(id, 'discard'), { revision }),
+};
+
 export const imageUrl = (id, size = 'gallery') => `/api/images/${encodeURIComponent(`${id}-${size}.jpg`)}`;
 
 /** Uploads one file with progress; resolves to the server's response. */

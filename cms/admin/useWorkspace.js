@@ -112,6 +112,12 @@ export function useWorkspace({ onSessionExpired }) {
     writeBackup(null);
   }, [accept]);
 
+  /** Saves pending edits, then takes the server's view (treatment and image state). */
+  const refresh = useCallback(async () => {
+    await flush();
+    replace(await api.workspace());
+  }, [flush, replace]);
+
   const restoreBackup = useCallback(() => {
     if (!recovered) return;
     apply(() => recovered.catalog);
@@ -123,10 +129,14 @@ export function useWorkspace({ onSessionExpired }) {
     setRecovered(null);
   }, []);
 
-  const derived = useMemo(() => (catalog && server ? {
-    problems: workspaceProblems(catalog, { base: server.base }),
-    summary: summarizeChanges(server.base, catalog),
-  } : null), [catalog, server]);
+  const derived = useMemo(() => {
+    if (!catalog || !server) return null;
+    const summary = summarizeChanges(server.base, catalog);
+    // Approved QuangEdit images (from the server) for photographs still published here.
+    const published = new Set(catalog.photographs.filter(({ status }) => status === 'published').map(({ id }) => id));
+    const images = (server.images ?? []).filter((id) => published.has(id));
+    return { problems: workspaceProblems(catalog, { base: server.base }), summary: { ...summary, images, count: summary.count + images.length } };
+  }, [catalog, server]);
 
-  return { server, catalog, save, loadError, derived, recovered, apply, flush, replace, reload: load, restoreBackup, dismissBackup };
+  return { server, catalog, save, loadError, derived, recovered, apply, flush, replace, refresh, reload: load, restoreBackup, dismissBackup };
 }

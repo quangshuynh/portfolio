@@ -40,7 +40,8 @@
     "cms": "node cms/server.mjs",
     "assets:refresh": "node scripts/refresh-project-assets.mjs",
     "test:hero:browser": "node scripts/check-hero-browser.mjs",
-    "measure:hero": "node scripts/measure-hero-bundles.mjs"
+    "measure:hero": "node scripts/measure-hero-bundles.mjs",
+    "check:cms:editor": "node scripts/check-cms-editor.mjs"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
