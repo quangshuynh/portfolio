@@ -30,7 +30,7 @@ function LayerIcon({ layer, thumbnail }) {
 }
 
 /** A labelled number field that applies on change (one undo step per edit, coalesced per field). */
-function NumberField({ label, value, min, max, step, unit, disabled, onApply, digits = 1 }) {
+export function NumberField({ label, value, min, max, step, unit, disabled, onApply, digits = 1 }) {
   const id = useId();
   return (
     <label className="pe-field pe-field--number" htmlFor={id}>
@@ -366,7 +366,7 @@ export default function LayersPanel({ layers, activeId, disabled, canvas, source
   );
 }
 
-function OpacityRange({ value, disabled, onPreview, onApply, onCommit }) {
+export function OpacityRange({ value, disabled, onPreview, onApply, onCommit, label = 'Opacity' }) {
   const id = useId();
   const dragging = useRef(false);
   const shown = Math.round(value * 100);
@@ -379,11 +379,11 @@ function OpacityRange({ value, disabled, onPreview, onApply, onCommit }) {
   return (
     <div className="pe-adjust">
       <div className="pe-adjust__head">
-        <label htmlFor={id}>Opacity</label>
+        <label htmlFor={id}>{label}</label>
         <input
           className="pe-adjust__value mono"
           type="number"
-          aria-label="Opacity value (%)"
+          aria-label={`${label} value (%)`}
           min={0}
           max={100}
           step={1}

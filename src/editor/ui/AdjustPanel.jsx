@@ -54,7 +54,8 @@ function Section({ id, title, open, onToggle, edited, onReset, resetDisabled, ch
  * :param geometry: Crop & Transform handlers (GeometryPanel props), or null without a photo
  * :param layer: { label } when the panels edit an image or adjustment layer's colour settings
  *   (`adjustments` are then that layer's, and `dispatch` targets it): only Light, Color, HSL,
- *   Tone Curve, LUT, the colour parts of Creative and Presets are shown
+ *   Tone Curve, LUT, the colour parts of Creative and Presets are shown; with `local: true` (a
+ *   local adjustment) only Light, Color, HSL and Detail
  */
 export default function AdjustPanel({ adjustments, disabled, dispatch, lut, presets, raw = null, hdr = null, geometry = null, text = null, thumbnails = null, layer = null }) {
   const [open, setOpen] = useState(readOpenSections);
@@ -90,12 +91,13 @@ export default function AdjustPanel({ adjustments, disabled, dispatch, lut, pres
   return (
     <section className="pe-panel pe-panel--adjust" aria-labelledby="pe-adjust-title">
       <div className="pe-panel__head">
-        <h2 id="pe-adjust-title">{layer ? <>Adjust <span className="pe-adjust-target">layer “{layer.label}”</span></> : 'Adjust'}</h2>
+        <h2 id="pe-adjust-title">{layer ? <>Adjust <span className="pe-adjust-target">{layer.local ? 'local' : 'layer'} “{layer.label}”</span></> : 'Adjust'}</h2>
         <button type="button" className="pe-text-button" disabled={disabled || isNeutral(adjustments)} onClick={() => dispatch({ type: 'resetAll' })}>
           Reset all
         </button>
       </div>
-      {layer && <p className="pe-note pe-note--layer">These settings apply to the selected layer only{layer.adjustment ? ' and change everything below it' : ''}. Select Background in Layers to edit the photo.</p>}
+      {layer && !layer.local && <p className="pe-note pe-note--layer">These settings apply to the selected layer only{layer.adjustment ? ' and change everything below it' : ''}. Select Background in Layers to edit the photo.</p>}
+      {layer?.local && <p className="pe-note pe-note--layer">These settings apply through the selected mask only, on top of the photo&apos;s own settings. Select it again in Masks to edit the photo.</p>}
       {!layer && section('geometry', 'Crop & Transform', geometry
         ? <GeometryPanel geometry={adjustments.geometry} disabled={disabled} {...geometry} />
         : <p className="pe-note">Open a photo to crop, rotate or transform it.</p>)}
@@ -104,17 +106,21 @@ export default function AdjustPanel({ adjustments, disabled, dispatch, lut, pres
       {section('light', 'Light', rows('light'))}
       {section('color', 'Color', rows('color'))}
       {section('hsl', 'HSL', <HslPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} />)}
-      {!layer && section('detail', 'Detail', (
+      {(!layer || layer.local) && section('detail', 'Detail', (
         <>
           {rows('detail')}
           <p className="pe-note">Rendered on the CPU, so the preview follows after a moment. Sharpening and noise reduction act on full-resolution pixels: the preview shows them as a downscaled export would.</p>
         </>
       ))}
-      {section('curves', 'Tone Curve', <CurveEditor curves={adjustments.curves} disabled={disabled} dispatch={dispatch} />)}
-      {section('lut', 'LUT', <LutPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} {...lut} />, { edited: Boolean(adjustments.lut) })}
-      {section('creative', 'Creative', <CreativePanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} onPreview={presets?.onPreview} presets={presets} thumbnails={thumbnails} layer={Boolean(layer)} />, { lazy: true })}
-      {!layer && text && section('text', 'Text', <TextPanel layers={adjustments.layers} disabled={disabled} dispatch={dispatch} {...text} />, { lazy: true })}
-      {section('presets', 'Presets', <PresetPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} {...presets} />, { reset: false, edited: false })}
+      {!layer?.local && (
+        <>
+          {section('curves', 'Tone Curve', <CurveEditor curves={adjustments.curves} disabled={disabled} dispatch={dispatch} />)}
+          {section('lut', 'LUT', <LutPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} {...lut} />, { edited: Boolean(adjustments.lut) })}
+          {section('creative', 'Creative', <CreativePanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} onPreview={presets?.onPreview} presets={presets} thumbnails={thumbnails} layer={Boolean(layer)} />, { lazy: true })}
+          {!layer && text && section('text', 'Text', <TextPanel layers={adjustments.layers} disabled={disabled} dispatch={dispatch} {...text} />, { lazy: true })}
+          {section('presets', 'Presets', <PresetPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} {...presets} />, { reset: false, edited: false })}
+        </>
+      )}
     </section>
   );
 }
