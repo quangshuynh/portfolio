@@ -21,6 +21,7 @@ import { adjustmentsEqual, groupKeys, neutralAdjustments, normalizeAdjustments }
 import { presetPatch } from './presets.mjs';
 import { filterPatch } from './filters.mjs';
 import { gradientLocals } from './masks.mjs';
+import { applyRecipe, recipeGroups } from './recipes.mjs';
 
 /** Kinds of source a group needs on both sides. */
 const developed = (photo) => Boolean(photo?.raw);
@@ -167,6 +168,22 @@ export function planLut(lut, intensity, targets, { hasLut = () => true } = {}) {
   const errors = lut && !hasLut(lut.sha256) ? [`The LUT "${lutName(lut)}" is not loaded.`] : [];
   const patch = { lut: lut ? { sha256: lut.sha256, name: lut.name, title: lut.title, size: lut.size } : null, lutIntensity: intensity };
   return { ...plan(targets, () => ({ patch })), errors };
+}
+
+/**
+ * Applies chosen groups of a QuangEdit Recipe to every target (model/recipes.mjs), in replace
+ * or merge mode. Without its LUT loaded, the plan leaves the LUT group out and has an error,
+ * so the rest can be previewed but nothing is applied.
+ * :param options: { groups, mode, lutOf(sha256) => loaded LUT or null }
+ */
+export function planRecipe(recipe, targets, { groups = recipeGroups(recipe), mode = 'replace', lutOf = () => null } = {}) {
+  const chosen = recipeGroups(recipe).filter((id) => groups.includes(id));
+  const errors = [];
+  if (!chosen.length) errors.push('Choose at least one group of settings.');
+  const lut = chosen.includes('lut') ? lutOf(recipe.lut.sha256) : null;
+  if (chosen.includes('lut') && !lut) errors.push(`The LUT "${lutName(recipe.lut)}" is not loaded. Import that .cube file again, or leave LUT out.`);
+  const usable = lut ? chosen : chosen.filter((id) => id !== 'lut');
+  return { ...plan(targets, (photo, before) => ({ patch: applyRecipe(before, recipe, { groups: usable, mode, lut }) })), errors };
 }
 
 /** Resets every target to neutral settings (its RAW and merge data are untouched). */
