@@ -19,6 +19,8 @@ import {
 import { cleanInterruptedUploads, initWorkspace, resolveWorkspaceDir } from './lib/workspace.mjs';
 
 const ADMIN_PATH = '/admin/photography/';
+// QuangEdit inside the CMS: the public editor's code with a CMS host (cms/admin/editor.html).
+const EDITOR_PATH = '/admin/photography/editor/';
 // Files already public on quanghuynh.com that browsers fetch without cookies (the web app
 // manifest is always requested without credentials). Everything else needs a session.
 const PUBLIC_FILES = new Set(['/manifest.json', '/favicon.ico', '/logo192.png', '/logo512.png']);
@@ -48,7 +50,7 @@ font:600 14px/1.2 system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4)">Pr
  * (tests). Resolves to { url, signInUrl, close }.
  */
 export async function startCmsServer({
-  port = 4317, workspace, baseBranch = 'main', remote = 'origin', offline = false, vite: useVite = true,
+  port = 4317, workspace, libraryDir = null, baseBranch = 'main', remote = 'origin', offline = false, vite: useVite = true,
   repoDir = projectRoot, github: githubOverride, githubSource: sourceOverride, sessions = createSessions(), log = console.log,
 } = {}) {
   const git = createGit(repoDir);
@@ -70,7 +72,7 @@ export async function startCmsServer({
 
   let viteServer = null;
   const api = createApi({
-    repoDir, workspaceDir, git, github, githubSource, remote, baseBranch, offline,
+    repoDir, workspaceDir, libraryDir: libraryDir ? path.resolve(libraryDir) : null, git, github, githubSource, remote, baseBranch, offline,
     onCatalogChanged: () => {
       const module = viteServer?.moduleGraph.getModuleById('\0virtual:photography-catalog');
       if (module) viteServer.moduleGraph.invalidateModule(module);
@@ -93,7 +95,7 @@ export async function startCmsServer({
       })],
       // No HMR socket: every request, including module requests, goes through the guard.
       server: { middlewareMode: true, hmr: false, fs: { strict: true, allow: [repoDir] } },
-      optimizeDeps: { entries: ['index.html', 'cms/admin/index.html'] },
+      optimizeDeps: { entries: ['index.html', 'cms/admin/index.html', 'cms/admin/editor.html'] },
     });
   }
 
@@ -129,6 +131,11 @@ export async function startCmsServer({
         response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
         return response.end(await viteServer.transformIndexHtml(ADMIN_PATH, html));
       }
+      if (url.pathname === EDITOR_PATH || url.pathname === '/admin/photography/editor') {
+        const html = await readFile(path.join(repoDir, 'cms', 'admin', 'editor.html'), 'utf8');
+        response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
+        return response.end(await viteServer.transformIndexHtml(EDITOR_PATH, html));
+      }
       if (url.pathname === '/photography/' || url.pathname === '/photography') {
         const { errors } = await loadPreview(workspaceDir);
         if (errors.length) {
@@ -156,6 +163,7 @@ export async function startCmsServer({
     url: `${origin}${ADMIN_PATH}`,
     signInUrl: `${origin}${ADMIN_PATH}?token=${sessions.token}`,
     workspaceDir,
+    libraryDir: libraryDir ? path.resolve(libraryDir) : null,
     github: { available: Boolean(github) && !offline, source: githubSource },
     async close() {
       await new Promise((resolve) => server.close(resolve));
@@ -169,8 +177,8 @@ function readFlags(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--offline') flags.offline = true;
-    else if (['--port', '--workspace', '--base', '--remote'].includes(arg)) flags[arg.slice(2)] = argv[++i];
-    else throw new Error(`Unknown option ${arg}. Options: --port, --workspace, --base, --remote, --offline.`);
+    else if (['--port', '--workspace', '--base', '--remote', '--library-dir'].includes(arg)) flags[arg.slice(2)] = argv[++i];
+    else throw new Error(`Unknown option ${arg}. Options: --port, --workspace, --library-dir, --base, --remote, --offline.`);
   }
   return flags;
 }
@@ -181,6 +189,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const cms = await startCmsServer({
       port: flags.port ? Number(flags.port) : 4317,
       workspace: flags.workspace ?? process.env.PHOTOGRAPHY_CMS_WORKSPACE,
+      libraryDir: flags['library-dir'] ?? process.env.PHOTOGRAPHY_LIBRARY_DIR ?? null,
       baseBranch: flags.base ?? 'main',
       remote: flags.remote ?? 'origin',
       offline: Boolean(flags.offline),
@@ -189,6 +198,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       '',
       'Photography CMS (local only, 127.0.0.1)',
       `  Workspace: ${cms.workspaceDir}`,
+      `  Library:   ${cms.libraryDir ?? 'not set (--library-dir: camera-library originals for QuangEdit)'}`,
       `  GitHub:    ${cms.github.available ? `pull requests via ${cms.github.source}` : 'unavailable (dry runs only)'}`,
       '',
       `  Sign in:   ${cms.signInUrl}`,

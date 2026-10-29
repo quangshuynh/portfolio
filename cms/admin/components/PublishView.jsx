@@ -8,6 +8,7 @@ function ChangeList({ summary, catalog }) {
     ['Withdrawn', summary.withdrawn],
     ['Edited', summary.edited.map(({ id, fields }) => `${id}: ${fields.join(', ')}`)],
     ['Reordered', summary.moved],
+    ['New images from QuangEdit', (summary.images ?? []).map((id) => `${caption(id)} (${id})`)],
     ['Featured', summary.featured ? [`${summary.featured.before.join(', ') || 'none'} → ${summary.featured.after.join(', ') || 'none'}`] : []],
     ['Hero', summary.hero ? [`${summary.hero.before} → ${summary.hero.after}`] : []],
     ['Collections', summary.collections ? [`${summary.collections.before.join(', ')} → ${summary.collections.after.join(', ')}`] : []],

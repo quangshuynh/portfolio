@@ -5,13 +5,15 @@
 //  3. In a temporary git worktree (the owner's checkout is never touched): write the public
 //     catalog, generate derivatives for newly published photographs from the private
 //     originals, remove derivatives and manifest entries of withdrawn ones.
+//     Approved QuangEdit renders replace the derivatives of their photographs (same file
+//     names, so URLs and deep links are unchanged); drafts' treatments are never considered.
 //  4. Check assets, check that nothing private is in the diff, commit.
 //  5. Push the branch and open the pull request. Never merges.
 //
 // Each step records progress in publication.json, so a failure after the commit (push or
 // pull request creation) is retried without redoing earlier work.
 import { randomBytes } from 'node:crypto';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { assetReport, catalogErrors, serializeCatalog } from '../../scripts/photography-catalog.mjs';
@@ -20,6 +22,7 @@ import { publicationCatalog, workspaceProblems } from './catalog-ops.mjs';
 import { pullRequestBody, summarizeChanges } from './changes.mjs';
 import { prepareDerivatives } from './derivatives.mjs';
 import { mergeCatalogs } from './merge.mjs';
+import { approvedImageChanges } from './treatment-publish.mjs';
 import { paths, readWorkspace, saveCatalog, setBase, withPublishLock, writePublication } from './workspace.mjs';
 
 export const CATALOG_PATH = 'src/data/photography.catalog.json';
@@ -72,7 +75,7 @@ export function reconcile(workspace, tip) {
   return { catalog, merged: true };
 }
 
-async function writeTree(worktree, { publication, tipCatalog, workspaceDir }) {
+async function writeTree(worktree, { publication, tipCatalog, workspaceDir, images }) {
   const p = paths(workspaceDir);
   const catalogFile = path.join(worktree, CATALOG_PATH);
   const manifestFile = path.join(worktree, MANIFEST_PATH);
@@ -102,9 +105,17 @@ async function writeTree(worktree, { publication, tipCatalog, workspaceDir }) {
     await prepareDerivatives({ catalogFile, sourceDir: p.originals, outputDir: derivativesDir, manifest: manifestFile, only: added });
   }
 
-  // Same order as the catalog, so the manifest is deterministic.
+  // Approved renders: their staged derivatives replace the photograph's images. The manifest
+  // keeps the original's public metadata (capture date, camera); only sizes change.
   const finalManifest = JSON.parse(await readFile(manifestFile, 'utf8'));
   const byId = new Map(finalManifest.map((entry) => [entry.id, entry]));
+  for (const { id, render, files } of images) {
+    const entry = byId.get(id);
+    if (!entry) throw new PublishError('assets', `No image record for "${id}".`);
+    await copyFile(files.gallery, path.join(derivativesDir, entry.galleryFilename));
+    await copyFile(files.viewer, path.join(derivativesDir, entry.viewerFilename));
+    byId.set(id, { ...entry, galleryWidth: render.gallery.width, galleryHeight: render.gallery.height, viewerWidth: render.viewer.width, viewerHeight: render.viewer.height });
+  }
   const ordered = publication.photographs.map(({ id }) => byId.get(id)).filter(Boolean);
   await writeFile(manifestFile, `${JSON.stringify(ordered, null, 2)}\n`, 'utf8');
   const { errors } = assetReport(publication, ordered, await readdir(derivativesDir));
@@ -160,7 +171,10 @@ export async function preparePublication({
     const problems = workspaceProblems(target, { base: tip.catalog });
     if (problems.publication.length) throw new PublishError('invalid', 'Fix these problems before publishing.', { errors: problems.publication });
     const publication = publicationCatalog(target);
-    const summary = summarizeChanges(tip.catalog, target);
+    const images = await approvedImageChanges({ git, commit: tip.commit, workspaceDir, ids: publication.photographs.map(({ id }) => id) })
+      .catch((error) => { throw new PublishError(error.code ?? 'assets', error.message); });
+    const summary = { ...summarizeChanges(tip.catalog, target), images: images.map(({ id }) => id) };
+    summary.count += images.length;
     if (!summary.count) throw new PublishError('nothing', `Nothing to publish: the public gallery on ${tip.ref} already matches the workspace.`);
     if (catalogErrors(publication).length) throw new PublishError('invalid', 'The merged catalog is invalid.', { errors: catalogErrors(publication) });
 
@@ -172,7 +186,7 @@ export async function preparePublication({
     let failed = true;
     try {
       await git(['worktree', 'add', '--quiet', '-b', branch, worktree, tip.commit]);
-      const { added, withdrawn } = await writeTree(worktree, { publication, tipCatalog: tip.catalog, workspaceDir });
+      const { added, withdrawn } = await writeTree(worktree, { publication, tipCatalog: tip.catalog, workspaceDir, images });
       files = await checkDiff(git, worktree, { workspace: { ...workspace, catalog: target }, publication });
       await git(['add', '--all', '--', ...PUBLISHED_PATHS], { cwd: worktree });
       const message = [
@@ -182,6 +196,7 @@ export async function preparePublication({
         `Withdrawn: ${withdrawn.join(', ') || 'none'}`,
         `Edited: ${summary.edited.map(({ id }) => id).join(', ') || 'none'}`,
         `Reordered: ${summary.moved.join(', ') || 'none'}`,
+        `New images (QuangEdit): ${summary.images.join(', ') || 'none'}`,
       ].join('\n');
       await git(['commit', '--quiet', '-m', message], { cwd: worktree });
       commit = await git(['rev-parse', 'HEAD'], { cwd: worktree });
@@ -208,7 +223,7 @@ export async function preparePublication({
       baseRef: tip.ref,
       baseCommit: tip.commit,
       title: `Photography: ${[summary.added.length && `add ${summary.added.length}`, summary.withdrawn.length && `withdraw ${summary.withdrawn.length}`,
-        summary.edited.length && `edit ${summary.edited.length}`, summary.moved.length && 'reorder'].filter(Boolean).join(', ') || 'update featured and collections'}`,
+        summary.edited.length && `edit ${summary.edited.length}`, summary.images.length && `new images for ${summary.images.length}`, summary.moved.length && 'reorder'].filter(Boolean).join(', ') || 'update featured and collections'}`,
       body,
       files,
       summary,

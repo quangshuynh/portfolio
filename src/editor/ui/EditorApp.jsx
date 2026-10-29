@@ -181,7 +181,13 @@ function outputSize(resource, target, settings) {
 // Actions the inspector panels send that edit the selected image or adjustment layer instead of the photo.
 const LAYER_TARGETED = new Set(['previewAdjustment', 'setAdjustment', 'resetAdjustment', 'previewSettings', 'applySettings', 'applyPreset', 'resetGroup', 'resetAll']);
 
-export default function EditorApp() {
+/**
+ * :param props.host: optional embedding host (the local photography CMS); the public route
+ *   passes none. { title, backHref, backLabel, privacyNote, load(): Promise<{ files, document }>,
+ *   Panel: component given { photo, documentFor, render, openHdrMerge, setNotice } }.
+ *   With a host, the photo comes from host.load() and nothing is autosaved to this browser.
+ */
+export default function EditorApp({ host = null }) {
   const [capabilities] = useState(() => browserCapabilities());
   const unsupported = capabilities.missing.length > 0;
   // Tells the HTML-shell startup watchdog (public/photography/editor-startup.js) that a
@@ -192,10 +198,13 @@ export default function EditorApp() {
     return () => { delete document.documentElement.dataset.editor; };
   }, [capabilities, unsupported]);
   if (unsupported) return <Unsupported missing={capabilities.missing} />;
-  return <EditorWorkspace />;
+  return <EditorWorkspace host={host} />;
 }
 
-function EditorWorkspace() {
+// Render settings for a host: full resolution, never resized, high-quality JPEG.
+export const HOST_RENDER_SETTINGS = Object.freeze({ format: 'jpeg', quality: 0.95, resize: Object.freeze({ mode: 'original' }), suffix: '-quangedit' });
+
+function EditorWorkspace({ host }) {
   const [state, dispatch] = useReducer(editorReducer, undefined, initialEditorState);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -310,15 +319,17 @@ function EditorWorkspace() {
 
   // Saved edits from an earlier visit wait for their originals to be reimported.
   useEffect(() => {
+    if (host) return;
     const saved = readAutosave();
     if (saved?.photos.length) {
       dispatch({ type: 'loadDocument', document: saved });
       setRestoredCount(saved.photos.length);
     }
-  }, []);
+  }, [host]);
 
-  // Autosave adjustment values (never pixels) so a reload keeps them.
+  // Autosave adjustment values (never pixels) so a reload keeps them. A host saves its own.
   useEffect(() => {
+    if (host) return undefined;
     const timer = setTimeout(() => {
       const photos = state.photos.filter(({ status }) => status === 'ready').map((item) => ({ ...item, adjustments: item.history.present }));
       const waiting = state.pendingEdits.map(({ source, adjustments: values }) => ({ ...source, adjustments: values }));
@@ -328,7 +339,7 @@ function EditorWorkspace() {
       } catch { /* storage unavailable: editing still works without restore */ }
     }, 400);
     return () => clearTimeout(timer);
-  }, [state.photos, state.pendingEdits, state.exportSettings]);
+  }, [host, state.photos, state.pendingEdits, state.exportSettings]);
 
   const importFiles = useCallback(async (fileList) => {
     const files = Array.from(fileList ?? []);
@@ -1053,6 +1064,42 @@ function EditorWorkspace() {
 
   const cancelExport = useCallback(() => exportJob.current?.cancel(), []);
 
+  // Host (CMS) integration: load the host's photo and saved edits once; the edits wait as
+  // pending edits and apply when the same file (by SHA-256) finishes importing.
+  const hostLoaded = useRef(false);
+  const [hostStatus, setHostStatus] = useState(host ? { state: 'loading' } : null);
+  useEffect(() => {
+    if (!host || hostLoaded.current) return;
+    hostLoaded.current = true;
+    (async () => {
+      try {
+        const { files, document } = await host.load();
+        if (document) dispatch({ type: 'loadDocument', document: parseEditDocument(document) });
+        await importFiles(files);
+        setHostStatus({ state: 'ready' });
+      } catch (error) {
+        setHostStatus({ state: 'error', message: error.message });
+      }
+    })();
+  }, [host, importFiles]);
+  // The edit document of one photo, as the host stores it.
+  const documentFor = useCallback((target) => serializeEditDocument(createEditDocument([{ ...target, adjustments: target.history.present }], stateRef.current.exportSettings)), []);
+  // Full-resolution render for the host, through the same export path as downloads.
+  const renderForHost = useCallback(async (target, { onProgress } = {}) => {
+    if (exportJob.current || batchRef.current) throw new Error('Another export is running.');
+    const running = { id: target.id, cancel: () => {} };
+    exportJob.current = running;
+    try {
+      const result = await exportPhoto(target, HOST_RENDER_SETTINGS, {
+        onProgress: (progress) => onProgress?.(progress),
+        onCancel: (cancel) => { running.cancel = cancel; },
+      });
+      return { ...result, fileName: exportFileName(target.name, HOST_RENDER_SETTINGS.format, HOST_RENDER_SETTINGS.suffix) };
+    } finally {
+      exportJob.current = null;
+    }
+  }, [exportPhoto]);
+
   // Batch edits. Copy and paste carry parameters only; paste replaces the default groups.
   const copyEdits = useCallback(() => {
     const target = activePhoto(stateRef.current);
@@ -1423,12 +1470,12 @@ function EditorWorkspace() {
     <div className="pe" data-engine={engine?.kind} data-mobile-panel={mobilePanel} data-dragging={dragDepth > 0 || undefined} {...dragHandlers}>
       <a className="skip-link" href="#pe-workspace">Skip to workspace</a>
       <header className="pe-bar">
-        <a className="pe-back" href={appHref('/photography/')}>
+        <a className="pe-back" href={host ? host.backHref : appHref('/photography/')}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          <span>Photography</span>
+          <span>{host ? host.backLabel : 'Photography'}</span>
         </a>
-        <h1 className="pe-title">Photo editor</h1>
-        <p className="pe-privacy"><span className="pe-privacy__dot" aria-hidden="true" />Processed on this device. Nothing is uploaded.</p>
+        <h1 className="pe-title">{host ? host.title : 'Photo editor'}</h1>
+        <p className="pe-privacy"><span className="pe-privacy__dot" aria-hidden="true" />{host ? host.privacyNote : 'Processed on this device. Nothing is uploaded.'}</p>
         <div className="pe-bar__actions">
           <button type="button" className="pe-icon-button" onClick={() => dispatch({ type: 'undo' })} disabled={!history || !canUndo(history)} aria-label="Undo" title="Undo (Ctrl+Z)" aria-keyshortcuts="Control+Z Meta+Z">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3.5L2.5 6.5l3 3M3 6.5h6.5a4 4 0 0 1 0 8H7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -1446,8 +1493,19 @@ function EditorWorkspace() {
         </div>
       </header>
 
-      {(notice || state.pendingEdits.length > 0) && (
+      {(host || notice || state.pendingEdits.length > 0) && (
         <div className="pe-notices">
+          {host && (
+            <host.Panel
+              status={hostStatus}
+              photo={ready ? photo : null}
+              documentFor={documentFor}
+              render={renderForHost}
+              cancelRender={cancelExport}
+              openHdrMerge={() => setHdrOpen(true)}
+              setNotice={setNotice}
+            />
+          )}
           {notice && (
             <p className={`pe-notice pe-notice--${notice.tone}`} role={notice.tone === 'error' ? 'alert' : 'status'}>
               <span>{notice.text}</span>

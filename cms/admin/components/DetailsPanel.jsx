@@ -3,6 +3,7 @@ import {
   movePhotographBy, publishedIds, setFeatured, setHero, setStatus, updatePhotograph,
 } from '../../lib/catalog-ops.mjs';
 import { imageUrl } from '../api.js';
+import TreatmentReview from './TreatmentReview.jsx';
 
 const METADATA_FIELDS = [
   ['camera', 'Camera', 'text'],
@@ -77,7 +78,7 @@ function MetadataEditor({ record, extracted, run }) {
   );
 }
 
-export default function DetailsPanel({ record, catalog, base, generated, problems, run, onClose }) {
+export default function DetailsPanel({ record, catalog, base, generated, problems, run, onClose, beforeLeave, onNotice, onTreatmentChanged }) {
   if (!record) return null;
   const wasPublished = publishedIds(base).has(record.id);
   const index = catalog.photographs.findIndex(({ id }) => id === record.id);
@@ -118,6 +119,8 @@ export default function DetailsPanel({ record, catalog, base, generated, problem
           <button type="button" className="cms-button" disabled={index === catalog.photographs.length - 1} onClick={() => run((c) => movePhotographBy(c, record.id, 1))}>Later ↓</button>
         </span>
       </div>
+
+      <TreatmentReview record={record} beforeLeave={beforeLeave} onNotice={onNotice} onChanged={onTreatmentChanged} />
 
       <Field label="Caption" value={record.caption} invalid={!record.caption} onCommit={(caption) => patch({ caption: caption.trim() })}
         hint="One or two factual words, as on the live gallery." />

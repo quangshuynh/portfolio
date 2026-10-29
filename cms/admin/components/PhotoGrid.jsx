@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { imageUrl } from '../api.js';
 
-function Badges({ record, isHero, needsWork }) {
+const TREATMENT_BADGES = { draft: 'Edit: draft', approved: 'Edit: approved', rejected: 'Edit: rejected' };
+
+function Badges({ record, isHero, needsWork, treatment }) {
   return (
     <span className="cms-badges">
       <span className={`cms-badge cms-badge--${record.status}`}>{record.status === 'published' ? 'Published' : 'Draft'}</span>
       {isHero && <span className="cms-badge cms-badge--hero">Hero</span>}
       {record.featured && <span className="cms-badge cms-badge--featured">Featured {record.featured}</span>}
       {needsWork && <span className="cms-badge cms-badge--warn">Needs details</span>}
+      {TREATMENT_BADGES[treatment?.status] && <span className="cms-badge cms-badge--edit">{TREATMENT_BADGES[treatment.status]}</span>}
     </span>
   );
 }
@@ -17,7 +20,7 @@ function Badges({ record, isHero, needsWork }) {
  * buttons do the same one step at a time, for keyboards and touch screens.
  */
 export default function PhotoGrid({
-  items, layout, catalog, selection, activeId, problems, reorderable, onToggle, onOpen, onMove,
+  items, layout, catalog, selection, activeId, problems, reorderable, onToggle, onOpen, onMove, treatments = {},
 }) {
   const [dragId, setDragId] = useState(null);
   const [overId, setOverId] = useState(null);
@@ -65,7 +68,7 @@ export default function PhotoGrid({
                 <span className="cms-photo-meta mono">
                   {publicNumber.has(record.id) ? `No. ${String(publicNumber.get(record.id)).padStart(2, '0')}` : 'Not numbered'} · {record.category} · {record.id}
                 </span>
-                <Badges record={record} isHero={catalog.hero === record.id} needsWork={Boolean(problems.drafts[record.id])} />
+                <Badges record={record} isHero={catalog.hero === record.id} needsWork={Boolean(problems.drafts[record.id])} treatment={treatments[record.id]} />
               </span>
             </button>
             <label className="cms-photo-select">

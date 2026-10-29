@@ -19,6 +19,7 @@ read it before changing projects or project assets.
 | `docs/project-assets.md` | Data model, caching rationale, screenshot guidelines. |
 | `src/data/photography.catalog.json` | Photography catalog: every photograph, published or draft, in curated order. Schema and workflows in `docs/photography-catalog.md`; logic in `scripts/photography-catalog.mjs`. |
 | `cms/` | Local photography CMS (`npm run cms`): server, API, publication, dashboard. Docs in `docs/photography-cms.md`. |
+| `cms/lib/treatments.mjs`, `editor-api.mjs`, `treatment-publish.mjs`, `cms/admin/editorHost.jsx` | QuangEdit in the CMS (Interval 15): private treatments (edit document v10), editing sources, staged renders, approval, approved images in publication; the editor's CMS host (`EditorApp` `host` prop, served only by the CMS). Docs in `docs/photography-cms.md` (Editing in QuangEdit). |
 | `docs/photography-platform/` | Interval 0 audit and architecture for the photography CMS and editor (planning only). |
 | `src/editor/raw/` | Editor RAW support (Interval 5): content sniffing, LibRaw wrapper, colour math, worker tasks, queue. Behaviour, limits and measurements in `docs/photography-editor.md` (RAW); notices in `public/photography/third-party-notices.txt`. |
 | `src/editor/hdr/` | Merge HDR (Interval 6): bracket validation, registration, radiance merge, exposure fusion, ghost masks, staged export. Behaviour, limits and measurements in `docs/photography-editor.md` (Merge HDR). Genuine-file tests need `HDR_FIXTURE_DIR`. |

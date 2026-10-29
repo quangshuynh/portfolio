@@ -149,6 +149,14 @@ describe('production build at the site root', () => {
     expect(entryCode).not.toMatch(/imageWorker|createEditorContext|uExposureGain/);
   });
 
+  test('ships no CMS code: no admin pages, no editor host, no CMS API routes', () => {
+    const files = readdirSync(outDir, { recursive: true }).map(String);
+    expect(files.some((file) => /admin|editorHost|editorMain/i.test(file))).toBe(false);
+    files.filter((file) => /\.(html|js)$/.test(file)).forEach((file) => {
+      expect(readFileSync(join(outDir, file), 'utf8')).not.toMatch(/\/api\/editor\/|\/api\/workspace|X-CMS-Request|quangedit-cms-treatment/);
+    });
+  });
+
   test('copies robots.txt with the sitemap directive', () => {
     expect(readFileSync(join(outDir, 'robots.txt'), 'utf8')).toContain('Sitemap: https://quanghuynh.com/sitemap.xml');
   });
