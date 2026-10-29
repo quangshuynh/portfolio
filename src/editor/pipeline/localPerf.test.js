@@ -93,11 +93,15 @@ test('the brush cache gives the same codes as a full evaluation, point by point,
 test('a cached raster reports the box that changed, so redrawing only that box rebuilds the new codes', () => {
   const stroke = (count) => ({ mode: 'add', radius: 0.05, hardness: 0.5, opacity: 1, points: Array.from({ length: count }, (_, i) => [0.1 + (0.8 * i) / 30, 0.4 + 0.2 * Math.sin(i / 4), 1]) });
   const def = (count) => mask(linear, { ...component({ id: 'b' }), type: 'brush', strokes: [stroke(count)] });
+  // A small canvas of its own: the test is about boxes, not band sizes.
+  const size = { width: 96, height: 80 };
+  const small = maskMap([1, 0, 0, 0, 1, 0, 0, 0, 1], size.width, size.height);
+  const mismatches = (a, b) => { let n = 0; for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) n += 1; return n; };
   const cache = new Map();
   let shown = null;
   let previous = null;
   for (let count = 1; count <= 30; count += 1) {
-    const raster = rasterizeMask(def(count), map, { width: W, height: H }, cache);
+    const raster = rasterizeMask(def(count), small, size, cache);
     const { change } = raster;
     if (!previous) {
       expect(change.from).toBeNull();
@@ -107,17 +111,17 @@ test('a cached raster reports the box that changed, so redrawing only that box r
       // Only the dirty box is copied over what was shown before.
       if (change.dirty) {
         for (let y = change.dirty.y0; y < change.dirty.y1; y += 1) {
-          for (let x = change.dirty.x0; x < change.dirty.x1; x += 1) shown[y * W + x] = raster.data[y * W + x];
+          for (let x = change.dirty.x0; x < change.dirty.x1; x += 1) shown[y * size.width + x] = raster.data[y * size.width + x];
         }
-        expect(change.dirty.x1 - change.dirty.x0).toBeLessThan(W);
+        expect(change.dirty.x1 - change.dirty.x0).toBeLessThan(size.width);
       }
     }
-    expect(shown).toEqual(raster.data);
+    expect(mismatches(shown, raster.data)).toBe(0);
     previous = raster;
   }
   // The same raster again: nothing changed. A different shape: everything.
-  expect(rasterizeMask(def(30), map, { width: W, height: H }, cache).change).toMatchObject({ dirty: null, from: previous.change.version });
-  const moved = rasterizeMask(mask({ ...linear, y1: 0.6 }, { ...component({ id: 'b' }), type: 'brush', strokes: [stroke(30)] }), map, { width: W, height: H }, cache);
-  expect(moved.change).toMatchObject({ from: null, dirty: { x0: 0, y0: 0, x1: W, y1: H } });
-  expect(rasterizeMask(def(5), map, { width: W, height: H }).change).toBeUndefined();
+  expect(rasterizeMask(def(30), small, size, cache).change).toMatchObject({ dirty: null, from: previous.change.version });
+  const moved = rasterizeMask(mask({ ...linear, y1: 0.6 }, { ...component({ id: 'b' }), type: 'brush', strokes: [stroke(30)] }), small, size, cache);
+  expect(moved.change).toMatchObject({ from: null, dirty: { x0: 0, y0: 0, x1: size.width, y1: size.height } });
+  expect(rasterizeMask(def(5), small, size).change).toBeUndefined();
 });
