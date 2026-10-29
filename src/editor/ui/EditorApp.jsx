@@ -6,7 +6,8 @@ import { adjustmentsEqual, isNeutral, neutralAdjustments, normalizeAdjustments }
 import { ASPECT_PRESETS, GeometryError, constrainGeometry, geometryEqual, parseAspect, setAspect, swapAspect, turnGeometry } from '../pipeline/geometry.mjs';
 import { TURN_LEFT, TURN_RIGHT, aspectBase, aspectChoices } from './GeometryPanel';
 import { DEFAULT_SYNC_GROUPS, planSync, sourceKind } from '../model/sync.mjs';
-import { PRESETS_STORAGE_KEY, applyPreset, parsePresetFile, serializePresets } from '../model/presets.mjs';
+import { PRESETS_STORAGE_KEY, applyPreset, parsePresetFile, serializePresets, uniquePresetName } from '../model/presets.mjs';
+import { MAX_RECIPES, RECIPES_STORAGE_KEY, parseRecipeLibrary, serializeRecipeLibrary } from '../model/recipes.mjs';
 import { LIMITS, exportDimensions, exportFileName, exportGeometry, formatBytes, previewEdgeLimit, proxyDimensions } from '../io/files.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { createImageWorker, usingMainThread } from '../io/workerClient.mjs';
@@ -43,6 +44,7 @@ import BatchPanel from './BatchPanel';
 import ExportPanel from './ExportPanel';
 import HdrMergeDialog from './HdrMergeDialog';
 import PhotoThumb from './PhotoThumb';
+import RecipeDialog from './RecipeDialog';
 import Viewer from './Viewer';
 import './editor.css';
 
@@ -83,6 +85,16 @@ function readPresets() {
   try {
     const text = localStorage.getItem(PRESETS_STORAGE_KEY);
     return text ? parsePresetFile(text).map((preset) => ({ ...preset, id: newId() })) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Saved QuangEdit Recipes: this browser only, validated again on every read.
+function readRecipes() {
+  try {
+    const text = localStorage.getItem(RECIPES_STORAGE_KEY);
+    return text ? parseRecipeLibrary(text).map((recipe) => ({ ...recipe, id: newId() })) : [];
   } catch {
     return [];
   }
@@ -255,6 +267,9 @@ function EditorWorkspace() {
   const [lutStatus, setLutStatus] = useState({ busy: false, error: null });
   const [userPresets, setUserPresets] = useState(readPresets);
   const [presetPreview, setPresetPreview] = useState(null);
+  const [recipes, setRecipes] = useState(readRecipes);
+  // The open recipe dialog: { mode: 'copy' | 'apply' | 'instructions', recipe? }.
+  const [recipeDialog, setRecipeDialog] = useState(null);
   const imageKeys = useRef(new WeakMap());
   const renderState = useRef({ client: null, key: null, luts: new Set() });
 
@@ -1136,11 +1151,15 @@ function EditorWorkspace() {
 
   // Parses a .cube off the main thread, adds it to this session's library and applies it
   // to the active photo. Photos waiting for this exact file (same hash) resolve too.
+  const loadLut = useCallback(async (file) => {
+    const lut = await worker('import').call('parseCube', { file });
+    setLuts((current) => new Map(current).set(lut.sha256, lut));
+    return lut;
+  }, [worker]);
   const importLut = useCallback(async (file) => {
     setLutStatus({ busy: true, error: null });
     try {
-      const lut = await worker('import').call('parseCube', { file });
-      setLuts((current) => new Map(current).set(lut.sha256, lut));
+      const lut = await loadLut(file);
       const target = activePhoto(stateRef.current);
       if (target?.status === 'ready') {
         // Applied to what the panels edit: the photo, or the selected image or adjustment layer.
@@ -1150,7 +1169,15 @@ function EditorWorkspace() {
     } catch (error) {
       setLutStatus({ busy: false, error: error.code === 'lut' ? error.message : `The LUT could not be read: ${error.message}` });
     }
-  }, [worker]);
+  }, [loadLut]);
+  // A recipe's LUT imported again: loaded only (the recipe dialog checks its hash before use).
+  const loadRecipeLut = useCallback(async (file) => {
+    try {
+      return await loadLut(file);
+    } catch (error) {
+      throw new Error(error.code === 'lut' ? error.message : 'The LUT could not be read.');
+    }
+  }, [loadLut]);
 
   const changePresets = useCallback((next) => {
     setUserPresets(next);
@@ -1160,6 +1187,31 @@ function EditorWorkspace() {
     } catch {
       setNotice({ tone: 'warning', text: 'This browser did not allow saving presets; they last until the page is closed. Export them to keep them.' });
     }
+  }, []);
+
+  const changeRecipes = useCallback((next) => {
+    setRecipes(next);
+    try {
+      if (next.length) localStorage.setItem(RECIPES_STORAGE_KEY, serializeRecipeLibrary(next.map(({ id, ...recipe }) => recipe)));
+      else localStorage.removeItem(RECIPES_STORAGE_KEY);
+    } catch {
+      setNotice({ tone: 'warning', text: 'This browser did not allow saving recipes; they last until the page is closed. Export them to keep them.' });
+    }
+  }, []);
+  const saveRecipe = useCallback((recipe) => {
+    if (recipes.length >= MAX_RECIPES) { setNotice({ tone: 'error', text: `You can keep up to ${MAX_RECIPES} recipes.` }); return; }
+    changeRecipes([...recipes, { ...recipe, id: newId(), name: uniquePresetName(recipe.name, recipes) }]);
+  }, [recipes, changeRecipes]);
+  // One photo: one undo step of its own. Several: a batch, undone per photo or as a whole.
+  const applyRecipePlan = useCallback((plan, recipe) => {
+    const changes = plan.items.filter(({ changed }) => changed.length).map(({ id, after }) => ({ id, after }));
+    if (plan.items.length === 1 && changes.length === 1 && changes[0].id === stateRef.current.activeId) {
+      dispatch({ type: 'applySettings', patch: changes[0].after });
+    } else {
+      dispatch({ type: 'applyBatch', label: `recipe ${recipe.name}`, changes });
+    }
+    setRecipeDialog(null);
+    setNotice({ tone: 'info', text: `Applied the recipe ${recipe.name} to ${changes.length} photo${changes.length === 1 ? '' : 's'}. Undo reverts it.` });
   }, []);
 
   const saveEdits = () => {
@@ -1216,7 +1268,7 @@ function EditorWorkspace() {
     return true;
   } : null;
   const dialogOpenRef = useRef(false);
-  dialogOpenRef.current = Boolean(batchDialog || exportDialogOpen);
+  dialogOpenRef.current = Boolean(batchDialog || exportDialogOpen || recipeDialog);
   // Keyboard shortcuts. Text fields keep their own undo and arrow keys.
   useEffect(() => {
     const onKey = (event) => {
@@ -1440,6 +1492,7 @@ function EditorWorkspace() {
             onCopy={copyEdits}
             onPaste={pasteEdits}
             onOpen={setBatchDialog}
+            onOpenRecipe={() => setRecipeDialog({ mode: 'apply' })}
             onExport={() => setExportDialogOpen(true)}
             batches={state.batches}
             dispatch={dispatch}
@@ -1634,6 +1687,7 @@ function EditorWorkspace() {
             dispatch={panelDispatch}
             lut={{ library: [...luts.values()], onImport: importLut, status: lutStatus }}
             presets={{ userPresets, onChange: changePresets, onPreview: targetLayer ? () => {} : setPresetPreview, onDownload: downloadBlob, newId }}
+            recipes={{ recipes, onChange: changeRecipes, onOpen: (mode, recipe = null) => setRecipeDialog({ mode, recipe }), onDownload: downloadBlob, newId }}
             raw={ready ? photo.raw ?? null : null}
             hdr={ready ? photo.hdr ?? null : null}
             geometry={ready ? { native: { width: photo.width, height: photo.height }, mode: transformMode, onMode: openTransform, onChange: changeGeometry, onCommit: commitGeometry, onStraightening: setStraightening } : null}
@@ -1710,6 +1764,22 @@ function EditorWorkspace() {
           lutFor={lutFor}
           onApply={applyPlan}
           onClose={() => setBatchDialog(null)}
+        />
+      )}
+      {recipeDialog && (recipeDialog.mode === 'instructions' || photo?.status === 'ready') && (
+        <RecipeDialog
+          mode={recipeDialog.mode}
+          recipe={recipeDialog.recipe}
+          adjustments={adjustments}
+          targets={selected}
+          luts={[...luts.values()]}
+          thumbnailOf={thumbnailOf}
+          lutFor={lutFor}
+          onLoadLut={loadRecipeLut}
+          onApply={applyRecipePlan}
+          onSave={saveRecipe}
+          onDownload={downloadBlob}
+          onClose={() => setRecipeDialog(null)}
         />
       )}
       {exportDialogOpen && (
