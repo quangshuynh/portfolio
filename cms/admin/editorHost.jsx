@@ -2,8 +2,31 @@
 // source and saved treatment from the private workspace, and saves and renders back to it.
 // Saving a treatment, approving it and publishing the photograph stay separate steps:
 // approval happens in the CMS review, publication through a pull request.
+//
+// Bulk watermarking (the CMS's Watermark view) runs this same editor once per photograph: the
+// queue in localStorage (so a closed tab can resume) lists the photos and the watermark settings
+// of each; for each, the page loads the photo and its treatment as usual, adds the watermark,
+// saves the treatment and renders it from the original (a draft, never approved here), then opens
+// the next photo. Photos with unapproved edits, or already staged with the same settings, are
+// left as they are (cms/lib/watermark-rules.mjs). Nothing is published.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ApiError, treatments } from './api.js';
+import { normalizeWatermark, watermarksEqual } from '../../src/editor/watermark/watermark.mjs';
+import { ApiError, treatments, watermark as watermarkApi } from './api.js';
+import { watermarkTreatmentState } from '../lib/watermark-rules.mjs';
+
+export const WATERMARK_QUEUE_KEY = 'cms-watermark-queue';
+/** The bulk watermark queue: { ids, settings: { id: settings }, index, results: [{ id, outcome, message }], stopped }, or null. */
+export function readWatermarkQueue() {
+  try {
+    const queue = JSON.parse(localStorage.getItem(WATERMARK_QUEUE_KEY) ?? 'null');
+    return queue && Array.isArray(queue.ids) && Number.isInteger(queue.index) ? queue : null;
+  } catch {
+    return null;
+  }
+}
+export const writeWatermarkQueue = (queue) => { try { localStorage.setItem(WATERMARK_QUEUE_KEY, JSON.stringify(queue)); } catch { /* the queue stops */ } };
+export const clearWatermarkQueue = () => { try { localStorage.removeItem(WATERMARK_QUEUE_KEY); } catch { /* nothing kept */ } };
+export const queueEditorHref = (id) => `/admin/photography/editor/?photo=${encodeURIComponent(id)}&queue=watermark`;
 
 const SOURCE_KINDS = {
   attached: 'attached editing source',
@@ -13,6 +36,8 @@ const SOURCE_KINDS = {
 };
 const STATUS_LABELS = { none: 'No treatment saved', draft: 'Draft treatment (not approved)', approved: 'Approved treatment', rejected: 'Rejected treatment' };
 
+const isHdrTreatment = (info) => Boolean(info?.treatment?.document?.photos[0]?.source.hdr);
+
 // What the treatment does, ignoring when it was saved.
 const comparable = (text) => {
   const { savedAt, ...rest } = JSON.parse(text);
@@ -21,6 +46,8 @@ const comparable = (text) => {
 
 export function createCmsHost(photoId) {
   const shared = { info: null, listeners: new Set() };
+  const queue = new URLSearchParams(window.location.search).get('queue') === 'watermark' ? readWatermarkQueue() : null;
+  const queued = queue && queue.ids[queue.index] === photoId ? queue : null;
   const publish = (info) => {
     shared.info = info;
     shared.listeners.forEach((listener) => listener(info));
@@ -41,13 +68,16 @@ export function createCmsHost(photoId) {
         files.push(new File([blob], source.name, { lastModified: 0 }));
       }
       const document = info.treatment.document ? JSON.stringify({ ...info.treatment.document, savedAt: info.treatment.updatedAt }) : null;
-      return { files, document };
+      const preference = await watermarkApi.preference().catch(() => null);
+      return { files, document, watermark: preference?.settings ?? null };
     },
-    Panel: (props) => <TreatmentPanel {...props} photoId={photoId} shared={shared} publish={publish} />,
+    // "Save as CMS global preference" in the Watermark section: used for photos watermarked from now on.
+    saveWatermarkDefault: async (settings) => (await watermarkApi.savePreference(settings)).settings,
+    Panel: (props) => <TreatmentPanel {...props} photoId={photoId} shared={shared} publish={publish} queue={queued} />,
   };
 }
 
-function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, render, cancelRender, openHdrMerge, setNotice }) {
+function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, render, cancelRender, openHdrMerge, setNotice, applySettings, queue }) {
   const [info, setInfo] = useState(shared.info);
   const [busy, setBusy] = useState(null);
   const [progress, setProgress] = useState(null);
@@ -93,10 +123,11 @@ function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, 
     }
   }, [photo, documentFor, photoId, shared, publish, setNotice, report]);
 
-  const renderForPortfolio = useCallback(async () => {
-    if (!photo) return;
-    const saved = dirty || !shared.info.treatment.document ? await save() : shared.info;
-    if (!saved) return;
+  // `forceSave`: bulk watermarking saves the treatment it is about to render in every case.
+  const renderForPortfolio = useCallback(async ({ forceSave = false } = {}) => {
+    if (!photo) return false;
+    const saved = forceSave === true || dirty || !shared.info.treatment.document ? await save() : shared.info;
+    if (!saved) return false;
     setError(null);
     setBusy('render');
     setProgress({ stage: 'rendering', fraction: 0 });
@@ -107,8 +138,10 @@ function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, 
       const next = await treatments.render(photoId, result.blob, { name: result.fileName, documentHash: latest.documentHash, revision: latest.revision });
       publish(next);
       setNotice({ tone: 'info', text: `Rendered ${result.width}×${result.height} from the original and staged the portfolio images. Review and approve it in the CMS.` });
+      return true;
     } catch (caught) {
       if (caught.code !== 'cancelled') report(caught);
+      return false;
     } finally {
       setBusy(null);
       setProgress(null);
@@ -131,14 +164,51 @@ function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, 
     }
   }, [shared, photoId, publish, setNotice, report]);
 
+  // Bulk watermarking: add the queued settings, then save and render once the photo has them.
+  const [queueStage, setQueueStage] = useState(queue ? 'waiting' : null);
+  const target = useMemo(() => (queue ? normalizeWatermark(queue.settings?.[photoId] ?? null) : null), [queue, photoId]);
+  const leaving = useRef(false);
+  const finishQueued = useCallback((outcome, message = '') => {
+    const latest = readWatermarkQueue() ?? queue;
+    const next = { ...latest, index: latest.index + 1, results: [...(latest.results ?? []).filter(({ id }) => id !== photoId), { id: photoId, outcome, message }] };
+    writeWatermarkQueue(next);
+    setQueueStage('done');
+    // The treatment is saved; leave without the unsaved-changes prompt.
+    leaving.current = true;
+    window.location.assign(next.index < next.ids.length && !next.stopped ? queueEditorHref(next.ids[next.index]) : '/admin/photography/#watermark');
+  }, [queue, photoId]);
   useEffect(() => {
-    const warn = (event) => { if (dirty || busy) { event.preventDefault(); event.returnValue = ''; } };
+    if (queueStage !== 'waiting') return;
+    if (status?.state === 'error') { finishQueued('failed', status.message); return; }
+    if (status?.state !== 'ready' || !photo || !info) return;
+    if (!target) { finishQueued('failed', 'No watermark settings were queued for this photograph.'); return; }
+    if (info.sources?.[0]?.limited) { finishQueued('skipped', 'Only the 2200 px public image is available; attach the original first.'); return; }
+    if (isHdrTreatment(info) && !photo.hdr) { finishQueued('skipped', 'HDR treatment: open it, Merge HDR, then add the watermark.'); return; }
+    const state = watermarkTreatmentState(info.treatment, target);
+    if (state.unapprovedEdits) { finishQueued('skipped', 'Its treatment has edits that are not approved; approve or discard them first.'); return; }
+    if (state.upToDate) { finishQueued('unchanged', 'Already staged with these watermark settings.'); return; }
+    applySettings({ watermark: target });
+    setQueueStage('applied');
+  }, [queueStage, status, photo, info, target, applySettings, finishQueued]);
+  useEffect(() => {
+    if (queueStage !== 'applied' || !photo || !watermarksEqual(photo.history.present.watermark ?? null, target)) return;
+    setQueueStage('rendering');
+    renderForPortfolio({ forceSave: true }).then((ok) => finishQueued(ok ? 'staged' : 'failed', ok ? '' : 'Saving or rendering failed; open the photograph to see why.'));
+  }, [queueStage, photo, target, renderForPortfolio, finishQueued]);
+  // Stops after this photograph; the rest stay queued and can be resumed from the Watermark view.
+  const stopQueue = useCallback(() => {
+    const latest = readWatermarkQueue();
+    if (latest) writeWatermarkQueue({ ...latest, stopped: true });
+  }, []);
+
+  useEffect(() => {
+    const warn = (event) => { if ((dirty || busy) && !leaving.current) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty, busy]);
 
   const source = info?.sources?.[0];
-  const isHdrTreatment = Boolean(treatment?.document?.photos[0]?.source.hdr);
+  const hdrTreatment = isHdrTreatment(info);
   const percent = progress?.fraction != null ? Math.round(progress.fraction * 100) : null;
   const statusLine = useMemo(() => {
     if (!treatment) return '';
@@ -160,6 +230,12 @@ function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, 
         )}
         {treatment && <span className="cms-host__status" role="status">{statusLine}{dirty ? ' · unsaved changes' : ''}</span>}
       </div>
+      {queue && queueStage && (
+        <p className="cms-host__note" role="status" data-watermark-queue={queueStage}>
+          Bulk watermarking: photograph {queue.index + 1} of {queue.ids.length}. {queueStage === 'rendering' ? 'Saving and rendering the draft…' : queueStage === 'done' ? 'Opening the next photograph…' : 'Loading…'}
+          {' '}<button type="button" className="pe-text-button" onClick={stopQueue}>Stop after this photograph</button> (the rest can be resumed)
+        </p>
+      )}
       <div className="cms-host__actions">
         <button type="button" className="pe-button pe-button--primary" onClick={save} disabled={!photo || Boolean(busy) || status?.state !== 'ready'}>
           {busy === 'save' ? 'Saving…' : 'Save treatment'}
@@ -179,7 +255,7 @@ function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, 
       {status?.state === 'error' && <p className="cms-host__note cms-host__note--error" role="alert">{status.message}</p>}
       {source?.limited && <p className="cms-host__note" role="note">{source.problem}</p>}
       {info?.staleSource && <p className="cms-host__note cms-host__note--error" role="alert">The saved treatment was made from a different file than this photograph's current source (moved, replaced or re-exported). It is kept; attach the original file it was made from to apply it.</p>}
-      {isHdrTreatment && !photo?.hdr && status?.state === 'ready' && (
+      {hdrTreatment && !photo?.hdr && status?.state === 'ready' && (
         <p className="cms-host__note" role="note">This treatment is a merged HDR. <button type="button" className="pe-text-button" onClick={openHdrMerge}>Merge HDR</button> with the three exposures; the saved merge settings and edits are restored.</p>
       )}
       {error && <p className="cms-host__note cms-host__note--error" role="alert">{error}</p>}

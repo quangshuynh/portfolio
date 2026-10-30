@@ -10,9 +10,10 @@ import { GitHubError } from './github.mjs';
 import { createEditorRoutes } from './editor-api.mjs';
 import { mergeCatalogs } from './merge.mjs';
 import { PublishError, preparePublication, publicationStatus, resolveBase } from './publish.mjs';
-import { approvedImageChanges } from './treatment-publish.mjs';
+import { DERIVATIVES_PATH, approvedImageChanges } from './treatment-publish.mjs';
 import { TreatmentError, listTreatments, treatmentSummary } from './treatments.mjs';
 import { MAX_UPLOAD_BYTES, UploadError, ingestUpload } from './uploads.mjs';
+import { WatermarkError, portfolioOverview, readWatermarkPreference, saveWatermarkPreference } from './watermark.mjs';
 import { WorkspaceError, paths, readWorkspace, saveCatalog, setBase, writePublication } from './workspace.mjs';
 
 const MAX_JSON_BYTES = 4 * 1024 * 1024;
@@ -169,6 +170,14 @@ export function createApi({ repoDir, workspaceDir, libraryDir = null, git, githu
       return state();
     },
 
+    // The global watermark preference and the portfolio overview for bulk staging (cms/lib/watermark.mjs).
+    'GET /api/watermark': () => readWatermarkPreference(workspaceDir),
+    'PUT /api/watermark': (request) => exclusive(async () => {
+      const { settings } = await readJsonBody(request);
+      return saveWatermarkPreference(workspaceDir, settings);
+    }),
+    'GET /api/watermark/portfolio': () => portfolioOverview({ workspaceDir, libraryDir, derivativesDir: path.join(repoDir, DERIVATIVES_PATH), manifestFile: path.join(repoDir, 'src', 'data', 'photographs.generated.json') }),
+
     'POST /api/publication/forget': () => exclusive(async () => {
       const { publication } = await readWorkspace(workspaceDir);
       if (publication && ['pr-open', 'committed', 'pushed'].includes(publication.status)) {
@@ -237,7 +246,7 @@ export function sendError(response, error) {
     return;
   }
   const known = error instanceof HttpError || error instanceof WorkspaceError || error instanceof PublishError
-    || error instanceof UploadError || error instanceof GitHubError || error instanceof GitError || error instanceof TreatmentError;
+    || error instanceof UploadError || error instanceof GitHubError || error instanceof GitError || error instanceof TreatmentError || error instanceof WatermarkError;
   // GitHub failures are reported as 502 so the browser never mistakes them for its own
   // session expiring (401).
   const fromGitHub = error instanceof GitHubError;

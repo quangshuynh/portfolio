@@ -9,7 +9,11 @@
 // approved render is listed for the next publication. Checks: no horizontal scroll at phone
 // width, no request leaves 127.0.0.1, no console errors. With CMS_EDITOR_FIXTURE_DIR (genuine
 // Sony .ARW files) Chromium also attaches a RAW and three exposures, develops and merges them,
-// and renders both at full size.
+// and renders both at full size. Watermark: a global preference is saved, the Watermark view
+// lists the published photographs with previews, one (given an attached original) is staged
+// through the bulk queue (QuangEdit renders it from the original), compared and explicitly
+// approved; the approved render differs from the original only inside the mark's box, and it
+// is listed for the next publication.
 // Usage: npm run check:cms:editor (CMS_EDITOR_RUNS=chromium,firefox to limit the runs)
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
@@ -19,6 +23,7 @@ import sharp from 'sharp';
 import { chromium, devices, firefox, webkit } from 'playwright';
 import { createEditDocument, serializeEditDocument } from '../src/editor/model/editDocument.mjs';
 import { neutralAdjustments } from '../src/editor/model/adjustments.mjs';
+import { WATERMARK_DEFAULTS, layoutWatermark, normalizeWatermark } from '../src/editor/watermark/watermark.mjs';
 import { startCmsServer } from '../cms/server.mjs';
 
 const work = mkdtempSync(path.join(tmpdir(), 'cms-editor-check-'));
@@ -214,6 +219,82 @@ try {
         await api(page, 'POST', `/api/editor/photos/${published}/discard`, { revision: approved.json.treatment.revision });
         return { published };
       });
+      await step('watermark: global preference, bulk staging of one photograph, explicit approval', async () => {
+        const preference = await api(page, 'PUT', '/api/watermark', { settings: { ...WATERMARK_DEFAULTS, position: 'bottom-left', color: 'auto' } });
+        assert.equal(preference.status, 200);
+        const published = (await api(page, 'GET', '/api/workspace')).json.catalog.photographs.filter(({ status }) => status === 'published');
+        const target = published[RUNS.indexOf(run) + 20];
+        // Give it an original, so it can be staged at full resolution.
+        const bytes = await syntheticJpeg(seed += 1);
+        const before = await api(page, 'GET', `/api/editor/photos/${target.id}`);
+        const attached = await page.evaluate(async ([photo, revision, data]) => {
+          const response = await fetch(`/api/editor/photos/${photo}/sources?filename=wm-original.jpg&revision=${revision}`, { method: 'POST', headers: { 'X-CMS-Request': '1' }, body: new Uint8Array(data) });
+          return response.status;
+        }, [target.id, before.json.treatment.revision, [...bytes]]);
+        assert.equal(attached, 200);
+        await page.goto(`${origin}/admin/photography/#watermark`);
+        await page.locator('#cms-watermark-portfolio').waitFor({ timeout: 60_000 });
+        // Every published photograph is listed; only those given an original are eligible (no library here).
+        await poll(() => page.locator('.cms-watermark-stats').textContent(), (text) => text.includes(`Published${published.length}`) && /Eligible[1-9]/.test(text), 'eligible count', 60_000);
+        await poll(() => page.locator('.cms-watermark-preview').count(), (n) => n >= 3, 'watermark previews', 60_000);
+        if (phone) await noSideScroll();
+        const chooseTarget = page.getByRole('checkbox', { name: `Stage ${target.caption || target.id}` });
+        await poll(async () => { if (!(await chooseTarget.isChecked())) await chooseTarget.click({ timeout: 5_000 }).catch(() => {}); return chooseTarget.isChecked(); }, Boolean, 'photo chosen for staging', 60_000);
+        await page.getByRole('button', { name: 'Stage 1 photograph…' }).click();
+        await page.getByRole('button', { name: 'Start staging' }).click();
+        await page.waitForURL(/queue=watermark/, { timeout: 30_000 });
+        await page.waitForURL(/#watermark$/, { timeout: 600_000 });
+        await page.locator('[data-watermark-run]', { hasText: '1 staged' }).waitFor({ timeout: 60_000 });
+        await page.locator('#cms-watermark-staged', { hasText: '(1)' }).waitFor();
+        // Lazy images above still load and shift the page on phones: click, then confirm the state.
+        const chooseStaged = page.locator('.cms-watermark-compare li').first().getByRole('checkbox');
+        await poll(async () => { if (!(await chooseStaged.isChecked())) await chooseStaged.click({ timeout: 5_000 }).catch(() => {}); return chooseStaged.isChecked(); }, Boolean, 'staged photo chosen', 60_000);
+        await page.getByRole('button', { name: 'Approve 1…' }).click();
+        const approve = page.locator('.cms-watermark-confirm button.cms-button--primary');
+        assert.equal(await approve.isDisabled(), true, 'approval needs the review checkbox');
+        await page.getByRole('checkbox', { name: 'I compared each before and after.' }).check();
+        await approve.click();
+        const approved = await poll(async () => (await api(page, 'GET', `/api/editor/photos/${target.id}`)).json, (json) => json.treatment.status === 'approved', 'approval');
+        const mark = approved.treatment.approved.document.photos[0].adjustments.watermark;
+        assert.deepEqual(mark, { ...WATERMARK_DEFAULTS, position: 'bottom-left', color: 'auto' });
+        // The approved full render against the original: the mark's box changed, the rest is re-encoding only.
+        const full = await page.evaluate(async (photo) => [...new Uint8Array(await (await fetch(`/api/editor/photos/${photo}/images/approved-full`)).arrayBuffer())], target.id);
+        const render = await sharp(Buffer.from(full)).raw().toBuffer({ resolveWithObject: true });
+        const original = await sharp(bytes).raw().toBuffer();
+        const { width, height } = render.info;
+        const layout = layoutWatermark(normalizeWatermark(mark), width, height);
+        const diff = { inside: [0, 0], outside: [0, 0] };
+        for (let y = 0; y < height; y += 2) {
+          for (let x = 0; x < width; x += 2) {
+            const i = (y * width + x) * 3;
+            const d = Math.abs(render.data[i] - original[i]) + Math.abs(render.data[i + 1] - original[i + 1]) + Math.abs(render.data[i + 2] - original[i + 2]);
+            const where = x >= layout.x && x < layout.x + layout.width && y >= layout.y && y < layout.y + layout.height ? 'inside' : 'outside';
+            diff[where][0] += d;
+            diff[where][1] += 1;
+          }
+        }
+        const inside = diff.inside[0] / diff.inside[1];
+        const outsideMean = diff.outside[0] / diff.outside[1];
+        assert.ok(inside > 8 * outsideMean && outsideMean < 3, `mark not where expected (inside ${inside.toFixed(2)}, outside ${outsideMean.toFixed(2)})`);
+        const workspace = (await api(page, 'GET', '/api/workspace')).json;
+        assert.ok(workspace.images.includes(target.id), 'listed for the next publication');
+        // Resume a stopped run: the photo already has these settings and a fresh render, so nothing changes.
+        await page.evaluate(([photo, settings]) => localStorage.setItem('cms-watermark-queue', JSON.stringify({ ids: [photo], settings: { [photo]: settings }, index: 0, results: [], stopped: true })), [target.id, mark]);
+        await page.goto(`${origin}/admin/photography/#watermark`);
+        await page.reload();
+        await page.getByRole('button', { name: 'Resume (1)' }).click();
+        await page.waitForURL(/#watermark$/, { timeout: 300_000 });
+        await page.locator('[data-watermark-run]', { hasText: '1 unchanged' }).waitFor({ timeout: 60_000 });
+        assert.equal((await api(page, 'GET', `/api/editor/photos/${target.id}`)).json.treatment.revision, approved.treatment.revision, 'a re-run left the treatment untouched');
+        // Rollback: removing an approved treatment (the upload's, which has its original) keeps the global watermark policy.
+        const uploaded = (await api(page, 'GET', `/api/editor/photos/${id}`)).json;
+        const removed = await api(page, 'POST', `/api/editor/photos/${id}/remove-approved`, { revision: uploaded.treatment.revision });
+        assert.equal(removed.status, 200, JSON.stringify(removed.json));
+        assert.equal((await api(page, 'GET', '/api/watermark')).json.settings.position, 'bottom-left');
+        await api(page, 'POST', `/api/editor/photos/${target.id}/discard`, { revision: approved.treatment.revision });
+        return { photo: target.id, size: `${width}×${height}`, inside: Math.round(inside * 10) / 10, outside: Math.round(outsideMean * 100) / 100 };
+      });
+
       if (run.genuine && RAW_FILES.length >= 3) {
         await step('genuine ARW: attach, develop from sensor data, render full size', async () => {
           const bytes = await syntheticJpeg(seed += 1, 1200, 800);
@@ -262,7 +343,7 @@ try {
       }
       assert.deepEqual(outside, [], `requests outside 127.0.0.1: ${outside.slice(0, 3).join(', ')}`);
       const relevant = errors.filter((text) => !/favicon|Failed to load resource: the server responded with a status of 404/.test(text));
-      assert.deepEqual(relevant, [], 'console errors');
+      assert.deepEqual(relevant, [], `console errors: ${relevant.slice(0, 3).join(' | ')}`);
     } catch (error) {
       failed = true;
       result.error = error.message.split('\n')[0];

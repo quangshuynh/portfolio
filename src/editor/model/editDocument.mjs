@@ -23,8 +23,10 @@ export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // newer files instead of silently dropping settings. Image layers name their source file
 // (SHA-256, name, size, format, dimensions), never its pixels. Version 10 added masks
 // (model/masks.mjs): `local` adjustments and a layer's optional `mask`, as geometry and stroke
-// paths, never bitmaps; version 9 files read with no masks.
-export const DOCUMENT_VERSION = 10;
+// paths, never bitmaps; version 9 files read with no masks. Version 11 added the watermark
+// (`watermark`, watermark/watermark.mjs: settings of the fixed HUYNH Photography mark, never text
+// or images); older files read without one.
+export const DOCUMENT_VERSION = 11;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).
@@ -35,6 +37,8 @@ export const DEFAULT_EXPORT_SETTINGS = Object.freeze({
   quality: 0.92,
   resize: Object.freeze({ mode: 'original', longEdge: 3840, maxWidth: 3840, maxHeight: 3840 }),
   suffix: DEFAULT_EXPORT_SUFFIX,
+  // Off leaves every photo's watermark out of this export without changing its settings.
+  includeWatermark: true,
 });
 
 /** Source formats a document may describe: the export formats, RAW, and merged HDR. */
@@ -59,6 +63,7 @@ export function normalizeExportSettings(input = {}) {
       maxHeight: positiveInteger(resize.maxHeight) ?? DEFAULT_EXPORT_SETTINGS.resize.maxHeight,
     },
     suffix: typeof source.suffix === 'string' && source.suffix !== LEGACY_DEFAULT_SUFFIX ? safeSuffix(source.suffix) : DEFAULT_EXPORT_SETTINGS.suffix,
+    includeWatermark: source.includeWatermark !== false,
   };
 }
 
@@ -119,7 +124,7 @@ function parseSource(source, index) {
 export function parseAdjustments(input) {
   const values = isObject(input) ? input : {};
   const numeric = Object.fromEntries(Object.entries(values).filter(([, value]) => typeof value === 'number' && Number.isFinite(value)));
-  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw, geometry: values.geometry, layers: values.layers, overlays: values.overlays, local: values.local, filter: values.filter });
+  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw, geometry: values.geometry, layers: values.layers, overlays: values.overlays, local: values.local, filter: values.filter, watermark: values.watermark });
 }
 
 /** Reads an edit file, refusing an oversized one before any of it is read into memory. */

@@ -14,7 +14,7 @@ export const newTextId = () => `text-${Date.now().toString(36)}-${(sequence += 1
  * on release) and a number field. `toValue`/`fromValue` convert between the stored value and
  * the displayed one (percent, degrees).
  */
-function TextRange({ label, value, min, max, step, unit = '', disabled, onPreview, onApply, onCommit, toShown = (v) => v, fromShown = (v) => v }) {
+export function TextRange({ label, value, min, max, step, unit = '', disabled, onPreview, onApply, onCommit, toShown = (v) => v, fromShown = (v) => v }) {
   const id = useId();
   const dragging = useRef(false);
   const shown = Number(toShown(value).toFixed(step < 1 ? 1 : 0));

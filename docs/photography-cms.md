@@ -189,6 +189,36 @@ approved one stands, **Remove approved treatment** withdraws the approved edit i
 **Not built:** reverting to an earlier approved treatment other than the current one;
 automatic HDD discovery or AI selection.
 
+## Watermark
+
+The **Watermark** view uses the editor's own renderer (no CMS renderer).
+
+- **Global preference** (`<workspace>/watermark.json`, a watermark file): the
+  starting point when a photo gets the watermark here or in QuangEdit ("Save as
+  CMS global preference"). Each treatment stores its own resolved settings, so
+  changing the preference never changes saved, approved or published photos,
+  and removing an approved treatment never touches the preference. A photo's
+  differences from it are shown as its overrides.
+- **Apply HUYNH Watermark to Portfolio**, three separate steps:
+  1. **Stage:** lists every published photograph from the catalog with a
+     preview over its gallery image, source, treatment, placement and colour;
+     choose photos and per-photo positions. QuangEdit then opens each in turn,
+     adds the watermark to its treatment (keeping approved grading, crops,
+     masks, layers), renders from the original and saves a **draft**. Progress
+     is kept in this browser: stop after any photo, resume or cancel later.
+  2. **Approve:** before/after (live vs staged) per photo, choose some or all,
+     confirm "I compared each". Shows the estimated change (2 public images per
+     photo, same names and URLs).
+  3. **Publish:** the usual pull request (Publish view); only approved renders.
+- **Not eligible / flagged:** no original (only the 2200 px public image), HDR
+  treatments (merge manually), treatments with **unapproved edits** (would
+  publish unreviewed changes). Already staged with the same settings: re-runs
+  report "unchanged". The mark is one setting over the original, so re-staging
+  replaces it (never stacks) and every render starts from the original (no
+  generation loss). The placement check flags corners much busier than the
+  picture or mid-tone backdrops: a detail/contrast heuristic on the gallery
+  image, **not** face or subject detection; review flagged photos by eye.
+
 ## What publication changes
 
 Only these paths, in a branch cut from the current `origin/main`:

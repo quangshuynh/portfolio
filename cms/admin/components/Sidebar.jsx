@@ -1,6 +1,7 @@
 const VIEWS = [
   ['library', 'Library'],
   ['collections', 'Collections'],
+  ['watermark', 'Watermark'],
   ['publish', 'Publish'],
 ];
 

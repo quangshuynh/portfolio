@@ -95,6 +95,11 @@ export function ExportSettingsFields({ settings, dispatch, unsupportedFormats, n
         <input type="text" value={settings.suffix} maxLength={40} spellCheck="false" onChange={(event) => set({ suffix: event.target.value })} />
       </label>
 
+      <label className="pe-check">
+        <input type="checkbox" checked={settings.includeWatermark !== false} onChange={(event) => set({ includeWatermark: event.target.checked })} />
+        <span>Include watermark <span className="pe-note">(photos with one enabled; their settings are kept either way)</span></span>
+      </label>
+
     </>
   );
 }
@@ -136,7 +141,7 @@ export default function ExportPanel({ settings, photo, dispatch, onExport, onCan
         </button>
       )}
       {blockedReason && <p className="pe-note pe-note--error" role="alert">{blockedReason}</p>}
-      {status.state === 'done' && <p className="pe-note" role="status">Saved {status.fileName} ({status.width} × {status.height}{status.hdr ? ', merged again from the three source files' : status.raw ? ', developed from the RAW sensor data' : ''}).</p>}
+      {status.state === 'done' && <p className="pe-note" role="status">Saved {status.fileName} ({status.width} × {status.height}{status.hdr ? ', merged again from the three source files' : status.raw ? ', developed from the RAW sensor data' : ''}{status.watermark ? `, HUYNH watermark in ${status.watermark.variant === 'dark' ? 'charcoal' : 'white'}${status.watermark.luminance !== null ? ' (auto)' : ''}` : ''}).</p>}
       {status.state === 'error' && <p className="pe-note pe-note--error" role="alert">{status.message}</p>}
       {status.state === 'cancelled' && <p className="pe-note" role="status">Export cancelled.</p>}
       <p className="pe-note">8-bit sRGB. The original file is never changed. EXIF, GPS and other metadata are not copied into exports.{photo?.hdr ? ' HDR exports decode and merge the three source files again at the chosen size (cropped to the area all three cover), never upscaling the preview.' : photo?.raw ? ' RAW exports are developed again from the sensor data at the chosen size, never from the preview or the embedded camera JPEG.' : ''}</p>

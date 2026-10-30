@@ -10,7 +10,8 @@
 // flips, perspective, stretch and resize; pipeline/geometry.mjs) and `layers` (image, text and
 // adjustment layers composited over the finished photo; model/layers.mjs) and `local` (masked local adjustments
 // over the finished photo, below the layers; model/masks.mjs) and `filter` (which Filter Library
-// filter set the Creative group, and at what strength; model/filters.mjs). The `hdr` controls only act on
+// filter set the Creative group, and at what strength; model/filters.mjs) and `watermark` (the HUYNH
+// Photography mark over the final output, or null; watermark/watermark.mjs). The `hdr` controls only act on
 // merged RAW HDR photos. Creative controls (pipeline/creative.mjs) carry a `section` for the
 // panel, and `scales` when a look's intensity scales them from neutral.
 
@@ -20,6 +21,7 @@ import { compactGeometry, geometryEqual, geometryNeutral, neutralGeometry, norma
 import { DAYLIGHT_KELVIN, RAW_KELVIN, RAW_TINT, WHITE_BALANCE_MODES } from '../raw/rawColor.mjs';
 import { compactLayers, layersEqual, normalizeLayers, textLayers } from './layers.mjs';
 import { MASK_LIMITS, compactLocals, localsEqual, normalizeLocalAdjustments } from './masks.mjs';
+import { normalizeWatermark, watermarksEqual } from '../watermark/watermark.mjs';
 
 /** Colour ranges for HSL, with their hue centres in degrees (HSV hue of sRGB values). */
 export const HSL_RANGES = Object.freeze([
@@ -149,6 +151,7 @@ export const ADJUSTMENT_GROUPS = Object.freeze([
   { id: 'text', label: 'Text' },
   { id: 'layers', label: 'Layers' },
   { id: 'masks', label: 'Masks' },
+  { id: 'watermark', label: 'Watermark' },
   { id: 'raw', label: 'RAW' },
   { id: 'hdr', label: 'HDR' },
 ].map(Object.freeze));
@@ -224,6 +227,7 @@ export function neutralAdjustments() {
     layers: [],
     local: [],
     filter: null,
+    watermark: null,
   };
 }
 
@@ -246,6 +250,7 @@ export function normalizeAdjustments(input = {}) {
     layers: normalizeLayers(source.layers, source.overlays, budget),
     local,
     filter: normalizeFilterRef(source.filter),
+    watermark: normalizeWatermark(source.watermark),
   };
 }
 
@@ -254,7 +259,8 @@ const lutRefsEqual = (a, b) => (a === null || b === null ? a === b : a.sha256 ==
 
 export const adjustmentsEqual = (a, b) => ADJUSTMENT_KEYS.every((key) => a[key] === b[key])
   && curvesEqual(a.curves, b.curves) && lutRefsEqual(a.lut, b.lut) && rawEqual(a.raw ?? RAW_DEFAULTS, b.raw ?? RAW_DEFAULTS)
-  && geometryEqual(a.geometry ?? NEUTRAL_GEOMETRY, b.geometry ?? NEUTRAL_GEOMETRY) && layersEqual(a.layers ?? [], b.layers ?? []) && localsEqual(a.local ?? [], b.local ?? []) && filterRefsEqual(a.filter ?? null, b.filter ?? null);
+  && geometryEqual(a.geometry ?? NEUTRAL_GEOMETRY, b.geometry ?? NEUTRAL_GEOMETRY) && layersEqual(a.layers ?? [], b.layers ?? []) && localsEqual(a.local ?? [], b.local ?? []) && filterRefsEqual(a.filter ?? null, b.filter ?? null)
+  && watermarksEqual(a.watermark ?? null, b.watermark ?? null);
 
 const numericNeutral = (adjustments, keys) => keys.every((key) => (adjustments[key] ?? byKey.get(key).default) === byKey.get(key).default);
 
@@ -270,6 +276,7 @@ export function groupIsNeutral(adjustments, group) {
   if (group === 'text') return !textLayers(adjustments.layers ?? []).length;
   if (group === 'layers') return !adjustments.layers?.length;
   if (group === 'masks') return !adjustments.local?.length;
+  if (group === 'watermark') return !adjustments.watermark;
   return numericNeutral(adjustments, groupKeys(group));
 }
 
@@ -288,6 +295,7 @@ export function neutralGroup(group, current = null) {
   if (group === 'masks') patch.local = [];
   if (group === 'text') patch.layers = (current?.layers ?? []).filter((layer) => layer.type !== 'text' || layer.locked);
   if (group === 'creative') patch.filter = null;
+  if (group === 'watermark') patch.watermark = null;
   return patch;
 }
 
@@ -318,5 +326,6 @@ export function compactAdjustments(adjustments) {
   if (a.layers.length) out.layers = compactLayers(a.layers);
   if (a.local.length) out.local = compactLocals(a.local);
   if (a.filter) out.filter = a.filter;
+  if (a.watermark) out.watermark = a.watermark;
   return out;
 }

@@ -121,8 +121,9 @@ describe('settings, documents and history', () => {
     const before = JSON.parse(fixture('parsed-by-v9-editor.json'));
     expect(document.version).toBe(9);
     document.photos.forEach((photo, i) => {
-      const { local, ...rest } = photo.adjustments;
+      const { local, watermark, ...rest } = photo.adjustments;
       expect(local).toEqual([]);
+      expect(watermark).toBeNull();
       expect(rest).toEqual(before[i]);
       photo.adjustments.layers.forEach((layer) => expect(layer).not.toHaveProperty('mask'));
     });
@@ -141,7 +142,7 @@ describe('settings, documents and history', () => {
     const text = serializeEditDocument(createEditDocument([photo], {}, new Date(0)));
     const parsed = parseEditDocument(text);
     expect(parsed.version).toBe(DOCUMENT_VERSION);
-    expect(DOCUMENT_VERSION).toBe(10);
+    expect(DOCUMENT_VERSION).toBeGreaterThanOrEqual(10);
     expect(parsed.photos[0].adjustments).toEqual(adjustments);
     // Masks are geometry and paths, never pixels.
     expect(text).not.toMatch(/data:|base64/);

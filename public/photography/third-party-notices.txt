@@ -104,3 +104,9 @@ and are loaded only by the editor's RAW worker. Nothing below was modified.
 6. Emscripten runtime (generated loader code)
    Copyright Emscripten authors. MIT or University of Illinois/NCSA licence:
    https://github.com/emscripten-core/emscripten/blob/main/LICENSE
+
+7. Schibsted Grotesk (text layers; the HUYNH Photography watermark uses its
+   static 500 and 800 instances, latin subset), via Fontsource
+   Copyright 2023 The Schibsted-Grotesk Project Authors
+   (https://github.com/schibsted/schibsted-grotesk). SIL Open Font License 1.1:
+   https://openfontlicense.org/open-font-license-official-text/

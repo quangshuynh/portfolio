@@ -723,3 +723,12 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 }
 .pe-masks .pe-field--check input { width: 1rem; min-height: 1rem; height: 1rem; padding: 0; }
 .pe-masks__row .pe-field, .pe-masks__brush .pe-field { margin-top: 0; }
+
+/* Watermark (watermark/watermark.mjs): the preview overlay and the Watermark section. */
+.pe-watermark-overlay { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+.pe-watermark-overlay[hidden] { display: none; }
+.pe-watermark { display: grid; gap: .5rem; }
+.pe-watermark__sample { width: 100%; max-width: 12rem; justify-self: center; color: var(--pe-text); font-family: "PE HUYNH Mark", var(--font-sans, sans-serif); }
+.pe-watermark__positions { display: grid; grid-template-columns: repeat(2, 1fr); gap: .375rem; }
+.pe-watermark__positions [data-position="center"] { grid-column: 1 / -1; }
+.pe-watermark__actions { display: flex; flex-wrap: wrap; gap: .375rem; }
