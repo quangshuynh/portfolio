@@ -1,19 +1,42 @@
 // Identifies supported RAW files from their content, never the file name: a TIFF
-// structure whose first IFD carries a DNGVersion tag (DNG) or the maker "SONY" (ARW).
-// Everything is bounds-checked; a damaged header is reported, not trusted.
+// structure whose first IFD carries a DNGVersion tag (DNG) or the maker "SONY" (ARW) or
+// "NIKON" (NEF). A format is listed only after genuine files decoded and developed
+// correctly (docs/photography-editor.md, RAW); other RAW formats are recognised so the
+// error can name them. Everything is bounds-checked; a damaged header is reported, not trusted.
 
 export const RAW_FORMATS = Object.freeze({
   arw: { label: 'Sony ARW' },
+  nef: { label: 'Nikon NEF' },
   dng: { label: 'DNG' },
 });
+
+/** What the editor's RAW support covers, for messages. */
+export const RAW_SUPPORT = 'Sony ARW, Nikon NEF and DNG';
+
+const ascii = (bytes, start, length) => String.fromCharCode(...bytes.subarray(start, start + length));
+
+/** Known RAW formats not validated with genuine files: refused with their name. */
+const UNVALIDATED = [
+  { label: 'Canon CR2', make: /^canon\b/i },
+  { label: 'Canon CR3', test: (bytes) => ascii(bytes, 4, 4) === 'ftyp' && ascii(bytes, 8, 4) === 'crx ' },
+  { label: 'Fujifilm RAF', test: (bytes) => ascii(bytes, 0, 15) === 'FUJIFILMCCD-RAW' },
+  { label: 'Olympus ORF', make: /^olympus|^om digital/i },
+  { label: 'Panasonic RW2', make: /^panasonic/i },
+  { label: 'Pentax PEF', make: /^pentax|^ricoh/i },
+];
+const unvalidated = (label) => Object.assign(new Error(`${label} files are not supported yet: no genuine ${label} file has been validated with this editor. RAW support covers ${RAW_SUPPORT}.`), { code: 'unsupported' });
+
+/** A RAW format outside the TIFF family that this editor recognises but does not support (Canon CR3, Fujifilm RAF), or null. */
+export function unsupportedRawLabel(bytes) {
+  if (bytes.length < 16) return null;
+  return UNVALIDATED.find(({ test }) => test?.(bytes))?.label ?? null;
+}
 
 /** Bytes read from the start of a file to identify it (IFD0 and its strings sit near the start). */
 export const RAW_SNIFF_BYTES = 256 * 1024;
 
 const TAG_MAKE = 0x010f;
 const TAG_DNG_VERSION = 0xc612;
-
-const ascii = (bytes, start, length) => String.fromCharCode(...bytes.subarray(start, start + length));
 
 /** True when the bytes start with a TIFF header (little- or big-endian). */
 export function isTiff(bytes) {
@@ -48,7 +71,7 @@ function readIfd0(bytes) {
 
 /**
  * :param bytes: Uint8Array with the start of a file (RAW_SNIFF_BYTES is enough)
- * :returns: 'arw' | 'dng' | null (not a TIFF structure)
+ * :returns: 'arw' | 'nef' | 'dng' | null (not a TIFF structure)
  * :throws: Error with a `code` of 'unsupported' (another TIFF-based format) or 'corrupt'
  */
 export function sniffRaw(bytes) {
@@ -57,6 +80,9 @@ export function sniffRaw(bytes) {
   if (!ifd0) throw Object.assign(new Error('The RAW file structure is damaged or incomplete.'), { code: 'corrupt' });
   if (ifd0.dng) return 'dng';
   if (/^sony\b/i.test(ifd0.make)) return 'arw';
+  if (/^nikon\b/i.test(ifd0.make)) return 'nef';
+  const known = UNVALIDATED.find(({ make }) => make?.test(ifd0.make));
+  if (known) throw unvalidated(known.label);
   const what = ifd0.make ? `RAW or TIFF files from ${ifd0.make.slice(0, 40)}` : 'TIFF files';
-  throw Object.assign(new Error(`${what} are not supported. RAW support covers Sony ARW and DNG.`), { code: 'unsupported' });
+  throw Object.assign(new Error(`${what} are not supported. RAW support covers ${RAW_SUPPORT}.`), { code: 'unsupported' });
 }

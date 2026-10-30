@@ -12,29 +12,18 @@ import {
 import { loadWatermarkFonts, markBounds, renderMarkSprite } from '../../../src/editor/watermark/watermarkRender.mjs';
 import { ApiError, imageUrl, treatmentImageUrl, treatments, watermark as watermarkApi } from '../api.js';
 import { clearWatermarkQueue, queueEditorHref, readWatermarkQueue, writeWatermarkQueue } from '../editorHost.jsx';
+import { loadPixels, nominalFrame } from '../watermarkImages.js';
+import { autoDraftsEnabled, setAutoDrafts } from './WatermarkAutopilot.jsx';
 
+const STATUS_LABELS = {
+  missing: 'Missing',
+  draft: 'Draft',
+  'needs-regeneration': 'Needs regeneration',
+  'needs-review': 'Needs review',
+  approved: 'Approved',
+};
 const FLAG_LABELS = { busy: 'Busy corner: detail or contrast behind the mark', 'low-contrast': 'Mid-tone backdrop: low contrast in either colour' };
 const positionLabel = (id) => WATERMARK_POSITIONS.find((position) => position.id === id)?.label ?? id;
-/** The full-size frame the mark is laid out for: the photo's proportions at a 6000 px long edge (originals are not read here). */
-const nominalFrame = (width, height) => {
-  const k = 6000 / Math.max(width, height);
-  return { width: Math.round(width * k), height: Math.round(height * k) };
-};
-
-function loadPixels(url) {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => {
-      const canvas = Object.assign(document.createElement('canvas'), { width: image.naturalWidth, height: image.naturalHeight });
-      const context = canvas.getContext('2d', { willReadFrequently: true });
-      context.drawImage(image, 0, 0);
-      resolve(context.getImageData(0, 0, canvas.width, canvas.height));
-    };
-    image.onerror = () => reject(new Error('The gallery image could not be read.'));
-    image.src = url;
-  });
-}
-
 /** The gallery image with the mark drawn on it by the shared renderer (layout for the full-size frame). */
 function Preview({ id, settings, show, alt, onVariant }) {
   const ref = useRef(null);
@@ -64,7 +53,8 @@ function Preview({ id, settings, show, alt, onVariant }) {
       }
     })();
     return () => { alive = false; };
-  }, [id, settings, show]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Keyed by the settings' value: the view builds a new settings object on every render.
+  }, [id, JSON.stringify(settings), show]); // eslint-disable-line react-hooks/exhaustive-deps
   return failed ? <span className="cms-watermark-missing">No gallery image</span> : <canvas ref={ref} className="cms-watermark-preview" role="img" aria-label={`${alt}${show ? ' (watermark preview)' : ''}`} />;
 }
 
@@ -120,7 +110,8 @@ export default function WatermarkView({ onNotice, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [variants, setVariants] = useState({});
   // The last or an interrupted bulk run (kept in this browser until dismissed).
-  const [run, setRun] = useState(readWatermarkQueue);
+  const [run, setRun] = useState(() => { const queue = readWatermarkQueue(); return queue?.mode === 'auto' ? null : queue; });
+  const [auto, setAuto] = useState(autoDraftsEnabled);
   const remaining = run ? run.ids.length - run.index : 0;
 
   const report = useCallback((caught) => setError(caught instanceof ApiError && caught.status === 401 ? 'The CMS session ended. Open the sign-in link printed by `npm run cms`.' : caught.message), []);
@@ -142,7 +133,9 @@ export default function WatermarkView({ onNotice, onChanged }) {
   const stageable = photos.filter((photo) => !blocked(photo));
   // Already staged or approved with exactly these settings: re-running changes nothing.
   const upToDate = (photo) => Boolean(photo.treatment.watermarked && photo.treatment.renderFresh && watermarksEqual(photo.treatment.watermark, settingsFor(photo.id)));
-  const staged = photos.filter((photo) => photo.treatment.watermarked && photo.treatment.renderFresh && photo.treatment.status === 'draft');
+  // Fresh watermarked drafts waiting for approval (with or without photographic edits).
+  const staged = photos.filter((photo) => photo.treatment.watermarkStatus === 'needs-review');
+  const byStatus = (status) => photos.filter((photo) => photo.treatment.watermarkStatus === status).length;
 
   // Placement check, one gallery image at a time.
   useEffect(() => {
@@ -219,8 +212,19 @@ export default function WatermarkView({ onNotice, onChanged }) {
           </div>
         </div>
       )}
+      <div className="cms-toolbar">
+        <label className="cms-check">
+          <input type="checkbox" checked={auto} onChange={(event) => { setAuto(event.target.checked); setAutoDrafts(event.target.checked); }} />
+          {' '}Prepare watermark drafts automatically
+        </label>
+      </div>
+      <p className="cms-field-hint">New, edited and out-of-date photographs get a draft one at a time in the background while the CMS is open. Nothing is approved automatically.</p>
+      <dl className="cms-watermark-stats" aria-label="Watermark status by photograph">
+        {Object.entries(STATUS_LABELS).map(([status, label]) => <div key={status}><dt>{label}</dt><dd data-status={status}>{byStatus(status)}</dd></div>)}
+      </dl>
       <dl className="cms-watermark-stats" aria-label="Portfolio watermark status">
         <div><dt>Published</dt><dd>{overview.count}</dd></div>
+        {overview.drafts > 0 && <div><dt>Imported drafts</dt><dd>{overview.drafts}</dd></div>}
         <div><dt>Eligible</dt><dd data-stat="eligible">{stageable.length}</dd></div>
         <div><dt>Flagged for review</dt><dd>{flagged.length}</dd></div>
         <div><dt>Not eligible</dt><dd>{photos.length - stageable.length}</dd></div>
@@ -256,6 +260,7 @@ export default function WatermarkView({ onNotice, onChanged }) {
                     <input type="checkbox" checked={chosen.has(photo.id)} disabled={Boolean(reason)} onChange={() => toggle(photo.id)} aria-label={`Stage ${photo.caption || photo.id}`} />
                     <span className="cms-photo-caption">{photo.caption || photo.id}</span>
                   </label>
+                  <span className={`cms-watermark-status cms-watermark-status--${photo.treatment.watermarkStatus}`} data-watermark-status={photo.treatment.watermarkStatus}>{STATUS_LABELS[photo.treatment.watermarkStatus]}{photo.published ? '' : ' · draft photograph'}</span>
                   <span className="cms-photo-meta">{photo.id} · {photo.source ? `${photo.source.kind}${photo.source.format ? ` ${photo.source.format}` : ''}` : 'no source'} · {photo.treatment.status === 'none' ? 'no treatment' : `${photo.treatment.status} treatment`}{photo.treatment.approvedWatermarked ? ' · approved watermark' : ''}</span>
                   <span className="cms-photo-meta" data-watermark-placement>{positionLabel(position)} · {settingsFor(photo.id).color === 'auto' ? `auto → ${variants[photo.id] === 'dark' ? 'charcoal' : variants[photo.id] ? 'white' : '…'}` : settingsFor(photo.id).color === 'dark' ? 'charcoal' : 'white'} · {Math.round(settingsFor(photo.id).opacity * 100)}%</span>
                   {reason && <span className="cms-photo-meta">{reason}</span>}
@@ -287,6 +292,7 @@ export default function WatermarkView({ onNotice, onChanged }) {
                     <input type="checkbox" checked={approving.has(photo.id)} onChange={() => setApproving((current) => { const next = new Set(current); if (next.has(photo.id)) next.delete(photo.id); else next.add(photo.id); return next; })} />
                     <span>{photo.caption || photo.id}</span>
                   </label>
+                  {photo.treatment.unapprovedEdits && <span className="cms-watermark-flag">Includes photographic edits from QuangEdit: approval covers them too</span>}
                   <figure><img src={imageUrl(photo.id, 'gallery')} alt={`${photo.alt || photo.id}, live`} loading="lazy" /><figcaption>Before (live)</figcaption></figure>
                   <figure><img src={treatmentImageUrl(photo.id, 'current-gallery', String(photo.treatment.revision))} alt={`${photo.alt || photo.id}, staged with the watermark`} loading="lazy" /><figcaption>After (staged)</figcaption></figure>
                 </li>

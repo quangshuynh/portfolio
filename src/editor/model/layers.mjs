@@ -67,7 +67,7 @@ export const LAYER_LIMITS = Object.freeze({
   sourceSide: 65_535,
 });
 
-export const IMAGE_SOURCE_FORMATS = Object.freeze(['jpeg', 'png', 'webp', 'arw', 'dng']);
+export const IMAGE_SOURCE_FORMATS = Object.freeze(['jpeg', 'png', 'webp', 'arw', 'nef', 'dng']);
 
 // Settings an image or adjustment layer may carry: the per-pixel colour controls, which the
 // compositor applies to the layer's pixels or to the composite below. Detail, glow, grain,

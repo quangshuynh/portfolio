@@ -13,7 +13,8 @@ import {
   rawDevelopParams, validColorMatrix, xyForMultipliers, xyToKelvinTint,
 } from './rawColor.mjs';
 import { decodeRaw, downsampleRaw } from './rawDecoder.mjs';
-import { isTiff, sniffRaw } from './rawFormat.mjs';
+import { isTiff, sniffRaw, unsupportedRawLabel } from './rawFormat.mjs';
+import { readImageHeader } from '../io/imageHeader.mjs';
 import { createRawHandlers, needsFullDecode } from './rawTasks.mjs';
 import { constrainedDevice, createRawQueue } from './rawClient.mjs';
 import { ROLLOFF_KNEE, deriveParams, developRaw, highlightRolloff } from '../pipeline/spec.mjs';
@@ -90,14 +91,27 @@ describe('RAW format sniffing (content, not file names)', () => {
     return bytes;
   };
 
-  test('identifies Sony ARW and DNG, and rejects other TIFF-based files with a reason', () => {
+  test('identifies Sony ARW, Nikon NEF and DNG, and rejects other TIFF-based files with a reason', () => {
     expect(sniffRaw(tiff({ make: 'SONY' }))).toBe('arw');
+    expect(sniffRaw(tiff({ make: 'NIKON CORPORATION' }))).toBe('nef');
     expect(sniffRaw(tiff({ make: 'Canon', dng: true }))).toBe('dng');
     expect(sniffRaw(createSyntheticDng())).toBe('dng');
-    expect(() => sniffRaw(tiff({ make: 'Canon' }))).toThrow(/Canon are not supported/);
+    // Known but unvalidated RAW formats are named in the refusal.
+    expect(() => sniffRaw(tiff({ make: 'Canon' }))).toThrow(/Canon CR2 files are not supported yet/);
+    expect(() => sniffRaw(tiff({ make: 'PENTAX' }))).toThrow(/Pentax PEF files are not supported yet/);
+    expect(() => sniffRaw(tiff({ make: 'Leaf' }))).toThrow(/files from Leaf are not supported\. RAW support covers Sony ARW, Nikon NEF and DNG/);
     expect(() => sniffRaw(tiff())).toThrow(expect.objectContaining({ code: 'unsupported' }));
     expect(sniffRaw(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toBeNull();
     expect(isTiff(new Uint8Array([0x4d, 0x4d, 0, 42, 0, 0, 0, 8]))).toBe(true);
+  });
+
+  test('Canon CR3 and Fujifilm RAF are recognised by content and refused by name', () => {
+    const bytes = (text) => { const out = new Uint8Array(64); out.set([...text].map((char) => char.charCodeAt(0))); return out; };
+    const cr3 = bytes('\0\0\0\x18ftypcrx ');
+    expect(unsupportedRawLabel(cr3)).toBe('Canon CR3');
+    expect(unsupportedRawLabel(bytes('FUJIFILMCCD-RAW 0201'))).toBe('Fujifilm RAF');
+    expect(unsupportedRawLabel(bytes('\0\0\0\x18ftypheic'))).toBeNull();
+    expect(() => readImageHeader(cr3)).toThrow(/Canon CR3 files are not supported yet/);
   });
 
   test('a damaged header is reported, never read out of bounds', () => {

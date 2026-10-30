@@ -57,6 +57,14 @@ test('the canonical document is stable and drops what the editor would drop', ()
   expect(first.document.savedAt).toBeUndefined();
 });
 
+test('a treatment developed from a Nikon NEF publishes only its JPEG derivatives', async () => {
+  await treat('beta', { source: { name: '_DSC0051.NEF', bytes: Buffer.concat([Buffer.from([0x4d, 0x4d, 0, 0x2a]), Buffer.alloc(2048, 5)]) } });
+  const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });
+  expect(state.summary.images).toEqual(['beta']);
+  expect(changed(state.branch).filter((file) => !file.endsWith('.json')).sort()).toEqual(['src/assets/photography/generated/beta-gallery.jpg', 'src/assets/photography/generated/beta-viewer.jpg']);
+  expect(tree(state.branch).some((file) => /\.nef$|sources|renders|treatments/i.test(file))).toBe(false);
+});
+
 test('an approved render replaces a published photograph\'s images under the same names', async () => {
   const treatment = await treat('alpha', { source: { name: 'DSC09640.ARW', bytes: Buffer.concat([Buffer.from([0x49, 0x49, 0x2a, 0]), Buffer.alloc(2048, 3)]) } });
   const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });
@@ -68,7 +76,7 @@ test('an approved render replaces a published photograph\'s images under the sam
   const manifest = JSON.parse(show(state.branch, 'src/data/photographs.generated.json'));
   expect(manifest.find(({ id }) => id === 'alpha')).toMatchObject({ viewerFilename: 'alpha-viewer.jpg', viewerWidth: 2200, viewerHeight: 1438, galleryWidth: 900 });
   // Nothing private: no workspace folders, no RAW, no full-size render.
-  expect(tree(state.branch).some((file) => /sources|renders|treatments|quangedit|\.arw$/i.test(file))).toBe(false);
+  expect(tree(state.branch).some((file) => /sources|renders|treatments|quangedit|\.(arw|nef|dng)$/i.test(file))).toBe(false);
   // Once the base has these images, there is nothing left to publish for alpha.
   expect(await approvedImageChanges({ git, commit: state.commit, workspaceDir: fixture.workspace, ids: ['alpha'] })).toEqual([]);
 });

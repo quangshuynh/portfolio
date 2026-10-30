@@ -99,6 +99,8 @@ try {
         HTMLCanvasElement.prototype.getContext = function getContext(type, ...rest) { return type === 'webgl2' ? null : original.call(this, type, ...rest); };
       });
     }
+    // Automatic watermark drafts stay off for the scripted steps (they would race them) until the step that tests them.
+    await context.addInitScript(() => { if (!localStorage.getItem('cms-watermark-auto')) localStorage.setItem('cms-watermark-auto', 'off'); });
     const page = await context.newPage();
     const outside = [];
     const errors = [];
@@ -235,7 +237,7 @@ try {
         await page.goto(`${origin}/admin/photography/#watermark`);
         await page.locator('#cms-watermark-portfolio').waitFor({ timeout: 60_000 });
         // Every published photograph is listed; only those given an original are eligible (no library here).
-        await poll(() => page.locator('.cms-watermark-stats').textContent(), (text) => text.includes(`Published${published.length}`) && /Eligible[1-9]/.test(text), 'eligible count', 60_000);
+        await poll(() => page.locator('.cms-watermark-stats[aria-label="Portfolio watermark status"]').textContent(), (text) => text.includes(`Published${published.length}`) && /Eligible[1-9]/.test(text), 'eligible count', 60_000);
         await poll(() => page.locator('.cms-watermark-preview').count(), (n) => n >= 3, 'watermark previews', 60_000);
         if (phone) await noSideScroll();
         const chooseTarget = page.getByRole('checkbox', { name: `Stage ${target.caption || target.id}` });
@@ -245,9 +247,11 @@ try {
         await page.waitForURL(/queue=watermark/, { timeout: 30_000 });
         await page.waitForURL(/#watermark$/, { timeout: 600_000 });
         await page.locator('[data-watermark-run]', { hasText: '1 staged' }).waitFor({ timeout: 60_000 });
-        await page.locator('#cms-watermark-staged', { hasText: '(1)' }).waitFor();
+        // Other runs share this workspace and may leave drafts awaiting review: choose this photograph's.
+        const stagedItem = page.locator('.cms-watermark-compare li', { hasText: target.caption || target.id });
+        await stagedItem.first().waitFor({ timeout: 60_000 });
         // Lazy images above still load and shift the page on phones: click, then confirm the state.
-        const chooseStaged = page.locator('.cms-watermark-compare li').first().getByRole('checkbox');
+        const chooseStaged = stagedItem.first().getByRole('checkbox');
         await poll(async () => { if (!(await chooseStaged.isChecked())) await chooseStaged.click({ timeout: 5_000 }).catch(() => {}); return chooseStaged.isChecked(); }, Boolean, 'staged photo chosen', 60_000);
         await page.getByRole('button', { name: 'Approve 1…' }).click();
         const approve = page.locator('.cms-watermark-confirm button.cms-button--primary');
@@ -294,6 +298,70 @@ try {
         await api(page, 'POST', `/api/editor/photos/${target.id}/discard`, { revision: approved.treatment.revision });
         return { photo: target.id, size: `${width}×${height}`, inside: Math.round(inside * 10) / 10, outside: Math.round(outsideMean * 100) / 100 };
       });
+
+      if (['chromium', 'webkit'].includes(run.id)) {
+        await step('automatic watermark drafts: on import, idempotent, regenerated after edits, approved kept, stop and resume', async () => {
+          const upload = async () => {
+            const data = await syntheticJpeg(seed += 1);
+            return page.evaluate(async (bytes) => (await (await fetch(`/api/uploads?filename=auto-${Date.now()}-${Math.random().toString(16).slice(2)}.jpg`, { method: 'POST', headers: { 'X-CMS-Request': '1' }, body: new Uint8Array(bytes) })).json()).id, [...data]);
+          };
+          const photo = async (photoId) => (await api(page, 'GET', `/api/editor/photos/${photoId}`)).json;
+          const statusOf = async (photoId) => (await api(page, 'GET', '/api/watermark/portfolio')).json.photographs.find(({ id: entry }) => entry === photoId)?.treatment.watermarkStatus;
+          const until = (photoId, status, timeout = 600_000) => poll(() => statusOf(photoId), (value) => value === status, `${photoId} ${status}`, timeout);
+          const imported = await upload();
+          assert.equal(await statusOf(imported), 'missing');
+          await page.goto(`${origin}/admin/photography/#watermark`);
+          await page.evaluate(() => localStorage.setItem('cms-watermark-auto', 'on'));
+          let started = Date.now();
+          await page.reload();
+          await until(imported, 'needs-review');
+          const draftMs = Date.now() - started;
+          const drafted = await photo(imported);
+          assert.equal(drafted.treatment.status, 'draft');
+          assert.equal(drafted.treatment.approved, null);
+          assert.equal(drafted.renderFresh, true);
+          assert.deepEqual(drafted.treatment.document.photos[0].adjustments.watermark, (await api(page, 'GET', '/api/watermark')).json.settings);
+          // Planning again (a reload) changes nothing for a photo awaiting review.
+          await page.reload();
+          await page.waitForTimeout(8_000);
+          assert.equal((await photo(imported)).treatment.revision, drafted.treatment.revision, 'repeated automatic runs left the draft alone');
+          // An edit (exposure) makes the render stale; the draft is regenerated with its own watermark.
+          const edit = (info, exposure) => {
+            const document = JSON.parse(JSON.stringify(info.treatment.document));
+            document.photos[0].adjustments.exposure = exposure;
+            return api(page, 'PUT', `/api/editor/photos/${imported}/treatment`, { document: JSON.stringify(document), revision: info.treatment.revision });
+          };
+          assert.equal((await edit(drafted, 0.4)).status, 200);
+          assert.equal(await statusOf(imported), 'needs-regeneration');
+          started = Date.now();
+          await until(imported, 'needs-review');
+          const regenerateMs = Date.now() - started;
+          // Approve, then edit again: the approved version stays untouched while the new draft is regenerated.
+          let info = await photo(imported);
+          assert.equal((await api(page, 'POST', `/api/editor/photos/${imported}/approve`, { revision: info.treatment.revision })).status, 200);
+          info = await photo(imported);
+          const approvedHash = info.treatment.approved.documentHash;
+          assert.equal(await statusOf(imported), 'approved');
+          assert.equal((await edit(info, -0.2)).status, 200);
+          await until(imported, 'needs-review');
+          info = await photo(imported);
+          assert.equal(info.treatment.approved.documentHash, approvedHash, 'the approved version was not replaced');
+          assert.notEqual(info.treatment.documentHash, approvedHash);
+          // Stop after the current photograph, then resume after a reload.
+          const [first, second] = [await upload(), await upload()];
+          await page.reload();
+          await page.locator('[data-watermark-autopilot=running]').waitFor({ timeout: 120_000 });
+          await page.getByRole('button', { name: 'Stop' }).click();
+          await page.locator('[data-watermark-autopilot]').waitFor({ state: 'detached', timeout: 600_000 });
+          const afterStop = [await statusOf(first), await statusOf(second)];
+          assert.equal(afterStop.filter((value) => value === 'needs-review').length, 1, `stop after one photograph: ${afterStop}`);
+          await page.reload();
+          await until(first, 'needs-review');
+          await until(second, 'needs-review');
+          await page.evaluate(() => localStorage.setItem('cms-watermark-auto', 'off'));
+          return { draftMs, regenerateMs };
+        });
+      }
 
       if (run.genuine && RAW_FILES.length >= 3) {
         await step('genuine ARW: attach, develop from sensor data, render full size', async () => {

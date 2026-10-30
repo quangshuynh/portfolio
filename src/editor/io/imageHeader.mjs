@@ -2,6 +2,8 @@
 // file, before anything is decoded, so oversized or mislabelled files are rejected
 // without allocating their pixels. Never trusts the file extension or MIME type.
 
+import { RAW_SUPPORT, unsupportedRawLabel } from '../raw/rawFormat.mjs';
+
 export const FORMATS = Object.freeze({
   jpeg: { label: 'JPEG', mime: 'image/jpeg', extension: 'jpg' },
   png: { label: 'PNG', mime: 'image/png', extension: 'png' },
@@ -120,7 +122,12 @@ function parseWebp(bytes, view) {
  */
 export function readImageHeader(bytes) {
   const format = sniffFormat(bytes);
-  if (!format) throw new ImageHeaderError('unsupported', 'Only JPEG, PNG, WebP and RAW (Sony ARW, DNG) files are supported.');
+  if (!format) {
+    const raw = unsupportedRawLabel(bytes);
+    throw new ImageHeaderError('unsupported', raw
+      ? `${raw} files are not supported yet. Only JPEG, PNG, WebP and RAW (${RAW_SUPPORT}) files are supported.`
+      : `Only JPEG, PNG, WebP and RAW (${RAW_SUPPORT}) files are supported.`);
+  }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let header;
   try {
