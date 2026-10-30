@@ -241,7 +241,7 @@ describe('edit document', () => {
   });
 });
 
-describe('retouch in edit documents (version 12)', () => {
+describe('retouch in edit documents (version 12 and later)', () => {
   test('clone and heal strokes are saved and reopened exactly; version 11 files open without any', () => {
     const retouch = [
       { id: 'h1', type: 'heal', enabled: true, points: [[0.4, 0.41]], radius: 0.02, hardness: 0.5, opacity: 1, spacing: 0.25, offset: { x: 0.03, y: -0.01 } },
@@ -249,7 +249,7 @@ describe('retouch in edit documents (version 12)', () => {
     ];
     const photo = { name: 'DSC09420.ARW', size: 10, lastModified: 0, sha256: 'a'.repeat(64), format: 'arw', width: 4024, height: 6024, adjustments: normalizeAdjustments({ exposure: 0.3, retouch }) };
     const text = serializeEditDocument(createEditDocument([photo], {}));
-    expect(JSON.parse(text).version).toBe(12);
+    expect(JSON.parse(text).version).toBe(DOCUMENT_VERSION);
     expect(parseEditDocument(text).photos[0].adjustments.retouch).toEqual(retouch);
     const v11 = JSON.stringify({ type: DOCUMENT_TYPE, version: 11, photos: [{ source: { name: 'a.jpg', size: 3 }, adjustments: { exposure: 1, retouch } }] });
     expect(parseEditDocument(v11).photos[0].adjustments.retouch).toEqual(retouch);
@@ -269,4 +269,22 @@ test('retouch belongs to one photo: sync, paste, presets and recipes never carry
   expect(DEFAULT_SYNC_GROUPS).not.toContain('retouch');
   expect(JSON.stringify(createPreset('All', source, PRESET_GROUPS.map(({ id }) => id)))).not.toContain('h1');
   expect(JSON.stringify(recipeFromAdjustments(source, { groups: RECIPE_GROUPS.map(({ id }) => id) }))).not.toContain('retouch');
+});
+
+test('version 13: removals keep their source area; version 12 files open unchanged', () => {
+  const retouch = [
+    { id: 'r1', type: 'remove', enabled: true, points: [[0.4, 0.4], [0.45, 0.42]], radius: 0.05, hardness: 0.6, opacity: 1, spacing: 0.25, offset: { x: 0, y: 0 }, source: { x: 0.1, y: 0.1, width: 0.2, height: 0.3 } },
+    { id: 'r2', type: 'remove', enabled: false, points: [[0.7, 0.7]], radius: 0.03, hardness: 0.5, opacity: 0.8, spacing: 0.25, offset: { x: 0, y: 0 }, source: null },
+  ];
+  const photo = { name: '_DSC0051.NEF', size: 10, lastModified: 0, sha256: 'b'.repeat(64), format: 'nef', width: 3084, height: 4644, adjustments: normalizeAdjustments({ retouch }) };
+  const text = serializeEditDocument(createEditDocument([photo], {}));
+  expect(JSON.parse(text).version).toBe(13);
+  expect(parseEditDocument(text).photos[0].adjustments.retouch).toEqual(retouch);
+  // A removal never carries a clone offset; a tiny or out-of-photo area is dropped.
+  const cleaned = normalizeAdjustments({ retouch: [{ ...retouch[0], offset: { x: 0.3, y: 0 }, source: { x: 2, y: 0, width: 0.001, height: 0.5 } }] }).retouch[0];
+  expect(cleaned.offset).toEqual({ x: 0, y: 0 });
+  expect(cleaned.source).toBeNull();
+  const v12 = JSON.stringify({ type: DOCUMENT_TYPE, version: 12, photos: [{ source: { name: 'a.jpg', size: 3 }, adjustments: { retouch: [{ id: 'h', type: 'heal', points: [[0.5, 0.5]], radius: 0.02, offset: { x: 0.1, y: 0 } }] } }] });
+  expect(parseEditDocument(v12).photos[0].adjustments.retouch[0]).toMatchObject({ type: 'heal', offset: { x: 0.1, y: 0 } });
+  expect(parseEditDocument(v12).photos[0].adjustments.retouch[0].source).toBeUndefined();
 });
