@@ -9,6 +9,7 @@ import { deriveParams } from '../pipeline/spec.mjs';
 import { proxyDimensions } from '../io/files.mjs';
 import { finishRows, warpImage } from '../pipeline/warp.mjs';
 import { HdrError, analyzeBracket, createFusionMerge, createRadianceMerge } from './hdrMerge.mjs';
+import { applyRetouch } from '../pipeline/retouch.mjs';
 
 export const HDR_BAND_ROWS = 256;
 
@@ -100,6 +101,8 @@ export const handlers = {
     const mergedAt = performance.now();
     let image = session.merge.finish();
     session.merge = null;
+    // Retouch (stage 0) on the finished merge, before geometry and every adjustment.
+    applyRetouch(image, adjustments.retouch);
     // Geometry: the merge (the three sources and their analysis untouched) is warped to the output.
     if (warp) image = warpImage(image, warp.matrix, warp);
     const merged = performance.now();

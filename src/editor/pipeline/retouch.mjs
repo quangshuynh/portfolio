@@ -19,7 +19,11 @@ const HEAL_ITERATIONS = 400;
 // The heal box extends this far (in radii) beyond the brush, so a ring of target pixels surrounds it.
 const HEAL_MARGIN = 0.35;
 
-const channelsOf = (image) => Math.round(image.data.length / (image.width * image.height));
+// `image.region` ({ x, y, width, height }) says `data` holds only that part of the photo (a canvas
+// read); coordinates stay those of the whole photo.
+const regionOf = (image) => image.region ?? { x: 0, y: 0, width: image.width, height: image.height };
+const channelsOf = (image) => { const r = regionOf(image); return Math.round(image.data.length / (r.width * r.height)); };
+const indexOf = (r, x, y, channels) => ((y - r.y) * r.width + (x - r.x)) * channels;
 const maxOf = (data) => (data instanceof Uint8Array || data instanceof Uint8ClampedArray ? 255 : data instanceof Uint16Array ? 65535 : Infinity);
 const smooth = (t) => t * t * (3 - 2 * t);
 
@@ -89,16 +93,17 @@ function brushMask(op, width, height, box) {
  * plus one pixel for bilinear sampling), read before anything is written.
  */
 function sourceSnapshot(image, channels, box, ox, oy) {
-  const sx0 = Math.max(0, Math.floor(box.x0 + ox) - 1);
-  const sy0 = Math.max(0, Math.floor(box.y0 + oy) - 1);
-  const sx1 = Math.min(image.width, Math.ceil(box.x1 + ox) + 1);
-  const sy1 = Math.min(image.height, Math.ceil(box.y1 + oy) + 1);
+  const r = regionOf(image);
+  const sx0 = Math.max(r.x, Math.floor(box.x0 + ox) - 1);
+  const sy0 = Math.max(r.y, Math.floor(box.y0 + oy) - 1);
+  const sx1 = Math.min(r.x + r.width, Math.ceil(box.x1 + ox) + 1);
+  const sy1 = Math.min(r.y + r.height, Math.ceil(box.y1 + oy) + 1);
   if (sx1 <= sx0 || sy1 <= sy0) return null;
   const w = sx1 - sx0;
   const data = new Float32Array(w * (sy1 - sy0) * 3);
   for (let y = sy0; y < sy1; y += 1) {
     for (let x = sx0; x < sx1; x += 1) {
-      const i = (y * image.width + x) * channels;
+      const i = indexOf(r, x, y, channels);
       const o = ((y - sy0) * w + (x - sx0)) * 3;
       data[o] = image.data[i]; data[o + 1] = image.data[i + 1]; data[o + 2] = image.data[i + 2];
     }
@@ -130,6 +135,7 @@ function sample(snap, image, x, y, out) {
  * grid of HEAL_GRID cells across the box's longer side. Returns a per-pixel sampler.
  */
 function healField(image, channels, box, mask, snap, ox, oy) {
+  const r = regionOf(image);
   const bw = box.x1 - box.x0;
   const bh = box.y1 - box.y0;
   const cell = Math.max(1, Math.max(bw, bh) / HEAL_GRID);
@@ -148,7 +154,7 @@ function healField(image, channels, box, mask, snap, ox, oy) {
       if (mask[y * bw + x] > 0) { inside[g] = 1; continue; } // eslint-disable-line no-continue
       const px = box.x0 + x; const py = box.y0 + y;
       if (!sample(snap, image, px + ox, py + oy, s)) continue; // eslint-disable-line no-continue
-      const i = (py * image.width + px) * channels;
+      const i = indexOf(r, px, py, channels);
       sums[g * 3] += image.data[i] - s[0]; sums[g * 3 + 1] += image.data[i + 1] - s[1]; sums[g * 3 + 2] += image.data[i + 2] - s[2];
       counts[g] += 1;
     }
@@ -206,13 +212,17 @@ export function applyRetouchOperation(image, op) {
   if (!op?.enabled) return null;
   const { width, height } = image;
   const channels = channelsOf(image);
-  const box = retouchBounds(op, width, height);
-  if (!box) return null;
+  const full = retouchBounds(op, width, height);
+  if (!full) return null;
+  const r = regionOf(image);
+  const box = { x0: Math.max(full.x0, r.x), y0: Math.max(full.y0, r.y), x1: Math.min(full.x1, r.x + r.width), y1: Math.min(full.y1, r.y + r.height) };
+  if (box.x1 <= box.x0 || box.y1 <= box.y0) return null;
   const ox = op.offset.x * width;
   const oy = op.offset.y * height;
   const snap = sourceSnapshot(image, channels, box, ox, oy);
   if (!snap) return null;
   const mask = brushMask(op, width, height, box);
+  // A region read must hold the whole target box (and its source) for the same result as a full image.
   const field = op.type === 'heal' ? healField(image, channels, box, mask, snap, ox, oy) : null;
   const top = maxOf(image.data);
   const bw = box.x1 - box.x0;
@@ -222,7 +232,7 @@ export function applyRetouchOperation(image, op) {
       const m = mask[(y - box.y0) * bw + (x - box.x0)] * op.opacity;
       if (m <= 0 || !sample(snap, image, x + ox, y + oy, s)) continue; // eslint-disable-line no-continue
       const add = field ? field(x - box.x0, y - box.y0) : null;
-      const i = (y * width + x) * channels;
+      const i = indexOf(r, x, y, channels);
       for (let k = 0; k < 3; k += 1) {
         const target = image.data[i + k];
         const value = target + ((add ? s[k] + add[k] : s[k]) - target) * m;
@@ -231,6 +241,36 @@ export function applyRetouchOperation(image, op) {
     }
   }
   return box;
+}
+
+/**
+ * The canvas region an operation reads and writes in a width × height photo: its target box
+ * and its source box (with a pixel for sampling), clipped. { x, y, width, height } or null.
+ */
+export function retouchRegion(op, width, height) {
+  const box = retouchBounds(op, width, height);
+  if (!box) return null;
+  const ox = op.offset.x * width;
+  const oy = op.offset.y * height;
+  const x0 = Math.max(0, Math.min(box.x0, Math.floor(box.x0 + ox) - 1));
+  const y0 = Math.max(0, Math.min(box.y0, Math.floor(box.y0 + oy) - 1));
+  const x1 = Math.min(width, Math.max(box.x1, Math.ceil(box.x1 + ox) + 1));
+  const y1 = Math.min(height, Math.max(box.y1, Math.ceil(box.y1 + oy) + 1));
+  return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+}
+
+/**
+ * Renders every enabled operation into a 2D canvas context of the photo at width × height,
+ * reading and writing one operation's region at a time (no full-size copy).
+ */
+export function applyRetouchToContext(context, width, height, operations) {
+  for (const op of operations ?? []) {
+    if (!op.enabled) continue; // eslint-disable-line no-continue
+    const region = retouchRegion(op, width, height);
+    if (!region) continue; // eslint-disable-line no-continue
+    const pixels = context.getImageData(region.x, region.y, region.width, region.height, { colorSpace: 'srgb' });
+    if (applyRetouchOperation({ width, height, data: pixels.data, region }, op)) context.putImageData(pixels, region.x, region.y);
+  }
 }
 
 /** Renders every enabled operation in order, in place. :returns: the changed pixel box, or null */

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { applyRetouch, applyRetouchOperation, brushFalloff, findHealSource, retouchBounds, retouchTouching } from './retouch.mjs';
+import { applyRetouch, applyRetouchOperation, brushFalloff, findHealSource, retouchBounds, retouchRegion, retouchTouching } from './retouch.mjs';
 import { createRetouchOperation, normalizeRetouch, retouchEqual } from '../model/retouch.mjs';
 
 // A reproducible photo-like field: a diagonal light gradient with fine texture (RGBA8).
@@ -180,4 +180,22 @@ test('bounds and the operations touching a region', () => {
   expect(retouchTouching([op], 100, 100, { x: 50, y: 50, width: 10, height: 10 })).toEqual([]);
   expect(retouchTouching([op], 100, 100, { x: 10, y: 10, width: 10, height: 10 })).toEqual([op]);
   expect(retouchTouching([{ ...op, enabled: false }], 100, 100, { x: 10, y: 10, width: 10, height: 10 })).toEqual([]);
+});
+
+test('rendering from a region read (as from a canvas) equals rendering the whole image', () => {
+  const ops = normalizeRetouch([
+    { id: 'a', type: 'heal', points: [[0.4, 0.4], [0.45, 0.42]], radius: 0.05, hardness: 0.5, offset: { x: 0.15, y: 0.05 } },
+    { id: 'b', type: 'clone', points: [[0.05, 0.9]], radius: 0.04, hardness: 0.7, offset: { x: 0.3, y: -0.1 } },
+  ]);
+  const whole = texture(240, 160);
+  applyRetouch(whole, ops);
+  const regional = texture(240, 160);
+  for (const op of ops) {
+    const region = retouchRegion(op, 240, 160);
+    const data = new Uint8ClampedArray(region.width * region.height * 4);
+    for (let y = 0; y < region.height; y += 1) data.set(regional.data.subarray(((region.y + y) * 240 + region.x) * 4, ((region.y + y) * 240 + region.x + region.width) * 4), y * region.width * 4);
+    applyRetouchOperation({ width: 240, height: 160, data, region }, op);
+    for (let y = 0; y < region.height; y += 1) regional.data.set(data.subarray(y * region.width * 4, (y + 1) * region.width * 4), ((region.y + y) * 240 + region.x) * 4);
+  }
+  expect(Array.from(regional.data)).toEqual(Array.from(whole.data));
 });

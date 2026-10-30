@@ -38,6 +38,8 @@ import { imageMaskMap } from '../pipeline/mask.mjs';
 import { createRasterCache } from './layerRasters.mjs';
 import LayersPanel, { newLayerId } from './LayersPanel';
 import MaskPanel, { DEFAULT_BRUSH, DEFAULT_OVERLAY } from './MaskPanel';
+import RetouchPanel from './RetouchPanel';
+import { RETOUCH_DEFAULTS, RETOUCH_LIMITS, removeRetouchOperation, updateRetouchOperation } from '../model/retouch.mjs';
 import { thumbnailSource } from './filterThumbs.mjs';
 import AdjustPanel from './AdjustPanel';
 import BatchDialog from './BatchDialog';
@@ -259,6 +261,14 @@ function EditorWorkspace({ host }) {
   const [brush, setBrush] = useState(DEFAULT_BRUSH);
   const [maskOverlay, setMaskOverlay] = useState(DEFAULT_OVERLAY);
   const [freeResize, setFreeResize] = useState(false);
+  // Retouch: the tool on the photo, its brush, the clone source (one photo's, never carried to
+  // another), whether the next tap sets that source, the selected operation and the last message.
+  const [retouchTool, setRetouchTool] = useState(null);
+  const [retouchBrush, setRetouchBrush] = useState(RETOUCH_DEFAULTS);
+  const [retouchClone, setRetouchClone] = useState({ source: null, aligned: true, offset: null });
+  const [retouchPicking, setRetouchPicking] = useState(false);
+  const [retouchSelected, setRetouchSelected] = useState(null);
+  const [retouchMessage, setRetouchMessage] = useState(null);
   // Image layer sources imported as layers only (by SHA-256); workspace photos serve as sources too.
   const layerFiles = useRef(new Map());
   const layerInputRef = useRef(null);
@@ -565,21 +575,21 @@ function EditorWorkspace({ host }) {
 
   // 1:1 inspection: a full-size decode keeps only a crop around the region (RAW in the RAW
   // queue, others in a fresh image worker that is ended afterwards); renders reuse it.
-  const loadRegionSource = useCallback(async (target, rect, geometry = null) => {
+  const loadRegionSource = useCallback(async (target, rect, geometry = null, retouch = []) => {
     inspectJob.current?.cancel();
     const resource = resources.current.get(target.id);
     if (!resource?.header) throw new Error('The original file is no longer available.');
     if (resource.hdr) throw Object.assign(new Error('1:1 inspection is not available for merged HDR photos: it would decode and merge the three files at full size. Export to inspect them.'), { code: 'unsupported' });
     if (resource.raw) {
       if (constrainedDevice()) throw Object.assign(new Error('1:1 inspection of RAW files needs a full-size decode (several hundred MB), more than this device can safely use.'), { code: 'memory' });
-      const job = raws().run('region', { file: resource.file, raw: resource.raw, rect, geometry });
+      const job = raws().run('region', { file: resource.file, raw: resource.raw, rect, geometry, retouch });
       inspectJob.current = job;
       return job.promise;
     }
     const client = createImageWorker();
     inspectJob.current = { cancel: () => client.terminate() };
     try {
-      return await client.call('regionSource', { file: resource.file, header: resource.header, rect, geometry });
+      return await client.call('regionSource', { file: resource.file, header: resource.header, rect, geometry, retouch });
     } finally {
       client.terminate();
     }
@@ -632,7 +642,7 @@ function EditorWorkspace({ host }) {
     if (mode && !transformStart.current) transformStart.current = geometryRef.current;
     if (!mode) { dispatch({ type: 'commitAdjustment' }); transformStart.current = null; }
     setTransformMode(mode);
-    if (mode) { setInspecting(false); setLayerToolOn(false); setMaskTool(null); }
+    if (mode) { setInspecting(false); setLayerToolOn(false); setMaskTool(null); setRetouchTool(null); }
   }, []);
   const applyTransform = useCallback(() => openTransform(null), [openTransform]);
   const cancelTransform = useCallback(() => {
@@ -770,8 +780,19 @@ function EditorWorkspace({ host }) {
   const chooseMaskTool = useCallback((value) => {
     if (transformMode) return;
     setMaskTool(value);
-    if (value) { setLayerToolOn(false); setInspecting(false); }
+    if (value) { setLayerToolOn(false); setInspecting(false); setRetouchTool(null); }
   }, [transformMode]);
+  const chooseRetouchTool = useCallback((value) => {
+    if (transformMode) return;
+    setRetouchTool(value);
+    setRetouchPicking(false);
+    setRetouchMessage(null);
+    if (value) { setMaskTool(null); setLayerToolOn(false); setInspecting(false); }
+  }, [transformMode]);
+  const applyRetouch = useCallback((retouch, coalesceKey = null) => dispatch({ type: 'applySettings', patch: { retouch }, coalesceKey }), []);
+  // A new photo: its own operations, no selection, no clone source from the last one.
+  useEffect(() => { setRetouchSelected(null); setRetouchClone((clone) => ({ ...clone, source: null, offset: null })); setRetouchPicking(false); setRetouchMessage(null); }, [photo?.id]);
+  useEffect(() => { if (retouchSelected && !adjustments.retouch.some(({ id }) => id === retouchSelected)) setRetouchSelected(null); }, [retouchSelected, adjustments.retouch]);
   const removeMaskComponent = useCallback((id) => {
     const target = maskTargetRef.current;
     if (!target) return;
@@ -1376,6 +1397,17 @@ function EditorWorkspace({ host }) {
     else return false;
     return true;
   } : null;
+  // Retouch shortcuts: J Spot Heal, S Clone Stamp, [ ] brush size, Delete the selected repair, Esc done.
+  const retouchKeyRef = useRef(null);
+  retouchKeyRef.current = ready && !transformMode ? (key) => {
+    if (key === 'j') chooseRetouchTool(retouchTool === 'heal' ? null : 'heal');
+    else if (key === 's') chooseRetouchTool(retouchTool === 'clone' ? null : 'clone');
+    else if ((key === '[' || key === ']') && retouchTool) setRetouchBrush((value) => ({ ...value, radius: Math.min(RETOUCH_LIMITS.radius[1], Math.max(RETOUCH_LIMITS.radius[0], value.radius * (key === ']' ? 1.2 : 1 / 1.2))) }));
+    else if ((key === 'delete' || key === 'backspace') && retouchSelected) { applyRetouch(removeRetouchOperation(adjustments.retouch, retouchSelected)); setRetouchSelected(null); }
+    else if (key === 'escape' && retouchTool) chooseRetouchTool(null);
+    else return false;
+    return true;
+  } : null;
   const dialogOpenRef = useRef(false);
   dialogOpenRef.current = Boolean(batchDialog || exportDialogOpen || recipeDialog);
   // Keyboard shortcuts. Text fields keep their own undo and arrow keys.
@@ -1398,6 +1430,7 @@ function EditorWorkspace({ host }) {
       if (mod || event.altKey || isControl(event.target) || hdrOpenRef.current) return;
       if (event.key === 'Escape' && transformRef.current) { event.preventDefault(); transformRef.current(); return; }
       if (maskKeyRef.current?.(key)) { event.preventDefault(); return; }
+      if (retouchKeyRef.current?.(key)) { event.preventDefault(); return; }
       if (event.key === 'Escape' && layerToolRef.current) { event.preventDefault(); setLayerToolOn(false); return; }
       if (event.key === 'Escape' && !dialogOpenRef.current) { dispatch({ type: 'clearSelection' }); setSelecting(false); return; }
       if (event.key === '\\') setCompare((value) => (value === 'original' ? 'edited' : 'original'));
@@ -1677,6 +1710,25 @@ function EditorWorkspace({ host }) {
             onCommit: (mask, coalesceKey = null) => applyMask(mask, coalesceKey),
             onRemove: removeMaskComponent,
           } : null}
+          retouchTool={ready && !transformMode && (retouchTool || retouchSelected) ? {
+            tool: retouchTool,
+            brush: retouchBrush,
+            clone: retouchClone,
+            picking: retouchPicking,
+            selectedId: retouchSelected,
+            newId: newLayerId,
+            onCommit: (op, offset) => {
+              if (adjustments.retouch.length >= RETOUCH_LIMITS.operations) { setRetouchMessage(`A photo can hold up to ${RETOUCH_LIMITS.operations} retouch operations.`); return; }
+              applyRetouch([...adjustments.retouch, op]);
+              setRetouchSelected(op.id);
+              setRetouchMessage(null);
+              if (op.type === 'clone' && retouchClone.aligned && !retouchClone.offset) setRetouchClone((clone) => ({ ...clone, offset }));
+            },
+            onSelect: setRetouchSelected,
+            onUpdate: (id, patch) => applyRetouch(updateRetouchOperation(adjustments.retouch, id, patch)),
+            onSource: (source) => { setRetouchClone((clone) => ({ ...clone, source, offset: null })); setRetouchPicking(false); setRetouchMessage(null); },
+            onError: setRetouchMessage,
+          } : null}
           layerRasters={layerRasters}
           lutFor={lutFor}
           exportSize={ready ? outputOf(photo) : null}
@@ -1787,6 +1839,22 @@ function EditorWorkspace({ host }) {
             onFreeResize={setFreeResize}
           />
           <input ref={layerInputRef} type="file" accept={ACCEPT} hidden data-layer-input onChange={(event) => { onLayerFile(event.target.files[0]); event.target.value = ''; }} />
+          <RetouchPanel
+            disabled={!ready}
+            operations={ready ? adjustments.retouch : []}
+            tool={retouchTool}
+            onTool={chooseRetouchTool}
+            brush={retouchBrush}
+            onBrush={setRetouchBrush}
+            clone={retouchClone}
+            onClone={setRetouchClone}
+            picking={retouchPicking}
+            onPicking={setRetouchPicking}
+            selectedId={retouchSelected}
+            onSelect={setRetouchSelected}
+            onApply={applyRetouch}
+            message={retouchMessage}
+          />
           <MaskPanel
             disabled={!ready}
             locals={ready ? adjustments.local : []}

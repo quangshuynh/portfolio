@@ -18,6 +18,7 @@ import { renderRegion, warpedRegionSource } from '../pipeline/detailRegion.mjs';
 import { decodeSize, geometryPlan, normalizeGeometry } from '../pipeline/geometry.mjs';
 import { adjustRows, adjustmentParams, compositeRasterRows, detailBandRows, prepareDetailPass } from '../pipeline/composite.mjs';
 import { renderDetailFrame } from '../pipeline/localPreview.mjs';
+import { applyRetouch, applyRetouchToContext } from '../pipeline/retouch.mjs';
 
 export const EXPORT_BAND_ROWS = 256;
 
@@ -151,7 +152,7 @@ export const handlers = {
    * size does), reads the guide source in bands like exportDetailBands, and keeps only
    * `rect` (the region, room to pan and the halo).
    */
-  async regionSource({ file, header, rect, geometry = null }) {
+  async regionSource({ file, header, rect, geometry = null, retouch = [] }) {
     const size = { width: header.displayWidth, height: header.displayHeight };
     const plan = geometryPlan(normalizeGeometry(geometry), size);
     if (!plan.identity) {
@@ -159,10 +160,13 @@ export const handlers = {
       // original size would decode it.
       const decode = decodeSize(plan, plan.native, size);
       const original = await decodeToRgba(file, header, decode);
+      applyRetouch(original, retouch);
       const kept = warpedRegionSource(original, plan, rect);
       return { result: kept, transfer: [kept.source.data.buffer] };
     }
     const { context } = await decodeToCanvas(file, header, size);
+    // Retouch before anything reads the pixels (the guide included).
+    applyRetouchToContext(context, size.width, size.height, retouch);
     const small = guideSize(size);
     const accumulator = createAreaAccumulator(undefined, size.width, size.height, small.width, small.height);
     let transparent = false;
@@ -353,6 +357,8 @@ export const handlers = {
     const flatten = settings.format === 'jpeg';
     progress({ stage: 'decoding', fraction: 0 });
     let { canvas, context } = await decodeToCanvas(file, header, geometry.decode);
+    // Retouch (stage 0) on the decoded original, before geometry and every adjustment.
+    applyRetouchToContext(context, geometry.decode.width, geometry.decode.height, adjustments.retouch);
     let spec = null;
     if (!geometry.identity) {
       // Geometry: the decoded original is read once, the decode canvas released, and the

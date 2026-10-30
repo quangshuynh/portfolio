@@ -27,7 +27,8 @@ export default function InspectView({ photo, adjustments, lut, raw, compare, spl
   const [drag, setDrag] = useState(null);
   const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
   const image = size ?? { width: photo.width, height: photo.height };
-  const geometryKey = JSON.stringify(adjustments.geometry ?? null);
+  // A new crop is decoded when the geometry or the retouch (applied to the source) changes.
+  const geometryKey = JSON.stringify([adjustments.geometry ?? null, adjustments.retouch ?? []]);
 
   // The region: as many source pixels as the stage has device pixels, around the centre.
   useLayoutEffect(() => {
@@ -66,7 +67,7 @@ export default function InspectView({ photo, adjustments, lut, raw, compare, spl
         if (!kept || kept.photoId !== photo.id || kept.geometryKey !== current.geometryKey || !covers(kept.rect, current.region, image)) {
           setStatus({ state: 'decoding' });
           const rect = sourceRect(current.region, image);
-          const source = await loadSource(photo, rect, current.geometry);
+          const source = await loadSource(photo, rect, current.geometry, current.retouch);
           kept = { photoId: photo.id, geometryKey: current.geometryKey, key: `${photo.id}:${rect.x},${rect.y},${rect.width},${rect.height}:${current.geometryKey}`, rect: { x0: rect.x, y0: rect.y, width: rect.width, height: rect.height }, source };
           keptRef.current = kept;
         }
@@ -88,7 +89,7 @@ export default function InspectView({ photo, adjustments, lut, raw, compare, spl
 
   useEffect(() => {
     if (!region) return undefined;
-    const timer = setTimeout(() => run({ region, adjustments, lut, raw, geometry: adjustments.geometry ?? null, geometryKey }), RENDER_DELAY_MS);
+    const timer = setTimeout(() => run({ region, adjustments, lut, raw, geometry: adjustments.geometry ?? null, retouch: adjustments.retouch ?? [], geometryKey }), RENDER_DELAY_MS);
     return () => clearTimeout(timer);
   }, [region, adjustments, lut, raw, run, geometryKey]);
 

@@ -13,6 +13,7 @@ import { finishRows, warpImage, warpSpec } from '../pipeline/warp.mjs';
 import { contentHash } from '../io/hash.mjs';
 import { RawDecodeError, decodeRaw, downsampleRaw } from './rawDecoder.mjs';
 import { RAW_SNIFF_BYTES, RAW_SUPPORT, sniffRaw } from './rawFormat.mjs';
+import { applyRetouch } from '../pipeline/retouch.mjs';
 
 export const RAW_BAND_ROWS = 256;
 
@@ -78,7 +79,7 @@ export function createRawHandlers(loadModule) {
      * 1:1 inspection source: the full demosaic (as an export at original size), its guide
      * source, and only `rect` of the pixels.
      */
-    async region({ file, raw, rect, geometry = null }) {
+    async region({ file, raw, rect, geometry = null, retouch = [] }) {
       const { Module, bytes, format } = await openRaw(file, loadModule);
       const decoded = decodeRaw(Module, bytes, { format, halfSize: false });
       if (decoded.info.width !== raw.width || decoded.info.height !== raw.height) {
@@ -86,6 +87,7 @@ export function createRawHandlers(loadModule) {
       }
       const image = downsampleRaw(decoded.image, raw.width, raw.height);
       decoded.image = null;
+      applyRetouch(image, retouch);
       const plan = geometryPlan(normalizeGeometry(geometry), { width: raw.width, height: raw.height });
       if (!plan.identity) {
         const kept = warpedRegionSource(image, plan, rect);
@@ -145,6 +147,8 @@ export function createRawHandlers(loadModule) {
       if (image.width !== developSize.width || image.height !== developSize.height) {
         throw new RawDecodeError('corrupt', `LibRaw returned ${image.width}×${image.height} instead of ${developSize.width}×${developSize.height}.`);
       }
+      // Retouch (stage 0) on the developed sensor data, before geometry and every adjustment.
+      applyRetouch(image, adjustments.retouch);
       const spec = geometry.identity ? null : warpSpec(geometry.plan, size, developSize);
       if (spec) image = warpImage(image, spec.matrix, spec);
       const nativeSize = geometry.identity ? raw : geometry.plan.native;
