@@ -21,6 +21,30 @@ import { rasterizeTextLayer } from '../text/textRender.mjs';
 import { loadTextFonts } from '../text/fonts.mjs';
 import { DESIGN, layoutWatermark, regionLuminance, resolveWatermarkColor, sampleBox, watermarkActive } from '../watermark/watermark.mjs';
 import { drawMark, loadWatermarkFonts, markBounds } from '../watermark/watermarkRender.mjs';
+import { applyRetouch, applyRetouchOperation, findHealSource } from '../pipeline/retouch.mjs';
+import { retouchEqual } from '../model/retouch.mjs';
+import RetouchTool from './RetouchTool';
+
+const NO_RETOUCH = Object.freeze([]);
+const unionBox = (a, b) => (!a ? b : !b ? a : { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) });
+/** The proxy's pixels as { width, height, data } (an ImageBitmap proxy is read once through a canvas). */
+function proxyPixels(source) {
+  if (source.data) return source;
+  const canvas = Object.assign(document.createElement('canvas'), { width: source.width, height: source.height });
+  const context = canvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
+  context.drawImage(source, 0, 0);
+  const { data } = context.getImageData(0, 0, source.width, source.height, { colorSpace: 'srgb' });
+  canvas.width = 0;
+  return { width: source.width, height: source.height, data };
+}
+/** Copies a pixel box from `from` (a typed array of the same layout) back into `image`. */
+function restoreBox(from, image, box) {
+  const channels = Math.round(image.data.length / (image.width * image.height));
+  for (let y = box.y0; y < box.y1; y += 1) {
+    const start = (y * image.width + box.x0) * channels;
+    image.data.set(from.subarray(start, (y * image.width + box.x1) * channels), start);
+  }
+}
 
 const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 8;
@@ -157,7 +181,7 @@ function overlayTable(view, hex) {
  *   canvas over the photo, so moving or resizing it never renders the photo again
  * :param onWatermarkAuto: receives { variant, mean } of the preview's backdrop when the colour is Auto
  */
-export default function Viewer({ photo, adjustments: settings, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, renderLocalDetail = null, deferWork = false, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, layerTool = null, maskTool = null, layerRasters = null, lutFor = () => null, exportSize: exportSizeProp = null, onWatermarkAuto = null }) {
+export default function Viewer({ photo, adjustments: settings, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, renderLocalDetail = null, deferWork = false, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, layerTool = null, maskTool = null, retouchTool = null, layerRasters = null, lutFor = () => null, exportSize: exportSizeProp = null, onWatermarkAuto = null }) {
   // The photo's settings keep their identity while only the watermark changes, so a watermark
   // edit redraws only its own overlay, never the photo or its layers.
   const settingsRef = useRef(settings);
@@ -171,6 +195,8 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
   const canvasHostRef = useRef(null);
   const engineRef = useRef(null);
   const proxyRef = useRef(null);
+  // The loaded (untouched) proxy; proxyRef holds its retouched copy when the photo has retouch.
+  const originalRef = useRef(null);
   const frameRef = useRef(0);
   const cpuJobRef = useRef({ latest: 0, busy: false, queued: null });
   // CPU preview of a RAW photo: its neutral development, for Original and Split.
@@ -265,7 +291,7 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
         setStatus({ state: 'error', message: 'The graphics context could not be restored. Reload the page to continue.' });
         return;
       }
-      if (proxyRef.current) engine.renderer.setSource(proxyRef.current);
+      if (originalRef.current) engine.renderer.setSource(originalRef.current);
       setStatus({ state: 'ready' });
       setProxy((current) => (current ? { ...current } : current));
     };
@@ -298,6 +324,7 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
       if (engine.kind === 'webgl2') engine.renderer.setSource(image);
       else { canvas.width = image.width; canvas.height = image.height; }
       proxyRef.current = image;
+      originalRef.current = image;
       onProxy?.({ photoId: photo.id, image });
       setProxy({ id: photo.id, width: image.width, height: image.height });
       setView({ fit: true, zoom: 1, x: 0, y: 0 });
@@ -400,7 +427,7 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
     }
     const out = request.warp ?? image;
     const sourceWidth = Math.round(out.width * split);
-    const before = sourceWidth > 0 ? await cpuBefore(image, request.raw, request.warp) : null;
+    const before = sourceWidth > 0 ? await cpuBefore(originalRef.current ?? image, request.raw, request.warp) : null;
     if (proxyRef.current !== image) return;
     const { context } = engine;
     if (context.canvas.width !== out.width || context.canvas.height !== out.height) Object.assign(context.canvas, { width: out.width, height: out.height });
@@ -489,7 +516,7 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
       const out = params.warp ?? image;
       const rendered = params.neutral && !params.warp ? image : await renderInWorker(image, params.adjustments, params.lutData, params.raw, params.nativeSize, params.warp);
       const sourceWidth = Math.round(out.width * params.split);
-      const before = sourceWidth > 0 ? await cpuBefore(image, params.raw, params.warp) : image;
+      const before = sourceWidth > 0 ? await cpuBefore(originalRef.current ?? image, params.raw, params.warp) : image;
       if (id === job.latest && proxyRef.current === image) {
         const { canvas: target } = engine.context;
         if (target.width !== out.width || target.height !== out.height) Object.assign(target, { width: out.width, height: out.height });
@@ -627,6 +654,85 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
     overlayDrawnRef.current = { raster, change, view, hex, image };
   }, [overlayMask?.overlay.view, overlayMask?.overlay.color]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Retouch (pipeline/retouch.mjs) changes the source itself: the shown proxy is a retouched copy of
+  // the loaded one. Appended operations are applied to that copy in place and only their box is
+  // uploaded; any other change starts again from the loaded proxy. A stroke in progress is drawn
+  // into the copy and undone from a snapshot when it ends. The loaded proxy stays for "before".
+  const retouchOps = renderAdjustments.retouch ?? NO_RETOUCH;
+  const retouchRef = useRef({ original: null, ops: NO_RETOUCH, image: null, preview: null });
+  const [retouchVersion, setRetouchVersion] = useState(0);
+  // Restores what the stroke in progress changed; `end` also drops its snapshot (one per stroke).
+  const undoPreview = (state, end = true) => {
+    const box = state.preview?.box ?? null;
+    if (box) restoreBox(state.preview.snapshot, state.image, box);
+    if (end) state.preview = null;
+    else if (state.preview) state.preview.box = null;
+    return box;
+  };
+  useEffect(() => {
+    const original = originalRef.current;
+    const engine = engineRef.current;
+    if (!original || !engine || !proxy || proxy.id !== photo?.id) return;
+    const state = retouchRef.current;
+    const started = performance.now();
+    const restored = state.original === original ? undoPreview(state) : null;
+    const active = retouchOps.some(({ enabled }) => enabled);
+    let image = original;
+    let dirty = null;
+    if (active) {
+      const appended = state.original === original && state.image && state.image !== original
+        && retouchOps.length > state.ops.length && retouchEqual(state.ops, retouchOps.slice(0, state.ops.length));
+      if (appended) {
+        dirty = unionBox(restored, applyRetouch(state.image, retouchOps.slice(state.ops.length)));
+        image = { ...state.image };
+      } else {
+        const pixels = proxyPixels(original);
+        image = { ...pixels, kind: original.kind, data: pixels.data.slice() };
+        applyRetouch(image, retouchOps);
+      }
+    }
+    retouchRef.current = { original, ops: retouchOps, image, preview: null };
+    proxyRef.current = image;
+    if (engine.kind === 'webgl2' && !engine.renderer.lost) {
+      if (image === original) engine.renderer.setRetouched(null);
+      else engine.renderer.setRetouched(image, dirty);
+    }
+    performance.mark?.('pe-retouch-applied', { detail: { ms: performance.now() - started, operations: retouchOps.length, incremental: Boolean(dirty) } });
+    setRetouchVersion((version) => version + 1);
+  }, [retouchOps, proxy, photo?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Draws a stroke in progress (an operation), or removes it (null), until the committed one arrives. */
+  const previewRetouch = useCallback((op) => {
+    const engine = engineRef.current;
+    const state = retouchRef.current;
+    if (!engine || !state.original || state.original !== originalRef.current) return;
+    const started = performance.now();
+    let box = undoPreview(state, !op);
+    if (op) {
+      if (!state.image || state.image === state.original) {
+        const pixels = proxyPixels(state.original);
+        state.image = { ...pixels, kind: state.original.kind, data: pixels.data.slice() };
+        proxyRef.current = state.image;
+        state.preview = null;
+        box = null;
+      }
+      // The stroke's snapshot is taken once, at its first preview.
+      state.preview ??= { snapshot: state.image.data.slice(), box: null };
+      state.preview.box = applyRetouchOperation(state.image, op);
+      box = box && state.preview.box ? unionBox(box, state.preview.box) : box ?? state.preview.box;
+    }
+    if (engine.kind === 'webgl2' && !engine.renderer.lost) engine.renderer.setRetouched(state.image === state.original ? null : state.image, box);
+    proxyRef.current = state.image ?? state.original;
+    performance.mark?.('pe-retouch-preview', { detail: { ms: performance.now() - started } });
+    setRetouchVersion((version) => version + 1);
+  }, []);
+  /** A source for a heal stroke from the pixels as they are now (earlier operations included). */
+  const healSource = useCallback((op) => {
+    const state = retouchRef.current;
+    const image = state.image ?? (originalRef.current ? proxyPixels(originalRef.current) : null);
+    return image ? findHealSource(image, op) : null;
+  }, []);
+
   // Render on the next frame with the latest values; intermediate values are dropped.
   // Never with another photo's settings: wait until this photo's proxy is loaded.
   const raw = photo?.raw ?? null;
@@ -711,7 +817,7 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
       }
     });
     return () => cancelAnimationFrame(frameRef.current);
-  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec, glowVersion, buildLayers, drawOverlay, layerRasters?.version, localVersion, maskTool?.owner.id, deferWork]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec, glowVersion, buildLayers, drawOverlay, layerRasters?.version, localVersion, maskTool?.owner.id, deferWork, retouchVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -791,7 +897,7 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
   const onPointerDown = (event) => {
     if (!proxy || event.button !== 0 || event.target.closest('.pe-split')) return;
     // The mask tool keeps its own pointer capture (it paints with that finger).
-    if (maskTool?.tool && event.target.closest('.pe-masktool')) toolPointersRef.current.add(event.pointerId);
+    if ((maskTool?.tool || retouchTool?.tool) && event.target.closest('.pe-masktool')) toolPointersRef.current.add(event.pointerId);
     else event.currentTarget.setPointerCapture(event.pointerId);
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     startGesture({ originX: offsetX, originY: offsetY, zoom });
@@ -947,6 +1053,27 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
             onPreview={maskTool.onPreview}
             onCommit={maskTool.onCommit}
             onRemove={maskTool.onRemove}
+          />
+        )}
+        {retouchTool && proxy && proxy.id === photo?.id && !transform && !inspect && compare !== 'original' && (
+          <RetouchTool
+            map={imageMaskMap(plan, { width: sourceWidth, height: sourceHeight }, native)}
+            box={{ x: offsetX, y: offsetY, width: displayWidth, height: displayHeight }}
+            output={{ width: sourceWidth, height: sourceHeight }}
+            tool={retouchTool.tool}
+            brush={retouchTool.brush}
+            operations={adjustments.retouch ?? []}
+            selectedId={retouchTool.selectedId}
+            clone={retouchTool.clone}
+            picking={retouchTool.picking}
+            newId={retouchTool.newId}
+            onPreview={previewRetouch}
+            onCommit={retouchTool.onCommit}
+            onSelect={retouchTool.onSelect}
+            onUpdate={retouchTool.onUpdate}
+            onSource={retouchTool.onSource}
+            onError={retouchTool.onError}
+            findSource={healSource}
           />
         )}
         {layerTool?.interactive && proxy && proxy.id === photo?.id && !transform && !inspect && compare !== 'original' && (

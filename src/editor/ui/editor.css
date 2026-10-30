@@ -705,6 +705,18 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-masktool__cursor { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; will-change: transform; }
 .pe-masktool__ring { position: absolute; box-sizing: border-box; border: 1px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(0, 0, 0, .55); }
 .pe-masktool__ring--inner { border-style: dashed; opacity: .7; box-shadow: none; }
+/* Retouch: repair areas as brush-wide strokes, the selected one's source dashed, the clone sampling ring. */
+.pe-retouchtool[data-tool='heal'], .pe-retouchtool[data-tool='clone'] { cursor: none; }
+.pe-retouchtool[data-picking] { cursor: crosshair; }
+.pe-masktool__shapes path.pe-retouch-area { stroke: rgba(255, 255, 255, .18); stroke-linecap: round; stroke-linejoin: round; vector-effect: none; filter: none; }
+.pe-masktool__shapes path.pe-retouch-area[data-selected] { stroke: rgba(255, 255, 255, .38); }
+.pe-masktool__shapes path.pe-retouch-area[data-disabled] { stroke-dasharray: 4 4; stroke: rgba(255, 255, 255, .12); }
+.pe-masktool__shapes path.pe-retouch-area--source { stroke: rgba(10, 132, 255, .3); }
+.pe-masktool__shapes path.pe-retouch-area--live { stroke: rgba(255, 255, 255, .3); }
+.pe-retouch-source::after { content: ''; position: absolute; inset: 25%; border: 2px solid #0a84ff; border-radius: 50%; background: rgba(10, 132, 255, .25); box-shadow: 0 0 0 1px rgba(0, 0, 0, .6); }
+.pe-retouch-source:focus-visible::after { outline: 2px solid #fff; outline-offset: 2px; }
+.pe-retouch-picked { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; pointer-events: none; background: linear-gradient(#fff, #fff) center / 2px 100% no-repeat, linear-gradient(#fff, #fff) center / 100% 2px no-repeat; filter: drop-shadow(0 0 1px #000); }
+.pe-retouch-marker .pe-masktool__ring { border-style: dashed; border-color: #0a84ff; }
 /* The hotspot: + paints, − erases (Alt swaps while held). */
 .pe-masktool__cursor::before, .pe-masktool__cursor::after { content: ''; position: absolute; left: -4px; top: -.5px; width: 8px; height: 1px; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .55); }
 .pe-masktool__cursor::after { left: -.5px; top: -4px; width: 1px; height: 8px; }
