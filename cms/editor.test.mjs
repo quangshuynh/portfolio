@@ -260,6 +260,15 @@ describe('attached editing sources', () => {
     expect(sha256(served.bytes)).toBe(sha256(raw));
   });
 
+  test('a Nikon NEF is accepted as an editing source and stored privately by content', async () => {
+    const { json } = await describe_('gamma');
+    const raw = Buffer.concat([Buffer.from([0x4d, 0x4d, 0x00, 0x2a]), Buffer.alloc(4096, 9)]);
+    const attached = await call('POST', `/api/editor/photos/gamma/sources?filename=_DSC0051.NEF&revision=${json.treatment.revision}`, { body: raw });
+    expect(attached.status).toBe(200);
+    expect(attached.json.sources).toEqual([expect.objectContaining({ kind: 'attached', format: 'nef', name: '_DSC0051.NEF', sha256: sha256(raw), available: true })]);
+    expect(readdirSync(path.join(fixture.workspace, 'sources'))).toContain(`${sha256(raw)}.nef`);
+  });
+
   test('unsupported files, a fourth source and a TIFF that is not ARW or DNG are refused', async () => {
     let revision = (await describe_('beta')).json.treatment.revision;
     expect((await call('POST', `/api/editor/photos/beta/sources?filename=a.txt&revision=${revision}`, { body: Buffer.from('hello') })).status).toBe(415);
