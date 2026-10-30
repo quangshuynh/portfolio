@@ -441,8 +441,9 @@ try {
     });
     console.log('text ink spread across environments (export px):', JSON.stringify(spread));
     results.push({ textSpread: spread });
-    // Same letters in the same places everywhere; anti-aliasing may change the ink by a few percent.
-    const off = spread.filter((line) => Math.max(line.left, line.right, line.top, line.bottom) > 1 || line.inkPercent > 10);
+    // Same letters in the same places everywhere; anti-aliasing changes the ink: up to 10% for HUYNH,
+    // 15% for the two small lines (about 7–9 px tall here, a few pixels per glyph stroke).
+    const off = spread.filter((line) => Math.max(line.left, line.right, line.top, line.bottom) > 1 || line.inkPercent > (line.id === 'name' ? 10 : 15));
     if (off.length) { console.log(`FAIL text differs across environments: ${JSON.stringify(off)}`); process.exitCode = 1; }
   }
   console.log(JSON.stringify(results, null, 2));

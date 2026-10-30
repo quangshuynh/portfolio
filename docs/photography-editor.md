@@ -1216,7 +1216,8 @@ Settings never change the text or typography.
 - **Fonts:** static 500/800 faces (~25 kB each, same site): Playwright WebKit
   draws variable faces on canvas at their default weight. Letter positions come
   from a fixed advance table, so they match across engines; anti-aliasing
-  differs (measured ink ≤ 5%, box positions 0 px apart).
+  differs (box positions 0 px apart; ink within 2% for HUYNH, up to 11% for
+  the 7 px web address; the check allows 10% and 15%).
 - **Measured** (`check:editor:watermark`): the watermark step costs 2–12 ms at
   6000 × 4000 and ~5 ms on an A7 III RAW export; pixels outside the box are
   unchanged; border pixels are within 2 levels of the exact blend (8-bit
