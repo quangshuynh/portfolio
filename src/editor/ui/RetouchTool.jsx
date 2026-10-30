@@ -12,6 +12,8 @@ const POINT_SPACING_RADIUS = 0.15;
  * so an operation keeps its place at any zoom, pan, crop or export size.
  * - Heal: click or paint; when the stroke ends a matching source nearby is found
  *   (`findSource`), and the operation is committed.
+ * - Remove: paint over an object; when the stroke ends it is filled content-aware (the page shows
+ *   progress). With `areaFor` set, a drag draws the area that removal may copy from (`onArea`).
  * - Clone: Alt/Option-click (or "Set source" on touch, `picking`) sets the source; painting
  *   copies from it with the offset fixed at the stroke's first point. Aligned keeps that offset
  *   for later strokes until a new source is set; otherwise each stroke starts at the source.
@@ -19,11 +21,11 @@ const POINT_SPACING_RADIUS = 0.15;
  * not used. The selected operation shows its target and source; dragging the source handle (or
  * the arrow keys on it) moves the source. The brush outline and source marker follow the pointer
  * outside React.
- * :param tool: 'heal' | 'clone' | null (handles only)
+ * :param tool: 'heal' | 'clone' | 'remove' | null (handles only)
  * :param brush: { radius, hardness, opacity, spacing }
  * :param clone: { source: { x, y } | null, aligned, offset: { x, y } | null } (the clone sampling state)
  */
-export default function RetouchTool({ map, box, output, tool, brush, operations, selectedId, clone, picking, newId, onPreview, onCommit, onSelect, onUpdate, onSource, findSource, onError }) {
+export default function RetouchTool({ map, box, output, tool, brush, operations, selectedId, clone, picking, newId, onPreview, onCommit, onSelect, onUpdate, onSource, findSource, onError, areaFor = null, onArea = () => {} }) {
   const dragRef = useRef(null);
   const frameRef = useRef(0);
   const cursorRef = useRef(null);
@@ -92,8 +94,19 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
     frameRef.current = requestAnimationFrame(() => onPreview(operationFor(drag)));
   };
 
+  const areaRef = useRef(null);
   const onPointerDown = (event) => {
-    if (event.button !== 0 || !tool) return;
+    if (event.button !== 0) return;
+    if (areaFor) {
+      // Remove: drag a rectangle, the area the fill may copy from.
+      event.preventDefault();
+      if (event.pointerType !== 'touch') event.stopPropagation();
+      try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* a synthetic pointer */ }
+      const point = local(event);
+      dragRef.current = { kind: 'area', pointer: event.pointerId, start: point, end: point };
+      return;
+    }
+    if (!tool) return;
     if (event.pointerType !== 'touch') event.stopPropagation();
     event.preventDefault();
     if (dragRef.current) {
@@ -130,6 +143,18 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
     const drag = dragRef.current;
     if (!drag || drag.pointer !== event.pointerId) return;
     if (event.pointerType !== 'touch') event.stopPropagation();
+    if (drag.kind === 'area') {
+      drag.end = point;
+      const rect = areaRef.current;
+      if (rect) {
+        rect.setAttribute('x', String(Math.min(drag.start.x, point.x)));
+        rect.setAttribute('y', String(Math.min(drag.start.y, point.y)));
+        rect.setAttribute('width', String(Math.abs(point.x - drag.start.x)));
+        rect.setAttribute('height', String(Math.abs(point.y - drag.start.y)));
+        rect.removeAttribute('visibility');
+      }
+      return;
+    }
     if (drag.kind === 'source') {
       const at = toSpace(point.x, point.y);
       const op = operations.find(({ id }) => id === drag.id);
@@ -165,6 +190,15 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
     cancelAnimationFrame(frameRef.current);
     liveRef.current?.setAttribute('visibility', 'hidden');
     if (event.type === 'pointercancel') { onPreview(null); return; }
+    if (drag.kind === 'area') {
+      areaRef.current?.setAttribute('visibility', 'hidden');
+      // The rectangle's corners in the photo's space (its bounding box there when the photo is turned).
+      const corners = [[drag.start.x, drag.start.y], [drag.end.x, drag.start.y], [drag.start.x, drag.end.y], [drag.end.x, drag.end.y]].map(([x, y]) => toSpace(x, y));
+      const u0 = Math.min(...corners.map(({ u }) => u)); const u1 = Math.max(...corners.map(({ u }) => u));
+      const v0 = Math.min(...corners.map(({ v }) => v)); const v1 = Math.max(...corners.map(({ v }) => v));
+      onArea(areaFor, { x: u0, y: v0, width: u1 - u0, height: v1 - v0 });
+      return;
+    }
     if (drag.kind === 'source') {
       if (drag.offset) onUpdate(drag.id, { offset: drag.offset });
       else onPreview(null);
@@ -202,14 +236,19 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
   }
   const radiusOf = (op) => (op.radius * short) / spacePerStage;
   const selected = operations.find(({ id }) => id === selectedId) ?? null;
-  const sourcePoint = selected ? toStage(selected.points[0][0] + selected.offset.x, selected.points[0][1] + selected.offset.y) : null;
+  const area = selected?.type === 'remove' && selected.source ? (() => {
+    const a = toStage(selected.source.x, selected.source.y);
+    const b = toStage(selected.source.x + selected.source.width, selected.source.y + selected.source.height);
+    return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) };
+  })() : null;
+  const sourcePoint = selected && selected.type !== 'remove' ? toStage(selected.points[0][0] + selected.offset.x, selected.points[0][1] + selected.offset.y) : null;
   const pickedSource = tool === 'clone' && clone?.source ? toStage(clone.source.x, clone.source.y) : null;
   const cursorRadius = (brush.radius * short) / spacePerStage;
 
   return (
     <div
       className="pe-masktool pe-retouchtool"
-      data-tool={tool ?? 'handles'}
+      data-tool={areaFor ? 'area' : tool ?? 'handles'}
       data-picking={picking || undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -222,8 +261,10 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
           <path key={op.id} d={pathOf(op.points)} className="pe-retouch-area" data-selected={op.id === selectedId || undefined} data-type={op.type} data-disabled={!op.enabled || undefined}
             style={{ strokeWidth: Math.max(2, 2 * radiusOf(op)) }} />
         ))}
-        {selected && <path d={pathOf(selected.points, selected.offset)} className="pe-retouch-area pe-retouch-area--source" style={{ strokeWidth: Math.max(2, 2 * radiusOf(selected)) }} />}
-        {tool === 'heal' && <path ref={liveRef} className="pe-retouch-area pe-retouch-area--live" visibility="hidden" />}
+        {selected && selected.type !== 'remove' && <path d={pathOf(selected.points, selected.offset)} className="pe-retouch-area pe-retouch-area--source" style={{ strokeWidth: Math.max(2, 2 * radiusOf(selected)) }} />}
+        {area && <rect className="pe-retouch-sourcearea" x={area.x} y={area.y} width={area.width} height={area.height} />}
+        <rect ref={areaRef} className="pe-retouch-sourcearea pe-retouch-sourcearea--live" visibility="hidden" />
+        {(tool === 'heal' || tool === 'remove') && <path ref={liveRef} className="pe-retouch-area pe-retouch-area--live" visibility="hidden" />}
       </svg>
       {selected && sourcePoint && (
         <span

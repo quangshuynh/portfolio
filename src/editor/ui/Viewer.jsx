@@ -21,7 +21,8 @@ import { rasterizeTextLayer } from '../text/textRender.mjs';
 import { loadTextFonts } from '../text/fonts.mjs';
 import { DESIGN, layoutWatermark, regionLuminance, resolveWatermarkColor, sampleBox, watermarkActive } from '../watermark/watermark.mjs';
 import { drawMark, loadWatermarkFonts, markBounds } from '../watermark/watermarkRender.mjs';
-import { applyRetouch, applyRetouchOperation, findHealSource } from '../pipeline/retouch.mjs';
+import { applyRetouch, applyRetouchAsync, applyRetouchOperation, findHealSource } from '../pipeline/retouch.mjs';
+import { createInpaintRunner } from '../pipeline/inpaintClient.mjs';
 import { retouchEqual } from '../model/retouch.mjs';
 import RetouchTool from './RetouchTool';
 
@@ -661,6 +662,11 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
   const retouchOps = renderAdjustments.retouch ?? NO_RETOUCH;
   const retouchRef = useRef({ original: null, ops: NO_RETOUCH, image: null, preview: null });
   const [retouchVersion, setRetouchVersion] = useState(0);
+  // Remove fills run in a worker: the photo keeps showing its last state meanwhile, with progress.
+  const [retouchBusy, setRetouchBusy] = useState(null);
+  const removerRef = useRef(null);
+  const retouchJobRef = useRef(0);
+  useEffect(() => () => removerRef.current?.dispose(), []);
   // Restores what the stroke in progress changed; `end` also drops its snapshot (one per stroke).
   const undoPreview = (state, end = true) => {
     const box = state.preview?.box ?? null;
@@ -679,11 +685,40 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
     const active = retouchOps.some(({ enabled }) => enabled);
     let image = original;
     let dirty = null;
+    const appended = active && state.original === original && state.image && state.image !== original
+      && retouchOps.length > state.ops.length && retouchEqual(state.ops, retouchOps.slice(0, state.ops.length));
+    const work = appended ? retouchOps.slice(state.ops.length) : retouchOps;
+    const job = (retouchJobRef.current += 1);
+    if (active && work.some((op) => op.enabled && op.type === 'remove')) {
+      // A fill: work on a copy in the background; a newer change abandons this one.
+      removerRef.current?.cancel();
+      removerRef.current ??= createInpaintRunner();
+      const runner = removerRef.current;
+      const base = appended ? state.image : proxyPixels(original);
+      const copy = { ...base, kind: original.kind, data: base.data.slice() };
+      const pending = work.filter((op) => op.enabled && op.type === 'remove').map(({ id }) => id);
+      setRetouchBusy({ fraction: 0, ids: pending });
+      let finished = 0;
+      applyRetouchAsync(copy, work, {
+        runRemove: (payload) => runner.run(payload, (fraction) => { if (retouchJobRef.current === job) setRetouchBusy({ fraction: (finished + fraction) / pending.length, ids: pending }); }).then((filled) => { finished += 1; return filled; }),
+      }).then((changed) => {
+        if (retouchJobRef.current !== job) return;
+        retouchRef.current = { original, ops: retouchOps, image: copy, preview: null };
+        proxyRef.current = copy;
+        if (engine.kind === 'webgl2' && !engine.renderer.lost) engine.renderer.setRetouched(copy, appended ? unionBox(restored, changed) : null);
+        setRetouchBusy(null);
+        performance.mark?.('pe-retouch-applied', { detail: { ms: performance.now() - started, operations: retouchOps.length, incremental: appended, fill: true } });
+        setRetouchVersion((version) => version + 1);
+      }).catch((error) => {
+        if (retouchJobRef.current !== job) return;
+        setRetouchBusy(error.code === 'cancelled' ? null : { error: error.message });
+      });
+      return;
+    }
+    setRetouchBusy(null);
     if (active) {
-      const appended = state.original === original && state.image && state.image !== original
-        && retouchOps.length > state.ops.length && retouchEqual(state.ops, retouchOps.slice(0, state.ops.length));
       if (appended) {
-        dirty = unionBox(restored, applyRetouch(state.image, retouchOps.slice(state.ops.length)));
+        dirty = unionBox(restored, applyRetouch(state.image, work));
         image = { ...state.image };
       } else {
         const pixels = proxyPixels(original);
@@ -1074,7 +1109,17 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
             onSource={retouchTool.onSource}
             onError={retouchTool.onError}
             findSource={healSource}
+            areaFor={retouchTool.areaFor}
+            onArea={retouchTool.onArea}
           />
+        )}
+        {retouchBusy && proxy && (
+          <div className="pe-retouch-progress" role={retouchBusy.error ? 'alert' : 'status'} data-retouch-busy={retouchBusy.error ? 'error' : 'filling'}>
+            {retouchBusy.error ? `Remove failed: ${retouchBusy.error}` : `Removing… ${Math.round((retouchBusy.fraction ?? 0) * 100)}%`}
+            {!retouchBusy.error && retouchTool?.onCancelFill && (
+              <button type="button" className="pe-text-button" onClick={() => { removerRef.current?.cancel(); retouchTool.onCancelFill(retouchBusy.ids); setRetouchBusy(null); }}>Cancel</button>
+            )}
+          </div>
         )}
         {layerTool?.interactive && proxy && proxy.id === photo?.id && !transform && !inspect && compare !== 'original' && (
           <LayerHandles

@@ -269,6 +269,8 @@ function EditorWorkspace({ host }) {
   const [retouchPicking, setRetouchPicking] = useState(false);
   const [retouchSelected, setRetouchSelected] = useState(null);
   const [retouchMessage, setRetouchMessage] = useState(null);
+  // The removal whose source area is being drawn on the photo, or null.
+  const [retouchArea, setRetouchArea] = useState(null);
   // Image layer sources imported as layers only (by SHA-256); workspace photos serve as sources too.
   const layerFiles = useRef(new Map());
   const layerInputRef = useRef(null);
@@ -787,11 +789,12 @@ function EditorWorkspace({ host }) {
     setRetouchTool(value);
     setRetouchPicking(false);
     setRetouchMessage(null);
+    setRetouchArea(null);
     if (value) { setMaskTool(null); setLayerToolOn(false); setInspecting(false); }
   }, [transformMode]);
   const applyRetouch = useCallback((retouch, coalesceKey = null) => dispatch({ type: 'applySettings', patch: { retouch }, coalesceKey }), []);
   // A new photo: its own operations, no selection, no clone source from the last one.
-  useEffect(() => { setRetouchSelected(null); setRetouchClone((clone) => ({ ...clone, source: null, offset: null })); setRetouchPicking(false); setRetouchMessage(null); }, [photo?.id]);
+  useEffect(() => { setRetouchSelected(null); setRetouchClone((clone) => ({ ...clone, source: null, offset: null })); setRetouchPicking(false); setRetouchMessage(null); setRetouchArea(null); }, [photo?.id]);
   useEffect(() => { if (retouchSelected && !adjustments.retouch.some(({ id }) => id === retouchSelected)) setRetouchSelected(null); }, [retouchSelected, adjustments.retouch]);
   const removeMaskComponent = useCallback((id) => {
     const target = maskTargetRef.current;
@@ -1397,13 +1400,15 @@ function EditorWorkspace({ host }) {
     else return false;
     return true;
   } : null;
-  // Retouch shortcuts: J Spot Heal, S Clone Stamp, [ ] brush size, Delete the selected repair, Esc done.
+  // Retouch shortcuts: R Remove, J Spot Heal, S Clone Stamp, [ ] brush size, Delete the selected repair, Esc done.
   const retouchKeyRef = useRef(null);
   retouchKeyRef.current = ready && !transformMode ? (key) => {
-    if (key === 'j') chooseRetouchTool(retouchTool === 'heal' ? null : 'heal');
+    if (key === 'r') chooseRetouchTool(retouchTool === 'remove' ? null : 'remove');
+    else if (key === 'j') chooseRetouchTool(retouchTool === 'heal' ? null : 'heal');
     else if (key === 's') chooseRetouchTool(retouchTool === 'clone' ? null : 'clone');
     else if ((key === '[' || key === ']') && retouchTool) setRetouchBrush((value) => ({ ...value, radius: Math.min(RETOUCH_LIMITS.radius[1], Math.max(RETOUCH_LIMITS.radius[0], value.radius * (key === ']' ? 1.2 : 1 / 1.2))) }));
     else if ((key === 'delete' || key === 'backspace') && retouchSelected) { applyRetouch(removeRetouchOperation(adjustments.retouch, retouchSelected)); setRetouchSelected(null); }
+    else if (key === 'escape' && retouchArea) setRetouchArea(null);
     else if (key === 'escape' && retouchTool) chooseRetouchTool(null);
     else return false;
     return true;
@@ -1710,7 +1715,7 @@ function EditorWorkspace({ host }) {
             onCommit: (mask, coalesceKey = null) => applyMask(mask, coalesceKey),
             onRemove: removeMaskComponent,
           } : null}
-          retouchTool={ready && !transformMode && (retouchTool || retouchSelected) ? {
+          retouchTool={ready && !transformMode && (retouchTool || retouchSelected || adjustments.retouch.some(({ type }) => type === 'remove')) ? {
             tool: retouchTool,
             brush: retouchBrush,
             clone: retouchClone,
@@ -1728,6 +1733,9 @@ function EditorWorkspace({ host }) {
             onUpdate: (id, patch) => applyRetouch(updateRetouchOperation(adjustments.retouch, id, patch)),
             onSource: (source) => { setRetouchClone((clone) => ({ ...clone, source, offset: null })); setRetouchPicking(false); setRetouchMessage(null); },
             onError: setRetouchMessage,
+            areaFor: retouchArea,
+            onArea: (id, source) => { applyRetouch(updateRetouchOperation(adjustments.retouch, id, { source })); setRetouchArea(null); },
+            onCancelFill: (ids) => applyRetouch(adjustments.retouch.filter((op) => !ids.includes(op.id))),
           } : null}
           layerRasters={layerRasters}
           lutFor={lutFor}
@@ -1854,6 +1862,8 @@ function EditorWorkspace({ host }) {
             onSelect={setRetouchSelected}
             onApply={applyRetouch}
             message={retouchMessage}
+            areaFor={retouchArea}
+            onAreaFor={(id) => { setRetouchArea(id); if (id) { setRetouchTool(null); setRetouchSelected(id); } }}
           />
           <MaskPanel
             disabled={!ready}
