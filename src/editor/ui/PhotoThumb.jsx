@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { renderAnyImage } from '../pipeline/detailRenderer.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { neutralGroup } from '../model/adjustments.mjs';
@@ -29,15 +29,19 @@ function shaped(thumbnail, geometry) {
 export default function PhotoThumb({ thumbnail, adjustments, lut = null, raw = null, photoWidth = 0 }) {
   const canvasRef = useRef(null);
   const lastRef = useRef(0);
+  // What the thumbnail draws: neither local adjustments nor layers (so painting a mask does not
+  // redraw it); Detail is left out too. A new object only when those settings change.
+  const drawnKey = JSON.stringify({ ...adjustments, ...neutralGroup('detail'), local: null, layers: null });
+  const drawn = useMemo(() => JSON.parse(drawnKey), [drawnKey]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !thumbnail) return undefined;
     const draw = () => {
       lastRef.current = performance.now();
-      const { image, spec } = shaped(thumbnail, adjustments.geometry);
+      const { image, spec } = shaped(thumbnail, drawn.geometry);
       // Detail is left out (fine filters do not show at this size); creative effects are kept.
-      const params = deriveParams({ ...adjustments, ...neutralGroup('detail') }, { lut, raw });
+      const params = deriveParams(drawn, { lut, raw });
       // Grain and other scale-aware effects: the thumbnail is a downscale of the photo's output.
       const factor = photoWidth ? thumbnail.width / photoWidth : 1;
       const data = finishRows(spec, renderAnyImage(image, params, { nativeWidth: image.width / factor, nativeHeight: image.height / factor }), 0, image.height, false);
@@ -49,7 +53,7 @@ export default function PhotoThumb({ thumbnail, adjustments, lut = null, raw = n
     if (wait <= 0) { draw(); return undefined; }
     const timer = setTimeout(draw, wait);
     return () => clearTimeout(timer);
-  }, [thumbnail, adjustments, lut, raw, photoWidth]);
+  }, [thumbnail, drawn, lut, raw, photoWidth]);
 
   return <canvas ref={canvasRef} className="pe-thumb" aria-hidden="true" />;
 }

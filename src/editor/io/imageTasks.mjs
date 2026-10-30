@@ -17,6 +17,7 @@ import { contentHash } from './hash.mjs';
 import { renderRegion, warpedRegionSource } from '../pipeline/detailRegion.mjs';
 import { decodeSize, geometryPlan, normalizeGeometry } from '../pipeline/geometry.mjs';
 import { adjustRows, adjustmentParams, compositeRasterRows, detailBandRows, prepareDetailPass } from '../pipeline/composite.mjs';
+import { renderDetailFrame } from '../pipeline/localPreview.mjs';
 
 export const EXPORT_BAND_ROWS = 256;
 
@@ -240,6 +241,12 @@ export const handlers = {
     if (!entry) throw stale('local detail');
     const rows = detailBandRows(source, entry.context, entry.pass, row, last);
     return rows ? { result: rows, transfer: [rows.buffer] } : { result: null };
+  },
+
+  /** A local Detail pass's unmasked result over a whole preview frame (pipeline/localPreview.mjs). */
+  async localDetailFrame({ image, pass }) {
+    const data = renderDetailFrame(image, pass);
+    return { result: data, transfer: [data.buffer] };
   },
 
   async compositeRows({ pass, raster = null, rows, width, y0, y1 }) {

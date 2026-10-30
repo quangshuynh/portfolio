@@ -348,7 +348,7 @@ export class GlRenderer {
    *   { width, height, data } (the Detail preview) drawn instead of the pipeline, scaled
    *   to the canvas when it is smaller
    */
-  render(params, { split = 0, before = null, rendered = null, layers = null } = {}) {
+  render(params, { split = 0, before = null, rendered = null, layers = null, renderedDirty = null } = {}) {
     const { gl } = this;
     if (!this.texture) return;
     this.last = [params, { split, before, rendered, layers }];
@@ -360,7 +360,7 @@ export class GlRenderer {
       this.composite(params, rendered, layers);
     } else {
       gl.viewport(0, 0, width, height);
-      if (rendered) this.draw({ ...params, neutral: true }, this.uploadRendered(rendered));
+      if (rendered) this.draw({ ...params, neutral: true }, this.uploadRendered(rendered, renderedDirty));
       else this.draw(params);
     }
     // Pixel x is "before" when its centre lies left of the split, (x + 0.5) / width < split.
@@ -539,7 +539,7 @@ export class GlRenderer {
   }
 
   /** Uploads a CPU-rendered RGBA8 frame into its own texture (linear filtering for scaling). */
-  uploadRendered({ width, height, data }) {
+  uploadRendered({ width, height, data }, dirty = null) {
     const { gl } = this;
     if (!this.renderedTexture) this.renderedTexture = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0);
@@ -547,6 +547,18 @@ export class GlRenderer {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    // The same frame buffer changed only in `dirty` (a brush move over local Detail): upload that box.
+    const uploaded = this.renderedUpload;
+    if (dirty && uploaded?.data === data && uploaded.width === width && uploaded.height === height) {
+      if (dirty.x1 > dirty.x0 && dirty.y1 > dirty.y0) {
+        const bytes = data instanceof Uint8Array ? data : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+        gl.pixelStorei(gl.UNPACK_ROW_LENGTH, width);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, dirty.x0, dirty.y0, dirty.x1 - dirty.x0, dirty.y1 - dirty.y0, gl.RGBA, gl.UNSIGNED_BYTE, bytes.subarray((dirty.y0 * width + dirty.x0) * 4));
+        gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0);
+      }
+      return this.renderedTexture;
+    }
+    this.renderedUpload = { data, width, height };
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data instanceof Uint8Array ? data : new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -722,6 +734,7 @@ export class GlRenderer {
     if (this.renderedTexture) this.gl.deleteTexture(this.renderedTexture);
     this.texture = null;
     this.renderedTexture = null;
+    this.renderedUpload = null;
     this.raw = false;
     this.hdr = false;
   }

@@ -9,7 +9,10 @@
 // Regression gate (BRUSH_STRICT=1, desktop Chromium only): the median main-thread time per move
 // stays under BRUSH_MAX_MAIN_MS (default 40 ms), generous enough for headless software WebGL.
 // Usage: npm run check:editor:brush (BRUSH_RUNS=chromium,cpu,iphone,pixel; CHECK_GPU=1: real GPU;
-// BRUSH_SKIP_BUILD=1 reuses dist/; BRUSH_MOVES=120; BRUSH_PROFILE=1 prints the CPU profile)
+// BRUSH_SKIP_BUILD=1 reuses dist/; BRUSH_MOVES=120; BRUSH_PROFILE=1 prints the CPU profile;
+// BRUSH_LOCAL=clarity paints a local Clarity adjustment instead of exposure, and reports the time
+// from release until the final Detail frame, then paints a second stroke; BRUSH_PAUSE_MS=500 is
+// the pause between setting the value and painting)
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,6 +30,7 @@ const ONLY_RUNS = process.env.BRUSH_RUNS?.split(',');
 const MOVES = Number(process.env.BRUSH_MOVES ?? 120);
 const MAX_MAIN_MS = Number(process.env.BRUSH_MAX_MAIN_MS ?? 40);
 const GENUINE_DIR = process.env.BRUSH_FIXTURE_DIR ?? '';
+const LOCAL = process.env.BRUSH_LOCAL === 'clarity' ? { section: /^Detail/, label: 'Clarity', value: '60' } : { label: 'Exposure', value: '1.5' };
 const GENUINE = GENUINE_DIR && existsSync(GENUINE_DIR) ? readdirSync(GENUINE_DIR).filter((name) => /\.jpe?g$/i.test(name)).sort().slice(0, 1).map((name) => path.join(GENUINE_DIR, name)) : [];
 const GPU_ARGS = process.env.CHECK_GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : [];
 
@@ -143,19 +147,27 @@ async function runOne(run, file) {
     await tab(2);
     await page.locator('.pe-masks__add[aria-label="New local adjustment"] button', { hasText: /^Brush$/ }).click();
     await page.locator('.pe-masktool').waitFor();
-    const field = page.getByRole('textbox', { name: 'Exposure value' });
-    await field.fill('1.5');
+    if (LOCAL.section) {
+      const toggle = page.locator('.pe-panel--adjust .pe-section__toggle', { hasText: LOCAL.section });
+      if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+    }
+    const field = page.getByRole('textbox', { name: `${LOCAL.label} value` });
+    await field.fill(LOCAL.value);
     await field.press('Enter');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(Number(process.env.BRUSH_PAUSE_MS ?? 500));
+    // Local Detail: the stroke starts once the frame with the setting is final.
+    if (LOCAL.section) await poll(() => page.evaluate(() => document.querySelector('[data-detail-preview]')?.dataset.detailPreview ?? null), (q) => q === null || q === 'final', 'Detail preview', 120_000);
     result.engine = await page.evaluate(() => (document.querySelector('.pe-canvas-host canvas')?.getContext ? document.querySelector('.pe-engine')?.textContent ?? null : null));
     const cdp = run.profile && process.env.BRUSH_PROFILE ? await context.newCDPSession(page) : null;
-    if (cdp) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); }
+    const startProfile = async () => { if (cdp) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); } };
+    // With BRUSH_LOCAL the profile covers the second stroke only.
+    if (!LOCAL.section) await startProfile();
     step('stroke');
     // The stroke: a wave across the photo, one move per animation frame.
-    const measured = await page.evaluate(async ({ moves, pointerType }) => {
+    const paintStroke = (offset) => page.evaluate(async ({ moves, pointerType, offset }) => {
       const tool = document.querySelector('.pe-masktool');
       const host = document.querySelector('.pe-canvas-host').getBoundingClientRect();
-      const at = (k) => ({ clientX: host.left + host.width * (0.1 + (0.8 * k) / moves), clientY: host.top + host.height * (0.5 + 0.25 * Math.sin((k / moves) * Math.PI * 4)) });
+      const at = (k) => ({ clientX: host.left + host.width * (0.1 + (0.8 * k) / moves), clientY: host.top + host.height * (0.5 + offset + 0.25 * Math.sin((k / moves) * Math.PI * 4)) });
       const send = (type, k) => tool.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 7, pointerType, isPrimary: true, button: 0, buttons: type === 'pointerup' ? 0 : 1, pressure: 0.5, ...at(k) }));
       const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
       await frame();
@@ -163,6 +175,7 @@ async function runOne(run, file) {
       const inputs = [];
       const handler = [];
       const frameTimes = [];
+      const quality = [];
       let last = await frame();
       const down = performance.now();
       send('pointerdown', 0);
@@ -171,6 +184,7 @@ async function runOne(run, file) {
         const now = await frame();
         frameTimes.push(now - last);
         last = now;
+        quality.push(document.querySelector('[data-detail-preview]')?.dataset.detailPreview ?? null);
         const t0 = performance.now();
         send('pointermove', k);
         handler.push(performance.now() - t0);
@@ -189,9 +203,18 @@ async function runOne(run, file) {
       key(); for (let k = 0; k < 4; k += 1) await frame(); // eslint-disable-line no-await-in-loop
       const overlayRedrawn = overlaySum();
       const t0 = performance.now();
+      const finals = performance.getEntriesByName('pe-detail-final').length + performance.getEntriesByName('pe-local-detail').length;
       send('pointerup', moves);
       await frame(); await frame();
       const commitMs = performance.now() - t0;
+      // Local Detail: release → the preview final again (the base frame and every local Detail pass).
+      let settleMs = null;
+      if (quality.some(Boolean)) {
+        const end = performance.now() + 120_000;
+        const settled = () => document.querySelector('[data-detail-preview]')?.dataset.detailPreview === 'final' && performance.getEntriesByName('pe-detail-final').length + performance.getEntriesByName('pe-local-detail').length > finals;
+        while (!settled() && performance.now() < end) await frame(); // eslint-disable-line no-await-in-loop
+        settleMs = performance.now() - t0;
+      }
       const latency = inputs.map((t, i) => {
         const next = inputs[i + 1] ?? Infinity;
         const draw = draws.find((d) => d >= t);
@@ -219,8 +242,12 @@ async function runOne(run, file) {
       const firstComposite = window.__brushComposites.find((d) => d >= down);
       const firstFrames = frameTimes.slice(0, 4);
       const firstPoint = { handler: downHandler, toDraw: firstDraw === undefined ? null : firstDraw - down, toComposite: firstComposite === undefined ? null : firstComposite - down, maxFrameOfFirstFour: Math.max(...firstFrames) };
-      return { handler, frameTimes, latency, commitMs, firstPoint, longFrames, span: inputs.at(-1) - inputs[0], overlayDiff };
-    }, { moves: MOVES, pointerType: run.device ? 'touch' : 'mouse' });
+      const detailShown = quality.some(Boolean) ? { final: quality.filter((q) => q === 'final').length, draft: quality.filter((q) => q === 'draft').length, rendering: quality.filter((q) => q === 'rendering').length } : null;
+      return { handler, frameTimes, latency, commitMs, settleMs, detailShown, firstPoint, longFrames, span: inputs.at(-1) - inputs[0], overlayDiff };
+    }, { moves: MOVES, pointerType: run.device ? 'touch' : 'mouse', offset });
+    // With BRUSH_LOCAL a second stroke follows (painting over a local Detail that already shows).
+    const measured = await paintStroke(0);
+    const second = LOCAL.section ? await (async () => { await page.waitForTimeout(300); await startProfile(); return paintStroke(-0.2); })() : null;
     if (cdp) {
       const { profile } = await cdp.send('Profiler.stop');
       const totalMs = (profile.endTime - profile.startTime) / 1000;
@@ -236,6 +263,10 @@ async function runOne(run, file) {
     result.inputToDrawMs = stats(measured.latency);
     result.longFrames = measured.longFrames.length ? { count: measured.longFrames.length, durationMs: stats(measured.longFrames.map((f) => f.duration)), renderMs: stats(measured.longFrames.map((f) => f.render)), busyShare: Math.round((100 * busy) / measured.span) } : 'none (or not Chromium)';
     result.commitMs = Math.round(measured.commitMs);
+    if (measured.settleMs !== null) Object.assign(result, { detailFinalAfterReleaseMs: Math.round(measured.settleMs), detailDuringStroke: measured.detailShown });
+    if (second) {
+      result.secondStroke = { inputToDrawMs: stats(second.latency), frameIntervalMs: stats(second.frameTimes), detailDuringStroke: second.detailShown, commitMs: Math.round(second.commitMs), detailFinalAfterReleaseMs: second.settleMs === null ? null : Math.round(second.settleMs) };
+    }
     step('overlay');
     // The overlay drawn box by box while painting equals a full redraw of the same mask (alpha
     // exactly; premultiplied colour within the canvas's rounding of one level).
@@ -246,11 +277,12 @@ async function runOne(run, file) {
     step('undo');
     // One stroke, one undo step.
     const strokes = () => page.evaluate(() => JSON.parse(localStorage.getItem('photo-editor:edits:v1') ?? 'null')?.photos[0]?.adjustments.local?.[0]?.mask.components[0]?.strokes?.length ?? 0);
-    await poll(strokes, (n) => n === 1, 'stroke saved', 15_000);
+    const painted = second ? 2 : 1;
+    await poll(strokes, (n) => n === painted, 'stroke saved', 15_000);
     await page.keyboard.press('Control+z');
-    await poll(strokes, (n) => n === 0, 'undo removes the whole stroke', 15_000);
+    await poll(strokes, (n) => n === painted - 1, 'undo removes the whole stroke', 15_000);
     await page.keyboard.press('Control+y');
-    await poll(strokes, (n) => n === 1, 'redo restores it', 15_000);
+    await poll(strokes, (n) => n === painted, 'redo restores it', 15_000);
     assert.deepEqual(problems, []);
     const median = result.handlerMs.p50 + (result.inputToDrawMs.p50 ?? 0);
     result.ok = !(process.env.BRUSH_STRICT && run.gate) || median <= MAX_MAIN_MS;
