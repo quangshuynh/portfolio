@@ -134,6 +134,7 @@ async function runOne(run, file) {
   const result = { environment: run.name, photo: path.basename(file) };
   const step = (name) => { result.step = name; if (process.env.BRUSH_VERBOSE) console.log(`  … ${run.id}: ${name}`); };
   const tab = async (index) => { if (run.device) await page.click(`.pe-tabs button:nth-child(${index})`); };
+  const strokesNow = () => page.evaluate(() => JSON.parse(localStorage.getItem('photo-editor:edits:v1') ?? 'null')?.photos[0]?.adjustments.local?.[0]?.mask.components[0]?.strokes?.length ?? 0);
   try {
     step('import');
     await page.goto(URL_EDITOR);
@@ -274,9 +275,35 @@ async function runOne(run, file) {
       result.overlayVsFullRedraw = measured.overlayDiff;
       assert.ok(measured.overlayDiff.pixels === 0, `incremental overlay differs from a full redraw: ${JSON.stringify(measured.overlayDiff)}`);
     }
+    if (run.device) {
+      // Touch: two fingers on the photo with the brush on pinch-zoom it and paint nothing.
+      step('pinch');
+      await poll(strokesNow, (n) => n >= 1, 'stroke saved', 15_000);
+      const before = await strokesNow();
+      const pinched = await page.evaluate(async () => {
+        const tool = document.querySelector('.pe-masktool');
+        const host = document.querySelector('.pe-canvas-host').getBoundingClientRect();
+        const cx = host.left + host.width / 2;
+        const cy = host.top + host.height / 2;
+        const send = (type, id, x) => tool.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: id, pointerType: 'touch', isPrimary: id === 11, button: 0, buttons: type === 'pointerup' ? 0 : 1, clientX: x, clientY: cy }));
+        const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+        const readout = () => document.querySelector('.pe-readout')?.textContent;
+        const zoomBefore = readout();
+        send('pointerdown', 11, cx - 30); await frame();
+        send('pointerdown', 12, cx + 30); await frame();
+        for (let k = 1; k <= 10; k += 1) { send('pointermove', 11, cx - 30 - 6 * k); send('pointermove', 12, cx + 30 + 6 * k); await frame(); } // eslint-disable-line no-await-in-loop
+        send('pointerup', 12, cx + 90); send('pointerup', 11, cx - 90);
+        for (let k = 0; k < 4; k += 1) await frame(); // eslint-disable-line no-await-in-loop
+        return { zoomBefore, zoomAfter: readout() };
+      });
+      await page.waitForTimeout(300);
+      result.pinch = { ...pinched, strokesBefore: before, strokesAfter: await strokesNow() };
+      assert.ok(parseInt(pinched.zoomAfter, 10) >= 2 * parseInt(pinched.zoomBefore, 10) - 2, `pinch zoom ${JSON.stringify(pinched)}`);
+      assert.equal(result.pinch.strokesAfter, before, 'a pinch paints nothing');
+    }
     step('undo');
     // One stroke, one undo step.
-    const strokes = () => page.evaluate(() => JSON.parse(localStorage.getItem('photo-editor:edits:v1') ?? 'null')?.photos[0]?.adjustments.local?.[0]?.mask.components[0]?.strokes?.length ?? 0);
+    const strokes = strokesNow;
     const painted = second ? 2 : 1;
     await poll(strokes, (n) => n === painted, 'stroke saved', 15_000);
     await page.keyboard.press('Control+z');

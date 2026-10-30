@@ -750,7 +750,9 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   }, [onWheel]);
 
   // One pointer pans; two pointers (touch) pinch-zoom around their midpoint and pan with it.
+  // Touches on the mask tool reach here too: one of them paints (no pan), two pinch.
   const pointersRef = useRef(new Map());
+  const toolPointersRef = useRef(new Set());
   const stagePoint = (x, y) => {
     const rect = stageRef.current.getBoundingClientRect();
     return { x: x - rect.left, y: y - rect.top };
@@ -761,14 +763,18 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       const [a, b] = points;
       dragRef.current = { pinch: true, distance: Math.hypot(a.x - b.x, a.y - b.y) || 1, mid: stagePoint((a.x + b.x) / 2, (a.y + b.y) / 2), ...view };
     } else if (points.length === 1) {
-      dragRef.current = { pinch: false, start: points[0], ...view };
+      // A finger on the mask tool paints, unless it is what is left of a pinch.
+      const [id] = pointersRef.current.keys();
+      dragRef.current = toolPointersRef.current.has(id) && !dragRef.current?.pinch ? null : { pinch: false, start: points[0], ...view };
     } else {
       dragRef.current = null;
     }
   };
   const onPointerDown = (event) => {
     if (!proxy || event.button !== 0 || event.target.closest('.pe-split')) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
+    // The mask tool keeps its own pointer capture (it paints with that finger).
+    if (maskTool?.tool && event.target.closest('.pe-masktool')) toolPointersRef.current.add(event.pointerId);
+    else event.currentTarget.setPointerCapture(event.pointerId);
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     startGesture({ originX: offsetX, originY: offsetY, zoom });
   };
@@ -789,6 +795,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     }
   };
   const onPointerUp = (event) => {
+    toolPointersRef.current.delete(event.pointerId);
     if (!pointersRef.current.delete(event.pointerId)) return;
     // Lifting one finger of a pinch continues as a pan from the current view.
     startGesture({ originX: offsetX, originY: offsetY, zoom });

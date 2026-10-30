@@ -67,7 +67,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     const p = brush.pressure && event.pointerType === 'pen' && event.pressure > 0 ? event.pressure : 1;
     const { u, v } = toSpace(point.x, point.y);
     const stroke = { mode: event.altKey ? (brush.mode === 'erase' ? 'add' : 'erase') : brush.mode, radius: brush.radius, hardness: brush.hardness, opacity: brush.opacity, points: [[u, v, p]] };
-    dragRef.current = { kind: 'paint', pointer: event.pointerId, base, id, stroke, last: point, latest: null };
+    dragRef.current = { kind: 'paint', pointer: event.pointerId, origin: mask, base, id, stroke, last: point, latest: null };
     // The first point is shown at once (moves are coalesced to one preview per frame).
     const first = appendStroke(base, id, stroke);
     dragRef.current.latest = first;
@@ -97,7 +97,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     const component = tool === 'linear' ? createLinear(id, { x0: u, y0: v, x1: u, y1: v }) : createRadial(id, { x: u, y: v, rx: 0.001, ry: 0.001 });
     const base = addComponent(mask, component);
     if (base === mask) return false;
-    dragRef.current = { kind: `create-${tool}`, pointer: event.pointerId, base, id, start: point, latest: null };
+    dragRef.current = { kind: `create-${tool}`, pointer: event.pointerId, origin: mask, base, id, start: point, latest: null };
     onSelect(id);
     return true;
   };
@@ -108,7 +108,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     event.preventDefault();
     try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* a synthetic pointer */ }
     onSelect(component.id);
-    dragRef.current = { kind: 'handle', handle, pointer: event.pointerId, component, start: local(event), latest: null };
+    dragRef.current = { kind: 'handle', handle, pointer: event.pointerId, origin: mask, component, start: local(event), latest: null };
   };
 
   const moveHandle = (drag, point) => {
@@ -141,14 +141,16 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
 
   const onPointerDown = (event) => {
     if (event.button !== 0 || !tool) return;
-    event.stopPropagation();
+    // Touches also reach the viewer, which pinch-zooms with two fingers (one finger paints here).
+    if (event.pointerType !== 'touch') event.stopPropagation();
     event.preventDefault();
     const drag = dragRef.current;
     if (drag) {
-      // A second touch: abandon the stroke or the new gradient (pinch to zoom with the tool off).
+      // A second touch: abandon the stroke or the new gradient; the fingers pinch-zoom instead.
+      // The mask returns to what it was before the gesture (its preview may already be shown).
       cancelAnimationFrame(frameRef.current);
       dragRef.current = null;
-      onPreview(mask);
+      onPreview(drag.origin);
       return;
     }
     try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* a synthetic pointer */ }
@@ -161,7 +163,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     if (tool === 'brush' && event.pointerType !== 'touch') setCursor(point);
     const drag = dragRef.current;
     if (!drag || drag.pointer !== event.pointerId) return;
-    event.stopPropagation();
+    if (event.pointerType !== 'touch') event.stopPropagation();
     if (drag.kind === 'paint') extendPaint(event, drag);
     else if (drag.kind === 'handle') moveHandle(drag, point);
     else {
@@ -176,7 +178,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
   const onPointerUp = (event) => {
     const drag = dragRef.current;
     if (!drag || drag.pointer !== event.pointerId) return;
-    event.stopPropagation();
+    if (event.pointerType !== 'touch') event.stopPropagation();
     if (event.type === 'pointerup' && drag.kind !== 'paint') onPointerMove(event);
     else if (event.type === 'pointerup') extendPaint(event, drag);
     dragRef.current = null;
@@ -184,7 +186,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     const point = local(event);
     const tooSmall = drag.kind.startsWith('create') && Math.hypot(point.x - drag.start.x, point.y - drag.start.y) < MIN_GRADIENT_PX;
     if (event.type === 'pointercancel' || tooSmall) {
-      onPreview(mask);
+      onPreview(drag.origin);
       if (tooSmall) onSelect(selectedId === drag.id ? null : selectedId);
       return;
     }
