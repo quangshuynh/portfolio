@@ -376,6 +376,31 @@ async function runOne(run, files) {
       result.placement.awayMax = away;
       assert.ok(away <= 1, `text export changed pixels away from the text by ${away}`);
     });
+    // Regression: WebKit drew the variable Schibsted face at its default weight on a canvas, so
+    // bold text was regular at bold spacing. The static faces draw each weight, with the same
+    // advances in every engine (Chromium values, 64 px).
+    await step('text faces: bold and italic draw at their weight, same advances in every engine', async () => {
+      const faces = await page.evaluate(async () => {
+        await document.fonts.ready;
+        const canvas = Object.assign(document.createElement('canvas'), { width: 900, height: 120 });
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        const sample = (font) => {
+          context.clearRect(0, 0, 900, 120);
+          context.font = `${font} 64px "PE Schibsted Grotesk", sans-serif`;
+          context.fillText('Bold Harbour 2026', 10, 90);
+          const { data } = context.getImageData(0, 0, 900, 120);
+          let ink = 0;
+          for (let i = 3; i < data.length; i += 4) ink += data[i];
+          return { ink: ink / 255, advance: context.measureText('Bold Harbour 2026').width };
+        };
+        return Object.fromEntries(['400', '700', 'italic 400', 'italic 700'].map((font) => [font, sample(font)]));
+      });
+      const advances = { 400: 564.53, 700: 589.97, 'italic 400': 553.85, 'italic 700': 575.47 };
+      for (const [font, expected] of Object.entries(advances)) assert.ok(close(faces[font].advance, expected, 0.3), `${font} advance ${faces[font].advance}, expected ${expected}`);
+      assert.ok(faces['700'].ink > faces['400'].ink * 1.35, `bold ink ${faces['700'].ink} vs regular ${faces['400'].ink}`);
+      assert.ok(faces['italic 700'].ink > faces['italic 400'].ink * 1.35, `bold italic ink ${faces['italic 700'].ink} vs ${faces['italic 400'].ink}`);
+      result.textFaces = Object.fromEntries(Object.entries(faces).map(([font, { ink, advance }]) => [font, { ink: Math.round(ink), advance: Number(advance.toFixed(2)) }]));
+    });
     await step('Original hides the text, Split keeps it on the edited side; undo restores', async () => {
       if (run.device) return;
       await page.click('.pe-compare button:has-text("Original")');

@@ -22,7 +22,7 @@ const solid = (width, height, rgba) => {
 
 describe('settings', () => {
   test('defaults are the approved HUYNH preset, and photos start without a watermark', () => {
-    expect(WATERMARK_DEFAULTS).toMatchObject({ preset: 'huynh-photography', position: 'bottom-right', size: 0.11, opacity: 0.65, color: 'white', margin: 0.025, border: true, rules: true });
+    expect(WATERMARK_DEFAULTS).toMatchObject({ preset: 'huynh-photography', position: 'bottom-right', size: 0.11, opacity: 0.65, color: 'white', margin: 0.025, border: true, rules: true, outline: true });
     expect(neutralAdjustments().watermark).toBeNull();
     expect(normalizeAdjustments({}).watermark).toBeNull();
     expect(watermarkActive(null)).toBe(false);
@@ -35,7 +35,7 @@ describe('settings', () => {
     expect(normalizeWatermark([1])).toBeNull();
     expect(normalizeWatermark({ preset: 'someone-else' })).toBeNull();
     const wild = normalizeWatermark({ enabled: 'yes', position: 'middle', size: 1e9, opacity: -4, color: '#ff0000', margin: Number.NaN, border: 0, rules: 'no', text: 'NOT HUYNH', logo: 'http://x' });
-    expect(wild).toEqual({ enabled: false, preset: 'huynh-photography', position: 'bottom-right', size: WATERMARK_LIMITS.size[1], opacity: WATERMARK_LIMITS.opacity[0], color: 'white', margin: 0.025, border: true, rules: true });
+    expect(wild).toEqual({ enabled: false, preset: 'huynh-photography', position: 'bottom-right', size: WATERMARK_LIMITS.size[1], opacity: WATERMARK_LIMITS.opacity[0], color: 'white', margin: 0.025, border: true, rules: true, outline: false });
     expect(Object.keys(wild)).not.toContain('text');
   });
 
@@ -258,7 +258,7 @@ describe('drawing', () => {
   };
 
   test('border, rules and every letter, placed from the fixed advances', () => {
-    const layout = layoutWatermark(on(), 6000, 4000);
+    const layout = layoutWatermark(on({ outline: false }), 6000, 4000);
     const context = recorder();
     drawMark(context, layout, '#ffffff');
     const rects = context.calls.filter(([name]) => name === 'fillRect');
@@ -268,8 +268,39 @@ describe('drawing', () => {
     const huynh = letters.slice(0, 5).map(([, , x]) => x);
     expect(huynh[1] - huynh[0]).toBeCloseTo(layout.lines[0].advances[0] + layout.lines[0].tracking, 6);
     const none = recorder();
-    drawMark(none, layoutWatermark(on({ border: false, rules: false }), 6000, 4000), '#ffffff');
+    drawMark(none, layoutWatermark(on({ border: false, rules: false, outline: false }), 6000, 4000), '#ffffff');
     expect(none.calls.filter(([name]) => name === 'fillRect')).toHaveLength(0);
+  });
+
+  test('the outline: the other colour behind every stroke and letter, then the mark at full strength', () => {
+    const layout = layoutWatermark(on(), 6000, 4000);
+    expect(layout.halo).toBe(Math.max(1, Math.round(DESIGN.outline.width * layout.s)));
+    expect(layout.bounds).toEqual({ x: layout.x - layout.halo, y: layout.y - layout.halo, width: layout.width + 2 * layout.halo, height: layout.height + 2 * layout.halo });
+    // Never thinner than one output pixel, even for the smallest mark.
+    expect(layoutWatermark(on({ size: 0.04 }), 600, 400).halo).toBeGreaterThanOrEqual(1);
+    for (const [color, outline] of [[DESIGN.colors.white, DESIGN.colors.dark], [DESIGN.colors.dark, DESIGN.colors.white]]) {
+      const context = recorder();
+      drawMark(context, layout, color);
+      const fills = context.calls.filter(([name]) => name === '=fillStyle').map(([, value]) => value);
+      expect(fills).toEqual([outline, color]);
+      const strokes = context.calls.filter(([name]) => name === 'strokeText');
+      expect(strokes.map(([, char]) => char).join('')).toBe('HUYNHPHOTOGRAPHYquanghuynh.com');
+      expect(context.calls).toContainEqual(['=lineWidth', 2 * layout.halo]);
+      expect(context.calls).toContainEqual(['=globalAlpha', DESIGN.outline.alpha]);
+      // Outline rectangles first (grown by the halo), then the mark's own, then its letters.
+      const rects = context.calls.filter(([name]) => name === 'fillRect');
+      expect(rects).toHaveLength(2 * (4 + 2));
+      expect(rects[0].slice(1)).toEqual([layout.x - layout.halo, layout.y - layout.halo, layout.width + 2 * layout.halo, layout.stroke + 2 * layout.halo]);
+      const lastStroke = context.calls.lastIndexOf(strokes.at(-1));
+      expect(context.calls.findIndex(([name]) => name === 'fillText')).toBeGreaterThan(lastStroke);
+    }
+    // Marks saved before the outline existed keep drawing without one.
+    const saved = normalizeWatermark({ enabled: true, preset: 'huynh-photography', position: 'top-right', color: 'auto' });
+    expect(saved.outline).toBe(false);
+    expect(layoutWatermark(saved, 6000, 4000).halo).toBe(0);
+    const plain = recorder();
+    drawMark(plain, layoutWatermark(saved, 6000, 4000), '#ffffff');
+    expect(plain.calls.some(([name]) => name === 'strokeText')).toBe(false);
   });
 
   test('applyWatermark composites one sprite at the opacity, reading pixels only for auto', () => {
@@ -281,12 +312,15 @@ describe('drawing', () => {
     });
     const target = recorder();
     const result = applyWatermark(target, on({ opacity: 0.4 }), { width: 3000, height: 2000 });
+    expect(sprites[0]).toBeDefined();
     expect(result.variant).toBe('white');
     expect(result.luminance).toBeNull();
     expect(target.calls.some(([name]) => name === 'getImageData')).toBe(false);
     expect(target.calls).toContainEqual(['=globalAlpha', 0.4]);
     const draw = target.calls.find(([name]) => name === 'drawImage');
-    expect(draw.slice(2)).toEqual([result.layout.x, result.layout.y]);
+    // The sprite covers the box and its outline.
+    expect(draw.slice(2)).toEqual([result.layout.bounds.x, result.layout.bounds.y]);
+    expect(result.layout.bounds.x).toBe(result.layout.x - result.layout.halo);
     expect(sprites[0].width).toBe(0);
 
     const auto = recorder();
