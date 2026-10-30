@@ -438,6 +438,88 @@ export function maskRows(mask, map, width, y0, y1, { x0 = 0, out = new Uint8Clam
 }
 
 /**
+ * The canvas box outside which a mask's coverage is exactly 0 (clipped to `size`), or null when
+ * it may cover any pixel. Conservative: brush strokes and radials are boxes around their points
+ * and ellipses, a linear gradient is 0 past its end (a half-plane, bounded when the space maps
+ * affinely), subtracting components only remove; an inverted mask or component, or a mask based
+ * on everything, covers anything. Exports skip bands outside it.
+ */
+export function maskBounds(mask, map, size) {
+  const whole = null;
+  if (mask.invert || mask.base === 'all') return whole;
+  const region = { x0: 0, y0: 0, x1: size.width, y1: size.height };
+  const empty = { x0: 0, y0: 0, x1: 0, y1: 0 };
+  if (!(mask.opacity > 0)) return empty;
+  const inverse = invert3(map.matrix);
+  let box = null;
+  const add = (spaceBox) => {
+    const b = canvasBox(inverse, spaceBox, region);
+    if (b.x1 > b.x0 && b.y1 > b.y0) box = union(box, b);
+  };
+  for (const c of mask.components) {
+    if (!c.enabled || !(c.opacity > 0) || c.op === 'subtract') continue; // eslint-disable-line no-continue
+    if (c.invert) return whole;
+    if (c.type === 'brush') {
+      for (const stroke of c.strokes) {
+        if (stroke.mode === 'erase' || !stroke.points.length) continue; // eslint-disable-line no-continue
+        const pts = strokePoints(stroke, map);
+        const r = Math.max(...pts.map(([, , radius]) => radius));
+        add({ x0: Math.min(...pts.map(([x]) => x)) - r, y0: Math.min(...pts.map(([, y]) => y)) - r, x1: Math.max(...pts.map(([x]) => x)) + r, y1: Math.max(...pts.map(([, y]) => y)) + r });
+      }
+    } else if (c.type === 'radial') {
+      const r = prepareRadial(c, map);
+      const ex = Math.hypot(r.rx * r.cos, r.ry * r.sin);
+      const ey = Math.hypot(r.rx * r.sin, r.ry * r.cos);
+      add({ x0: r.cx - ex, y0: r.cy - ey, x1: r.cx + ex, y1: r.cy + ey });
+    } else {
+      const b = linearBounds(c, map, region);
+      if (b === whole) return whole;
+      if (b.x1 > b.x0 && b.y1 > b.y0) box = union(box, b);
+    }
+  }
+  return box ?? empty;
+}
+
+/** Canvas box of a linear gradient's non-zero side (t < 1), or null when the map is projective. */
+function linearBounds(c, map, region) {
+  const m = map.matrix;
+  if (Math.abs(m[6]) > 1e-12 || Math.abs(m[7]) > 1e-12) return null;
+  const s = m[8];
+  const ax = c.x0 * map.width;
+  const ay = c.y0 * map.height;
+  const dx = c.x1 * map.width - ax;
+  const dy = c.y1 * map.height - ay;
+  const length2 = dx * dx + dy * dy;
+  if (length2 < 1e-12) return { x0: 0, y0: 0, x1: 0, y1: 0 };
+  // Space point of a canvas pixel centre (x, y): (m0 x + m1 y + m2, m3 x + m4 y + m5) / s, so the
+  // side with t < 1 is n · (x, y) < k in canvas pixels.
+  const nx = (m[0] * dx + m[3] * dy) / s;
+  const ny = (m[1] * dx + m[4] * dy) / s;
+  const k = length2 + ax * dx + ay * dy - (m[2] * dx + m[5] * dy) / s;
+  // The canvas rectangle (pixel centres, with a pixel of margin) clipped to that side.
+  const corners = [[region.x0 - 1, region.y0 - 1], [region.x1 + 1, region.y0 - 1], [region.x1 + 1, region.y1 + 1], [region.x0 - 1, region.y1 + 1]];
+  const inside = (p) => nx * p[0] + ny * p[1] < k;
+  const kept = [];
+  corners.forEach((p, i) => {
+    const q = corners[(i + 1) % 4];
+    if (inside(p)) kept.push(p);
+    if (inside(p) !== inside(q)) {
+      const fp = nx * p[0] + ny * p[1] - k;
+      const fq = nx * q[0] + ny * q[1] - k;
+      const t = fp / (fp - fq);
+      kept.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
+    }
+  });
+  if (!kept.length) return { x0: 0, y0: 0, x1: 0, y1: 0 };
+  return {
+    x0: Math.max(region.x0, Math.floor(Math.min(...kept.map(([x]) => x))) - 1),
+    y0: Math.max(region.y0, Math.floor(Math.min(...kept.map(([, y]) => y))) - 1),
+    x1: Math.min(region.x1, Math.ceil(Math.max(...kept.map(([x]) => x))) + 1),
+    y1: Math.min(region.y1, Math.ceil(Math.max(...kept.map(([, y]) => y))) + 1),
+  };
+}
+
+/**
  * Coverage of a whole canvas of `size` ({ width, height, data } with one code per pixel; with a
  * cache also `change`: { key, version, from, dirty } where dirty is the box changed since `from`).
  * :param cache: a Map kept by the caller for strokes being painted (see brushCoverage), or null

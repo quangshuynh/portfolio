@@ -15,7 +15,7 @@
 
 import { createWorkerClient, WorkerCancelled } from './workerClient.mjs';
 import {
-  COMPOSITE_BAND_ROWS, adjustmentPass, compositeImage, detailPassOptions, detailWriter, localPasses, prepareDetailPass, rasterPass,
+  COMPOSITE_BAND_ROWS, adjustmentPass, compositeImage, detailPassOptions, detailWriter, localPasses, passTouchesRows, prepareDetailPass, rasterPass,
 } from '../pipeline/composite.mjs';
 import { layerMatrix, offsetMatrix } from '../pipeline/layerTransform.mjs';
 import { sourceRows } from '../pipeline/warp.mjs';
@@ -60,7 +60,10 @@ async function passInBands(image, pass, clients, signal) {
   const bands = [];
   const first = pass.kind === 'raster' ? pass.bounds.y : 0;
   const last = pass.kind === 'raster' ? pass.bounds.y + pass.bounds.height : height;
-  for (let row = Math.floor(first / COMPOSITE_BAND_ROWS) * COMPOSITE_BAND_ROWS; row < last; row += COMPOSITE_BAND_ROWS) bands.push(row);
+  // Bands the pass cannot change (outside its mask's bounds) are not sent.
+  for (let row = Math.floor(first / COMPOSITE_BAND_ROWS) * COMPOSITE_BAND_ROWS; row < last; row += COMPOSITE_BAND_ROWS) {
+    if (passTouchesRows(pass, image, row, Math.min(height, row + COMPOSITE_BAND_ROWS))) bands.push(row);
+  }
   const { raster, ...plain } = pass;
   const lane = async (client) => {
     while (bands.length) {
@@ -86,13 +89,15 @@ async function passInBands(image, pass, clients, signal) {
 /** A local adjustment's Detail pass on `clients` render workers (see the comment at the top). */
 async function detailInBands(image, pass, clients, signal) {
   const { width, height, data } = image;
+  // Bands outside the mask's bounds are not sent (found first, so the workers get the bounds too).
+  const bands = [];
+  for (let row = 0; row < height; row += COMPOSITE_BAND_ROWS) if (passTouchesRows(pass, image, row, Math.min(height, row + COMPOSITE_BAND_ROWS))) bands.push(row);
+  if (!bands.length) return;
   const options = detailPassOptions(image, pass);
   const { halo } = prepareDetailPass(pass, options);
   const job = `${Date.now()}-${Math.random()}`;
   await Promise.all(clients.map((client) => client.call('localDetailBegin', { job, pass, options })));
   const writer = detailWriter(data, width, halo);
-  const bands = [];
-  for (let row = 0; row < height; row += COMPOSITE_BAND_ROWS) bands.push(row);
   let next = 0;
   // The first backdrop row a band not yet sent will read.
   const readFrom = () => (next < bands.length ? bands[next] - halo : Infinity);
