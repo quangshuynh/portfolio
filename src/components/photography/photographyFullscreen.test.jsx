@@ -166,3 +166,44 @@ test('fullscreen styles keep safe-area spacing and do not clip the page globally
   expect(overlaysCss).toMatch(/\.is-fullscreen \.photography-lightbox-info \{ display: grid !important; \}/);
   expect(overlaysCss).not.toMatch(/(^|\n)\s*(html|body)\s*\{[^}]*overflow:\s*hidden/);
 });
+
+// Regression: on phones the gesture surface was sized to the fitted photograph (overflow hidden),
+// so in fullscreen a pinch only enlarged the photo inside that box. Real layout: check:photography:viewer.
+test('in fullscreen a pinch zooms across the whole viewport, not only the fitted photograph box', async () => {
+  await openDirectly(ordered[0]);
+  // A 390 × 664 phone viewport.
+  const fitted = calculateFittedImageDimensions(ordered[0].viewerWidth, ordered[0].viewerHeight, 390, 664);
+  const stage = document.querySelector('.photography-lightbox-image-wrap');
+  Object.defineProperty(stage, 'clientWidth', { configurable: true, get: () => 390 });
+  Object.defineProperty(stage, 'clientHeight', { configurable: true, get: () => 664 });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Enter fullscreen' })); });
+  // The gesture surface is never shrunk to the fitted photograph.
+  expect(stage.style.width).toBe('');
+  expect(stage.style.height).toBe('');
+  stage.getBoundingClientRect = () => ({ left: 0, top: 0, width: 390, height: 664, right: 390, bottom: 664, x: 0, y: 0 });
+  const image = stage.querySelector('img');
+  Object.defineProperty(image, 'offsetWidth', { configurable: true, get: () => fitted.width });
+  Object.defineProperty(image, 'offsetHeight', { configurable: true, get: () => fitted.height });
+  const pointer = (type, id, x, y) => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.assign(event, { pointerId: id, pointerType: 'touch', clientX: x, clientY: y, button: 0 });
+    act(() => { stage.dispatchEvent(event); });
+  };
+  // Pinch to 4× at the centre, then pan far down-right: the 4× photo is bounded by the viewport,
+  // not by its fitted box.
+  pointer('pointerdown', 1, 175, 332);
+  pointer('pointerdown', 2, 215, 332);
+  pointer('pointermove', 1, 115, 332);
+  pointer('pointermove', 2, 275, 332);
+  pointer('pointerup', 2, 275, 332);
+  pointer('pointermove', 1, 5000, 5000);
+  const max = { x: Math.max(0, (fitted.width * 4 - 390) / 2), y: Math.max(0, (fitted.height * 4 - 664) / 2) };
+  expect(image.style.transform).toBe(`translate3d(${max.x}px, ${max.y}px, 0) scale(4)`);
+  expect(screen.getByRole('button', { name: 'Reset zoom' })).toHaveTextContent('400%');
+});
+
+test('fullscreen fills the visual viewport and lets the photo use all of it', () => {
+  expect(overlaysCss).toMatch(/\.photography-lightbox-backdrop \{[^}]*height: var\(--photography-viewport-height, 100dvh\)[^}]*touch-action: none/);
+  expect(overlaysCss).toMatch(/\.is-fullscreen \.photography-lightbox-image-wrap \{ position: absolute; inset: 0;/);
+  expect(overlaysCss).toMatch(/\.photography-lightbox-image-wrap \{[^}]*width: 100%; height: 100%;/);
+});

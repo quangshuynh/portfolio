@@ -135,8 +135,10 @@ export function resetPhotographyPreloadsForTests() {
 
 export default function PhotographyLightbox({ photograph, collection, onNavigate, onClose, returnFocusRef }) {
   const [infoOpen, setInfoOpen] = useState(false);
+  // The view lives in a ref and is painted straight onto the image, so a pan never re-renders;
+  // `scale` (state) only drives the percentage and the zoom buttons.
   const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const viewRef = useRef({ scale: 1, position: { x: 0, y: 0 } });
   const [fitSize, setFitSize] = useState({ width: 0, height: 0 });
   const backdropRef = useRef(null);
   const viewerRef = useRef(null);
@@ -152,14 +154,12 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   const pinchRef = useRef(null);
   const tapRef = useRef(null);
   const tapZoomRef = useRef(-Infinity);
-  const scaleRef = useRef(scale);
   const latestPhotograph = useRef(photograph);
   const sheetTitleId = useId();
   const index = collection.findIndex(({ id }) => id === photograph.id);
   const previous = index > 0 ? collection[index - 1] : null;
   const next = index >= 0 && index < collection.length - 1 ? collection[index + 1] : null;
   latestPhotograph.current = photograph;
-  scaleRef.current = scale;
   useOverlayLock();
   // The backdrop goes fullscreen, so the information sheet (its sibling) stays reachable.
   const fullscreen = useFullscreen(backdropRef);
@@ -168,15 +168,10 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     const stage = stageRef.current;
     const image = imageRef.current;
     if (!stage || !image) return;
-    // Measure the unconstrained stage so the fit can grow again after rotation or
-    // mobile browser chrome collapsing, not only shrink to the previous inline size.
-    const { width: fittedWidth, height: fittedHeight } = stage.style;
-    stage.style.width = '';
-    stage.style.height = '';
+    // The stage fills the viewer (the whole viewport in fullscreen); the photograph is fitted
+    // inside it and zooms and pans across all of it, not only inside its fitted box.
     const availableWidth = stage.clientWidth;
     const availableHeight = stage.clientHeight;
-    stage.style.width = fittedWidth;
-    stage.style.height = fittedHeight;
     const nextFit = calculateFittedImageDimensions(
       image.naturalWidth || photograph.viewerWidth || image.width || 0,
       image.naturalHeight || photograph.viewerHeight || image.height || 0,
@@ -186,7 +181,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     setFitSize(nextFit);
   }, [photograph.viewerHeight, photograph.viewerWidth]);
 
-  const clampPosition = React.useCallback((next, nextScale = scaleRef.current) => {
+  const clampPosition = React.useCallback((next, nextScale = viewRef.current.scale) => {
     const stageRect = stageRef.current?.getBoundingClientRect();
     const baseWidth = fitSize.width || imageRef.current?.offsetWidth || 0;
     const baseHeight = fitSize.height || imageRef.current?.offsetHeight || 0;
@@ -199,19 +194,28 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     };
   }, [fitSize.height, fitSize.width]);
 
-  const zoom = React.useCallback((amount) => {
-    setScale((current) => {
-      const next = Math.min(MAX_ZOOM, Math.max(1, Number((current + amount).toFixed(2))));
-      scaleRef.current = next;
-      setPosition((currentPosition) => clampPosition(currentPosition, next));
-      return next;
-    });
-  }, [clampPosition]);
-
-  const reset = React.useCallback(() => {
-    setScale(1);
-    setPosition({ x: 0, y: 0 });
+  const paint = React.useCallback(() => {
+    const { scale: currentScale, position: { x, y } } = viewRef.current;
+    if (imageRef.current) imageRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${currentScale})`;
   }, []);
+
+  const applyView = React.useCallback(({ scale: nextScale, position: nextPosition }) => {
+    viewRef.current = { scale: nextScale, position: nextScale > 1 ? clampPosition(nextPosition, nextScale) : { x: 0, y: 0 } };
+    paint();
+    setScale(nextScale);
+  }, [clampPosition, paint]);
+
+  const zoom = React.useCallback((amount) => {
+    const { scale: current, position: currentPosition } = viewRef.current;
+    applyView({ scale: Math.min(MAX_ZOOM, Math.max(1, Number((current + amount).toFixed(2)))), position: currentPosition });
+  }, [applyView]);
+
+  // Independent of the fit, so a rotation does not reset the zoom; only a new photograph does.
+  const reset = React.useCallback(() => {
+    viewRef.current = { scale: 1, position: { x: 0, y: 0 } };
+    paint();
+    setScale(1);
+  }, [paint]);
 
   const closeInfo = () => {
     setInfoOpen(false);
@@ -249,13 +253,35 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   useEffect(() => { measureFit(); }, [fullscreen.mode, measureFit]);
 
   useEffect(() => {
+    // Rotation, resizing and mobile browser chrome showing or hiding. The backdrop is sized to the
+    // visual viewport, the area actually on screen (iOS Safari's layout viewport can be taller).
+    const backdrop = backdropRef.current;
+    const viewport = window.visualViewport;
     const handleResize = () => {
+      if (backdrop && viewport) {
+        backdrop.style.setProperty('--photography-viewport-height', `${viewport.height}px`);
+        backdrop.style.setProperty('--photography-viewport-top', `${viewport.offsetTop}px`);
+      }
       measureFit();
-      setPosition((current) => clampPosition(current));
     };
+    handleResize();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [clampPosition, measureFit]);
+    window.addEventListener('orientationchange', handleResize);
+    viewport?.addEventListener('resize', handleResize);
+    viewport?.addEventListener('scroll', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+      viewport?.removeEventListener('resize', handleResize);
+      viewport?.removeEventListener('scroll', handleResize);
+    };
+  }, [measureFit]);
+
+  // A new fit (rotation, fullscreen) keeps the zoom and brings the pan back inside the bounds.
+  useEffect(() => {
+    viewRef.current = { ...viewRef.current, position: clampPosition(viewRef.current.position) };
+    paint();
+  }, [clampPosition, paint]);
 
   useEffect(() => {
     preloadedSources.add(photograph.viewerSrc);
@@ -311,23 +337,21 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     const rect = stageRef.current.getBoundingClientRect();
     return { x: x - rect.left - rect.width / 2, y: y - rect.top - rect.height / 2 };
   };
-  const applyView = ({ scale: nextScale, position: nextPosition }) => {
-    scaleRef.current = nextScale;
-    setScale(nextScale);
-    setPosition(nextScale > 1 ? clampPosition(nextPosition, nextScale) : { x: 0, y: 0 });
-  };
   const startPinch = () => {
     const [a, b] = [...pointersRef.current.values()];
     dragRef.current = null;
-    pinchRef.current = { distance: Math.hypot(a.x - b.x, a.y - b.y) || 1, mid: stagePoint((a.x + b.x) / 2, (a.y + b.y) / 2), scale, position };
+    pinchRef.current = { distance: Math.hypot(a.x - b.x, a.y - b.y) || 1, mid: stagePoint((a.x + b.x) / 2, (a.y + b.y) / 2), ...viewRef.current };
   };
   const onPointerDown = (event) => {
     if (event.button === 2) return;
+    const { scale: currentScale, position: currentPosition } = viewRef.current;
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, time: event.timeStamp });
     // Touches are followed even at 100%, so a second finger can pinch.
-    if (event.pointerType === 'touch' || scale > 1) event.currentTarget.setPointerCapture?.(event.pointerId);
+    if (event.pointerType === 'touch' || currentScale > 1) event.currentTarget.setPointerCapture?.(event.pointerId);
+    // The image follows the fingers without easing while they are down.
+    event.currentTarget.classList.add('is-gesturing');
     if (pointersRef.current.size === 2) startPinch();
-    else if (pointersRef.current.size === 1 && scale > 1) dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, origin: position };
+    else if (pointersRef.current.size === 1 && currentScale > 1) dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, origin: currentPosition };
   };
   const onPointerMove = (event) => {
     const pointer = pointersRef.current.get(event.pointerId);
@@ -341,22 +365,25 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
       return;
     }
     const current = dragRef.current;
-    if (!current || current.pointerId !== event.pointerId || scale <= 1) return;
-    setPosition(clampPosition({
-      x: current.origin.x + event.clientX - current.startX,
-      y: current.origin.y + event.clientY - current.startY,
-    }));
+    if (!current || current.pointerId !== event.pointerId || viewRef.current.scale <= 1) return;
+    viewRef.current = {
+      ...viewRef.current,
+      position: clampPosition({ x: current.origin.x + event.clientX - current.startX, y: current.origin.y + event.clientY - current.startY }),
+    };
+    paint();
   };
   const endDrag = (event) => {
     const pointer = pointersRef.current.get(event.pointerId);
     pointersRef.current.delete(event.pointerId);
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (!pointersRef.current.size) event.currentTarget.classList.remove('is-gesturing');
+    const { scale: currentScale, position: currentPosition } = viewRef.current;
     if (pinchRef.current) {
       // Lifting one finger of a pinch continues as a pan with the other.
       pinchRef.current = null;
       tapRef.current = null;
       const [rest] = [...pointersRef.current.entries()];
-      dragRef.current = rest && scaleRef.current > 1 ? { pointerId: rest[0], startX: rest[1].x, startY: rest[1].y, origin: position } : null;
+      dragRef.current = rest && currentScale > 1 ? { pointerId: rest[0], startX: rest[1].x, startY: rest[1].y, origin: currentPosition } : null;
       return;
     }
     if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
@@ -368,8 +395,8 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     if (last && tap.time - last.time <= DOUBLE_TAP_MS && Math.hypot(tap.x - last.x, tap.y - last.y) <= TAP_SLOP_PX) {
       tapRef.current = null;
       tapZoomRef.current = tap.time;
-      if (scale > 1) reset();
-      else applyView(zoomAround({ scale, position }, 2.5, stagePoint(tap.x, tap.y)));
+      if (currentScale > 1) reset();
+      else applyView(zoomAround(viewRef.current, 2.5, stagePoint(tap.x, tap.y)));
     } else {
       tapRef.current = tap;
     }
@@ -377,8 +404,8 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   // A double tap already toggled the zoom: the browser's own dblclick after it is ignored.
   const onDoubleClick = (event) => {
     if (event.timeStamp - tapZoomRef.current < 600) return;
-    if (scale > 1) reset();
-    else zoom(1);
+    if (viewRef.current.scale > 1) reset();
+    else applyView(zoomAround(viewRef.current, 2, stagePoint(event.clientX, event.clientY)));
   };
 
   const announcement = `Photo ${index + 1} of ${collection.length}. ${photograph.caption}.`;
@@ -418,10 +445,10 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
             <div
               ref={stageRef}
               className={`photography-lightbox-image-wrap${scale > 1 ? ' is-zoomed' : ''}`}
-              style={{ width: fitSize.width ? `${fitSize.width}px` : undefined, height: fitSize.height ? `${fitSize.height}px` : undefined }}
               onWheel={(event) => {
                 event.preventDefault();
-                zoom(-Math.max(-100, Math.min(100, event.deltaY)) * .0025);
+                const step = -Math.max(-100, Math.min(100, event.deltaY)) * .0025;
+                applyView(zoomAround(viewRef.current, viewRef.current.scale + step, stagePoint(event.clientX, event.clientY)));
               }}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
@@ -429,7 +456,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
               onPointerCancel={endDrag}
               onDoubleClick={onDoubleClick}
             >
-              <img ref={imageRef} key={photograph.id} src={photograph.viewerSrc} width={photograph.viewerWidth} height={photograph.viewerHeight} alt={photograph.alt} loading="eager" fetchPriority="high" decoding="async" style={{ width: `${fitSize.width}px`, height: `${fitSize.height}px`, transform: `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})` }} />
+              <img ref={imageRef} key={photograph.id} src={photograph.viewerSrc} width={photograph.viewerWidth} height={photograph.viewerHeight} alt={photograph.alt} loading="eager" fetchPriority="high" decoding="async" style={{ width: `${fitSize.width}px`, height: `${fitSize.height}px` }} />
             </div>
             <button type="button" onClick={() => next && onNavigate(next)} disabled={!next} aria-label="Next photograph"><FaChevronRight aria-hidden="true" /></button>
           </div>
