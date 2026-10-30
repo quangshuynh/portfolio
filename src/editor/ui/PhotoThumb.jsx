@@ -55,5 +55,12 @@ export default function PhotoThumb({ thumbnail, adjustments, lut = null, raw = n
     return () => clearTimeout(timer);
   }, [thumbnail, drawn, lut, raw, photoWidth]);
 
+  // Unmounted (a closed dialog, a removed photo): the pixels go now. Chromium was seen keeping
+  // a closed Merge HDR dialog's thumbnail canvases alive with no script reference to them.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    return () => { if (canvas) { canvas.width = 0; canvas.height = 0; } };
+  }, []);
+
   return <canvas ref={canvasRef} className="pe-thumb" aria-hidden="true" />;
 }

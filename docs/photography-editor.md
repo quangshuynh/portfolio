@@ -44,7 +44,7 @@ navigation).
 | `src/editor/model/sync.mjs` | Batch plans: sync groups and compatibility, paste, presets, LUTs and reset on several photos. Selection and batch undo are in `editorState.mjs`. |
 | `src/editor/batch/` | Batch export: queue (`exportBatch`), names (`batchNames`), ZIP parts (`zipArchive`, client-zip). |
 | `scripts/check-editor-batch.mjs`, `check-editor-raw-stability.mjs` | `npm run check:editor:batch` (batch flow, ZIP integrity, genuine ARW with `BATCH_FIXTURE_DIR`); `npm run check:editor:raw-stability` (WebKit LibRaw crash regression check; fails on any crash). |
-| `scripts/check-editor-memory.mjs` | `npm run check:editor:memory`: two identical cycles of the heavy workflows (import, switching, RAW exports, HDR merge and cancel, ZIP cancel and retry, remove all) with genuine files from `MEMORY_FIXTURE_DIR`; working set, page heap and live workers after each step (Chromium, Windows). |
+| `scripts/check-editor-memory.mjs` | `npm run check:editor:memory`: identical cycles (`MEMORY_CYCLES`, default two) of the heavy workflows (import, switching, RAW exports, HDR merge and cancel, ZIP cancel and retry, remove all) with genuine files from `MEMORY_FIXTURE_DIR`; working set, page heap and live workers after each step (Chromium, Windows). |
 | `src/editor/pipeline/shader.mjs`, `glRenderer.mjs` | WebGL2 preview: GLSL mirror of `spec.mjs`, constants injected from it. |
 | `src/editor/model/` | Adjustment registry, bounded undo history, reducer, edit document. |
 | `src/editor/io/` | Header parsing, limits and filenames, decoding, the image worker. |
@@ -1018,14 +1018,48 @@ PNG). Every export still equals the Node reference exactly. RAW decoding and the
 unchanged (one frame decoded at a time, the merge worker ended before compositing); their peaks
 fell only with the compositing. `check:editor:memory` (genuine files, two cycles, now with a
 local Clarity brush step): growth between cycles 144 MB, no workers left in an empty workspace.
-**Unexplained:** the first cycle's local Clarity step sampled a whole-browser peak of 10.9 GB
-(the second 3.1 GB); one run, not reproduced or profiled yet. Thumbnails no
+The first cycle's local Clarity step sampled a whole-browser peak of 10.9 GB (the second
+3.1 GB); see Interval 16.6.1 below: the sampler summed unrelated processes. Thumbnails no
 longer redraw on mask or layer edits (two redraws per brush move before).
+
+**Interval 16.6.1: brush outline and memory** (2026-10-30, same machine, `CHECK_GPU=1`).
+
+- *Cursor lag:* hovering with the brush set React state on each `pointermove`; React commits
+  continuous-event updates in a later task, after the frame the move was aligned to, so the
+  outline (the only cursor: the native one is hidden) was a frame behind. Hovering never drew
+  the preview (0 draw calls). The outline is now a small layer moved by a `transform` written in
+  the handler (no React render, no CSS filter, the stage rect read at most once per frame), with
+  a centred + or − for add or erase (Alt swaps it). `check:editor:brush` hovers with real
+  input: input → frame showing the outline 30.3 → 14.0 ms p50, 32.4 → 15.8 ms p95 (exposure and
+  local Clarity alike; the rest is Chromium's frame-aligned input). First brush point unchanged
+  (38–40 ms). While a new local Detail value renders, one ~150 ms frame (GPU readback and
+  compose) still pauses the outline once.
+- *10.9 GB peak:* `check:editor:memory` found "the browser" by `*profile*` on the command line,
+  which also matched the sampling PowerShell (`-NoProfile`), the owner's Brave
+  (`--profile-directory`), NVIDIA Overlay and any concurrent Playwright browser
+  (`playwright_chromiumdev_profile-*`), plus their child processes: about 1.1 GB of unrelated
+  processes in every reading here, and a whole concurrent browser check when one ran. Not
+  reproduced in 7 runs (SwiftShader and GPU, 2–5 cycles; editor peaks 3.2–4.3 GB with the old
+  filter, 3.4 GB with the new one, always in the ZIP step); most likely a concurrent check. The
+  check now matches only browser executables started with its own temporary folder, and
+  records private memory per process type, a 250 ms timeline per step, and live page
+  ArrayBuffers, canvases and ImageBitmaps (`Runtime.queryObjects` in an object group released
+  each time, or the check keeps everything it counts alive). Corrected baseline: 273 MB (was
+  read as ~1.4 GB).
+- *Lifecycle:* after each cycle 0 workers, 0 MB of page ArrayBuffers, 0 ImageBitmaps, page heap
+  8 MB. Chromium kept each closed Merge HDR dialog's three thumbnail canvases alive with no
+  script reference (no path from any GC root in a heap snapshot); a thumbnail now sets its canvas
+  to 0×0 on unmount, so they hold no pixels. Four GPU cycles: empty workspace 1525, 1827, 1981,
+  2074 MB working set (private 931, 1041, 1459, 1277 MB; GPU process 760–891 MB), growth between
+  the last two 93 MB: memory the allocators and the GPU process keep, not objects the page holds.
 
 **Physical iPhone (not tested by the agent).** Besides the list below, check: pinch-zoom with the
 brush on (two fingers zoom and do not paint; one finger paints after), a stroke over a local
 Clarity (Detail appears while painting), the gallery viewer's pinch, one-finger pan, double tap
-and Reset zoom, in and out of fullscreen.
+and Reset zoom, in and out of fullscreen. Interval 16.6.1 adds: with an Apple Pencil that hovers, the brush outline
+follows the tip (no outline for fingers); a RAW import followed by local Clarity; Before/After
+while a Detail preview renders; ten minutes of strokes across photo switches without a reload
+(Safari may reload a tab under memory pressure: note it in Diagnostics if it happens).
 
 **Physical iPhone (not tested by the agent).** On the phone, open the editor from a Vercel
 preview, import a camera JPEG and check: one-finger painting (no page scroll or zoom), brush size,
