@@ -90,3 +90,17 @@ test('a filtered frame that arrives after the settings changed again is not kept
   preview.clear();
   expect(preview.compose(base, old).complete).toBe(false);
 });
+
+test('while deferred (an export runs) nothing is filtered; afterwards the pass is requested', async () => {
+  const base = photo();
+  const calls = [];
+  const preview = createLocalPreview({ renderDetail: async (image, pass) => { calls.push(pass); return renderDetailFrame(image, pass); } });
+  const passes = passesOf([local('a', { clarity: 30 }, mask(brush(6)))], new Map());
+  expect(preview.compose(base, passes, { defer: true }).complete).toBe(false);
+  expect(preview.compose(base, passes, { defer: true }).complete).toBe(false);
+  expect(calls).toHaveLength(0);
+  preview.compose(base, passes);
+  expect(calls).toHaveLength(1);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(diff(preview.compose(base, passes).image.data, reference(base, passes))).toBe(0);
+});

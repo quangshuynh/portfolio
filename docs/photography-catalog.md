@@ -196,3 +196,12 @@ viewer derivative (2200 px, the largest public image) fitted without enlarging p
 details move to the information sheet; previous/next, arrows, zoom and pan keep working; `Esc`
 leaves fullscreen before it closes the viewer; closing the viewer leaves fullscreen and returns
 focus to the thumbnail.
+
+**Zoom gestures** (`photographyLightbox.jsx`, tested in `photographyGestures.test.jsx`): the
+image area has `touch-action: none`, so the viewer handles them itself. Two fingers zoom
+(100–500%) around their midpoint, which follows the fingers; lifting one continues as a pan;
+one finger pans while zoomed, kept inside the photo's edges. A double tap zooms to 250% at the
+tap, or back to the fit when zoomed (the `dblclick` a browser may send after it is ignored); a
+mouse double-click, the wheel, `+`/`-`, the zoom buttons and **Reset zoom** still work. A
+new photograph starts at the fit; gestures never navigate (only the buttons and arrow keys do).
+Browser page zoom outside the image is unchanged.

@@ -492,6 +492,13 @@ function EditorWorkspace({ host }) {
     if (lut) sent.luts.add(lut.sha256);
     return result;
   }, [worker]);
+  // While an export runs, the preview's local Detail work stops (it would take cores from the
+  // export's band workers); the preview asks again afterwards.
+  useEffect(() => {
+    if (!exporting || !workers.current.local) return;
+    workers.current.local.terminate();
+    workers.current.local = null;
+  }, [exporting]);
   // A local Detail pass over a whole preview frame, in a worker of its own so brush moves never
   // wait behind it; only the settings travel (the mask is applied on the page).
   const renderLocalDetail = useCallback((image, { kind, adjustments: values, native }) => worker('local')
@@ -1591,6 +1598,7 @@ function EditorWorkspace({ host }) {
           loadProxy={loadProxy}
           renderInWorker={renderInWorker}
           renderLocalDetail={renderLocalDetail}
+          deferWork={exporting}
           onEngine={onEngine}
           onProxy={setViewProxy}
           zoomCommand={zoomCommand}

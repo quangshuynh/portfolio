@@ -151,7 +151,7 @@ function overlayTable(view, hex) {
  * :param maskTool: the mask being edited ({ owner: { kind: 'local' } | { kind: 'layer', layer },
  *   mask, interactive, overlay: { show, color, view: 'overlay' | 'mask' }, and MaskTool's props }) or null
  */
-export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, renderLocalDetail = null, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, layerTool = null, maskTool = null, layerRasters = null, lutFor = () => null }) {
+export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, renderLocalDetail = null, deferWork = false, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, layerTool = null, maskTool = null, layerRasters = null, lutFor = () => null }) {
   const stageRef = useRef(null);
   const canvasHostRef = useRef(null);
   const engineRef = useRef(null);
@@ -172,6 +172,9 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   const [localVersion, setLocalVersion] = useState(0);
   const renderLocalRef = useRef(renderLocalDetail);
   renderLocalRef.current = renderLocalDetail;
+  // While an export runs, Detail passes not filtered yet wait (shown without them, labelled).
+  const deferRef = useRef(deferWork);
+  deferRef.current = deferWork;
   const localPreviewRef = useRef(null);
   localPreviewRef.current ??= createLocalPreview({
     renderDetail: (image, pass) => (renderLocalRef.current ? renderLocalRef.current(image, pass) : Promise.resolve().then(() => renderDetailFrame(image, pass))),
@@ -353,7 +356,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     const scaled = scaledRef.current;
     const key = `${out.width}x${out.height}`;
     if (scaled.frame !== frame || scaled.key !== key) Object.assign(scaled, { frame, key, image: scaleFrame(frame, out) });
-    const result = localPreviewRef.current.compose(scaled.image, request.layers.cpu);
+    const result = localPreviewRef.current.compose(scaled.image, request.layers.cpu, { defer: deferRef.current });
     const job = detailJobRef.current;
     const quality = !result.complete ? 'rendering' : job.shown === 'final' ? { width: frame.width, height: frame.height } : job.shown ?? 'draft';
     setDetailQuality((shown) => (JSON.stringify(shown) === JSON.stringify(quality) ? shown : quality));
@@ -676,10 +679,10 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
             }
           }
           if (warm) {
-            localPreviewRef.current.warm(gpuBaseRef.current.image, warm);
+            if (!deferWork) localPreviewRef.current.warm(gpuBaseRef.current.image, warm);
             engine.renderer.render(params, { split: splitFraction, before });
           } else if (localOnGpu) {
-            const { image, dirty, complete } = localPreviewRef.current.compose(gpuBaseRef.current.image, layers.cpu);
+            const { image, dirty, complete } = localPreviewRef.current.compose(gpuBaseRef.current.image, layers.cpu, { defer: deferWork });
             engine.renderer.render({ ...params, neutral: true }, { split: splitFraction, before, rendered: image, renderedDirty: dirty });
             const quality = complete ? { width: out.width, height: out.height } : 'rendering';
             setDetailQuality((shown) => (JSON.stringify(shown) === JSON.stringify(quality) ? shown : quality));
@@ -693,7 +696,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       }
     });
     return () => cancelAnimationFrame(frameRef.current);
-  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec, glowVersion, buildLayers, drawOverlay, layerRasters?.version, localVersion, maskTool?.owner.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec, glowVersion, buildLayers, drawOverlay, layerRasters?.version, localVersion, maskTool?.owner.id, deferWork]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useLayoutEffect(() => {
     const stage = stageRef.current;

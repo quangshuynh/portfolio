@@ -91,11 +91,12 @@ export function createLocalPreview({ renderDetail, onReady = () => {}, keep = 2 
   return {
     /**
      * The frame `base` (canvas size) with `passes` composited, or with the Detail passes whose
-     * filtered frames are not ready yet left out (`complete` false; they are requested).
+     * filtered frames are not ready yet left out (`complete` false; they are requested, unless
+     * `defer`: an export is running).
      * :returns: { image, dirty, complete } dirty: the box that differs from the previous result
      *   (empty: nothing), or null (all)
      */
-    compose(base, passes) {
+    compose(base, passes, { defer = false } = {}) {
       const { width, height } = base;
       const keys = passes.map(passKey);
       // The backdrop of pass j: the base and every pass before it.
@@ -112,7 +113,7 @@ export function createLocalPreview({ renderDetail, onReady = () => {}, keep = 2 
       const applied = keys.map((key, j) => (passes[j].kind !== 'detail' || ready(j) ? key : '-')).join('>');
       const same = last && last.base === base && last.complete === complete && keys.length === last.keys.length;
       // Nothing drawn changed (a pass still rendering has a new mask, a split moved): the last frame.
-      if (same && applied === last.applied && [...wanted].every((key) => filtered.has(key) || pending.has(key))) {
+      if (same && applied === last.applied && (defer || [...wanted].every((key) => filtered.has(key) || pending.has(key)))) {
         Object.assign(last, { keys, passes });
         return { image: last.image, dirty: { x0: 0, y0: 0, x1: 0, y1: 0 }, complete };
       }
@@ -122,11 +123,11 @@ export function createLocalPreview({ renderDetail, onReady = () => {}, keep = 2 
       // restored and every pass from there on applied again.
       if (same && complete) {
         const changed = keys.map((key, j) => (key !== last.keys[j] ? j : -1)).filter((j) => j >= 0);
-        const j = changed[0];
-        const raster = passes[j].mask?.raster;
+        const j = changed.length ? changed[0] : 0;
+        const raster = passes[j]?.mask?.raster;
         const change = raster?.change;
-        const before = last.passes[j].mask?.raster?.change;
-        const onlyMask = changed.every((k) => passes[k].mask?.raster === raster && drawnKey(passes[k]) === drawnKey(last.passes[k]));
+        const before = last.passes[j]?.mask?.raster?.change;
+        const onlyMask = changed.length > 0 && changed.every((k) => passes[k].mask?.raster === raster && drawnKey(passes[k]) === drawnKey(last.passes[k]));
         if (onlyMask && passes[j].kind === 'detail' && last.backdrops.has(j) && passes.slice(j + 1).every(({ kind }) => kind !== 'detail')
           && change && before && change.from !== null && change.key === before.key && change.from === before.version) {
           const { dirty } = change;
@@ -150,7 +151,7 @@ export function createLocalPreview({ renderDetail, onReady = () => {}, keep = 2 
       passes.forEach((pass, j) => {
         if (pass.kind !== 'detail') { applyRows(data, pass, width, 0, height); return; }
         const detailed = ready(j);
-        if (!detailed) { request(`${backdropKeys[j]}|${filterKey(pass)}`, { width, height, data }, pass); return; }
+        if (!detailed) { if (!defer) request(`${backdropKeys[j]}|${filterKey(pass)}`, { width, height, data }, pass); return; }
         // The backdrop is kept for the box updates (the base itself for a first pass), for two Detail passes at most.
         if (j === 0) backdrops.set(j, base.data);
         else if (backdrops.size < 2) {
