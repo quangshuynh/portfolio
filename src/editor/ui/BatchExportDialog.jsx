@@ -47,6 +47,7 @@ export default function BatchExportDialog({ photos, settings, dispatch, unsuppor
   const failed = rows.filter(({ status }) => status.state === 'error' || status.state === 'cancelled').map(({ photo }) => photo.id);
   const heavyOnPhone = constrained && exportable.some(({ photo, output }) => (photo.raw || photo.hdr) && output.width * output.height > PHONE_CANVAS_PIXELS);
   const done = rows.filter(({ status }) => status.state === 'done').length;
+  const watermarked = exportable.filter(({ photo }) => photo.history.present.watermark?.enabled).length;
 
   return (
     <Dialog
@@ -87,6 +88,13 @@ export default function BatchExportDialog({ photos, settings, dispatch, unsuppor
       <fieldset className="pe-batch-settings" disabled={running}>
         <ExportSettingsFields settings={settings} dispatch={dispatch} unsupportedFormats={unsupportedFormats} name="pe-batch-format" />
       </fieldset>
+      {watermarked > 0 && (
+        <p className="pe-note" data-batch-watermark>
+          {settings.includeWatermark !== false
+            ? `${watermarked} of ${exportable.length} photos get the HUYNH Photography watermark, each with its own placement (Sync › Watermark copies one photo's settings to the others).`
+            : `Watermarks are left out of this export; the ${watermarked} watermarked photos keep their settings.`}
+        </p>
+      )}
       <p className="pe-note">The aspect ratio is always kept and photos are never upscaled. Every photo is rendered again from its original file (RAW sensor data, the three files of a merge) with its own settings; the original files are never changed.</p>
       {largest && (
         <p className="pe-note" data-batch-memory>

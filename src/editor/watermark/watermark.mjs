@@ -305,14 +305,15 @@ const BUSY_ABSOLUTE = 0.06;
  * than the picture as a whole likely holds part of the subject, text or other detail, and
  * mid-grey backdrops with high spread read poorly in either colour; both are flagged for
  * manual review, with the calmest corner suggested.
- * :param image: straight RGBA8 { width, height, data } of the whole output frame
+ * :param image: straight RGBA8 { width, height, data } of the whole output frame, at any size
+ * :param frame: { width, height } of the full-size output the mark is laid out for (default: the image)
  * :returns: { position, flags: ['busy' | 'low-contrast'], busy, overall, luminance, suggestion }
  */
-export function placementReport(image, settings) {
+export function placementReport(image, settings, { frame = image } = {}) {
   const step = Math.max(1, Math.round(Math.sqrt((image.width * image.height) / 250000)));
   const overall = busyness(image, { x: 0, y: 0, width: image.width, height: image.height }, step);
   const measure = (position) => {
-    const layout = layoutWatermark({ ...settings, position }, image.width, image.height, { snap: false });
+    const layout = layoutWatermark({ ...settings, position }, frame.width, frame.height, { snap: false, scale: image.width / frame.width });
     const box = sampleBox(layout);
     return { position, busy: busyness(image, box, step), luminance: regionLuminance(image, box) };
   };

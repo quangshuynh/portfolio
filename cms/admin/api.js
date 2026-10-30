@@ -37,6 +37,13 @@ export const api = {
   signOut: () => fetch('/api/session/sign-out', { method: 'POST', headers: { 'X-CMS-Request': '1' } }),
 };
 
+// The global watermark preference and the portfolio overview (cms/lib/watermark.mjs).
+export const watermark = {
+  preference: () => request('GET', '/api/watermark'),
+  savePreference: (settings) => request('PUT', '/api/watermark', { settings }),
+  portfolio: () => request('GET', '/api/watermark/portfolio'),
+};
+
 // QuangEdit treatments (cms/lib/editor-api.mjs).
 const editorPath = (id, rest = '') => `/api/editor/photos/${encodeURIComponent(id)}${rest ? `/${rest}` : ''}`;
 export const editorUrl = (id) => `/admin/photography/editor/?photo=${encodeURIComponent(id)}`;

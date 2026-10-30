@@ -1,6 +1,6 @@
 // QuangEdit treatments: the complete, non-destructive edit of one CMS photograph, kept
-// privately in the workspace. A treatment holds the editor's own edit document (version 10:
-// every setting, geometry, layers, masks), never pixels; a rendered full-resolution image and
+// privately in the workspace. A treatment holds the editor's own edit document (version 11:
+// every setting, geometry, layers, masks, watermark), never pixels; a rendered full-resolution image and
 // its public derivatives are staged beside it. Saving a treatment, approving it and
 // publishing the photograph are three separate steps (docs/photography-cms.md).
 //
@@ -152,9 +152,10 @@ function libraryFile(libraryDir, relative) {
  * Where the editor reads a photograph from, best first. Each entry has `file` (server only,
  * never sent to the browser). Attached sources win; then the uploaded original; then the
  * camera library (read in place, never copied); and only if none exists, the public
- * 2200 px derivative, marked `limited`.
+ * 2200 px derivative, marked `limited`. With `hash: false` (overviews), files are only checked
+ * for existence and library and derivative entries carry no `sha256`.
  */
-export async function editingSources({ workspaceDir, libraryDir, record, treatment, derivativesDir = DERIVATIVES_DIRECTORY }) {
+export async function editingSources({ workspaceDir, libraryDir, record, treatment, derivativesDir = DERIVATIVES_DIRECTORY, hash = true }) {
   const p = paths(workspaceDir);
   if (treatment.attached.length) {
     const index = await readJson(p.originalsIndex, {});
@@ -178,7 +179,7 @@ export async function editingSources({ workspaceDir, libraryDir, record, treatme
   if (library) {
     if (await exists(library)) {
       const info = await stat(library);
-      return [{ kind: 'library', name: record.sourceFilename, format: formatFromName(record.sourceFilename), size: info.size, sha256: await fileHash(library), file: library, available: true, problem: null }];
+      return [{ kind: 'library', name: record.sourceFilename, format: formatFromName(record.sourceFilename), size: info.size, sha256: hash ? await fileHash(library) : null, file: library, available: true, problem: null }];
     }
     // Moved or renamed in the archive: fall through to the public image, saying so.
   }
@@ -186,7 +187,7 @@ export async function editingSources({ workspaceDir, libraryDir, record, treatme
   for (const directory of [derivativesDir, p.previewDir]) {
     const file = path.join(directory, viewerFilename);
     if (await exists(file)) {
-      return [{ kind: 'derivative', limited: true, name: viewerFilename, format: 'jpeg', size: (await stat(file)).size, sha256: await fileHash(file), file, available: true,
+      return [{ kind: 'derivative', limited: true, name: viewerFilename, format: 'jpeg', size: (await stat(file)).size, sha256: hash ? await fileHash(file) : null, file, available: true,
         problem: library ? 'The camera-library original was not found (moved or renamed); only the 2200 px public image is available.'
           : 'Only the 2200 px public image is available. Attach the original (JPEG, ARW or DNG) to edit at full quality.' }];
     }

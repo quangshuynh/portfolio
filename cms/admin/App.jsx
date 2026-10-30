@@ -10,6 +10,7 @@ import Sidebar from './components/Sidebar.jsx';
 import StatsBar from './components/StatsBar.jsx';
 import Toolbar from './components/Toolbar.jsx';
 import UploadPanel from './components/UploadPanel.jsx';
+import WatermarkView from './components/WatermarkView.jsx';
 import { useWorkspace } from './useWorkspace.js';
 
 const THEME_KEY = 'portfolio-theme';
@@ -28,7 +29,8 @@ export default function App() {
   const [expired, setExpired] = useState(false);
   const onSessionExpired = useCallback(() => setExpired(true), []);
   const ws = useWorkspace({ onSessionExpired });
-  const [view, setView] = useState('library');
+  // #watermark (the end of a bulk watermark run) opens the Watermark view.
+  const [view, setView] = useState(() => (window.location.hash === '#watermark' ? 'watermark' : 'library'));
   const [filters, setFilters] = useState({ query: '', status: 'all', category: 'all' });
   const [layout, setLayout] = useState('grid');
   const [selection, setSelection] = useState(() => new Set());
@@ -36,7 +38,7 @@ export default function App() {
   const hashId = () => window.location.hash.match(/^#(?:photo|review)=([A-Za-z0-9_-]+)$/)?.[1] ?? null;
   const [activeId, setActiveId] = useState(hashId);
   useEffect(() => {
-    const onHash = () => { const id = hashId(); if (id) { setActiveId(id); setView('library'); } };
+    const onHash = () => { const id = hashId(); if (id) { setActiveId(id); setView('library'); } else if (window.location.hash === '#watermark') setView('watermark'); };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
@@ -148,6 +150,7 @@ export default function App() {
           <CollectionsView catalog={catalog} run={run} onFilter={(category) => { setFilters({ query: '', status: 'all', category }); setView('library'); }} />
         )}
         {view === 'publish' && <PublishView ws={ws} onNotice={setNotice} />}
+        {view === 'watermark' && <WatermarkView onNotice={setNotice} onChanged={() => ws.refresh().catch(() => {})} />}
       </main>
 
       {view === 'library' && active && (
