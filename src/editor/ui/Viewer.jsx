@@ -20,7 +20,7 @@ import MaskTool from './MaskTool';
 import { rasterizeTextLayer } from '../text/textRender.mjs';
 import { loadTextFonts } from '../text/fonts.mjs';
 import { DESIGN, layoutWatermark, regionLuminance, resolveWatermarkColor, sampleBox, watermarkActive } from '../watermark/watermark.mjs';
-import { drawMark, loadWatermarkFonts } from '../watermark/watermarkRender.mjs';
+import { drawMark, loadWatermarkFonts, markBounds } from '../watermark/watermarkRender.mjs';
 
 const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 8;
@@ -862,9 +862,9 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
     const element = watermarkRef.current;
     if (!element) return;
     if (!watermarkBox || !markFontsReady) { element.width = 0; return; }
-    const { layout } = watermarkBox;
-    Object.assign(element, { width: layout.width, height: layout.height });
-    drawMark(element.getContext('2d'), layout, DESIGN.colors[watermarkVariant], { offsetX: -layout.x, offsetY: -layout.y });
+    const bounds = markBounds(watermarkBox.layout);
+    Object.assign(element, { width: Math.ceil(bounds.width), height: Math.ceil(bounds.height) });
+    drawMark(element.getContext('2d'), watermarkBox.layout, DESIGN.colors[watermarkVariant], { offsetX: -bounds.x, offsetY: -bounds.y });
   }, [watermarkBox, watermarkVariant, markFontsReady]);
   // Auto colour: the mean luminance behind the mark in the shown frame, read once the frame settles.
   const autoWatermark = watermark?.color === 'auto';
@@ -885,13 +885,14 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
     onWatermarkAuto?.(autoWatermark && watermarkMean !== null ? { variant: watermarkVariant, mean: watermarkMean } : null);
   }, [autoWatermark, watermarkMean, watermarkVariant, onWatermarkAuto]);
   const watermarkStyle = watermarkBox ? (() => {
-    const { layout, cssPerPixel } = watermarkBox;
-    const left = offsetX + layout.x * cssPerPixel;
+    const { cssPerPixel } = watermarkBox;
+    const bounds = markBounds(watermarkBox.layout);
+    const left = offsetX + bounds.x * cssPerPixel;
     const clip = compare === 'split' ? Math.max(0, splitX - left) : 0;
     return {
-      width: layout.width * cssPerPixel,
-      height: layout.height * cssPerPixel,
-      transform: `translate(${left}px, ${offsetY + layout.y * cssPerPixel}px)`,
+      width: Math.ceil(bounds.width) * cssPerPixel,
+      height: Math.ceil(bounds.height) * cssPerPixel,
+      transform: `translate(${left}px, ${offsetY + bounds.y * cssPerPixel}px)`,
       opacity: watermark.opacity,
       clipPath: clip > 0 ? `inset(0 0 0 ${clip}px)` : undefined,
     };

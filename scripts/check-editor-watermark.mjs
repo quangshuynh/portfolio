@@ -125,11 +125,20 @@ function outside(a, b, box) {
   return { max, count };
 }
 
-/** Border pixels against the exact blend: every pixel of the left stroke's middle third. */
+/**
+ * Border pixels against the exact blend: every pixel of the left stroke's middle third. With
+ * the outline, the pixels beside the stroke (outside and inside) are the outline colour's blend
+ * at opacity × outline alpha (`outline` the largest difference from it).
+ */
 function borderCheck(marked, base, layout, hex, opacity) {
   const rgb = [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));
+  const halo = layout.halo ?? 0;
+  const outlineHex = hex === DESIGN.colors.white ? DESIGN.colors.dark : DESIGN.colors.white;
+  const outlineRgb = [1, 3, 5].map((i) => Number.parseInt(outlineHex.slice(i, i + 2), 16));
+  const outlineOpacity = opacity * DESIGN.outline.alpha;
   let max = 0;
   let fringe = 0;
+  let outline = 0;
   const y0 = layout.y + Math.round(layout.height / 3);
   const y1 = layout.y + Math.round((layout.height * 2) / 3);
   for (let y = y0; y < y1; y += 1) {
@@ -137,13 +146,20 @@ function borderCheck(marked, base, layout, hex, opacity) {
       const i = (y * marked.width + x) * 4;
       for (let c = 0; c < 3; c += 1) max = Math.max(max, Math.abs(marked.data[i + c] - (base.data[i + c] * (1 - opacity) + rgb[c] * opacity)));
     }
-    // The pixel just outside the stroke and just inside it (before any text) are untouched.
-    for (const x of [layout.x - 1, layout.x + layout.stroke]) {
+    // The pixel just outside what the mark paints, and just inside the stroke when there is no
+    // outline (before any text), are untouched.
+    for (const x of halo ? [layout.x - halo - 1] : [layout.x - 1, layout.x + layout.stroke]) {
       const i = (y * marked.width + x) * 4;
       for (let c = 0; c < 3; c += 1) fringe = Math.max(fringe, Math.abs(marked.data[i + c] - base.data[i + c]));
     }
+    if (halo) {
+      for (const x of [layout.x - 1, layout.x + layout.stroke]) {
+        const i = (y * marked.width + x) * 4;
+        for (let c = 0; c < 3; c += 1) outline = Math.max(outline, Math.abs(marked.data[i + c] - (base.data[i + c] * (1 - outlineOpacity) + outlineRgb[c] * outlineOpacity)));
+      }
+    }
   }
-  return { max: Math.round(max * 10) / 10, fringe };
+  return { max: Math.round(max * 10) / 10, fringe, outline: Math.round(outline * 10) / 10 };
 }
 
 /** Ink (changed pixels) of each text line inside the mark, as boxes relative to the mark box. */
@@ -253,7 +269,7 @@ async function runOne(run, files) {
       const layout = layoutWatermark(normalizeWatermark(adjustments.watermark), 3000, 2000);
       // One screen pixel is several export pixels: compare in screen pixels (within 1.5).
       const screenScale = await page.evaluate(() => 3000 / document.querySelector('.pe-canvas-host').getBoundingClientRect().width);
-      const offBy = Math.max(...['x', 'y', 'width', 'height'].map((key) => Math.abs(shown[key] - layout[key]) / screenScale));
+      const offBy = Math.max(...['x', 'y', 'width', 'height'].map((key) => Math.abs(shown[key] - layout.bounds[key]) / screenScale));
       result.preview = { offByScreenPx: Math.round(offBy * 100) / 100, variant: shown.variant, opacity: shown.opacity };
       assert.ok(offBy <= 1.5, `preview box differs from the export layout by ${offBy} screen px`);
       assert.equal(shown.variant, 'white');
@@ -265,14 +281,15 @@ async function runOne(run, files) {
       const marked = await decode(exported.file);
       const layout = layoutWatermark(normalizeWatermark(WATERMARK_DEFAULTS), 3000, 2000);
       const changed = changedBox(marked, base);
-      const rest = outside(marked, base, layout);
+      const rest = outside(marked, base, layout.bounds);
       const border = borderCheck(marked, base, layout, DESIGN.colors.white, 0.65);
-      result.png = { file: exported.name, changed, layout: { x: layout.x, y: layout.y, width: layout.width, height: layout.height, stroke: layout.stroke }, outside: rest, border };
+      result.png = { file: exported.name, changed, layout: { ...layout.bounds, stroke: layout.stroke, halo: layout.halo }, outside: rest, border };
       assert.ok(exported.name.endsWith('-quangedit.png') && !exported.name.includes('-quangedit-quangedit'), exported.name);
-      assert.deepEqual([changed.x, changed.y, changed.width, changed.height], [layout.x, layout.y, layout.width, layout.height]);
-      assert.equal(rest.max, 0, 'pixels outside the mark changed');
+      assert.deepEqual([changed.x, changed.y, changed.width, changed.height], [layout.bounds.x, layout.bounds.y, layout.bounds.width, layout.bounds.height]);
+      assert.equal(rest.max, 0, 'pixels outside the mark and its outline changed');
       assert.ok(border.max <= BLEND_ALLOWANCE, `border differs from the exact blend by ${border.max}`);
-      assert.equal(border.fringe, 0, 'pixels beside the border changed');
+      assert.equal(border.fringe, 0, 'pixels beside the outline changed');
+      assert.ok(layout.halo >= 1 && border.outline <= BLEND_ALLOWANCE, `outline beside the border differs from the charcoal blend by ${border.outline}`);
       result.ink = inkLines(marked, base, layout);
       result.ink.forEach((line, i) => {
         const spec = layout.lines[i];
@@ -309,8 +326,8 @@ async function runOne(run, files) {
       // The cropped base: the plain photo has no watermark at the same crop.
       const plain = await decode((await exportFile('png', { include: false })).file);
       const changed = changedBox(marked, plain);
-      result.crop = { size: `${marked.width}×${marked.height}`, changed, layout: { x: layout.x, y: layout.y, width: layout.width, height: layout.height } };
-      assert.deepEqual([changed.x, changed.y, changed.width, changed.height], [layout.x, layout.y, layout.width, layout.height]);
+      result.crop = { size: `${marked.width}×${marked.height}`, changed, layout: layout.bounds };
+      assert.deepEqual([changed.x, changed.y, changed.width, changed.height], [layout.bounds.x, layout.bounds.y, layout.bounds.width, layout.bounds.height]);
       await openSection('geometry');
       await page.getByRole('button', { name: 'Reset Crop & Transform' }).click();
       await savedWhen('bright.png', (a) => !a.geometry, 'crop reset');
@@ -365,7 +382,7 @@ async function runOne(run, files) {
         const variant = name.startsWith('bright') ? 'dark' : 'white';
         const border = borderCheck(image, other, layout, DESIGN.colors[variant], 0.65);
         result.zip[name] = { size: `${image.width}×${image.height}`, variant, border: border.max, box: changed && [changed.x, changed.y, changed.width, changed.height].join(',') };
-        assert.deepEqual([changed.x, changed.y, changed.width, changed.height], [layout.x, layout.y, layout.width, layout.height], name);
+        assert.deepEqual([changed.x, changed.y, changed.width, changed.height], [layout.bounds.x, layout.bounds.y, layout.bounds.width, layout.bounds.height], name);
         assert.ok(border.max <= BLEND_ALLOWANCE, `${name}: ${variant} border off by ${border.max}`);
       }
     });

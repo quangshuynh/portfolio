@@ -32,6 +32,10 @@ export const DESIGN = Object.freeze({
   ]),
   padding: Object.freeze({ x: 0.55, top: 0.42, bottom: 0.42 }),
   stroke: 0.035,
+  // Optional outline in the other colour (charcoal around white, white around charcoal) behind
+  // every letter, rule and border stroke, for busy or mid-tone backdrops. Width in `s`, at least
+  // one output pixel; drawn at `alpha` inside the opaque sprite, under the mark's own opacity.
+  outline: Object.freeze({ width: 0.02, alpha: 0.6 }),
   rule: Object.freeze({ gap: 0.2, min: 0.25 }),
   colors: Object.freeze({ white: '#ffffff', dark: '#1f1f22' }),
 });
@@ -77,6 +81,7 @@ export const WATERMARK_DEFAULTS = Object.freeze({
   margin: 0.025,
   border: true,
   rules: true,
+  outline: true,
 });
 
 const SETTING_KEYS = Object.keys(WATERMARK_DEFAULTS);
@@ -101,6 +106,8 @@ export function normalizeWatermark(input) {
     margin: round(clamp(input.margin, WATERMARK_LIMITS.margin, WATERMARK_DEFAULTS.margin), 4),
     border: input.border !== false,
     rules: input.rules !== false,
+    // Absent in marks saved before the outline existed: they keep drawing without it.
+    outline: input.outline === true,
   };
 }
 
@@ -178,7 +185,8 @@ export const MARK_ASPECT = UNITS.width / UNITS.height;
  * (`margin` × √(W·H)). With `snap`, the box and strokes fall on whole pixels, so the border
  * is crisp at every resolution. `scale` draws that same layout on a canvas `scale` times the
  * output's size (the preview at screen resolution): sizes are decided in output pixels first.
- * :returns: { s, x, y, width, height, stroke, lines: [{ text, weight, px, tracking, x, baseline, advances }], rules: [{ x, y, width, height }] }
+ * :returns: { s, x, y, width, height, stroke, halo, bounds, lines: [{ text, weight, px, tracking, x, baseline, advances }], rules: [{ x, y, width, height }] }
+ *   (`halo` the outline width, 0 without one; `bounds` the box grown by it)
  *   in output pixels, text `x` the left edge of the first letter
  */
 export function layoutWatermark(settings, width, height, { snap = true, scale = 1 } = {}) {
@@ -226,7 +234,10 @@ export function layoutWatermark(settings, width, height, { snap = true, scale = 
     rules.push({ x: title.x - gap - length, y: top, width: length, height: stroke });
     rules.push({ x: title.x + textWidth + gap, y: top, width: length, height: stroke });
   }
-  return { s, x, y, width: boxWidth, height: boxHeight, stroke, border: settings.border, lines, rules };
+  const halo = !settings.outline ? 0 : snap ? Math.max(1, Math.round(DESIGN.outline.width * s)) : Math.max(scale, DESIGN.outline.width * s);
+  // What the mark paints: the box plus its outline.
+  const bounds = { x: x - halo, y: y - halo, width: boxWidth + 2 * halo, height: boxHeight + 2 * halo };
+  return { s, x, y, width: boxWidth, height: boxHeight, stroke, halo, bounds, border: settings.border, lines, rules };
 }
 
 /** Relative luminance (0–1) of an sRGB channel value 0–255, linearised. */

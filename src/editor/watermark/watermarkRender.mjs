@@ -45,34 +45,53 @@ const createSurface = (width, height) => {
  * same in every browser.
  */
 export function drawMark(context, layout, color, { offsetX = 0, offsetY = 0 } = {}) {
-  context.save();
-  context.translate(offsetX, offsetY);
-  context.fillStyle = color;
+  const rects = [];
   if (layout.border) {
     const { x, y, width, height, stroke } = layout;
-    context.fillRect(x, y, width, stroke);
-    context.fillRect(x, y + height - stroke, width, stroke);
-    context.fillRect(x, y + stroke, stroke, height - 2 * stroke);
-    context.fillRect(x + width - stroke, y + stroke, stroke, height - 2 * stroke);
+    rects.push([x, y, width, stroke], [x, y + height - stroke, width, stroke], [x, y + stroke, stroke, height - 2 * stroke], [x + width - stroke, y + stroke, stroke, height - 2 * stroke]);
   }
-  layout.rules.forEach((rule) => context.fillRect(rule.x, rule.y, rule.width, rule.height));
+  layout.rules.forEach((rule) => rects.push([rule.x, rule.y, rule.width, rule.height]));
+  const letters = (paint) => {
+    for (const line of layout.lines) {
+      context.font = `${line.weight} ${line.px}px ${FAMILY}`;
+      let x = line.x;
+      [...line.text].forEach((char, i) => {
+        paint(char, x, line.baseline);
+        x += line.advances[i] + line.tracking;
+      });
+    }
+  };
+  context.save();
+  context.translate(offsetX, offsetY);
   context.textAlign = 'left';
   context.textBaseline = 'alphabetic';
-  for (const line of layout.lines) {
-    context.font = `${line.weight} ${line.px}px ${FAMILY}`;
-    let x = line.x;
-    [...line.text].forEach((char, i) => {
-      context.fillText(char, x, line.baseline);
-      x += line.advances[i] + line.tracking;
-    });
+  const halo = layout.halo ?? 0;
+  if (halo > 0) {
+    // The outline first, in the other colour; the mark is filled over it at full strength.
+    const outline = color === DESIGN.colors.white ? DESIGN.colors.dark : DESIGN.colors.white;
+    context.globalAlpha = DESIGN.outline.alpha;
+    context.fillStyle = outline;
+    context.strokeStyle = outline;
+    context.lineWidth = 2 * halo;
+    context.lineJoin = 'round';
+    rects.forEach(([x, y, width, height]) => context.fillRect(x - halo, y - halo, width + 2 * halo, height + 2 * halo));
+    letters((char, x, y) => context.strokeText(char, x, y));
+    context.globalAlpha = 1;
   }
+  context.fillStyle = color;
+  rects.forEach(([x, y, width, height]) => context.fillRect(x, y, width, height));
+  letters((char, x, y) => context.fillText(char, x, y));
   context.restore();
 }
 
-/** The opaque mark in `color` on a transparent sprite of its box. */
+/** The painted area of a layout: its box, grown by the outline (older layouts have no bounds). */
+export const markBounds = (layout) => layout.bounds ?? { x: layout.x, y: layout.y, width: layout.width, height: layout.height };
+
+/** The opaque mark in `color` on a transparent sprite of its painted area (`markBounds`). */
 export function renderMarkSprite(layout, color) {
-  const sprite = createSurface(Math.max(1, Math.ceil(layout.width)), Math.max(1, Math.ceil(layout.height)));
-  drawMark(sprite.getContext('2d'), layout, color, { offsetX: -layout.x, offsetY: -layout.y });
+  const bounds = markBounds(layout);
+  const sprite = createSurface(Math.max(1, Math.ceil(bounds.width)), Math.max(1, Math.ceil(bounds.height)));
+  drawMark(sprite.getContext('2d'), layout, color, { offsetX: -bounds.x, offsetY: -bounds.y });
   return sprite;
 }
 
@@ -103,7 +122,8 @@ export function applyWatermark(context, settings, size) {
   context.globalAlpha = settings.opacity;
   context.globalCompositeOperation = 'source-over';
   context.imageSmoothingEnabled = false;
-  context.drawImage(sprite, layout.x, layout.y);
+  const bounds = markBounds(layout);
+  context.drawImage(sprite, bounds.x, bounds.y);
   context.restore();
   releaseSurface(sprite);
   return { layout, variant, luminance };

@@ -5,7 +5,7 @@ import {
 } from '../watermark/watermark.mjs';
 import { TextRange } from './TextPanel';
 
-const OVERRIDE_LABELS = { position: 'position', size: 'size', opacity: 'opacity', color: 'colour', margin: 'margin', border: 'border', rules: 'accent lines' };
+const OVERRIDE_LABELS = { position: 'position', size: 'size', opacity: 'opacity', color: 'colour', margin: 'margin', border: 'border', rules: 'accent lines', outline: 'outline' };
 
 /**
  * The Watermark section: the HUYNH Photography mark over this photo's final output. Settings are
@@ -109,6 +109,10 @@ export default function WatermarkPanel({ watermark, disabled, dispatch, defaults
       <label className="pe-check">
         <input type="checkbox" checked={watermark?.rules ?? base.rules} disabled={editing} onChange={(event) => apply({ rules: event.target.checked })} />
         <span>Accent lines</span>
+      </label>
+      <label className="pe-check">
+        <input type="checkbox" checked={watermark?.outline ?? base.outline} disabled={editing} onChange={(event) => apply({ outline: event.target.checked })} />
+        <span>Outline (charcoal around white, white around charcoal)</span>
       </label>
       {overrides.length > 0 && <p className="pe-note" data-watermark-overrides>This photo overrides the {defaults.label}: {overrides.map((key) => OVERRIDE_LABELS[key]).join(', ')}.</p>}
 

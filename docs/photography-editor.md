@@ -1191,6 +1191,7 @@ Settings never change the text or typography.
 | Opacity / margin | 65% / 2.5% | 5–100% / 0–15% |
 | Colour | white | white, charcoal `#1f1f22`, auto |
 | Border, accent lines | on | on/off |
+| Outline (charcoal around white, white around charcoal) | on | on/off; off for marks saved without it |
 
 - **Where it lives:** `adjustments.watermark` (edit document v11, `null` =
   none), so it is in undo/redo, saved documents, autosave and CMS treatments.
@@ -1214,6 +1215,11 @@ Settings never change the text or typography.
   backdrops within a few percent of the threshold.
 - **Preview:** the export-size layout drawn at screen resolution on its own
   small canvas over the photo; a watermark change never re-renders the photo.
+- **Outline:** behind every letter, rule and border stroke, 0.02 × the HUYNH size
+  (at least 1 output pixel), at 60% inside the sprite and then the mark's opacity;
+  the mark is filled over it at full strength. The painted area is `layout.bounds`
+  (the box grown by `layout.halo`). Settings saved before Interval 16.7.2 have no
+  `outline` key and keep drawing without it.
 - **Fonts:** static 500/800 faces (~25 kB each, same site): Playwright WebKit
   draws variable faces on canvas at their default weight. Letter positions come
   from a fixed advance table, so they match across engines; anti-aliasing

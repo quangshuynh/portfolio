@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DESIGN, WATERMARK_COLORS, WATERMARK_LIMITS, WATERMARK_POSITIONS, layoutWatermark, normalizeWatermark, placementReport, regionLuminance, resolveWatermarkColor, sampleBox, watermarksEqual,
 } from '../../../src/editor/watermark/watermark.mjs';
-import { drawMark, loadWatermarkFonts } from '../../../src/editor/watermark/watermarkRender.mjs';
+import { loadWatermarkFonts, markBounds, renderMarkSprite } from '../../../src/editor/watermark/watermarkRender.mjs';
 import { ApiError, imageUrl, treatmentImageUrl, treatments, watermark as watermarkApi } from '../api.js';
 import { clearWatermarkQueue, queueEditorHref, readWatermarkQueue, writeWatermarkQueue } from '../editorHost.jsx';
 
@@ -55,10 +55,10 @@ function Preview({ id, settings, show, alt, onVariant }) {
         const layout = layoutWatermark(settings, frame.width, frame.height, { scale: pixels.width / frame.width });
         const variant = resolveWatermarkColor(settings, regionLuminance(pixels, sampleBox(layout)).mean);
         onVariant?.(variant);
-        const sprite = Object.assign(document.createElement('canvas'), { width: layout.width, height: layout.height });
-        drawMark(sprite.getContext('2d'), layout, DESIGN.colors[variant], { offsetX: -layout.x, offsetY: -layout.y });
+        const sprite = renderMarkSprite(layout, DESIGN.colors[variant]);
+        const bounds = markBounds(layout);
         context.globalAlpha = settings.opacity;
-        context.drawImage(sprite, layout.x, layout.y);
+        context.drawImage(sprite, bounds.x, bounds.y);
       } catch {
         if (alive) setFailed(true);
       }
@@ -94,6 +94,7 @@ function PreferenceForm({ preference, onSaved, onError }) {
         {percent('opacity', 'Opacity', WATERMARK_LIMITS.opacity, 1)}
         {percent('margin', 'Margin', WATERMARK_LIMITS.margin, 0.5)}
         <label className="cms-check"><input type="checkbox" checked={draft.border} onChange={(event) => set({ border: event.target.checked })} /> Border</label>
+        <label className="cms-check"><input type="checkbox" checked={draft.outline} onChange={(event) => set({ outline: event.target.checked })} /> Outline</label>
         <label className="cms-check"><input type="checkbox" checked={draft.rules} onChange={(event) => set({ rules: event.target.checked })} /> Accent lines</label>
       </div>
       <div className="cms-toolbar">
