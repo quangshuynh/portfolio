@@ -1016,7 +1016,10 @@ exports right after loading the edits, so on `main` the export shared the cores 
 preview too (with the preview filtering during the export the branch took 20.7 s for the 24 MP
 PNG). Every export still equals the Node reference exactly. RAW decoding and the HDR merge are
 unchanged (one frame decoded at a time, the merge worker ended before compositing); their peaks
-fell only with the compositing. Thumbnails no
+fell only with the compositing. `check:editor:memory` (genuine files, two cycles, now with a
+local Clarity brush step): growth between cycles 144 MB, no workers left in an empty workspace.
+**Unexplained:** the first cycle's local Clarity step sampled a whole-browser peak of 10.9 GB
+(the second 3.1 GB); one run, not reproduced or profiled yet. Thumbnails no
 longer redraw on mask or layer edits (two redraws per brush move before).
 
 **Physical iPhone (not tested by the agent).** Besides the list below, check: pinch-zoom with the
