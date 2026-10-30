@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { assetReport, catalogErrors, serializeCatalog } from './photography-catalog.mjs';
 import { DEFAULT_CATALOG_PATH, DERIVATIVES_DIRECTORY, GENERATED_MANIFEST_PATH, projectRoot } from './photography-catalog-files.mjs';
+import { photographLibraryPaths } from './photography-sources.mjs';
 
 const text = readFileSync(DEFAULT_CATALOG_PATH, 'utf8');
 const catalog = JSON.parse(text);
@@ -27,6 +28,16 @@ test('the catalog is valid and in canonical form', () => {
 
 test('every published photograph has its metadata and derivatives, and drafts have none', () => {
   expect(assetReport(catalog, generated, derivatives).errors).toEqual([]);
+});
+
+test('camera-library sources are JPEG or PNG files of published photographs, never RAW originals', () => {
+  const published = new Map(catalog.photographs.filter(({ status }) => status === 'published').map((record) => [record.id, record]));
+  const manifest = new Map(generated.map((entry) => [entry.id, entry]));
+  for (const [id, file] of Object.entries(photographLibraryPaths)) {
+    expect(file, id).toMatch(/\.(jpe?g|png)$/i);
+    expect(published.has(id), id).toBe(true);
+    expect(path.posix.basename(file)).toBe(manifest.get(id).sourceFilename);
+  }
 });
 
 test('the orphaned derivatives are preserved and accounted for', () => {
