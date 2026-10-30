@@ -55,6 +55,7 @@ function createCpuEngine(host, maxPreviewEdge) {
   return { element, engine: { kind: 'cpu', context, maxEdge: Math.min(2048, maxPreviewEdge) } };
 }
 
+const whenIdle = (task) => (typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(task, { timeout: 1000 }) : setTimeout(task, 200));
 const clampZoom = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 const NEUTRAL_GEOMETRY = neutralGeometry();
 const specKey = (spec) => (spec ? JSON.stringify([spec.matrix, spec.width, spec.height, spec.coverage, spec.background]) : '');
@@ -263,6 +264,9 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       setProxy({ id: photo.id, width: image.width, height: image.height });
       setView({ fit: true, zoom: 1, x: 0, y: 0 });
       setStatus({ state: 'ready' });
+      // The layer and mask programs start compiling once the photo is shown, so the first brush
+      // point or layer does not wait for the driver (the first brush point took ~0.5 s for this).
+      if (engine.kind === 'webgl2') whenIdle(() => { if (engineRef.current === engine) engine.renderer.prepareCompositor(); });
     }).catch((error) => {
       if (!cancelled && error.code !== 'cancelled') setStatus({ state: 'error', message: error.message });
     });

@@ -73,29 +73,37 @@ function floatTexture(gl, target) {
   return texture;
 }
 
-function compile(gl, type, source) {
-  const shader = gl.createShader(type);
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const log = gl.getShaderInfoLog(shader);
-    gl.deleteShader(shader);
-    throw new Error(`Shader compile failed: ${log}`);
-  }
-  return shader;
+function link(gl, fragmentSource) {
+  return finishLink(gl, startLink(gl, fragmentSource));
 }
 
-function link(gl, fragmentSource) {
+/**
+ * Compiles and links without asking for the result, so the driver can work in the background
+ * (asking for a status waits for it); finishLink checks the result and throws its log.
+ */
+function startLink(gl, fragmentSource) {
   const program = gl.createProgram();
-  const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
-  const fragment = compile(gl, gl.FRAGMENT_SHADER, fragmentSource);
-  gl.attachShader(program, vertex);
-  gl.attachShader(program, fragment);
+  const shaders = [[gl.VERTEX_SHADER, VERTEX_SHADER], [gl.FRAGMENT_SHADER, fragmentSource]].map(([type, source]) => {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    gl.attachShader(program, shader);
+    return shader;
+  });
   gl.bindAttribLocation(program, 0, 'aPosition');
   gl.linkProgram(program);
-  gl.deleteShader(vertex);
-  gl.deleteShader(fragment);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(`Shader link failed: ${gl.getProgramInfoLog(program)}`);
+  return { program, shaders };
+}
+
+function finishLink(gl, { program, shaders }) {
+  const linked = gl.getProgramParameter(program, gl.LINK_STATUS);
+  const logs = linked ? '' : shaders.map((shader) => (gl.getShaderParameter(shader, gl.COMPILE_STATUS) ? '' : gl.getShaderInfoLog(shader))).join(' ');
+  shaders.forEach((shader) => gl.deleteShader(shader));
+  if (!linked) {
+    const message = logs.trim() ? `Shader compile failed: ${logs.trim()}` : `Shader link failed: ${gl.getProgramInfoLog(program)}`;
+    gl.deleteProgram(program);
+    throw new Error(message);
+  }
   return program;
 }
 
@@ -452,11 +460,30 @@ export class GlRenderer {
     return this.emptyMask;
   }
 
+  /**
+   * Starts compiling the layer and mask programs before they are first needed (a masked pass, a
+   * layer): linking takes hundreds of milliseconds on some drivers, and with
+   * KHR_parallel_shader_compile it runs without blocking. Cheap to call more than once.
+   * :returns: true once the programs are ready (or were never started), false while linking
+   */
+  prepareCompositor() {
+    if (this.compositor || this.lost) return true;
+    const { gl } = this;
+    if (!this.pendingCompositor) {
+      this.parallelCompile ??= gl.getExtension('KHR_parallel_shader_compile');
+      this.pendingCompositor = { program: startLink(gl, COMPOSITE_SHADER), copy: startLink(gl, COPY_SHADER) };
+    }
+    const done = this.parallelCompile?.COMPLETION_STATUS_KHR;
+    return !done || [this.pendingCompositor.program, this.pendingCompositor.copy].every(({ program }) => gl.getProgramParameter(program, done));
+  }
+
   ensureCompositor() {
     if (this.compositor) return this.compositor;
     const { gl } = this;
-    const program = link(gl, COMPOSITE_SHADER);
-    const copy = link(gl, COPY_SHADER);
+    const pending = this.pendingCompositor ?? { program: startLink(gl, COMPOSITE_SHADER), copy: startLink(gl, COPY_SHADER) };
+    this.pendingCompositor = null;
+    const program = finishLink(gl, pending.program);
+    const copy = finishLink(gl, pending.copy);
     this.compositor = {
       program,
       uniforms: Object.fromEntries(COMPOSITE_UNIFORMS.map((name) => [name, gl.getUniformLocation(program, name)])),
@@ -713,6 +740,7 @@ export class GlRenderer {
     this.releaseSource();
     this.releaseLayers();
     if (this.compositor) { gl.deleteProgram(this.compositor.program); gl.deleteProgram(this.compositor.copy); }
+    if (this.pendingCompositor) [this.pendingCompositor.program, this.pendingCompositor.copy].forEach(({ program, shaders }) => { shaders.forEach((shader) => gl.deleteShader(shader)); gl.deleteProgram(program); });
     gl.deleteTexture(this.curveTexture);
     gl.deleteTexture(this.lutTexture);
     gl.deleteTexture(this.glowTexture);

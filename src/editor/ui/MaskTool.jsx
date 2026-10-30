@@ -68,7 +68,10 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     const { u, v } = toSpace(point.x, point.y);
     const stroke = { mode: event.altKey ? (brush.mode === 'erase' ? 'add' : 'erase') : brush.mode, radius: brush.radius, hardness: brush.hardness, opacity: brush.opacity, points: [[u, v, p]] };
     dragRef.current = { kind: 'paint', pointer: event.pointerId, base, id, stroke, last: point, latest: null };
-    preview(appendStroke(base, id, stroke));
+    // The first point is shown at once (moves are coalesced to one preview per frame).
+    const first = appendStroke(base, id, stroke);
+    dragRef.current.latest = first;
+    onPreview(first);
     return true;
   };
   const extendPaint = (event, drag) => {

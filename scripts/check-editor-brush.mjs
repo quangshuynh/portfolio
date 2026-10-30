@@ -54,6 +54,17 @@ const DRAW_PROBE = () => {
   wrap(globalThis.WebGL2RenderingContext?.prototype, 'drawArrays');
   wrap(globalThis.CanvasRenderingContext2D?.prototype, 'putImageData');
   wrap(globalThis.CanvasRenderingContext2D?.prototype, 'drawImage');
+  // A composited GPU frame (masked passes) ends by drawing to the canvas after framebuffer passes.
+  window.__brushComposites = [];
+  const bind = globalThis.WebGL2RenderingContext?.prototype.bindFramebuffer;
+  if (bind) {
+    let offscreen = false;
+    WebGL2RenderingContext.prototype.bindFramebuffer = function bindFramebuffer(target, framebuffer) {
+      if (framebuffer) offscreen = true;
+      else if (offscreen) { offscreen = false; window.__brushComposites.push(performance.now()); }
+      return bind.call(this, target, framebuffer);
+    };
+  }
   window.__brushFrames = [];
   try {
     new PerformanceObserver((list) => { for (const entry of list.getEntries()) window.__brushFrames.push({ start: entry.startTime, duration: entry.duration, blocking: entry.blockingDuration, render: entry.renderStart ? entry.startTime + entry.duration - entry.renderStart : 0 }); })
@@ -153,7 +164,9 @@ async function runOne(run, file) {
       const handler = [];
       const frameTimes = [];
       let last = await frame();
+      const down = performance.now();
       send('pointerdown', 0);
+      const downHandler = performance.now() - down;
       for (let k = 1; k <= moves; k += 1) {
         const now = await frame();
         frameTimes.push(now - last);
@@ -199,7 +212,14 @@ async function runOne(run, file) {
           overlayDiff.premultiplied = Math.max(overlayDiff.premultiplied, Math.round(p * 100) / 100);
         }
       }
-      return { handler, frameTimes, latency, commitMs, longFrames, span: inputs.at(-1) - inputs[0], overlayDiff };
+      // The first point: pointerdown to the first draw of the preview after it (the brush overlay
+      // or the edited frame, whichever comes first) and to the first draw after the first move.
+      // On the GPU preview, the first composited frame (the masked pass) is the stroke shown.
+      const firstDraw = draws.find((d) => d >= down);
+      const firstComposite = window.__brushComposites.find((d) => d >= down);
+      const firstFrames = frameTimes.slice(0, 4);
+      const firstPoint = { handler: downHandler, toDraw: firstDraw === undefined ? null : firstDraw - down, toComposite: firstComposite === undefined ? null : firstComposite - down, maxFrameOfFirstFour: Math.max(...firstFrames) };
+      return { handler, frameTimes, latency, commitMs, firstPoint, longFrames, span: inputs.at(-1) - inputs[0], overlayDiff };
     }, { moves: MOVES, pointerType: run.device ? 'touch' : 'mouse' });
     if (cdp) {
       const { profile } = await cdp.send('Profiler.stop');
@@ -209,6 +229,7 @@ async function runOne(run, file) {
     }
     const busy = measured.longFrames.reduce((sum, f) => sum + f.duration, 0);
     result.moves = MOVES;
+    result.firstPointMs = Object.fromEntries(Object.entries(measured.firstPoint).map(([k, v]) => [k, v === null || !Number.isFinite(v) ? null : Math.round(v * 10) / 10]));
     result.handlerMs = stats(measured.handler);
     result.frameIntervalMs = stats(measured.frameTimes);
     result.fps = Math.round((1000 * MOVES) / measured.span);
