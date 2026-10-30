@@ -2,7 +2,7 @@ import { act, render, screen } from '@testing-library/react';
 import App from '../../App';
 import { photographs, sortPhotographs } from '../../data/photographs';
 import { photographyHref } from '../../util/navigation';
-import { MAX_ZOOM, resetPhotographyPreloadsForTests, zoomAround } from './photographyLightbox';
+import { MAX_ZOOM, SWIPE_SETTLE_MS, resetPhotographyPreloadsForTests, swipeCommits, zoomAround } from './photographyLightbox';
 
 const ordered = sortPhotographs(photographs);
 
@@ -107,4 +107,75 @@ test('a pinch never navigates, and next and previous still work after zooming', 
   expect(at()).toBe(photographyHref(ordered[2].slug));
   // A new photograph starts at the fit.
   expect(shownScale()).toBe('100%');
+});
+
+test('a swipe commits past a fifth of the stage (at most 96 px) or on a quick flick', () => {
+  expect(swipeCommits(-80, 600, 400)).toBe(true);
+  expect(swipeCommits(-79, 600, 400)).toBe(false);
+  expect(swipeCommits(96, 900, 1600)).toBe(true);
+  expect(swipeCommits(40, 60, 1600)).toBe(true);
+  expect(swipeCommits(20, 10, 1600)).toBe(false);
+});
+
+const settled = () => act(() => new Promise((resolve) => { setTimeout(resolve, SWIPE_SETTLE_MS + 50); }));
+const at = () => window.location.pathname + window.location.hash;
+
+test('one-finger swipes at the fit change photograph; short and edge swipes spring back', async () => {
+  const stage = await open(ordered[1]);
+  // A short swipe follows the finger, then springs back.
+  touch('pointerdown', stage, 1, 300, 200, 10);
+  touch('pointermove', stage, 1, 260, 202, 300);
+  expect(transform(stage)).toMatch(/translate3d\(-40px, 0px, 0\) scale\(1\)/);
+  touch('pointerup', stage, 1, 260, 202, 600);
+  await settled();
+  expect(transform(stage)).toMatch(/translate3d\(0px, 0px, 0\)/);
+  expect(at()).toBe(photographyHref(ordered[1].slug));
+  // A mostly vertical drag is not a swipe.
+  touch('pointerdown', stage, 2, 300, 100, 1000);
+  touch('pointermove', stage, 2, 280, 260, 1100);
+  touch('pointerup', stage, 2, 280, 260, 1200);
+  await settled();
+  expect(at()).toBe(photographyHref(ordered[1].slug));
+  // Swiping left goes to the next photograph, which opens at the fit.
+  touch('pointerdown', stage, 3, 400, 200, 2000);
+  touch('pointermove', stage, 3, 300, 205, 2100);
+  touch('pointerup', stage, 3, 250, 205, 2200);
+  await settled();
+  expect(at()).toBe(photographyHref(ordered[2].slug));
+  expect(shownScale()).toBe('100%');
+  // Swiping right goes back.
+  const next = document.querySelector('.photography-lightbox-image-wrap');
+  next.getBoundingClientRect = stage.getBoundingClientRect;
+  touch('pointerdown', next, 4, 200, 200, 3000);
+  touch('pointerup', next, 4, 320, 200, 3100);
+  await settled();
+  expect(at()).toBe(photographyHref(ordered[1].slug));
+});
+
+test('past the first photograph a swipe only gives a little and never navigates', async () => {
+  const stage = await open(ordered[0]);
+  touch('pointerdown', stage, 1, 200, 200, 10);
+  touch('pointermove', stage, 1, 300, 200, 100);
+  expect(transform(stage)).toMatch(/translate3d\(30px, 0px, 0\)/);
+  touch('pointerup', stage, 1, 400, 200, 200);
+  await settled();
+  expect(at()).toBe(photographyHref(ordered[0].slug));
+  expect(transform(stage)).toMatch(/translate3d\(0px, 0px, 0\)/);
+});
+
+test('zoomed, a horizontal one-finger drag pans and never changes photograph', async () => {
+  const stage = await open(ordered[1]);
+  touch('pointerdown', stage, 1, 250, 200);
+  touch('pointerdown', stage, 2, 350, 200);
+  touch('pointermove', stage, 1, 200, 200);
+  touch('pointermove', stage, 2, 400, 200);
+  touch('pointerup', stage, 1, 200, 200);
+  touch('pointerup', stage, 2, 400, 200);
+  expect(shownScale()).toBe('200%');
+  touch('pointerdown', stage, 3, 400, 200, 1000);
+  touch('pointermove', stage, 3, 100, 200, 1050);
+  touch('pointerup', stage, 3, 100, 200, 1100);
+  await settled();
+  expect(at()).toBe(photographyHref(ordered[1].slug));
+  expect(transform(stage)).toMatch(/translate3d\(-200px, 0px, 0\) scale\(2\)/);
 });

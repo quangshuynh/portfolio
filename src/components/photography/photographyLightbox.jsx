@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { FaChevronLeft, FaChevronRight, FaCompress, FaExpand, FaInfoCircle, FaMinus, FaPlus, FaTimes } from 'react-icons/fa';
 import useOverlayLock from '../utilities/overlayLock';
@@ -117,6 +117,28 @@ export function calculateFittedImageDimensions(width, height, availableWidth, av
 export const MAX_ZOOM = 5;
 const DOUBLE_TAP_MS = 300;
 const TAP_SLOP_PX = 24;
+// A one-finger swipe at the fit changes photograph once it is mostly horizontal and passes
+// SWIPE_START_PX; it commits past a fifth of the stage (at most SWIPE_COMMIT_PX) or on a flick.
+const SWIPE_START_PX = 10;
+const SWIPE_COMMIT_PX = 96;
+const SWIPE_FLICK_PX = 32;
+const SWIPE_FLICK_SPEED = 0.45;
+const SWIPE_EDGE_RESISTANCE = 0.3;
+export const SWIPE_SETTLE_MS = 200;
+
+/**
+ * Whether a released swipe changes photograph.
+ * :param dx: horizontal travel in px (negative: towards the next photograph)
+ * :param duration: ms since the finger went down
+ * :param width: stage width in px
+ */
+export function swipeCommits(dx, duration, width) {
+  const distance = Math.abs(dx);
+  const speed = distance / Math.max(1, duration);
+  return distance >= Math.min(SWIPE_COMMIT_PX, width * 0.2) || (distance >= SWIPE_FLICK_PX && speed >= SWIPE_FLICK_SPEED);
+}
+
+const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 /**
  * The view after zooming to `nextScale` (1–MAX_ZOOM) so that the image point under `point`
@@ -135,10 +157,16 @@ export function resetPhotographyPreloadsForTests() {
 
 export default function PhotographyLightbox({ photograph, collection, onNavigate, onClose, returnFocusRef }) {
   const [infoOpen, setInfoOpen] = useState(false);
-  // The view lives in a ref and is painted straight onto the image, so a pan never re-renders;
-  // `scale` (state) only drives the percentage and the zoom buttons.
+  // The view lives in a ref and is painted straight onto the image and the percentage, so a pan,
+  // pinch or swipe never re-renders; `scale` (state) drives the zoom buttons and is committed
+  // when a gesture ends.
   const [scale, setScale] = useState(1);
   const viewRef = useRef({ scale: 1, position: { x: 0, y: 0 } });
+  const scaleLabelRef = useRef(null);
+  // A swipe between photographs: its finger and start, and the image's horizontal offset.
+  const swipeRef = useRef(null);
+  const swipeOffsetRef = useRef(0);
+  const settleTimerRef = useRef(null);
   const [fitSize, setFitSize] = useState({ width: 0, height: 0 });
   const backdropRef = useRef(null);
   const viewerRef = useRef(null);
@@ -196,13 +224,16 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
 
   const paint = React.useCallback(() => {
     const { scale: currentScale, position: { x, y } } = viewRef.current;
-    if (imageRef.current) imageRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${currentScale})`;
+    if (imageRef.current) imageRef.current.style.transform = `translate3d(${x + swipeOffsetRef.current}px, ${y}px, 0) scale(${currentScale})`;
+    const label = `${Math.round(currentScale * 100)}%`;
+    if (scaleLabelRef.current && scaleLabelRef.current.textContent !== label) scaleLabelRef.current.textContent = label;
   }, []);
 
-  const applyView = React.useCallback(({ scale: nextScale, position: nextPosition }) => {
+  // `commit: false` during a pinch: painted only; the zoom buttons follow when the fingers lift.
+  const applyView = React.useCallback(({ scale: nextScale, position: nextPosition }, { commit = true } = {}) => {
     viewRef.current = { scale: nextScale, position: nextScale > 1 ? clampPosition(nextPosition, nextScale) : { x: 0, y: 0 } };
     paint();
-    setScale(nextScale);
+    if (commit) setScale(nextScale);
   }, [clampPosition, paint]);
 
   const zoom = React.useCallback((amount) => {
@@ -213,6 +244,8 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   // Independent of the fit, so a rotation does not reset the zoom; only a new photograph does.
   const reset = React.useCallback(() => {
     viewRef.current = { scale: 1, position: { x: 0, y: 0 } };
+    swipeRef.current = null;
+    swipeOffsetRef.current = 0;
     paint();
     setScale(1);
   }, [paint]);
@@ -228,25 +261,36 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     (returnFocusRef?.current?.isConnected ? returnFocusRef.current : fallback)?.focus({ preventScroll: true });
   }), [returnFocusRef]);
 
-  useEffect(() => {
+  // Before the new photograph is painted: it opens at the fit, sized from its catalog dimensions.
+  useLayoutEffect(() => {
+    clearTimeout(settleTimerRef.current);
+    stageRef.current?.classList.remove('is-settling');
     reset();
   }, [photograph.id, reset]);
+  useEffect(() => () => clearTimeout(settleTimerRef.current), []);
 
   useEffect(() => {
     if (infoOpen) sheetCloseRef.current?.focus();
   }, [infoOpen]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     measureFit();
     const image = imageRef.current;
     if (!image) return undefined;
+    // The photograph fades in once decoded (CSS), so a switch never shows a half-drawn image.
+    const shown = () => { image.dataset.loaded = 'true'; };
     if (image.complete) {
+      shown();
       measureFit();
       return undefined;
     }
-    const handleLoad = () => measureFit();
+    const handleLoad = () => { shown(); measureFit(); };
     image.addEventListener('load', handleLoad);
-    return () => image.removeEventListener('load', handleLoad);
+    image.addEventListener('error', shown);
+    return () => {
+      image.removeEventListener('load', handleLoad);
+      image.removeEventListener('error', shown);
+    };
   }, [measureFit, photograph.id]);
 
   // Entering or leaving fullscreen changes the stage; native fullscreen also fires resize.
@@ -337,13 +381,51 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     const rect = stageRef.current.getBoundingClientRect();
     return { x: x - rect.left - rect.width / 2, y: y - rect.top - rect.height / 2 };
   };
+  const settle = () => {
+    const stage = stageRef.current;
+    stage?.classList.add('is-settling');
+    clearTimeout(settleTimerRef.current);
+    settleTimerRef.current = setTimeout(() => stage?.classList.remove('is-settling'), SWIPE_SETTLE_MS);
+  };
+  const cancelSwipe = () => {
+    if (!swipeRef.current) return;
+    swipeRef.current = null;
+    if (swipeOffsetRef.current) {
+      swipeOffsetRef.current = 0;
+      settle();
+      paint();
+    }
+  };
+  // A released swipe slides out and changes photograph, or springs back.
+  const endSwipe = (swipe, event) => {
+    swipeRef.current = null;
+    const dx = event.clientX - swipe.startX;
+    const target = dx < 0 ? next : previous;
+    const width = stageRef.current?.getBoundingClientRect().width || window.innerWidth;
+    if (target && swipeCommits(dx, event.timeStamp - swipe.time, width)) {
+      if (prefersReducedMotion()) {
+        onNavigate(target);
+        return;
+      }
+      swipeRef.current = { ...swipe, leaving: true };
+      swipeOffsetRef.current = Math.sign(dx) * width;
+      settle();
+      paint();
+      settleTimerRef.current = setTimeout(() => onNavigate(target), SWIPE_SETTLE_MS);
+      return;
+    }
+    swipeOffsetRef.current = 0;
+    settle();
+    paint();
+  };
   const startPinch = () => {
     const [a, b] = [...pointersRef.current.values()];
     dragRef.current = null;
+    cancelSwipe();
     pinchRef.current = { distance: Math.hypot(a.x - b.x, a.y - b.y) || 1, mid: stagePoint((a.x + b.x) / 2, (a.y + b.y) / 2), ...viewRef.current };
   };
   const onPointerDown = (event) => {
-    if (event.button === 2) return;
+    if (event.button === 2 || swipeRef.current?.leaving) return;
     const { scale: currentScale, position: currentPosition } = viewRef.current;
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, time: event.timeStamp });
     // Touches are followed even at 100%, so a second finger can pinch.
@@ -352,6 +434,8 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     event.currentTarget.classList.add('is-gesturing');
     if (pointersRef.current.size === 2) startPinch();
     else if (pointersRef.current.size === 1 && currentScale > 1) dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, origin: currentPosition };
+    // At the fit one finger may swipe to the neighbouring photograph; zoomed, it only pans.
+    else if (pointersRef.current.size === 1 && event.pointerType === 'touch') swipeRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, time: event.timeStamp, active: false };
   };
   const onPointerMove = (event) => {
     const pointer = pointersRef.current.get(event.pointerId);
@@ -361,7 +445,22 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     if (pinch && pointersRef.current.size >= 2) {
       const [a, b] = [...pointersRef.current.values()];
       const mid = stagePoint((a.x + b.x) / 2, (a.y + b.y) / 2);
-      applyView(zoomAround(pinch, pinch.scale * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.distance), pinch.mid, mid));
+      applyView(zoomAround(pinch, pinch.scale * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.distance), pinch.mid, mid), { commit: false });
+      return;
+    }
+    const swipe = swipeRef.current;
+    if (swipe && !swipe.leaving && swipe.pointerId === event.pointerId) {
+      const dx = event.clientX - swipe.startX;
+      const dy = event.clientY - swipe.startY;
+      if (!swipe.active) {
+        if (Math.abs(dx) >= SWIPE_START_PX && Math.abs(dx) > Math.abs(dy)) swipe.active = true;
+        else if (Math.abs(dy) >= SWIPE_START_PX) swipeRef.current = null;
+      }
+      if (swipe.active) {
+        // Past the first or last photograph the image only gives a little.
+        swipeOffsetRef.current = (dx < 0 ? next : previous) ? dx : dx * SWIPE_EDGE_RESISTANCE;
+        paint();
+      }
       return;
     }
     const current = dragRef.current;
@@ -378,10 +477,27 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     if (!pointersRef.current.size) event.currentTarget.classList.remove('is-gesturing');
     const { scale: currentScale, position: currentPosition } = viewRef.current;
+    const swipe = swipeRef.current;
+    if (swipe && !swipe.leaving && swipe.pointerId === event.pointerId) {
+      swipeRef.current = null;
+      // A flick can end before any move is delivered.
+      const dx = event.clientX - swipe.startX;
+      if (Math.abs(dx) >= SWIPE_START_PX && Math.abs(dx) > Math.abs(event.clientY - swipe.startY)) swipe.active = true;
+      if (swipe.active) {
+        tapRef.current = null;
+        if (event.type === 'pointerup') endSwipe(swipe, event);
+        else {
+          swipeRef.current = swipe;
+          cancelSwipe();
+        }
+        return;
+      }
+    }
     if (pinchRef.current) {
       // Lifting one finger of a pinch continues as a pan with the other.
       pinchRef.current = null;
       tapRef.current = null;
+      setScale(currentScale);
       const [rest] = [...pointersRef.current.entries()];
       dragRef.current = rest && currentScale > 1 ? { pointerId: rest[0], startX: rest[1].x, startY: rest[1].y, origin: currentPosition } : null;
       return;
@@ -428,7 +544,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
           <div>
             <div className="photography-lightbox-zoom-controls" aria-label="Image zoom controls">
               <button type="button" onClick={() => zoom(-.25)} disabled={scale <= 1} aria-label="Zoom out"><FaMinus aria-hidden="true" /></button>
-              <button className="photography-lightbox-scale" type="button" onClick={reset} aria-label="Reset zoom">{Math.round(scale * 100)}%</button>
+              <button className="photography-lightbox-scale" type="button" onClick={reset} aria-label="Reset zoom"><span ref={scaleLabelRef}>100%</span></button>
               <button type="button" onClick={() => zoom(.25)} disabled={scale >= 5} aria-label="Zoom in"><FaPlus aria-hidden="true" /></button>
             </div>
             <button className="photography-lightbox-fullscreen" type="button" onClick={fullscreen.toggle} aria-pressed={fullscreen.active} aria-label={fullscreen.active ? 'Exit fullscreen' : 'Enter fullscreen'} title={fullscreen.active ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}>

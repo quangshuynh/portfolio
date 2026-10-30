@@ -4,7 +4,8 @@
 // with overflow hidden, so a pinch only enlarged the photo inside that box. Each run checks that
 // in fullscreen the stage fills the viewport, the photo fits without cropping (portrait, landscape,
 // square and panoramic), a pinch and pan use the whole viewport within bounds, double tap and reset
-// work, rotation refits, previous/next work and the page behind never scrolls.
+// work, rotation refits, previous/next and swipes work (a zoomed drag only pans), the page behind
+// never scrolls and closing restores it; pinch and pan change nothing in the DOM but the image.
 // Gestures are synthesised pointer events; emulation is evidence, not a physical-device test.
 // Usage: npm run check:photography:viewer  (VIEWER_ENGINES=webkit-iphone,... to narrow; SHOTS_DIR saves screenshots)
 import assert from 'node:assert/strict';
@@ -210,11 +211,96 @@ async function runEngine(run, fixtures) {
     assertFits(await measure(page), `${run.name}, previous photograph`);
     await page.getByRole('button', { name: 'Next photograph' }).click();
     await page.waitForFunction((text) => document.querySelector('.photography-lightbox').getAttribute('aria-label') === text, first);
+
+    // A swipe at the fit changes photograph and opens it at the fit; a zoomed drag only pans.
+    const swipe = async (dx) => {
+      const { stage } = await measure(page);
+      const x = stage.left + stage.width / 2;
+      const y = stage.top + stage.height / 2;
+      await touch(page, [['pointerdown', 20, x, y], ['pointermove', 20, x + dx / 2, y + 3], ['pointermove', 20, x + dx, y + 3], ['pointerup', 20, x + dx, y + 3]]);
+    };
+    const settledOn = async (predicate, text) => {
+      await page.waitForFunction(([wanted, same]) => (document.querySelector('.photography-lightbox').getAttribute('aria-label') === wanted) === same, [text, predicate]);
+      await page.waitForFunction(() => document.querySelector('.photography-lightbox img')?.dataset.loaded === 'true');
+      await page.waitForTimeout(300);
+    };
+    await swipe(-200);
+    await settledOn(false, first);
+    let m = await measure(page);
+    assertFits(m, `${run.name}, after swipe to next`);
+    assert.equal(m.scale, '100%', `${run.name}: swiped-to photograph opens at the fit`);
+    await swipe(200);
+    await settledOn(true, first);
+    assertFits(await measure(page), `${run.name}, after swipe back`);
+    m = await measure(page);
+    const cx = m.stage.left + m.stage.width / 2;
+    const cy = m.stage.top + m.stage.height / 2;
+    await touch(page, [['pointerdown', 21, cx, cy, 900], ['pointerup', 21, cx, cy, 40], ['pointerdown', 22, cx, cy, 80], ['pointerup', 22, cx, cy, 40]]);
+    assert.equal((await measure(page)).scale, '250%', `${run.name}: double tap zooms before the drag`);
+    await swipe(-200);
+    await page.waitForTimeout(400);
+    assert.equal(await caption(), first, `${run.name}: a zoomed one-finger drag pans, never navigates`);
+    assert.equal((await measure(page)).scale, '250%', `${run.name}: zoom kept while panning`);
+    await page.getByRole('button', { name: 'Reset zoom' }).click();
+
+    // Gesture cost: one pointermove per frame; nothing but the image transform, the stage's
+    // gesture class and the percentage may change in the DOM while the fingers move.
+    const cost = await page.evaluate(async () => {
+      const stage = document.querySelector('.photography-lightbox-image-wrap');
+      const label = document.querySelector('[aria-label="Reset zoom"] span');
+      const r = stage.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      const frame = () => new Promise(requestAnimationFrame);
+      const fire = (type, id, px, py) => stage.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: id, pointerType: 'touch', isPrimary: id === 30, clientX: px, clientY: py, buttons: type === 'pointerup' ? 0 : 1 }));
+      let changes = 0;
+      const observer = new MutationObserver((list) => {
+        for (const m of list) {
+          const ours = (m.target.tagName === 'IMG' && m.attributeName === 'style') || (m.target === stage && m.attributeName === 'class') || label.contains(m.target);
+          if (!ours) changes += 1;
+        }
+      });
+      observer.observe(document.querySelector('.photography-lightbox-backdrop'), { subtree: true, attributes: true, childList: true, characterData: true });
+      const timed = (fn) => { const start = performance.now(); fn(); return performance.now() - start; };
+      const summary = (samples) => { const sorted = [...samples].sort((a, b) => a - b); return { mean: sorted.reduce((a, b) => a + b, 0) / sorted.length, p95: sorted[Math.floor(sorted.length * 0.95)] }; };
+      const pinch = [];
+      fire('pointerdown', 30, x - 20, y);
+      fire('pointerdown', 31, x + 20, y);
+      for (let k = 1; k <= 60; k += 1) { pinch.push(timed(() => { fire('pointermove', 30, x - 20 - k, y); fire('pointermove', 31, x + 20 + k, y); })); await frame(); }
+      const pinchChanges = changes;
+      fire('pointerup', 31, x + 80, y);
+      await frame();
+      await frame();
+      const pan = [];
+      changes = 0;
+      for (let k = 1; k <= 60; k += 1) { pan.push(timed(() => fire('pointermove', 30, x - 80 + Math.sin(k / 8) * 120, y + k))); await frame(); }
+      const panChanges = changes;
+      fire('pointerup', 30, x, y);
+      observer.disconnect();
+      return { pinch: summary(pinch), pan: summary(pan), pinchChanges, panChanges };
+    });
+    assert.equal(cost.pinchChanges, 0, `${run.name}: no re-render while pinching (${cost.pinchChanges} DOM changes)`);
+    assert.equal(cost.panChanges, 0, `${run.name}: no re-render while panning (${cost.panChanges} DOM changes)`);
+    console.log(`    gesture cost per move: pinch ${cost.pinch.mean.toFixed(3)} ms (p95 ${cost.pinch.p95.toFixed(3)}), pan ${cost.pan.mean.toFixed(3)} ms (p95 ${cost.pan.p95.toFixed(3)})`);
+    await page.getByRole('button', { name: 'Reset zoom' }).click();
+
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.querySelector('.photography-lightbox-backdrop').classList.contains('is-fullscreen'));
     await page.getByRole('button', { name: 'Close photograph' }).click();
     await page.waitForFunction(() => !document.querySelector('.photography-lightbox'));
     assert.equal(await page.evaluate(() => document.body.style.position), '', `${run.name}: the page is unlocked after closing`);
+
+    // Closing returns the gallery to where it was scrolled.
+    const link = page.locator('[data-photo-slug] a').nth(12);
+    await link.evaluate((element) => element.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await page.waitForTimeout(300);
+    const scrolled = await page.evaluate(() => window.scrollY);
+    await link.click();
+    await page.waitForFunction(() => document.querySelector('.photography-lightbox img')?.naturalWidth > 0);
+    await page.getByRole('button', { name: 'Close photograph' }).click();
+    await page.waitForFunction(() => !document.querySelector('.photography-lightbox'));
+    await page.waitForTimeout(200);
+    assert.ok(scrolled > 0 && near(await page.evaluate(() => window.scrollY), scrolled, 2), `${run.name}: closing restores the gallery scroll (${scrolled})`);
     assert.deepEqual(errors, [], `${run.name}: no page errors`);
     console.log(`ok  ${run.name}`);
   } finally {
