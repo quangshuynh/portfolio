@@ -247,9 +247,11 @@ try {
         await page.waitForURL(/queue=watermark/, { timeout: 30_000 });
         await page.waitForURL(/#watermark$/, { timeout: 600_000 });
         await page.locator('[data-watermark-run]', { hasText: '1 staged' }).waitFor({ timeout: 60_000 });
-        await page.locator('#cms-watermark-staged', { hasText: '(1)' }).waitFor();
+        // Other runs share this workspace and may leave drafts awaiting review: choose this photograph's.
+        const stagedItem = page.locator('.cms-watermark-compare li', { hasText: target.caption || target.id });
+        await stagedItem.first().waitFor({ timeout: 60_000 });
         // Lazy images above still load and shift the page on phones: click, then confirm the state.
-        const chooseStaged = page.locator('.cms-watermark-compare li').first().getByRole('checkbox');
+        const chooseStaged = stagedItem.first().getByRole('checkbox');
         await poll(async () => { if (!(await chooseStaged.isChecked())) await chooseStaged.click({ timeout: 5_000 }).catch(() => {}); return chooseStaged.isChecked(); }, Boolean, 'staged photo chosen', 60_000);
         await page.getByRole('button', { name: 'Approve 1…' }).click();
         const approve = page.locator('.cms-watermark-confirm button.cms-button--primary');

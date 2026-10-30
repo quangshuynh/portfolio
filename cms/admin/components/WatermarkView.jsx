@@ -215,9 +215,10 @@ export default function WatermarkView({ onNotice, onChanged }) {
       <div className="cms-toolbar">
         <label className="cms-check">
           <input type="checkbox" checked={auto} onChange={(event) => { setAuto(event.target.checked); setAutoDrafts(event.target.checked); }} />
-          {' '}Prepare watermark drafts automatically (new, edited and out-of-date photographs; one at a time in the background; never approves)
+          {' '}Prepare watermark drafts automatically
         </label>
       </div>
+      <p className="cms-field-hint">New, edited and out-of-date photographs get a draft one at a time in the background while the CMS is open. Nothing is approved automatically.</p>
       <dl className="cms-watermark-stats" aria-label="Watermark status by photograph">
         {Object.entries(STATUS_LABELS).map(([status, label]) => <div key={status}><dt>{label}</dt><dd data-status={status}>{byStatus(status)}</dd></div>)}
       </dl>
