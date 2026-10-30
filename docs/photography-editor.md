@@ -628,7 +628,8 @@ sensor noise, per-channel clipping and early-camera response, soft focus. No cod
 preset values were taken; every filter here is an original approximation.
 
 **Text** (section Text, **Text** under the preview or T): Add text, then edit the wording,
-font (Schibsted Grotesk or Martian Mono, SIL OFL, bundled), bold, italic (Grotesk), size
+font (Schibsted Grotesk or Martian Mono, SIL OFL, bundled as static 400/700 faces: WebKit draws
+the variable face on canvas at its default weight), bold, italic (Grotesk), size
 (% of the short edge), colour, opacity, alignment, outline, shadow, position, rotation and
 scale; Duplicate, Bring forward / Send backward and Delete. With the tool on, drag a text to
 move it (the photo does not pan), the corner handle scales, the round handle rotates (Shift:

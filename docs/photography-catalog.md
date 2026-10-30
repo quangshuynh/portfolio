@@ -213,5 +213,10 @@ image area has `touch-action: none`, so the viewer handles them itself. Two fing
 one finger pans while zoomed, kept inside the photo's edges. A double tap zooms to 250% at the
 tap, or back to the fit when zoomed (the `dblclick` a browser may send after it is ignored); a
 mouse double-click and the wheel (both around the pointer), `+`/`-`, the zoom buttons and **Reset zoom** still work. A
-new photograph starts at the fit; gestures never navigate (only the buttons and arrow keys do).
-Browser page zoom outside the image is unchanged.
+new photograph starts at the fit, sized from its catalog dimensions before it is painted, and
+fades in once decoded. At the fit one finger swipes to the previous or next photograph: the image
+follows the finger and changes past a fifth of the stage (at most 96 px) or on a flick, and
+springs back otherwise (past the first or last it only gives a little). Zoomed, the same drag
+only pans; a pinch never navigates. Pinch, pan and swipe paint the image and the percentage
+from refs, so nothing re-renders until the fingers lift (`check:photography:viewer` counts DOM
+changes). Browser page zoom outside the image is unchanged.
