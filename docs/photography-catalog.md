@@ -197,11 +197,21 @@ details move to the information sheet; previous/next, arrows, zoom and pan keep 
 leaves fullscreen before it closes the viewer; closing the viewer leaves fullscreen and returns
 focus to the thumbnail.
 
+In fullscreen the photograph and its gesture surface fill the whole screen (the toolbar and
+previous/next float above it, inside the safe-area insets). The backdrop is sized to the
+visual viewport (`--photography-viewport-height`, updated on resize, rotation and mobile
+toolbar changes) and has `touch-action: none`, so the page behind never scrolls or zooms. The
+gesture surface fills the stage in every mode: it is never sized to the fitted photograph, which
+was the old mobile bug (a pinch enlarged the photo only inside its fitted box). Pans paint the
+transform from a ref without re-rendering. `npm run check:photography:viewer` checks this in
+real layout (see PROJECT_MAINTENANCE.md). Zooming past 100% enlarges the 2200 px viewer image;
+there is no larger public derivative.
+
 **Zoom gestures** (`photographyLightbox.jsx`, tested in `photographyGestures.test.jsx`): the
 image area has `touch-action: none`, so the viewer handles them itself. Two fingers zoom
 (100–500%) around their midpoint, which follows the fingers; lifting one continues as a pan;
 one finger pans while zoomed, kept inside the photo's edges. A double tap zooms to 250% at the
 tap, or back to the fit when zoomed (the `dblclick` a browser may send after it is ignored); a
-mouse double-click, the wheel, `+`/`-`, the zoom buttons and **Reset zoom** still work. A
+mouse double-click and the wheel (both around the pointer), `+`/`-`, the zoom buttons and **Reset zoom** still work. A
 new photograph starts at the fit; gestures never navigate (only the buttons and arrow keys do).
 Browser page zoom outside the image is unchanged.
