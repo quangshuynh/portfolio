@@ -533,6 +533,20 @@
       "category": "Nature"
     },
     {
+      "id": "DSC00043",
+      "slug": "arch-underside",
+      "status": "published",
+      "sourceFilename": "DSC00043.JPG",
+      "caption": "Under the arch",
+      "alt": "A white steel arch bridge lit at night, seen from the riverbank below its deck: cables and cross braces against a dark sky, a blue-lit tower between them, and an orange-lit stone wall and lawn in the foreground",
+      "shape": "landscape",
+      "category": "Places",
+      "tags": [
+        "Night",
+        "Water"
+      ]
+    },
+    {
       "id": "river-gorge",
       "slug": "river-gorge",
       "status": "published",
@@ -613,6 +627,20 @@
       "alt": "Wide stone steps climbing between two globe-topped columns toward a green-roofed colonnade on a grassy rise, under a deep blue sky",
       "shape": "portrait",
       "category": "Places"
+    },
+    {
+      "id": "DSC00034",
+      "slug": "stone-bridge-night",
+      "status": "published",
+      "sourceFilename": "DSC00034.JPG",
+      "caption": "Stone bridge",
+      "alt": "A lit stone arch bridge with parked cars along it crossing a shallow, rocky river at night, a brick office building with lit windows, a white tower top and a blue-crowned round tower behind it",
+      "shape": "landscape",
+      "category": "Places",
+      "tags": [
+        "Night",
+        "Water"
+      ]
     },
     {
       "id": "DSC00266",
