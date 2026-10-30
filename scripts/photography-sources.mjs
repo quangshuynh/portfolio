@@ -65,4 +65,15 @@ export const photographLibraryPaths = {
   DSC09912: 'sony-a7iii/2026-10-27/DSC09912.JPG',
   DSC09923: 'sony-a7iii/2026-10-27/DSC09923.JPG',
   DSC09967: 'sony-a7iii/2026-10-27/DSC09967.JPG',
+  // Matched to their public derivatives by content (Interval 16.7.1); the D3100 numbers repeat across days.
+  IMG_0758: 'canon-powershot-g11/2026-08-02/IMG_0758.JPG',
+  IMG_0776: 'canon-powershot-g11/2026-08-03/IMG_0776.JPG',
+  IMG_0811: 'canon-powershot-g11/2026-08-05/IMG_0811.JPG',
+  IMG_0845: 'canon-powershot-g11/2026-08-19/IMG_0845.JPG',
+  IMG_0858: 'canon-powershot-g11/2026-08-24/IMG_0858.JPG',
+  _DSC0003: 'nikon-d3100/2026-04-22/_DSC0003.JPG',
+  _DSC0023: 'nikon-d3100/2026-04-04/_DSC0023.JPG',
+  _DSC0033: 'nikon-d3100/2026-04-13/_DSC0033.JPG',
+  IMGP0579: 'pentax-k50/2026-07-11/IMGP0579.JPG',
+  IMGP0739: 'pentax-k50/2026-07-25/IMGP0739.JPG',
 };
