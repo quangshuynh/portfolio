@@ -203,6 +203,23 @@ async function main() {
         await setValue('Dehaze', 10);
         await previewShown();
       });
+      await timed(`cycle ${cycle}: local Clarity brush, ${REPEATS} strokes, tool put away`, async () => {
+        await photoButton(names(JPEGS)[0]).click();
+        await previewShown();
+        await page.locator('.pe-masks__add[aria-label="New local adjustment"] button', { hasText: /^Brush$/ }).click();
+        await setValue('Clarity', 40);
+        const host = await page.locator('.pe-canvas-host').boundingBox();
+        for (let i = 0; i < REPEATS; i += 1) {
+          const y = host.y + host.height * (0.3 + 0.2 * i);
+          await page.mouse.move(host.x + host.width * 0.2, y);
+          await page.mouse.down();
+          for (let k = 1; k <= 20; k += 1) await page.mouse.move(host.x + host.width * (0.2 + 0.03 * k), y + 10 * Math.sin(k)); // eslint-disable-line no-await-in-loop
+          await page.mouse.up();
+        }
+        await poll(() => page.evaluate(() => document.querySelector('[data-detail-preview]')?.dataset.detailPreview ?? null), (q) => q === 'final', 'local Detail preview', 120_000);
+        await page.keyboard.press('Escape');
+        await previewShown();
+      });
       await timed(`cycle ${cycle}: ZIP of all photos cancelled after 1, then complete`, async () => {
         const cancelled = await batchZip(1);
         assert.match(cancelled.outcome, /cancelled/);

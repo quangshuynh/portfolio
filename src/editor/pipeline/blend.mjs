@@ -159,6 +159,15 @@ export function compositePixel(code, out, o, src, i, alpha) {
  * B(Cb, adjusted) by the layer's opacity; alpha is the backdrop's.
  * :param adjusted: RGBA8 codes of the backdrop after the layer's settings, at `i`
  */
+/** adjustPixel in the normal mode (0) without the blend call (it returns the source): the same arithmetic. */
+export function mixPixel(out, o, adjusted, i, opacity) {
+  if (opacity <= 0) return;
+  for (let c = 0; c < 3; c += 1) {
+    const b = out[o + c] / 255;
+    out[o + c] = code8(b + opacity * (adjusted[i + c] / 255 - b));
+  }
+}
+
 export function adjustPixel(code, out, o, adjusted, i, opacity) {
   if (opacity <= 0) return;
   const br = out[o] / 255;

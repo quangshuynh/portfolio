@@ -127,12 +127,13 @@ describe('mask tool on the photo', () => {
   const map = canvasMaskMap(output);
   const renderTool = (props) => {
     const handlers = { onSelect: vi.fn(), onPreview: vi.fn(), onCommit: vi.fn(), onRemove: vi.fn() };
-    const view = render(
+    const tree = (more) => (
       <div className="pe-stage-area">
-        <MaskTool mask={createMask('image')} map={map} box={box} output={output} tool={null} brush={DEFAULT_BRUSH} selectedId={null} newId={newId} {...handlers} {...props} />
-      </div>,
+        <MaskTool mask={createMask('image')} map={map} box={box} output={output} tool={null} brush={DEFAULT_BRUSH} selectedId={null} newId={newId} {...handlers} {...props} {...more} />
+      </div>
     );
-    return { ...handlers, view, layer: view.container.querySelector('.pe-masktool') };
+    const view = render(tree());
+    return { ...handlers, view, rerender: (more) => view.rerender(tree(more)), layer: view.container.querySelector('.pe-masktool') };
   };
   const pointer = (element, type, x, y, extra = {}) => fireEvent[type](element, { pointerId: 1, button: 0, clientX: x, clientY: y, pointerType: 'mouse', ...extra });
 
@@ -166,6 +167,21 @@ describe('mask tool on the photo', () => {
     pointer(layer, 'pointerUp', 60, 200);
     expect(onCommit).toHaveBeenCalledTimes(1);
     window.requestAnimationFrame.mockRestore();
+  });
+
+  test('a second touch a frame later restores the mask from before the stroke, not its preview', () => {
+    const before = createMask('image');
+    const { layer, onCommit, onPreview, rerender } = renderTool({ tool: 'brush', mask: before });
+    pointer(layer, 'pointerDown', 60, 200, { pointerType: 'touch' });
+    // The first point is previewed at once; the editor passes that preview back as the mask.
+    const previewed = onPreview.mock.calls.at(-1)[0];
+    expect(previewed.components[0].strokes).toHaveLength(1);
+    rerender({ mask: previewed });
+    pointer(layer, 'pointerDown', 200, 200, { pointerId: 2, pointerType: 'touch' });
+    expect(onPreview).toHaveBeenLastCalledWith(before);
+    pointer(layer, 'pointerUp', 200, 200, { pointerId: 2, pointerType: 'touch' });
+    pointer(layer, 'pointerUp', 60, 200, { pointerType: 'touch' });
+    expect(onCommit).not.toHaveBeenCalled();
   });
 
   test('dragging out a linear gradient sets its start and end; a click alone adds nothing', () => {

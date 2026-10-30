@@ -73,29 +73,37 @@ function floatTexture(gl, target) {
   return texture;
 }
 
-function compile(gl, type, source) {
-  const shader = gl.createShader(type);
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const log = gl.getShaderInfoLog(shader);
-    gl.deleteShader(shader);
-    throw new Error(`Shader compile failed: ${log}`);
-  }
-  return shader;
+function link(gl, fragmentSource) {
+  return finishLink(gl, startLink(gl, fragmentSource));
 }
 
-function link(gl, fragmentSource) {
+/**
+ * Compiles and links without asking for the result, so the driver can work in the background
+ * (asking for a status waits for it); finishLink checks the result and throws its log.
+ */
+function startLink(gl, fragmentSource) {
   const program = gl.createProgram();
-  const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
-  const fragment = compile(gl, gl.FRAGMENT_SHADER, fragmentSource);
-  gl.attachShader(program, vertex);
-  gl.attachShader(program, fragment);
+  const shaders = [[gl.VERTEX_SHADER, VERTEX_SHADER], [gl.FRAGMENT_SHADER, fragmentSource]].map(([type, source]) => {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    gl.attachShader(program, shader);
+    return shader;
+  });
   gl.bindAttribLocation(program, 0, 'aPosition');
   gl.linkProgram(program);
-  gl.deleteShader(vertex);
-  gl.deleteShader(fragment);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(`Shader link failed: ${gl.getProgramInfoLog(program)}`);
+  return { program, shaders };
+}
+
+function finishLink(gl, { program, shaders }) {
+  const linked = gl.getProgramParameter(program, gl.LINK_STATUS);
+  const logs = linked ? '' : shaders.map((shader) => (gl.getShaderParameter(shader, gl.COMPILE_STATUS) ? '' : gl.getShaderInfoLog(shader))).join(' ');
+  shaders.forEach((shader) => gl.deleteShader(shader));
+  if (!linked) {
+    const message = logs.trim() ? `Shader compile failed: ${logs.trim()}` : `Shader link failed: ${gl.getProgramInfoLog(program)}`;
+    gl.deleteProgram(program);
+    throw new Error(message);
+  }
   return program;
 }
 
@@ -340,7 +348,7 @@ export class GlRenderer {
    *   { width, height, data } (the Detail preview) drawn instead of the pipeline, scaled
    *   to the canvas when it is smaller
    */
-  render(params, { split = 0, before = null, rendered = null, layers = null } = {}) {
+  render(params, { split = 0, before = null, rendered = null, layers = null, renderedDirty = null } = {}) {
     const { gl } = this;
     if (!this.texture) return;
     this.last = [params, { split, before, rendered, layers }];
@@ -352,7 +360,7 @@ export class GlRenderer {
       this.composite(params, rendered, layers);
     } else {
       gl.viewport(0, 0, width, height);
-      if (rendered) this.draw({ ...params, neutral: true }, this.uploadRendered(rendered));
+      if (rendered) this.draw({ ...params, neutral: true }, this.uploadRendered(rendered, renderedDirty));
       else this.draw(params);
     }
     // Pixel x is "before" when its centre lies left of the split, (x + 0.5) / width < split.
@@ -452,11 +460,30 @@ export class GlRenderer {
     return this.emptyMask;
   }
 
+  /**
+   * Starts compiling the layer and mask programs before they are first needed (a masked pass, a
+   * layer): linking takes hundreds of milliseconds on some drivers, and with
+   * KHR_parallel_shader_compile it runs without blocking. Cheap to call more than once.
+   * :returns: true once the programs are ready (or were never started), false while linking
+   */
+  prepareCompositor() {
+    if (this.compositor || this.lost) return true;
+    const { gl } = this;
+    if (!this.pendingCompositor) {
+      this.parallelCompile ??= gl.getExtension('KHR_parallel_shader_compile');
+      this.pendingCompositor = { program: startLink(gl, COMPOSITE_SHADER), copy: startLink(gl, COPY_SHADER) };
+    }
+    const done = this.parallelCompile?.COMPLETION_STATUS_KHR;
+    return !done || [this.pendingCompositor.program, this.pendingCompositor.copy].every(({ program }) => gl.getProgramParameter(program, done));
+  }
+
   ensureCompositor() {
     if (this.compositor) return this.compositor;
     const { gl } = this;
-    const program = link(gl, COMPOSITE_SHADER);
-    const copy = link(gl, COPY_SHADER);
+    const pending = this.pendingCompositor ?? { program: startLink(gl, COMPOSITE_SHADER), copy: startLink(gl, COPY_SHADER) };
+    this.pendingCompositor = null;
+    const program = finishLink(gl, pending.program);
+    const copy = finishLink(gl, pending.copy);
     this.compositor = {
       program,
       uniforms: Object.fromEntries(COMPOSITE_UNIFORMS.map((name) => [name, gl.getUniformLocation(program, name)])),
@@ -512,7 +539,7 @@ export class GlRenderer {
   }
 
   /** Uploads a CPU-rendered RGBA8 frame into its own texture (linear filtering for scaling). */
-  uploadRendered({ width, height, data }) {
+  uploadRendered({ width, height, data }, dirty = null) {
     const { gl } = this;
     if (!this.renderedTexture) this.renderedTexture = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0);
@@ -520,6 +547,18 @@ export class GlRenderer {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    // The same frame buffer changed only in `dirty` (a brush move over local Detail): upload that box.
+    const uploaded = this.renderedUpload;
+    if (dirty && uploaded?.data === data && uploaded.width === width && uploaded.height === height) {
+      if (dirty.x1 > dirty.x0 && dirty.y1 > dirty.y0) {
+        const bytes = data instanceof Uint8Array ? data : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+        gl.pixelStorei(gl.UNPACK_ROW_LENGTH, width);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, dirty.x0, dirty.y0, dirty.x1 - dirty.x0, dirty.y1 - dirty.y0, gl.RGBA, gl.UNSIGNED_BYTE, bytes.subarray((dirty.y0 * width + dirty.x0) * 4));
+        gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0);
+      }
+      return this.renderedTexture;
+    }
+    this.renderedUpload = { data, width, height };
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data instanceof Uint8Array ? data : new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -695,6 +734,7 @@ export class GlRenderer {
     if (this.renderedTexture) this.gl.deleteTexture(this.renderedTexture);
     this.texture = null;
     this.renderedTexture = null;
+    this.renderedUpload = null;
     this.raw = false;
     this.hdr = false;
   }
@@ -713,6 +753,7 @@ export class GlRenderer {
     this.releaseSource();
     this.releaseLayers();
     if (this.compositor) { gl.deleteProgram(this.compositor.program); gl.deleteProgram(this.compositor.copy); }
+    if (this.pendingCompositor) [this.pendingCompositor.program, this.pendingCompositor.copy].forEach(({ program, shaders }) => { shaders.forEach((shader) => gl.deleteShader(shader)); gl.deleteProgram(program); });
     gl.deleteTexture(this.curveTexture);
     gl.deleteTexture(this.lutTexture);
     gl.deleteTexture(this.glowTexture);

@@ -300,8 +300,8 @@ function EditorWorkspace({ host }) {
   const exporting = state.photos.some(({ exportStatus }) => exportStatus.state === 'running');
 
   const worker = useCallback((name) => {
-    // The render worker only computes (CPU and Detail previews), so it needs no worker canvas.
-    workers.current[name] ??= createImageWorker(undefined, { canvas: name !== 'render' });
+    // The render and local workers only compute (CPU and Detail previews), so they need no worker canvas.
+    workers.current[name] ??= createImageWorker(undefined, { canvas: name !== 'render' && name !== 'local' });
     return workers.current[name];
   }, []);
 
@@ -492,6 +492,17 @@ function EditorWorkspace({ host }) {
     if (lut) sent.luts.add(lut.sha256);
     return result;
   }, [worker]);
+  // While an export runs, the preview's local Detail work stops (it would take cores from the
+  // export's band workers); the preview asks again afterwards.
+  useEffect(() => {
+    if (!exporting || !workers.current.local) return;
+    workers.current.local.terminate();
+    workers.current.local = null;
+  }, [exporting]);
+  // A local Detail pass over a whole preview frame, in a worker of its own so brush moves never
+  // wait behind it; only the settings travel (the mask is applied on the page).
+  const renderLocalDetail = useCallback((image, { kind, adjustments: values, native }) => worker('local')
+    .call('localDetailFrame', { image, pass: { kind, adjustments: values, native } }, { transfer: [image.data.buffer] }), [worker]);
   const onEngine = useCallback((info) => setEngine(info), []);
 
 
@@ -855,7 +866,7 @@ function EditorWorkspace({ host }) {
     // the cached CPU-preview proxy) are freed now rather than at the next collection.
     if (!resources.current.size) {
       rasterCacheRef.current.clear();
-      ['proxy', 'render', 'import', 'thumbs', 'layers'].forEach((name) => {
+      ['proxy', 'render', 'import', 'thumbs', 'layers', 'local'].forEach((name) => {
         workers.current[name]?.terminate();
         workers.current[name] = null;
       });
@@ -1586,6 +1597,8 @@ function EditorWorkspace({ host }) {
           onSplitChange={setSplit}
           loadProxy={loadProxy}
           renderInWorker={renderInWorker}
+          renderLocalDetail={renderLocalDetail}
+          deferWork={exporting}
           onEngine={onEngine}
           onProxy={setViewProxy}
           zoomCommand={zoomCommand}
@@ -1602,7 +1615,7 @@ function EditorWorkspace({ host }) {
             onEdit: (id) => { setActiveLayer(id); setMobilePanel('adjust'); setTextFocus((count) => count + 1); },
           } : null}
           maskTool={maskTarget && !transformMode ? {
-            owner: maskTarget.kind === 'local' ? { kind: 'local' } : { kind: 'layer', layer: maskTarget.layer },
+            owner: maskTarget.kind === 'local' ? { kind: 'local', id: maskTarget.local.id } : { kind: 'layer', layer: maskTarget.layer },
             mask: maskTarget.kind === 'local' ? maskTarget.local.mask : maskTarget.layer.mask,
             editable: !(maskTarget.kind === 'layer' && maskTarget.layer.locked),
             interactive: Boolean(maskTool),

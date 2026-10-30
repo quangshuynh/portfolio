@@ -13,8 +13,9 @@ import LayerHandles from './LayerHandles';
 import { visibleLayers } from '../model/layers.mjs';
 import { adjustmentParams, adjustmentPass, compositeImageSync, localPasses, rasterPass } from '../pipeline/composite.mjs';
 import { layerMatrix, offsetMatrix } from '../pipeline/layerTransform.mjs';
-import { maskActive, splitLocalSettings, visibleLocals } from '../model/masks.mjs';
+import { maskActive, maskHasComponents, splitLocalSettings, visibleLocals } from '../model/masks.mjs';
 import { canvasMaskMap, imageMaskMap, layerMaskMap, maskMapKey, rasterizeMask } from '../pipeline/mask.mjs';
+import { createLocalPreview, renderDetailFrame } from '../pipeline/localPreview.mjs';
 import MaskTool from './MaskTool';
 import { rasterizeTextLayer } from '../text/textRender.mjs';
 import { loadTextFonts } from '../text/fonts.mjs';
@@ -55,6 +56,7 @@ function createCpuEngine(host, maxPreviewEdge) {
   return { element, engine: { kind: 'cpu', context, maxEdge: Math.min(2048, maxPreviewEdge) } };
 }
 
+const whenIdle = (task) => (typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(task, { timeout: 1000 }) : setTimeout(task, 200));
 const clampZoom = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 const NEUTRAL_GEOMETRY = neutralGeometry();
 const specKey = (spec) => (spec ? JSON.stringify([spec.matrix, spec.width, spec.height, spec.coverage, spec.background]) : '');
@@ -77,6 +79,11 @@ function scaleFrame(frame, out) {
 }
 
 const hasDetailPass = (passes) => Boolean(passes?.some(({ kind }) => kind === 'detail'));
+// The Detail pass of a local adjustment that is shown but has no mask yet, or null.
+function warmPass(local, native) {
+  if (!local?.enabled || !(local.amount > 0) || maskHasComponents(local.mask)) return null;
+  return localPasses(local, null, native, splitLocalSettings(local.settings)).find(({ kind }) => kind === 'detail') ?? null;
+}
 
 /**
  * The map of a mask's owner at a canvas of `out` size: a local adjustment's mask is in the
@@ -144,7 +151,7 @@ function overlayTable(view, hex) {
  * :param maskTool: the mask being edited ({ owner: { kind: 'local' } | { kind: 'layer', layer },
  *   mask, interactive, overlay: { show, color, view: 'overlay' | 'mask' }, and MaskTool's props }) or null
  */
-export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, layerTool = null, maskTool = null, layerRasters = null, lutFor = () => null }) {
+export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, renderLocalDetail = null, deferWork = false, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, layerTool = null, maskTool = null, layerRasters = null, lutFor = () => null }) {
   const stageRef = useRef(null);
   const canvasHostRef = useRef(null);
   const engineRef = useRef(null);
@@ -160,6 +167,23 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   const [glowVersion, setGlowVersion] = useState(0);
   const splitRef = useRef(0);
   const [detailQuality, setDetailQuality] = useState(null);
+  // Local Detail over the Detail frame: each pass filtered once (local worker), mixed through its
+  // mask on every brush move; `localVersion` repaints when a filtered frame arrives.
+  const [localVersion, setLocalVersion] = useState(0);
+  const renderLocalRef = useRef(renderLocalDetail);
+  renderLocalRef.current = renderLocalDetail;
+  // While an export runs, Detail passes not filtered yet wait (shown without them, labelled).
+  const deferRef = useRef(deferWork);
+  deferRef.current = deferWork;
+  const localPreviewRef = useRef(null);
+  localPreviewRef.current ??= createLocalPreview({
+    renderDetail: (image, pass) => (renderLocalRef.current ? renderLocalRef.current(image, pass) : Promise.resolve().then(() => renderDetailFrame(image, pass))),
+    onReady: (error) => { if (error) setStatus({ state: 'error', message: error.message }); else setLocalVersion((value) => value + 1); },
+  });
+  // The Detail frame at the canvas's size, made once per frame; the GPU frame read back for
+  // local Detail over GPU settings.
+  const scaledRef = useRef({ frame: null, key: '', image: null });
+  const gpuBaseRef = useRef({ key: '', image: null });
   const [canvas, setCanvas] = useState(null);
   const [engineKind, setEngineKind] = useState(null);
   const [proxy, setProxy] = useState(null);
@@ -263,6 +287,9 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       setProxy({ id: photo.id, width: image.width, height: image.height });
       setView({ fit: true, zoom: 1, x: 0, y: 0 });
       setStatus({ state: 'ready' });
+      // The layer and mask programs start compiling once the photo is shown, so the first brush
+      // point or layer does not wait for the driver (the first brush point took ~0.5 s for this).
+      if (engine.kind === 'webgl2') whenIdle(() => { if (engineRef.current === engine) engine.renderer.prepareCompositor(); });
     }).catch((error) => {
       if (!cancelled && error.code !== 'cancelled') setStatus({ state: 'error', message: error.message });
     });
@@ -274,7 +301,12 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   useEffect(() => {
     if (!proxy) engineRef.current?.renderer?.clear();
     if (cpuBeforeRef.current.image !== proxyRef.current) Object.assign(cpuBeforeRef.current, { image: null, key: '', data: null });
-    if (detailJobRef.current.image !== proxyRef.current) Object.assign(detailJobRef.current, { frame: null, image: null, key: null });
+    if (detailJobRef.current.image !== proxyRef.current) {
+      Object.assign(detailJobRef.current, { frame: null, image: null, key: null });
+      Object.assign(scaledRef.current, { frame: null, key: '', image: null });
+      gpuBaseRef.current = { key: '', image: null };
+      localPreviewRef.current.clear();
+    }
     if (glowRef.current.image !== proxyRef.current) Object.assign(glowRef.current, { map: null, image: null, key: null });
   }, [proxy]);
 
@@ -315,6 +347,24 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     return { data: cache.data };
   }, [renderInWorker]);
 
+  /**
+   * The Detail frame scaled to the canvas with its passes composited (pipeline/localPreview.mjs):
+   * passes whose filtered frame is still rendering are left out, and labelled.
+   */
+  const composeLocal = useCallback((frame, request) => {
+    const out = request.warp ?? request.image;
+    const scaled = scaledRef.current;
+    const key = `${out.width}x${out.height}`;
+    if (scaled.frame !== frame || scaled.key !== key) Object.assign(scaled, { frame, key, image: scaleFrame(frame, out) });
+    const result = localPreviewRef.current.compose(scaled.image, request.layers.cpu, { defer: deferRef.current });
+    const job = detailJobRef.current;
+    const quality = !result.complete ? 'rendering' : job.shown === 'final' ? { width: frame.width, height: frame.height } : job.shown ?? 'draft';
+    setDetailQuality((shown) => (JSON.stringify(shown) === JSON.stringify(quality) ? shown : quality));
+    // Local timing mark for the browser checks (never sent anywhere): local Detail fully shown.
+    if (result.complete) performance.mark?.('pe-local-detail');
+    return result;
+  }, []);
+
   /** Shows a Detail frame (any size; scaled to the canvas) with the current split. */
   const paintDetail = useCallback(async (frame, request) => {
     const engine = engineRef.current;
@@ -326,8 +376,8 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       if (engine.renderer.lost) return;
       // Local Detail runs on the CPU: then every pass is composited there, at the canvas's size.
       if (hasDetailPass(request.layers?.cpu)) {
-        const composited = withLayers(scaleFrame(frame, request.warp ?? image), request.layers.cpu);
-        engine.renderer.render({ ...request.params, neutral: true }, { split, before, rendered: composited });
+        const { image: composited, dirty } = composeLocal(frame, request);
+        engine.renderer.render({ ...request.params, neutral: true }, { split, before, rendered: composited, renderedDirty: dirty });
         return;
       }
       engine.renderer.render(request.params, { split, before, rendered: frame, layers: request.layers?.gpu });
@@ -339,7 +389,12 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     if (proxyRef.current !== image) return;
     const { context } = engine;
     if (context.canvas.width !== out.width || context.canvas.height !== out.height) Object.assign(context.canvas, { width: out.width, height: out.height });
-    if (frame.width === out.width && frame.height === out.height) {
+    if (hasDetailPass(request.layers?.cpu)) {
+      const { image: composited, dirty } = composeLocal(frame, request);
+      // The box a brush move changed; anything else (a split move too) redraws the canvas.
+      const box = dirty && dirty.x1 > dirty.x0 ? dirty : { x0: 0, y0: 0, x1: out.width, y1: out.height };
+      if (box.y1 > box.y0) context.putImageData(new ImageData(composited.data, out.width, out.height), 0, 0, box.x0, box.y0, box.x1 - box.x0, box.y1 - box.y0);
+    } else if (frame.width === out.width && frame.height === out.height) {
       context.putImageData(new ImageData(new Uint8ClampedArray(withLayers(frame, request.layers?.cpu).data), frame.width, frame.height), 0, 0);
     } else {
       const scratch = document.createElement('canvas');
@@ -354,7 +409,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       }
     }
     if (before) context.putImageData(new ImageData(new Uint8ClampedArray(before.data), out.width, out.height), 0, 0, 0, 0, sourceWidth, out.height);
-  }, [cpuBefore]);
+  }, [cpuBefore, composeLocal]);
 
   /**
    * Runs Detail renders one at a time, keeping only the newest request: a draft at
@@ -393,8 +448,8 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         // Newer values, another photo, or Detail turned off meanwhile: this frame is stale.
         if (current.generation !== job.generation) current = null;
         if (!current || job.pending || proxyRef.current !== image) continue; // eslint-disable-line no-continue
-        Object.assign(job, { frame, key: current.key, image });
         const quality = final || !needsFinal(current) ? 'final' : 'draft';
+        Object.assign(job, { frame, key: current.key, image, shown: quality });
         setDetailQuality(quality === 'final' ? { width: frame.width, height: frame.height } : 'draft');
         await paintDetail(frame, current);
         // Local timing marks for the browser checks (never sent anywhere).
@@ -574,7 +629,13 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       setLayersShown(layers?.cpu.length ?? 0);
       drawOverlay(layers?.overlay ?? null);
       if (layers && !layers.cpu.length) layers = null;
-      if (params.cpuOnly || hasDetailPass(layers?.cpu)) {
+      // Local Detail with no global CPU stage: the GPU's own frame is the backdrop (canvas size).
+      const gpuDetail = engine.kind === 'webgl2' && !engine.renderer.lost && !params.cpuOnly;
+      const localOnGpu = gpuDetail && hasDetailPass(layers?.cpu);
+      // The local adjustment being masked has Detail but no mask yet: its filtered frame is made
+      // now, so the first stroke shows Detail at once (only while it would be the first pass).
+      const warm = gpuDetail && !layers && maskTool?.owner.kind === 'local' ? warmPass(values.local?.find(({ id }) => id === maskTool.owner.id), plan.native) : null;
+      if ((params.cpuOnly || hasDetailPass(layers?.cpu)) && !localOnGpu) {
         // Spatial Detail: the CPU renders the frame (draft, then final); a split or
         // compare change alone repaints the last frame.
         const key = `${photo.id}|${JSON.stringify({ ...values, layers: null, local: null })}|${params.lutActive ? lut.sha256 : ''}|${specKey(previewSpec)}`;
@@ -587,7 +648,12 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         return;
       }
       Object.assign(detailJobRef.current, { key: null, pending: null, generation: detailJobRef.current.generation + 1 });
-      setDetailQuality(null);
+      if (!localOnGpu && !warm && (scaledRef.current.frame || gpuBaseRef.current.image)) {
+        Object.assign(scaledRef.current, { frame: null, key: '', image: null });
+        gpuBaseRef.current = { key: '', image: null };
+        localPreviewRef.current.clear();
+      }
+      if (!localOnGpu) setDetailQuality(null);
       const nativeSize = plan.identity ? native : plan.native;
       if (engine.kind === 'webgl2') {
         // Bloom and halation: the last glow map of this proxy is drawn until the new one arrives.
@@ -602,14 +668,35 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
         const before = raw ? deriveParams(neutralAdjustments(), { raw }) : null;
         if (!engine.renderer.lost) {
           engine.renderer.setCreative({ nativeWidth: nativeSize.width, nativeHeight: nativeSize.height, glow });
-          engine.renderer.render(params, { split: splitFraction, before, layers: layers?.gpu });
+          if (localOnGpu || warm) {
+            // The frame without layers, read back once per change of the photo's own settings;
+            // the passes are composited over it on the CPU (pipeline/localPreview.mjs).
+            const key = `${photo.id}|${JSON.stringify({ ...values, layers: null, local: null })}|${params.lutActive ? lut.sha256 : ''}|${specKey(previewSpec)}|${glowVersion}`;
+            const base = gpuBaseRef.current;
+            if (base.key !== key) {
+              const data = engine.renderer.readPixels(params, {});
+              gpuBaseRef.current = { key, image: { width: out.width, height: out.height, data: new Uint8ClampedArray(data.buffer) } };
+            }
+          }
+          if (warm) {
+            if (!deferWork) localPreviewRef.current.warm(gpuBaseRef.current.image, warm);
+            engine.renderer.render(params, { split: splitFraction, before });
+          } else if (localOnGpu) {
+            const { image, dirty, complete } = localPreviewRef.current.compose(gpuBaseRef.current.image, layers.cpu, { defer: deferWork });
+            engine.renderer.render({ ...params, neutral: true }, { split: splitFraction, before, rendered: image, renderedDirty: dirty });
+            const quality = complete ? { width: out.width, height: out.height } : 'rendering';
+            setDetailQuality((shown) => (JSON.stringify(shown) === JSON.stringify(quality) ? shown : quality));
+            if (complete) performance.mark?.('pe-local-detail');
+          } else {
+            engine.renderer.render(params, { split: splitFraction, before, layers: layers?.gpu });
+          }
         }
       } else {
         drawCpu({ ...params, neutral: params.neutral && !layers?.cpu.length, adjustments: values, lutData: params.lutActive ? lut : null, split: splitFraction, raw, warp: previewSpec, nativeSize: { nativeWidth: nativeSize.width, nativeHeight: nativeSize.height }, layers });
       }
     });
     return () => cancelAnimationFrame(frameRef.current);
-  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec, glowVersion, buildLayers, drawOverlay, layerRasters?.version]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec, glowVersion, buildLayers, drawOverlay, layerRasters?.version, localVersion, maskTool?.owner.id, deferWork]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -666,7 +753,9 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   }, [onWheel]);
 
   // One pointer pans; two pointers (touch) pinch-zoom around their midpoint and pan with it.
+  // Touches on the mask tool reach here too: one of them paints (no pan), two pinch.
   const pointersRef = useRef(new Map());
+  const toolPointersRef = useRef(new Set());
   const stagePoint = (x, y) => {
     const rect = stageRef.current.getBoundingClientRect();
     return { x: x - rect.left, y: y - rect.top };
@@ -677,14 +766,18 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
       const [a, b] = points;
       dragRef.current = { pinch: true, distance: Math.hypot(a.x - b.x, a.y - b.y) || 1, mid: stagePoint((a.x + b.x) / 2, (a.y + b.y) / 2), ...view };
     } else if (points.length === 1) {
-      dragRef.current = { pinch: false, start: points[0], ...view };
+      // A finger on the mask tool paints, unless it is what is left of a pinch.
+      const [id] = pointersRef.current.keys();
+      dragRef.current = toolPointersRef.current.has(id) && !dragRef.current?.pinch ? null : { pinch: false, start: points[0], ...view };
     } else {
       dragRef.current = null;
     }
   };
   const onPointerDown = (event) => {
     if (!proxy || event.button !== 0 || event.target.closest('.pe-split')) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
+    // The mask tool keeps its own pointer capture (it paints with that finger).
+    if (maskTool?.tool && event.target.closest('.pe-masktool')) toolPointersRef.current.add(event.pointerId);
+    else event.currentTarget.setPointerCapture(event.pointerId);
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     startGesture({ originX: offsetX, originY: offsetY, zoom });
   };
@@ -705,6 +798,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
     }
   };
   const onPointerUp = (event) => {
+    toolPointersRef.current.delete(event.pointerId);
     if (!pointersRef.current.delete(event.pointerId)) return;
     // Lifting one finger of a pinch continues as a pan from the current view.
     startGesture({ originX: offsetX, originY: offsetY, zoom });

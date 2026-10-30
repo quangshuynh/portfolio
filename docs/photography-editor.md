@@ -834,8 +834,9 @@ handles (linear: start = full effect, end = none, centre moves; radial: centre, 
 rotation). Gradient centres are focusable: arrow keys move them (Shift: larger steps), Delete
 removes. Keys: M tool on/off, O overlay, X paint/erase, [ ] brush size, Esc ends the tool.
 While a tool is on, one pointer paints or drags (the photo does not pan, the page does not
-scroll); a second touch cancels the stroke; turn the tool off to pan or pinch. Handles are 44 px
-on touch screens. Every stroke or drag is one undo step.
+scroll); a second finger cancels the stroke (the mask returns to what it was before it) and the
+two fingers pinch-zoom around their midpoint, lifting one pans; with the tool off one finger
+pans. Handles are 44 px on touch screens. Every stroke or drag is one undo step.
 
 **Model** (`model/masks.mjs`, plain data in the photo's settings). A mask is
 `{ space, base, enabled, invert, opacity, components }`; a component is a brush (`strokes`), a
@@ -878,16 +879,20 @@ then Light, Color and HSL through the adjustment-layer renderer, both mixed back
 amount. They act on the 8-bit finished photo (after its global settings, including Creative
 grain and vignette), like adjustment layers, not on the linear RAW or HDR data. Neutral settings,
 amount 0 and empty masks add no pass. Preview: the GPU reads a mask texture computed by the same
-code on the page (exactly the CPU's codes); a local adjustment with Detail switches the preview to
-the CPU renderer (draft, then final, labelled). Exports evaluate masks band by band at the
+code on the page (exactly the CPU's codes). A local adjustment with Detail is composited on the
+CPU over the GPU's own frame (read back once per change of the photo's settings), or over the
+CPU Detail frame (draft, then final) when the photo itself needs the CPU; labelled either way
+(see Interval 16.6). Exports evaluate masks band by band at the
 export's size; Detail passes read a halo of rows around each band from the unchanged composite
 and render only the rows and columns their mask covers, so tiles have no seams. On desktops the
 page computes a Detail pass's guide once and its bands run on the render workers (each with its
 halo of unchanged rows; a result is written back only when no band still to be sent reads its
 rows); masked adjustment passes render only the box their mask covers. While the brush paints,
 the edited mask keeps its finished strokes' coverage, each component's coverage and the codes,
-so a new point recomputes only the box its segment touches (a dirty rectangle); any other change
-(a new stroke, a moved gradient, undo) evaluates in full. Masks of more than six components skip
+so a new point, a new stroke or a brush's first stroke recomputes only the box its segments
+touch (a dirty rectangle); any other change (a moved gradient, undo) evaluates in full. Exports
+skip bands outside a mask's bounds (`maskBounds`: strokes, ellipses, the near side of a linear
+gradient; inverted masks are unbounded). Masks of more than six components skip
 the cache; it holds two brush components and is released when the brush is put away. All three
 give the same codes and pixels as before (tested, `pipeline/localPerf.test.js`). Clipping masks (a layer clipped to the one below) are **not built**: they would need
 nested passes and a second alpha source per pass, and no control is shown for them.
@@ -975,6 +980,52 @@ point of a stroke still costs ~750 ms in Chromium (WebGL program link for the fi
 and the first full rasterisation). Headless Chromium without `CHECK_GPU` uses SwiftShader (frames
 of seconds at 4096 px) and the Pixel 7 run is software-rendered too: use them for function, not
 speed. Exports, the GPU and CPU compositors and the codes are unchanged.
+
+**Interval 16.6: first stroke, local Detail, exports** (same machine, 2026-10-29; Chromium with
+`CHECK_GPU=1`, one run each of `main` and this branch unless noted; `check:editor:brush` with
+`BRUSH_LOCAL=clarity BRUSH_MOVES=30` for local Detail).
+
+| | `main` | After |
+| --- | --- | --- |
+| First brush point → stroke on screen (24 MP, 4096 px preview) | 778 ms | 39–41 ms |
+| Longest of the first four frames · per-move input → draw p50 | 733 · 7.6 ms | 16.7 · 7.6 ms |
+| Mask cost at a new stroke: first stroke · later strokes (Node, 4096 px) | 500 · 168 ms | 10 · 5 ms |
+| Local Clarity brush, first stroke 0.5 s after setting it: moves showing Clarity · release stall · release → final | 0 of 29 · 1266 ms · 3.9 s | 0 of 29 (still filtering) · 7–11 ms · 0.27–0.82 s |
+| Same, a later stroke, or the first after a 3 s pause | not measured | 29–30 of 30 · 6–10 ms · 6–9 ms |
+| 24 MP, four local passes, compositing on one thread (Node) | 6.4 s | 4.2 s |
+| Exports (`check:editor:masks`, SwiftShader): 24 MP PNG, Dehaze gradient + Clarity radial · peak | 18.0 s · 1.77 GB | 7.4 s · 1.65 GB |
+| Genuine ARW, three local adjustments · peak | 9.7 s · 1.61 GB | 7.9 s · 1.50 GB |
+| Merged RAW HDR (DSC09640–42) + local gradient · peak | 19.7 s · 2.38 GB | 18.5 s · 2.25 GB |
+
+The first point waited for the layer/mask programs to link (~490 ms, now started when the photo
+is shown, with `KHR_parallel_shader_compile` where available) and a full rasterisation of the mask
+(now a dirty box: a new stroke on the cached strokes, or a new brush's first stroke); pointerdown
+also previews without waiting a frame. Local Detail was rendered on the CPU every time the mask
+changed and, while painting, never caught up. Now each local Detail pass is filtered once per
+backdrop and settings, unmasked, in a worker of its own (24 MP preview at 4096 px: 0.8–2 s per
+control), kept (two frames) and mixed through the mask on every move, in the box the mask cache
+reports, uploaded with `texSubImage2D`; frames equal `compositeImageSync` exactly
+(`pipeline/localPreview.test.js`). A local adjustment with Detail but no mask yet is filtered
+while the tool is on, so its first stroke already shows Detail. Until a filtered frame is ready
+the pass is left out and the label reads **Rendering on the CPU…**. Painting over local Detail
+runs at about 30 fps at 4096 px (the per-move mix and upload); exposure-only strokes at 60.
+Memory: the GPU frame, the composite and each kept filtered frame are 4 bytes per preview pixel
+(45 MB each at 4096 px), freed on another photo or when local Detail goes. While an export runs
+the local worker is ended and the preview waits, so the export keeps every core: the check
+exports right after loading the edits, so on `main` the export shared the cores with the Detail
+preview too (with the preview filtering during the export the branch took 20.7 s for the 24 MP
+PNG). Every export still equals the Node reference exactly. RAW decoding and the HDR merge are
+unchanged (one frame decoded at a time, the merge worker ended before compositing); their peaks
+fell only with the compositing. `check:editor:memory` (genuine files, two cycles, now with a
+local Clarity brush step): growth between cycles 144 MB, no workers left in an empty workspace.
+**Unexplained:** the first cycle's local Clarity step sampled a whole-browser peak of 10.9 GB
+(the second 3.1 GB); one run, not reproduced or profiled yet. Thumbnails no
+longer redraw on mask or layer edits (two redraws per brush move before).
+
+**Physical iPhone (not tested by the agent).** Besides the list below, check: pinch-zoom with the
+brush on (two fingers zoom and do not paint; one finger paints after), a stroke over a local
+Clarity (Detail appears while painting), the gallery viewer's pinch, one-finger pan, double tap
+and Reset zoom, in and out of fullscreen.
 
 **Physical iPhone (not tested by the agent).** On the phone, open the editor from a Vercel
 preview, import a camera JPEG and check: one-finger painting (no page scroll or zoom), brush size,
@@ -1376,12 +1427,15 @@ Safari cannot encode WebP (the option is disabled when the browser cannot).
 ## Known issues
 
 - Zoom past the proxy (about 170% of the source width for 24 MP) is upscaled.
-- Thumbnails re-render on the main thread (about 7 ms each, throttled).
+- Thumbnails re-render on the main thread (about 7 ms each, throttled) when the photo's own
+  settings change; painting masks or editing layers does not redraw them (they show neither).
 - Main-thread image tasks (no worker canvas) pause the page briefly while decoding.
 - Phones, ≤ 4 GB devices and CPUs with fewer than four threads export on one CPU thread
   (no band workers), so heavy edits take several times longer there.
-- Pinch-zoom works with two pointers on the preview; it has not been tried on a
-  physical phone.
+- Pinch-zoom works with two pointers on the preview, also with a mask tool on (emulated
+  touch in `check:editor:brush`); it has not been tried on a physical phone. Pinching moves the
+  existing preview (no re-render per move); the preview is not re-rendered at a higher
+  resolution while zoomed (zoom past the proxy is upscaled, as above).
 - Filter Library (Interval 11.5): capture and channel-shift filters preview on the CPU (0.7–2.6 s
   to the final frame on 24 MP, a draft sooner) and are left out while cropping; capture
   thumbnails are coarser than the photo; JPEG compression always works at the 768 px capture

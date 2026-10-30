@@ -28,11 +28,11 @@
 
 import { prepareRender, renderRgba8 } from './cpuRenderer.mjs';
 import { normalizeAdjustments } from '../model/adjustments.mjs';
-import { maskRows } from './mask.mjs';
+import { maskBounds, maskRows } from './mask.mjs';
 import { guideSource, prepareDetailRender, renderDetailRows, rowsHaveAlpha } from './detailRenderer.mjs';
 import { deriveParams } from './spec.mjs';
 import { warpRows, hasAlpha } from './warp.mjs';
-import { BLEND_CODES, adjustPixel, compositePixel } from './blend.mjs';
+import { BLEND_CODES, adjustPixel, compositePixel, mixPixel } from './blend.mjs';
 import { matrixScale, rasterBounds } from './layerTransform.mjs';
 import { layerAdjustments } from '../model/layers.mjs';
 
@@ -102,10 +102,33 @@ export function localPasses(local, mask, native, { detail, color }) {
 export function passMask(pass, canvasWidth, y0, y1, x0 = 0, width = canvasWidth) {
   const { mask } = pass;
   if (!mask) return null;
+  const box = mask.bounds;
+  if (!mask.raster && box && x0 === 0 && width === canvasWidth) {
+    // Codes are 0 outside the mask's bounds (passTouchesRows): only the part inside is evaluated.
+    const out = new Uint8ClampedArray(width * (y1 - y0));
+    const [top, bottom] = [Math.max(y0, box.y0), Math.min(y1, box.y1)];
+    if (box.x1 <= box.x0 || bottom <= top) return out;
+    const w = box.x1 - box.x0;
+    const part = maskRows(mask.def, mask.map, w, top, bottom, { x0: box.x0 });
+    for (let y = top; y < bottom; y += 1) out.set(part.subarray((y - top) * w, (y - top + 1) * w), (y - y0) * width + box.x0);
+    return out;
+  }
   if (!mask.raster) return maskRows(mask.def, mask.map, width, y0, y1, { x0 });
   const out = new Uint8ClampedArray(width * (y1 - y0));
   for (let y = y0; y < y1; y += 1) out.set(mask.raster.data.subarray(y * canvasWidth + x0, y * canvasWidth + x0 + width), (y - y0) * width);
   return out;
+}
+
+/**
+ * Whether an adjustment or Detail pass can change canvas rows [row, last): false when its mask
+ * is exactly 0 there (mask.maskBounds, computed once per pass; not for a preview's raster).
+ */
+export function passTouchesRows(pass, size, row, last) {
+  const { mask } = pass;
+  if (!mask || pass.kind === 'raster') return true;
+  if (!('bounds' in mask)) mask.bounds = mask.raster ? null : maskBounds(mask.def, mask.map, size);
+  const box = mask.bounds;
+  return !box || (box.x1 > box.x0 && box.y0 < last && box.y1 > row);
 }
 
 /** deriveParams of an adjustment pass (no RAW: it acts on the 8-bit composite). */
@@ -164,7 +187,8 @@ export function adjustRows(rows, pass, prepared, { width = 0, y0 = 0 } = {}) {
   for (let y = box.y0; y < box.y1; y += 1) {
     for (let x = box.x0; x < box.x1; x += 1) {
       const p = y * width + x;
-      adjustPixel(pass.mode, rows, p * 4, adjusted, ((y - box.y0) * w + x - box.x0) * 4, pass.opacity * (mask[p] / 255));
+      if (pass.mode === 0) mixPixel(rows, p * 4, adjusted, ((y - box.y0) * w + x - box.x0) * 4, pass.opacity * (mask[p] / 255));
+      else adjustPixel(pass.mode, rows, p * 4, adjusted, ((y - box.y0) * w + x - box.x0) * 4, pass.opacity * (mask[p] / 255));
     }
   }
   return rows;
@@ -222,7 +246,7 @@ export function detailBandRows(image, context, pass, row, last) {
   for (let y = box.y0; y < box.y1; y += 1) {
     for (let x = box.x0; x < box.x1; x += 1) {
       const p = y * width + x;
-      adjustPixel(0, rows, p * 4, rendered, ((y - box.y0) * w + x - box.x0) * 4, mask ? pass.opacity * (mask[p] / 255) : pass.opacity);
+      mixPixel(rows, p * 4, rendered, ((y - box.y0) * w + x - box.x0) * 4, mask ? pass.opacity * (mask[p] / 255) : pass.opacity);
     }
   }
   return rows;
@@ -254,7 +278,7 @@ function* detailBands(canvas, pass, bandRows) {
   const writer = detailWriter(data, width, context.halo);
   for (let row = 0; row < height; row += bandRows) {
     const last = Math.min(height, row + bandRows);
-    writer.add(row, last, detailBandRows(image, context, pass, row, last));
+    if (passTouchesRows(pass, image, row, last)) writer.add(row, last, detailBandRows(image, context, pass, row, last));
     // The next band reads the backdrop from `last − halo`: rows above that are final.
     writer.flush(last - context.halo);
     yield last / height;
@@ -296,7 +320,7 @@ export async function compositeImage(image, passes, { bandRows = COMPOSITE_BAND_
       if (cancelled?.()) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
       const last = Math.min(height, row + bandRows);
       const rows = data.subarray(row * width * 4, last * width * 4);
-      if (pass.kind === 'adjust') adjustRows(rows, pass, prepared, { width, y0: row });
+      if (pass.kind === 'adjust') { if (passTouchesRows(pass, image, row, last)) adjustRows(rows, pass, prepared, { width, y0: row }); }
       else compositeRasterRows(rows, width, row, last, pass);
       done += last - row;
       await onBand?.(done / total);

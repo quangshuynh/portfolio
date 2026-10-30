@@ -114,6 +114,21 @@ export function calculateFittedImageDimensions(width, height, availableWidth, av
   };
 }
 
+export const MAX_ZOOM = 5;
+const DOUBLE_TAP_MS = 300;
+const TAP_SLOP_PX = 24;
+
+/**
+ * The view after zooming to `nextScale` (1–MAX_ZOOM) so that the image point under `point`
+ * stays under `to` (default: the same place). Points are stage pixels from the stage's centre,
+ * where the image is centred and scaled from.
+ */
+export function zoomAround({ scale, position }, nextScale, point, to = point) {
+  const target = Math.min(MAX_ZOOM, Math.max(1, nextScale));
+  const ratio = target / scale;
+  return { scale: target, position: { x: to.x - (point.x - position.x) * ratio, y: to.y - (point.y - position.y) * ratio } };
+}
+
 export function resetPhotographyPreloadsForTests() {
   preloadedSources.clear();
 }
@@ -132,6 +147,11 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   const stageRef = useRef(null);
   const imageRef = useRef(null);
   const dragRef = useRef(null);
+  // Touch gestures: pointers down on the image, a pinch in progress and the last tap.
+  const pointersRef = useRef(new Map());
+  const pinchRef = useRef(null);
+  const tapRef = useRef(null);
+  const tapZoomRef = useRef(-Infinity);
   const scaleRef = useRef(scale);
   const latestPhotograph = useRef(photograph);
   const sheetTitleId = useId();
@@ -181,7 +201,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
 
   const zoom = React.useCallback((amount) => {
     setScale((current) => {
-      const next = Math.min(5, Math.max(1, Number((current + amount).toFixed(2))));
+      const next = Math.min(MAX_ZOOM, Math.max(1, Number((current + amount).toFixed(2))));
       scaleRef.current = next;
       setPosition((currentPosition) => clampPosition(currentPosition, next));
       return next;
@@ -286,10 +306,79 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [infoOpen, onClose, onNavigate, previous, next, reset, zoom, fullscreen]);
 
-  const endDrag = (event) => {
-    if (dragRef.current?.pointerId !== event.pointerId) return;
+  // A stage point (from its centre) of a pointer.
+  const stagePoint = (x, y) => {
+    const rect = stageRef.current.getBoundingClientRect();
+    return { x: x - rect.left - rect.width / 2, y: y - rect.top - rect.height / 2 };
+  };
+  const applyView = ({ scale: nextScale, position: nextPosition }) => {
+    scaleRef.current = nextScale;
+    setScale(nextScale);
+    setPosition(nextScale > 1 ? clampPosition(nextPosition, nextScale) : { x: 0, y: 0 });
+  };
+  const startPinch = () => {
+    const [a, b] = [...pointersRef.current.values()];
     dragRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    pinchRef.current = { distance: Math.hypot(a.x - b.x, a.y - b.y) || 1, mid: stagePoint((a.x + b.x) / 2, (a.y + b.y) / 2), scale, position };
+  };
+  const onPointerDown = (event) => {
+    if (event.button === 2) return;
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, time: event.timeStamp });
+    // Touches are followed even at 100%, so a second finger can pinch.
+    if (event.pointerType === 'touch' || scale > 1) event.currentTarget.setPointerCapture?.(event.pointerId);
+    if (pointersRef.current.size === 2) startPinch();
+    else if (pointersRef.current.size === 1 && scale > 1) dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, origin: position };
+  };
+  const onPointerMove = (event) => {
+    const pointer = pointersRef.current.get(event.pointerId);
+    if (!pointer) return;
+    Object.assign(pointer, { x: event.clientX, y: event.clientY });
+    const pinch = pinchRef.current;
+    if (pinch && pointersRef.current.size >= 2) {
+      const [a, b] = [...pointersRef.current.values()];
+      const mid = stagePoint((a.x + b.x) / 2, (a.y + b.y) / 2);
+      applyView(zoomAround(pinch, pinch.scale * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.distance), pinch.mid, mid));
+      return;
+    }
+    const current = dragRef.current;
+    if (!current || current.pointerId !== event.pointerId || scale <= 1) return;
+    setPosition(clampPosition({
+      x: current.origin.x + event.clientX - current.startX,
+      y: current.origin.y + event.clientY - current.startY,
+    }));
+  };
+  const endDrag = (event) => {
+    const pointer = pointersRef.current.get(event.pointerId);
+    pointersRef.current.delete(event.pointerId);
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (pinchRef.current) {
+      // Lifting one finger of a pinch continues as a pan with the other.
+      pinchRef.current = null;
+      tapRef.current = null;
+      const [rest] = [...pointersRef.current.entries()];
+      dragRef.current = rest && scaleRef.current > 1 ? { pointerId: rest[0], startX: rest[1].x, startY: rest[1].y, origin: position } : null;
+      return;
+    }
+    if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
+    // A double tap (touch) zooms in at the tap, or back to the fit when zoomed.
+    if (!pointer || event.pointerType !== 'touch' || event.type !== 'pointerup') return;
+    if (Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) > TAP_SLOP_PX) { tapRef.current = null; return; }
+    const tap = { time: event.timeStamp, x: event.clientX, y: event.clientY };
+    const last = tapRef.current;
+    if (last && tap.time - last.time <= DOUBLE_TAP_MS && Math.hypot(tap.x - last.x, tap.y - last.y) <= TAP_SLOP_PX) {
+      tapRef.current = null;
+      tapZoomRef.current = tap.time;
+      if (scale > 1) reset();
+      else applyView(zoomAround({ scale, position }, 2.5, stagePoint(tap.x, tap.y)));
+    } else {
+      tapRef.current = tap;
+    }
+  };
+  // A double tap already toggled the zoom: the browser's own dblclick after it is ignored.
+  const onDoubleClick = (event) => {
+    if (event.timeStamp - tapZoomRef.current < 600) return;
+    if (scale > 1) reset();
+    else zoom(1);
   };
 
   const announcement = `Photo ${index + 1} of ${collection.length}. ${photograph.caption}.`;
@@ -334,22 +423,11 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
                 event.preventDefault();
                 zoom(-Math.max(-100, Math.min(100, event.deltaY)) * .0025);
               }}
-              onPointerDown={(event) => {
-                if (scale <= 1 || event.button === 2) return;
-                event.currentTarget.setPointerCapture(event.pointerId);
-                dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, origin: position };
-              }}
-              onPointerMove={(event) => {
-                const current = dragRef.current;
-                if (!current || current.pointerId !== event.pointerId || scale <= 1) return;
-                setPosition(clampPosition({
-                  x: current.origin.x + event.clientX - current.startX,
-                  y: current.origin.y + event.clientY - current.startY,
-                }));
-              }}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
               onPointerUp={endDrag}
               onPointerCancel={endDrag}
-              onDoubleClick={() => (scale > 1 ? reset() : zoom(1))}
+              onDoubleClick={onDoubleClick}
             >
               <img ref={imageRef} key={photograph.id} src={photograph.viewerSrc} width={photograph.viewerWidth} height={photograph.viewerHeight} alt={photograph.alt} loading="eager" fetchPriority="high" decoding="async" style={{ width: `${fitSize.width}px`, height: `${fitSize.height}px`, transform: `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})` }} />
             </div>

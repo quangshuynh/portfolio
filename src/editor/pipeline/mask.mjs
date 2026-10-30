@@ -181,12 +181,13 @@ function brushCoverage(component, map, inverse, region, n, cache) {
     // Two brush components at most (three canvas-size buffers each): the one being painted and one more.
     const brushes = [...cache.keys()].filter((name) => !name.startsWith('rows|'));
     if (brushes.length >= 2) cache.delete(brushes[0]);
-    entry = { prefix: [], prefixComp: new Float32Array(n), scratch: new Float32Array(n), live: null };
+    // The scratch buffer is made when a kept stroke must be painted again.
+    entry = { prefix: [], prefixComp: new Float32Array(n), scratch: null, live: null };
     cache.set(key, entry);
   }
   const last = strokes.length - 1;
   let k = 0;
-  while (k < entry.prefix.length && k < last && entry.prefix[k] === strokes[k]) k += 1;
+  while (k < entry.prefix.length && k < last && sameStroke(entry.prefix[k], strokes[k])) k += 1;
   if (k < entry.prefix.length) {
     entry.prefix = [];
     entry.prefixComp.fill(0);
@@ -196,19 +197,22 @@ function brushCoverage(component, map, inverse, region, n, cache) {
     const stroke = strokes[k];
     // The stroke just finished: its painted buffer is reused when it is the same stroke.
     const live = entry.live && sameStrokeStart(entry.live, stroke) && entry.live.count === stroke.points.length ? entry.live : null;
+    if (!live) entry.scratch ??= new Float32Array(n);
     const box = live ? live.box : paintStroke(stroke, strokePoints(stroke, map), 0, map, inverse, region, entry.scratch);
     if (box) applyStroke(stroke, live ? live.buffer : entry.scratch, box, region, entry.prefixComp, true);
     if (live) entry.live = null;
     entry.prefix.push(stroke);
   }
-  const comp = entry.prefixComp.slice();
+  // No kept strokes: their coverage is zero, so a fresh buffer replaces a copy of 4 bytes per pixel.
+  const comp = entry.prefix.length ? entry.prefixComp.slice() : new Float32Array(n);
   if (last < 0) return comp;
   const stroke = strokes[last];
   let { live } = entry;
   const continues = live && sameStrokeStart(live, stroke);
   if (!continues) {
-    live = { buffer: live?.buffer ?? new Float32Array(n), box: null, count: 0 };
-    live.buffer.fill(0);
+    const reused = live?.buffer;
+    live = { buffer: reused ?? new Float32Array(n), box: null, count: 0 };
+    if (reused) reused.fill(0);
   }
   growLive(entry, live, stroke, continues, map, inverse, region);
   if (live.box) applyStroke(stroke, live.buffer, live.box, region, comp, false);
@@ -225,49 +229,79 @@ function growLive(entry, live, stroke, continues, map, inverse, region) {
 
 const brushKey = (component, map, region) => `${component.id}|${maskMapKey(map)}|${region.x0},${region.y0},${region.x1},${region.y1}`;
 // Everything about a mask except its brush strokes. While this is unchanged and only the stroke
-// being painted grew, only the pixels its new segments touch can change.
-const maskShape = (mask) => JSON.stringify([mask.base, mask.invert, mask.opacity, mask.components.map((c) => (c.type === 'brush' ? { ...c, strokes: c.strokes.length } : c))]);
+// being painted grew, only the pixels its new segments touch can change. Inactive components
+// (disabled, transparent, or an empty brush) add nothing to the codes and are left out.
+const maskShape = (mask, active) => JSON.stringify([mask.base, mask.invert, mask.opacity, active.map((c) => (c.type === 'brush' ? { ...c, strokes: null } : c))]);
 // Per-component coverage is kept while painting; masks with more components are evaluated in full.
 const MAX_CACHED_COMPONENTS = 6;
+// Strokes by value: a committed stroke can be a copy of the one last previewed.
+const sameStroke = (a, b) => a === b || (a.mode === b.mode && a.radius === b.radius && a.hardness === b.hardness && a.opacity === b.opacity
+  && a.points.length === b.points.length && a.points.every((p, i) => p[0] === b.points[i][0] && p[1] === b.points[i][1] && p[2] === b.points[i][2]));
+const sameStrokes = (a, b, count = a.length) => a.length >= count && b.length >= count && a.slice(0, count).every((stroke, i) => sameStroke(stroke, b[i]));
 
-/** Which brush component's last stroke grew since `entry`, or { changed: true } for anything else. */
-function strokeChange(entry, active, cache, map, region) {
-  let growing = null;
+/**
+ * How the active components differ from `entry`: { changed: true } (evaluate in full), or the one
+ * brush change that is incremental, `growing` = { component, brush, index, kind }: 'grow' (the
+ * stroke being painted has new points), 'stroke' (a stroke started after the strokes the cache
+ * holds) or 'first' (a brush became active with its first stroke; `added` is its index).
+ */
+function strokeChange(entry, active, cache, map, region, added) {
+  let growing = added >= 0 ? { component: active[added], brush: null, index: added, kind: 'first' } : null;
   for (let index = 0; index < active.length; index += 1) {
     const c = active[index];
-    if (c.type !== 'brush') continue; // eslint-disable-line no-continue
+    if (c.type !== 'brush' || index === added) continue; // eslint-disable-line no-continue
     const before = entry.strokes.get(c.id);
-    if (before.length === c.strokes.length && before.every((stroke, i) => stroke === c.strokes[i])) continue; // eslint-disable-line no-continue
+    if (before.length === c.strokes.length && sameStrokes(before, c.strokes)) continue; // eslint-disable-line no-continue
+    if (growing) return { changed: true };
     const last = c.strokes.length - 1;
     const brush = cache.get(brushKey(c, map, region));
-    const grows = !growing && last >= 0 && before.length === c.strokes.length && before.slice(0, last).every((stroke, i) => stroke === c.strokes[i])
-      && brush?.live && brush.prefix.length === last && sameStrokeStart(brush.live, c.strokes[last]);
-    if (!grows) return { changed: true };
-    growing = { component: c, brush, index };
+    if (!brush?.live || last < 0) return { changed: true };
+    if (before.length === c.strokes.length && sameStrokes(before, c.strokes, last) && brush.prefix.length === last && sameStrokeStart(brush.live, c.strokes[last])) {
+      growing = { component: c, brush, index, kind: 'grow' };
+    } else if (before.length === last && last > 0 && sameStrokes(before, c.strokes) && brush.prefix.length === last - 1
+      && sameStrokes(brush.prefix, before, last - 1) && sameStrokeStart(brush.live, before[last - 1]) && brush.live.count === before[last - 1].points.length) {
+      growing = { component: c, brush, index, kind: 'stroke' };
+    } else {
+      return { changed: true };
+    }
   }
   return { changed: false, growing };
 }
 
+/** Index of the one brush in `active` that `entry` did not have (its first stroke, not inverted), or -1 when the ids are the same; null for any other difference. */
+function addedBrush(entry, mask, active) {
+  const ids = active.map(({ id }) => id);
+  if (ids.length === entry.ids.length && ids.every((id, i) => id === entry.ids[i])) return entry.shape === maskShape(mask, active) ? -1 : null;
+  if (ids.length !== entry.ids.length + 1) return null;
+  const added = ids.findIndex((id, i) => id !== entry.ids[i]);
+  const c = active[added];
+  const rest = active.filter((_, i) => i !== added);
+  if (c.type !== 'brush' || c.invert || c.strokes.length !== 1 || !rest.every(({ id }, i) => id === entry.ids[i])) return null;
+  return maskShape(mask, rest) === entry.shape ? added : null;
+}
+
 /**
  * maskRows with a cache (the preview while painting): each component's coverage and the codes
- * are kept, and when the only change is the stroke being painted growing, only the box of its
- * new segments is recomputed (a dirty rectangle). Each pixel goes through exactly the arithmetic
- * of the full path, so the codes are identical; any other change recomputes everything.
+ * are kept, and when the only change is a brush stroke being painted (new points, a new stroke,
+ * or a brush's first stroke), only the box of its new segments is recomputed (a dirty
+ * rectangle). Each pixel goes through exactly the arithmetic of the full path, so the codes are
+ * identical; any other change recomputes everything.
  */
 function cachedMaskRows(mask, map, width, y0, y1, x0, out, cache) {
   const n = width * Math.max(0, y1 - y0);
   const region = { x0, y0, x1: x0 + width, y1 };
   const key = `rows|${maskMapKey(map)}|${region.x0},${region.y0},${region.x1},${region.y1}`;
-  const shape = maskShape(mask);
   const active = mask.components.filter((c) => c.enabled && c.opacity > 0 && !(c.type === 'brush' && !c.strokes.length && !c.invert));
   if (active.length > MAX_CACHED_COMPONENTS) {
     cache.delete(key);
     cache.lastRows = null;
     return maskRows(mask, map, width, y0, y1, { x0, out });
   }
+  const shape = maskShape(mask, active);
   let entry = cache.get(key);
   let dirty = null;
-  const change = entry && entry.shape === shape ? strokeChange(entry, active, cache, map, region) : { changed: true };
+  const added = entry ? addedBrush(entry, mask, active) : null;
+  const change = added === null ? { changed: true } : strokeChange(entry, active, cache, map, region, added);
   if (!change.changed && !change.growing) {
     cache.lastRows = { key, version: entry.version, from: entry.version, dirty: null };
     out.set(entry.codes);
@@ -275,11 +309,29 @@ function cachedMaskRows(mask, map, width, y0, y1, x0, out, cache) {
   }
   const from = change.changed ? null : entry.version;
   if (!change.changed) {
-    const { component, brush, index } = change.growing;
+    const { component, index, kind } = change.growing;
+    let { brush } = change.growing;
+    const inverse = invert3(map.matrix);
     const stroke = component.strokes[component.strokes.length - 1];
-    dirty = growLive(brush, brush.live, stroke, true, map, invert3(map.matrix), region);
+    if (kind === 'first') {
+      // Its coverage is zero outside its stroke's box, where it leaves every code unchanged.
+      entry.covs.splice(index, 0, brushCoverage(component, map, inverse, region, n, cache));
+      entry.ids = active.map(({ id }) => id);
+      brush = cache.get(brushKey(component, map, region));
+      dirty = brush.live.box;
+    } else {
+      if (kind === 'stroke') {
+        // The finished stroke joins the kept strokes, as brushCoverage would; the buffer starts empty.
+        const done = component.strokes[component.strokes.length - 2];
+        if (brush.live.box) applyStroke(done, brush.live.buffer, brush.live.box, region, brush.prefixComp, true);
+        brush.prefix.push(done);
+        brush.live = { buffer: brush.live.buffer, box: null, count: 0 };
+      }
+      dirty = growLive(brush, brush.live, stroke, kind === 'grow', map, inverse, region);
+    }
+    entry.shape = shape;
     entry.strokes.set(component.id, component.strokes.slice());
-    if (dirty) {
+    if (dirty && kind !== 'first') {
       // The component's coverage in the box: finished strokes, then the live stroke (applyStroke).
       const cov = entry.covs[index];
       const erase = stroke.mode === 'erase';
@@ -294,7 +346,7 @@ function cachedMaskRows(mask, map, width, y0, y1, x0, out, cache) {
   } else {
     const inverse = invert3(map.matrix);
     const covs = active.map((c) => (c.type === 'brush' ? brushCoverage(c, map, inverse, region, n, cache) : componentCoverage(c, map, region)));
-    entry = { shape, covs, strokes: new Map(active.filter(({ type }) => type === 'brush').map((c) => [c.id, c.strokes.slice()])), codes: new Uint8ClampedArray(n), version: (entry?.version ?? 0) + 1 };
+    entry = { shape, ids: active.map(({ id }) => id), covs, strokes: new Map(active.filter(({ type }) => type === 'brush').map((c) => [c.id, c.strokes.slice()])), codes: new Uint8ClampedArray(n), version: (entry?.version ?? 0) + 1 };
     cache.delete(key);
     cache.set(key, entry);
     dirty = region;
@@ -383,6 +435,88 @@ export function maskRows(mask, map, width, y0, y1, { x0 = 0, out = new Uint8Clam
   }
   for (let i = 0; i < n; i += 1) out[i] = code8(mask.opacity * (mask.invert ? 1 - acc[i] : acc[i]));
   return out;
+}
+
+/**
+ * The canvas box outside which a mask's coverage is exactly 0 (clipped to `size`), or null when
+ * it may cover any pixel. Conservative: brush strokes and radials are boxes around their points
+ * and ellipses, a linear gradient is 0 past its end (a half-plane, bounded when the space maps
+ * affinely), subtracting components only remove; an inverted mask or component, or a mask based
+ * on everything, covers anything. Exports skip bands outside it.
+ */
+export function maskBounds(mask, map, size) {
+  const whole = null;
+  if (mask.invert || mask.base === 'all') return whole;
+  const region = { x0: 0, y0: 0, x1: size.width, y1: size.height };
+  const empty = { x0: 0, y0: 0, x1: 0, y1: 0 };
+  if (!(mask.opacity > 0)) return empty;
+  const inverse = invert3(map.matrix);
+  let box = null;
+  const add = (spaceBox) => {
+    const b = canvasBox(inverse, spaceBox, region);
+    if (b.x1 > b.x0 && b.y1 > b.y0) box = union(box, b);
+  };
+  for (const c of mask.components) {
+    if (!c.enabled || !(c.opacity > 0) || c.op === 'subtract') continue; // eslint-disable-line no-continue
+    if (c.invert) return whole;
+    if (c.type === 'brush') {
+      for (const stroke of c.strokes) {
+        if (stroke.mode === 'erase' || !stroke.points.length) continue; // eslint-disable-line no-continue
+        const pts = strokePoints(stroke, map);
+        const r = Math.max(...pts.map(([, , radius]) => radius));
+        add({ x0: Math.min(...pts.map(([x]) => x)) - r, y0: Math.min(...pts.map(([, y]) => y)) - r, x1: Math.max(...pts.map(([x]) => x)) + r, y1: Math.max(...pts.map(([, y]) => y)) + r });
+      }
+    } else if (c.type === 'radial') {
+      const r = prepareRadial(c, map);
+      const ex = Math.hypot(r.rx * r.cos, r.ry * r.sin);
+      const ey = Math.hypot(r.rx * r.sin, r.ry * r.cos);
+      add({ x0: r.cx - ex, y0: r.cy - ey, x1: r.cx + ex, y1: r.cy + ey });
+    } else {
+      const b = linearBounds(c, map, region);
+      if (b === whole) return whole;
+      if (b.x1 > b.x0 && b.y1 > b.y0) box = union(box, b);
+    }
+  }
+  return box ?? empty;
+}
+
+/** Canvas box of a linear gradient's non-zero side (t < 1), or null when the map is projective. */
+function linearBounds(c, map, region) {
+  const m = map.matrix;
+  if (Math.abs(m[6]) > 1e-12 || Math.abs(m[7]) > 1e-12) return null;
+  const s = m[8];
+  const ax = c.x0 * map.width;
+  const ay = c.y0 * map.height;
+  const dx = c.x1 * map.width - ax;
+  const dy = c.y1 * map.height - ay;
+  const length2 = dx * dx + dy * dy;
+  if (length2 < 1e-12) return { x0: 0, y0: 0, x1: 0, y1: 0 };
+  // Space point of a canvas pixel centre (x, y): (m0 x + m1 y + m2, m3 x + m4 y + m5) / s, so the
+  // side with t < 1 is n · (x, y) < k in canvas pixels.
+  const nx = (m[0] * dx + m[3] * dy) / s;
+  const ny = (m[1] * dx + m[4] * dy) / s;
+  const k = length2 + ax * dx + ay * dy - (m[2] * dx + m[5] * dy) / s;
+  // The canvas rectangle (pixel centres, with a pixel of margin) clipped to that side.
+  const corners = [[region.x0 - 1, region.y0 - 1], [region.x1 + 1, region.y0 - 1], [region.x1 + 1, region.y1 + 1], [region.x0 - 1, region.y1 + 1]];
+  const inside = (p) => nx * p[0] + ny * p[1] < k;
+  const kept = [];
+  corners.forEach((p, i) => {
+    const q = corners[(i + 1) % 4];
+    if (inside(p)) kept.push(p);
+    if (inside(p) !== inside(q)) {
+      const fp = nx * p[0] + ny * p[1] - k;
+      const fq = nx * q[0] + ny * q[1] - k;
+      const t = fp / (fp - fq);
+      kept.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
+    }
+  });
+  if (!kept.length) return { x0: 0, y0: 0, x1: 0, y1: 0 };
+  return {
+    x0: Math.max(region.x0, Math.floor(Math.min(...kept.map(([x]) => x))) - 1),
+    y0: Math.max(region.y0, Math.floor(Math.min(...kept.map(([, y]) => y))) - 1),
+    x1: Math.min(region.x1, Math.ceil(Math.max(...kept.map(([x]) => x))) + 1),
+    y1: Math.min(region.y1, Math.ceil(Math.max(...kept.map(([, y]) => y))) + 1),
+  };
 }
 
 /**
