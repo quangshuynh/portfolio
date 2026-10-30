@@ -5,14 +5,34 @@
 // composited once with the chosen opacity, so the border, rules and letters never double
 // their alpha where they meet, and the canvas's premultiplied source-over blend keeps thin
 // strokes free of dark fringes.
+//
+// Fonts: the static Schibsted Grotesk 500 and 800 instances (OFL 1.1, latin subset, about 25 kB
+// each, from this site), not the variable font text layers use: WebKit draws a variable face
+// at its default weight on a canvas whatever weight is asked for (checked in Playwright WebKit),
+// while static faces draw the same weights in every engine. Their advances equal the table in
+// watermark.mjs (measured in Chromium, Firefox and WebKit).
 
-import { loadTextFonts, fontFamily } from '../text/fonts.mjs';
+import mark500 from '@fontsource/schibsted-grotesk/files/schibsted-grotesk-latin-500-normal.woff2?url';
+import mark800 from '@fontsource/schibsted-grotesk/files/schibsted-grotesk-latin-800-normal.woff2?url';
 import { DESIGN, layoutWatermark, regionLuminance, resolveWatermarkColor, sampleBox } from './watermark.mjs';
 
-const FAMILY = fontFamily({ font: DESIGN.font });
+export const MARK_FAMILY = 'PE HUYNH Mark';
+const FAMILY = `"${MARK_FAMILY}", sans-serif`;
 
-/** Loads the bundled font once (shared with text layers); the mark is drawn only after it. */
-export const loadWatermarkFonts = () => loadTextFonts();
+let loading = null;
+/** Loads the mark's two faces once; the mark is drawn only after they are ready. */
+export function loadWatermarkFonts(fontSet = globalThis.document?.fonts) {
+  if (!fontSet || typeof FontFace !== 'function') return Promise.resolve(false);
+  loading ??= Promise.all([[mark500, '500'], [mark800, '800']].map(async ([url, weight]) => {
+    const face = new FontFace(MARK_FAMILY, `url(${url}) format('woff2')`, { weight, style: 'normal' });
+    fontSet.add(face);
+    await face.load();
+  })).then(() => true).catch((error) => {
+    loading = null;
+    throw error;
+  });
+  return loading;
+}
 
 const createSurface = (width, height) => {
   if (typeof document !== 'undefined') return Object.assign(document.createElement('canvas'), { width, height });

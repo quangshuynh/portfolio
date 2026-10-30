@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { glowDependencies } from '../pipeline/detailRenderer.mjs';
-import { neutralAdjustments, neutralGroup } from '../model/adjustments.mjs';
+import { adjustmentsEqual, neutralAdjustments, neutralGroup } from '../model/adjustments.mjs';
 import { GeometryError, cropRatio, frameGeometry, geometryPlan, neutralGeometry } from '../pipeline/geometry.mjs';
 import { warpSpec } from '../pipeline/warp.mjs';
 import CropOverlay from './CropOverlay';
@@ -19,6 +19,8 @@ import { createLocalPreview, renderDetailFrame } from '../pipeline/localPreview.
 import MaskTool from './MaskTool';
 import { rasterizeTextLayer } from '../text/textRender.mjs';
 import { loadTextFonts } from '../text/fonts.mjs';
+import { DESIGN, layoutWatermark, regionLuminance, resolveWatermarkColor, sampleBox, watermarkActive } from '../watermark/watermark.mjs';
+import { drawMark, loadWatermarkFonts } from '../watermark/watermarkRender.mjs';
 
 const MIN_ZOOM = 0.02;
 const MAX_ZOOM = 8;
@@ -150,8 +152,21 @@ function overlayTable(view, hex) {
  * preview to the CPU renderer (draft, then final).
  * :param maskTool: the mask being edited ({ owner: { kind: 'local' } | { kind: 'layer', layer },
  *   mask, interactive, overlay: { show, color, view: 'overlay' | 'mask' }, and MaskTool's props }) or null
+ * :param exportSize: { width, height } of the export with the current settings; the watermark is
+ *   laid out for it (watermark/watermark.mjs) and drawn at screen resolution on its own small
+ *   canvas over the photo, so moving or resizing it never renders the photo again
+ * :param onWatermarkAuto: receives { variant, mean } of the preview's backdrop when the colour is Auto
  */
-export default function Viewer({ photo, adjustments, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, renderLocalDetail = null, deferWork = false, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, layerTool = null, maskTool = null, layerRasters = null, lutFor = () => null }) {
+export default function Viewer({ photo, adjustments: settings, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, renderLocalDetail = null, deferWork = false, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, layerTool = null, maskTool = null, layerRasters = null, lutFor = () => null, exportSize: exportSizeProp = null, onWatermarkAuto = null }) {
+  // The photo's settings keep their identity while only the watermark changes, so a watermark
+  // edit redraws only its own overlay, never the photo or its layers.
+  const settingsRef = useRef(settings);
+  if (settingsRef.current !== settings && !adjustmentsEqual({ ...settingsRef.current, watermark: null }, { ...settings, watermark: null })) settingsRef.current = settings;
+  const adjustments = settingsRef.current;
+  const watermarkSettings = settings.watermark;
+  // Compared by value: the parent computes the export size afresh on every render.
+  const exportKey = exportSizeProp ? `${exportSizeProp.width}x${exportSizeProp.height}` : null;
+  const exportSize = useMemo(() => exportSizeProp, [exportKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const stageRef = useRef(null);
   const canvasHostRef = useRef(null);
   const engineRef = useRef(null);
@@ -822,6 +837,66 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   const previewSize = previewSpec ?? proxy;
   const splitX = offsetX + displayWidth * split;
 
+  // The watermark over the photo: laid out for the export's size, rasterised for the screen.
+  const watermark = showLayers && proxy && proxy.id === photo?.id && !inspect && watermarkActive(watermarkSettings) && exportSize ? watermarkSettings : null;
+  const watermarkRef = useRef(null);
+  const [watermarkMean, setWatermarkMean] = useState(null);
+  const watermarkBox = useMemo(() => {
+    if (!watermark) return null;
+    const ratio = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    // Screen pixels per export pixel, capped so the sprite stays under 4096 px wide.
+    let scale = (displayWidth / exportSize.width) * ratio;
+    let layout = layoutWatermark(watermark, exportSize.width, exportSize.height, { scale });
+    if (layout.width > 4096) layout = layoutWatermark(watermark, exportSize.width, exportSize.height, { scale: (scale *= 4096 / layout.width) });
+    return { layout, cssPerPixel: displayWidth / (exportSize.width * scale) };
+  }, [watermark, exportSize, displayWidth]);
+  const watermarkVariant = watermark ? resolveWatermarkColor(watermark, watermarkMean ?? 0) : null;
+  const [markFontsReady, setMarkFontsReady] = useState(false);
+  useEffect(() => {
+    if (!watermark || markFontsReady) return undefined;
+    let alive = true;
+    loadWatermarkFonts().catch(() => {}).then(() => { if (alive) setMarkFontsReady(true); });
+    return () => { alive = false; };
+  }, [watermark, markFontsReady]);
+  useLayoutEffect(() => {
+    const element = watermarkRef.current;
+    if (!element) return;
+    if (!watermarkBox || !markFontsReady) { element.width = 0; return; }
+    const { layout } = watermarkBox;
+    Object.assign(element, { width: layout.width, height: layout.height });
+    drawMark(element.getContext('2d'), layout, DESIGN.colors[watermarkVariant], { offsetX: -layout.x, offsetY: -layout.y });
+  }, [watermarkBox, watermarkVariant, markFontsReady]);
+  // Auto colour: the mean luminance behind the mark in the shown frame, read once the frame settles.
+  const autoWatermark = watermark?.color === 'auto';
+  useEffect(() => {
+    if (!autoWatermark) { setWatermarkMean(null); return undefined; }
+    const timer = setTimeout(() => {
+      const engine = engineRef.current;
+      if (!engine || !proxyRef.current) return;
+      const frame = engine.kind === 'webgl2' ? engine.renderer.snapshot() : (({ width, height }) => ({ width, height, data: engine.context.getImageData(0, 0, width, height).data }))(engine.context.canvas);
+      if (!frame) return;
+      const layout = layoutWatermark(watermarkSettings, exportSize.width, exportSize.height, { scale: frame.width / exportSize.width, snap: false });
+      const { mean } = regionLuminance(frame, sampleBox(layout));
+      setWatermarkMean(mean);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [autoWatermark, watermarkBox, renderAdjustments, proxy, previewSpec, exportSize, layerRasters?.version, glowVersion, localVersion, detailQuality]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    onWatermarkAuto?.(autoWatermark && watermarkMean !== null ? { variant: watermarkVariant, mean: watermarkMean } : null);
+  }, [autoWatermark, watermarkMean, watermarkVariant, onWatermarkAuto]);
+  const watermarkStyle = watermarkBox ? (() => {
+    const { layout, cssPerPixel } = watermarkBox;
+    const left = offsetX + layout.x * cssPerPixel;
+    const clip = compare === 'split' ? Math.max(0, splitX - left) : 0;
+    return {
+      width: layout.width * cssPerPixel,
+      height: layout.height * cssPerPixel,
+      transform: `translate(${left}px, ${offsetY + layout.y * cssPerPixel}px)`,
+      opacity: watermark.opacity,
+      clipPath: clip > 0 ? `inset(0 0 0 ${clip}px)` : undefined,
+    };
+  })() : null;
+
   return (
     <div className="pe-viewer" data-layers-shown={layersShown}>
       <div
@@ -848,6 +923,14 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
           data-view={overlayMask?.overlay.view}
           hidden={!overlayMask || !proxy}
           style={{ width: displayWidth, height: displayHeight, transform: `translate(${offsetX}px, ${offsetY}px)` }}
+        />
+        <canvas
+          ref={watermarkRef}
+          className="pe-watermark-overlay"
+          aria-hidden="true"
+          data-watermark={watermark ? watermarkVariant : undefined}
+          hidden={!watermarkStyle || !markFontsReady}
+          style={watermarkStyle ?? undefined}
         />
         {maskTool?.editable && proxy && proxy.id === photo?.id && !transform && !inspect && compare !== 'original' && (
           <MaskTool

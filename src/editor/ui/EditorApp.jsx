@@ -28,6 +28,8 @@ import { appHref } from '../../util/navigation';
 import { createTextOverlay } from '../model/overlays.mjs';
 import { loadTextFonts } from '../text/fonts.mjs';
 import { rasterizeTextLayer } from '../text/textRender.mjs';
+import { WATERMARK_DEFAULTS, normalizeWatermark, watermarkActive } from '../watermark/watermark.mjs';
+import { applyWatermark, loadWatermarkFonts } from '../watermark/watermarkRender.mjs';
 import { createImageLayer, createAdjustmentLayer, insertLayer, layerAdjustments, layerLabel, settingsNeutral, updateLayer, visibleLayers } from '../model/layers.mjs';
 import { rasterSize } from '../pipeline/layerTransform.mjs';
 import { composeLayers } from '../io/composeLayers.mjs';
@@ -98,6 +100,18 @@ function readRecipes() {
     return text ? parseRecipeLibrary(text).map((recipe) => ({ ...recipe, id: newId() })) : [];
   } catch {
     return [];
+  }
+}
+
+// The watermark settings "Enable" starts from in the public editor: this browser's saved default
+// (a per-viewer convenience), else the built-in HUYNH Photography preset.
+const WATERMARK_DEFAULT_KEY = 'photo-editor:watermark-default:v1';
+function readWatermarkDefault() {
+  try {
+    const text = localStorage.getItem(WATERMARK_DEFAULT_KEY);
+    return (text && text.length < 4096 && normalizeWatermark({ ...JSON.parse(text), enabled: true })) || null;
+  } catch {
+    return null;
   }
 }
 
@@ -281,6 +295,9 @@ function EditorWorkspace({ host }) {
   const [userPresets, setUserPresets] = useState(readPresets);
   const [presetPreview, setPresetPreview] = useState(null);
   const [recipes, setRecipes] = useState(readRecipes);
+  const [watermarkDefault, setWatermarkDefault] = useState(readWatermarkDefault);
+  // The preview's auto colour choice ({ variant, mean }), shown in the Watermark section.
+  const [watermarkAuto, setWatermarkAuto] = useState(null);
   // The open recipe dialog: { mode: 'copy' | 'apply' | 'instructions', recipe? }.
   const [recipeDialog, setRecipeDialog] = useState(null);
   const imageKeys = useRef(new WeakMap());
@@ -295,6 +312,22 @@ function EditorWorkspace({ host }) {
   const thumbSource = useRef({ key: null, value: null });
   // While a preset is hovered or focused, the preview shows it applied (nothing is recorded).
   const viewAdjustments = useMemo(() => (presetPreview && ready ? applyPreset(adjustments, presetPreview) : adjustments), [presetPreview, ready, adjustments]);
+  // Watermark defaults: the host's (CMS global preference) or this browser's saved default.
+  const [hostWatermark, setHostWatermark] = useState(null);
+  const watermarkDefaults = useMemo(() => (host ? {
+    settings: hostWatermark ?? WATERMARK_DEFAULTS,
+    label: 'CMS global preference',
+    onSave: host.saveWatermarkDefault ? async (settings) => setHostWatermark(normalizeWatermark(await host.saveWatermarkDefault(settings))) : null,
+    overrides: true,
+  } : {
+    settings: watermarkDefault ?? WATERMARK_DEFAULTS,
+    label: watermarkDefault ? 'saved default' : 'HUYNH defaults',
+    onSave: (settings) => {
+      try { localStorage.setItem(WATERMARK_DEFAULT_KEY, JSON.stringify(settings)); } catch { throw new Error('This browser does not allow saving settings.'); }
+      setWatermarkDefault(normalizeWatermark(settings));
+    },
+    overrides: false,
+  }), [host, hostWatermark, watermarkDefault]);
   const missingLut = ready && adjustments.lut && !luts.has(adjustments.lut.sha256) ? adjustments.lut : null;
   const importing = state.photos.filter(({ status }) => status === 'importing').length;
   const exporting = state.photos.some(({ exportStatus }) => exportStatus.state === 'running');
@@ -911,12 +944,16 @@ function EditorWorkspace({ host }) {
     const resource = resources.current.get(target.id);
     const values = target.history.present;
     const lut = values.lut ? lutsRef.current.get(values.lut.sha256) : null;
-    // Local adjustments and layers: applied over the rendered photo before encoding (io/composeLayers.mjs).
+    // Local adjustments and layers: applied over the rendered photo before encoding (io/composeLayers.mjs);
+    // then the watermark over the final output frame at the export's size (watermark/watermarkRender.mjs).
     const layerCancel = { cancelled: false };
     const native = { width: target.width, height: target.height };
-    const compose = visibleLayers(values.layers).length || visibleLocals(values.local).length ? async (context, { size, signal, onProgress: progress }) => {
-      if (values.layers.some((layer) => layer.type === 'text')) await loadTextFonts();
+    const watermark = settings.includeWatermark !== false && watermarkActive(values.watermark) ? values.watermark : null;
+    let watermarked = null;
+    const compose = visibleLayers(values.layers).length || visibleLocals(values.local).length || watermark ? async (context, { size, signal, onProgress: progress }) => {
+      if (values.layers.some((layer) => layer.type === 'text' && layer.visible !== false)) await loadTextFonts();
       const merged = { get cancelled() { return layerCancel.cancelled || Boolean(signal?.cancelled); } };
+      if (watermark) await loadWatermarkFonts();
       await composeLayers(context, values.layers, {
         size,
         loadRaster: (layer, canvasSize) => exportLayerRaster(layer, canvasSize, merged),
@@ -929,14 +966,23 @@ function EditorWorkspace({ host }) {
         signal: merged,
         onProgress: progress,
       });
+      if (watermark) {
+        if (merged.cancelled) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
+        const started = performance.now();
+        const { variant, luminance } = applyWatermark(context, watermark, size);
+        watermarked = { variant, luminance, ms: performance.now() - started };
+        performance.measure?.('pe-watermark', { start: started });
+      }
     } : null;
+    // What the watermark resolved to (auto colour), reported with the export.
+    const marked = (result) => (watermarked ? { ...result, watermark: watermarked } : result);
     onCancel(() => { layerCancel.cancelled = true; });
     if (resource.hdr) {
       const { inputs, analysis } = resource.hdr;
       const job = createHdrJob();
       onCancel(() => job.cancel());
       try {
-        return { ...await exportHdr(inputs, analysis, { adjustments: values, raw: target.raw, lut, settings, compose }, { rawQueue: raws(), job, onProgress }), hdr: true };
+        return marked({ ...await exportHdr(inputs, analysis, { adjustments: values, raw: target.raw, lut, settings, compose }, { rawQueue: raws(), job, onProgress }), hdr: true });
       } finally {
         job.cancel();
       }
@@ -954,7 +1000,7 @@ function EditorWorkspace({ host }) {
         },
       });
       if (rawJob.cancelled) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
-      return { ...result, raw: true };
+      return marked({ ...result, raw: true });
     }
     const client = createImageWorker();
     const signal = { cancelled: false };
@@ -964,7 +1010,7 @@ function EditorWorkspace({ host }) {
       // Band workers when there is something to render (a neutral export only re-encodes).
       // Layers are composited on the page, so a photo with layers always takes this path.
       if (compose || (workers > 0 && !deriveParams(values, { lut }).neutral)) {
-        return await exportImageInBands(client, { file: resource.file, header: resource.header, adjustments: values, lut, settings, compose }, { workers: Math.max(1, workers), onProgress, signal });
+        return marked(await exportImageInBands(client, { file: resource.file, header: resource.header, adjustments: values, lut, settings, compose }, { workers: Math.max(1, workers), onProgress, signal }));
       }
       return await client.call('export', { file: resource.file, header: resource.header, adjustments: values, lut, settings }, { onProgress });
     } finally {
@@ -993,7 +1039,7 @@ function EditorWorkspace({ host }) {
       performance.measure('pe-export', 'pe-export-start');
       const fileName = exportFileName(target.name, settings.format, settings.suffix);
       downloadBlob(result.blob, fileName);
-      dispatch({ type: 'exportStatus', id: target.id, status: { state: 'done', fileName, width: result.width, height: result.height, bytes: result.blob.size, timings: result.timings, hdr: Boolean(result.hdr), raw: Boolean(result.raw), adjustments: target.history.present } });
+      dispatch({ type: 'exportStatus', id: target.id, status: { state: 'done', fileName, width: result.width, height: result.height, bytes: result.blob.size, timings: result.timings, hdr: Boolean(result.hdr), raw: Boolean(result.raw), watermark: result.watermark ?? null, adjustments: target.history.present } });
     } catch (error) {
       dispatch({ type: 'exportStatus', id: target.id, status: error.code === 'cancelled' ? { state: 'cancelled' } : { state: 'error', message: error.message } });
     } finally {
@@ -1088,7 +1134,8 @@ function EditorWorkspace({ host }) {
     hostLoaded.current = true;
     (async () => {
       try {
-        const { files, document } = await host.load();
+        const { files, document, watermark } = await host.load();
+        if (watermark) setHostWatermark(normalizeWatermark({ ...watermark, enabled: true }));
         if (document) dispatch({ type: 'loadDocument', document: parseEditDocument(document) });
         await importFiles(files);
         setHostStatus({ state: 'ready' });
@@ -1524,6 +1571,7 @@ function EditorWorkspace({ host }) {
               cancelRender={cancelExport}
               openHdrMerge={() => setHdrOpen(true)}
               setNotice={setNotice}
+              applySettings={(patch) => dispatch({ type: 'applySettings', patch })}
             />
           )}
           {notice && (
@@ -1631,6 +1679,8 @@ function EditorWorkspace({ host }) {
           } : null}
           layerRasters={layerRasters}
           lutFor={lutFor}
+          exportSize={ready ? outputOf(photo) : null}
+          onWatermarkAuto={setWatermarkAuto}
         />
         {!state.photos.length && (
           <div className="pe-empty">
@@ -1773,6 +1823,7 @@ function EditorWorkspace({ host }) {
             geometry={ready ? { native: { width: photo.width, height: photo.height }, mode: transformMode, onMode: openTransform, onChange: changeGeometry, onCommit: commitGeometry, onStraightening: setStraightening } : null}
             text={{ selectedId: activeLayer, onSelect: setActiveLayer, editing: layerToolOn, onTool: (on) => { if (!transformMode) setLayerToolOn(on); }, focusRequest: textFocus }}
             thumbnails={filterThumbnails}
+            watermark={{ defaults: watermarkDefaults, auto: watermarkAuto, onDownload: downloadBlob }}
           />
         </div>
         <div className="pe-inspector__section" data-section="export">

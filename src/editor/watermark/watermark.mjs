@@ -8,9 +8,10 @@
 // Units: the layout is computed in pixels of the output frame (after crop, rotation and the
 // export's resize), from its width and height only, so the mark keeps its place and share of
 // the picture at any export size; the preview computes it for its own pixel size the same way.
-// Glyph advances are those of the bundled Schibsted Grotesk (OFL 1.1, text/fonts.mjs) at the
-// weights used, measured in Chromium, Firefox and WebKit (they agree to 0.01/1000 em), so text
-// positions never depend on the browser; only glyph rasterisation (anti-aliasing) does.
+// Glyph advances are those of Schibsted Grotesk (OFL 1.1) at the two weights used, measured in
+// Chromium, Firefox and WebKit (they agree to 0.01/1000 em; watermarkRender.mjs loads the
+// matching static faces), so text positions never depend on the browser; only glyph
+// rasterisation (anti-aliasing) does.
 
 export const WATERMARK_PRESET = 'huynh-photography';
 export const WATERMARK_PRESET_LABEL = 'HUYNH Photography';
@@ -22,7 +23,6 @@ export const WATERMARK_PRESET_LABEL = 'HUYNH Photography';
  * line and reach the width of the first; the border and rules share one stroke width.
  */
 export const DESIGN = Object.freeze({
-  font: 'sans',
   capHeight: 0.703,
   descender: 0.203,
   lines: Object.freeze([
@@ -36,7 +36,7 @@ export const DESIGN = Object.freeze({
   colors: Object.freeze({ white: '#ffffff', dark: '#1f1f22' }),
 });
 
-// Advance widths in 1/1000 em (Schibsted Grotesk variable, latin subset).
+// Advance widths in 1/1000 em (Schibsted Grotesk 500 and 800, latin subset).
 const ADVANCES = {
   500: { P: 630.37, H: 729, O: 769.04, T: 655.76, G: 721.19, R: 647.95, A: 710.45, Y: 632.81, q: 600.1, u: 590.82, a: 563.48, n: 590.82, g: 561.52, h: 577.15, y: 564.45, '.': 286.62, c: 559.57, o: 600.59, m: 883.3 },
   800: { H: 766.6, U: 735.84, Y: 673.34, N: 783.2 },
