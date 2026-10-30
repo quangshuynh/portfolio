@@ -263,3 +263,23 @@ describe('startup on limited browsers', () => {
     }
   });
 });
+
+describe('fullscreen workspace', () => {
+  test('the bar toggles fullscreen (a focus mode without the Fullscreen API) and keeps the controls', async () => {
+    render(<EditorApp />);
+    const enter = await screen.findByRole('button', { name: 'Enter fullscreen' });
+    await act(async () => { fireEvent.click(enter); });
+    const root = document.querySelector('.pe');
+    expect(root).toHaveAttribute('data-fullscreen', 'immersive');
+    const exit = screen.getByRole('button', { name: 'Exit fullscreen' });
+    expect(exit).toHaveAttribute('aria-pressed', 'true');
+    exit.focus();
+    // Undo, redo and compare stay in the bar; the library and filmstrip step aside (CSS).
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Compare' })).toBeInTheDocument();
+    expect(editorCss).toMatch(/\.pe\[data-fullscreen\] \.pe-library, \.pe\[data-fullscreen\] \.pe-filmstrip/);
+    await act(async () => { fireEvent.click(exit); });
+    expect(root).not.toHaveAttribute('data-fullscreen');
+    expect(screen.getByRole('button', { name: 'Enter fullscreen' })).toHaveFocus();
+  });
+});

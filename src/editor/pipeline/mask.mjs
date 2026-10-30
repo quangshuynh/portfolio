@@ -262,15 +262,18 @@ function cachedMaskRows(mask, map, width, y0, y1, x0, out, cache) {
   const active = mask.components.filter((c) => c.enabled && c.opacity > 0 && !(c.type === 'brush' && !c.strokes.length && !c.invert));
   if (active.length > MAX_CACHED_COMPONENTS) {
     cache.delete(key);
+    cache.lastRows = null;
     return maskRows(mask, map, width, y0, y1, { x0, out });
   }
   let entry = cache.get(key);
   let dirty = null;
   const change = entry && entry.shape === shape ? strokeChange(entry, active, cache, map, region) : { changed: true };
   if (!change.changed && !change.growing) {
+    cache.lastRows = { key, version: entry.version, from: entry.version, dirty: null };
     out.set(entry.codes);
     return out;
   }
+  const from = change.changed ? null : entry.version;
   if (!change.changed) {
     const { component, brush, index } = change.growing;
     const stroke = component.strokes[component.strokes.length - 1];
@@ -291,7 +294,7 @@ function cachedMaskRows(mask, map, width, y0, y1, x0, out, cache) {
   } else {
     const inverse = invert3(map.matrix);
     const covs = active.map((c) => (c.type === 'brush' ? brushCoverage(c, map, inverse, region, n, cache) : componentCoverage(c, map, region)));
-    entry = { shape, covs, strokes: new Map(active.filter(({ type }) => type === 'brush').map((c) => [c.id, c.strokes.slice()])), codes: new Uint8ClampedArray(n) };
+    entry = { shape, covs, strokes: new Map(active.filter(({ type }) => type === 'brush').map((c) => [c.id, c.strokes.slice()])), codes: new Uint8ClampedArray(n), version: (entry?.version ?? 0) + 1 };
     cache.delete(key);
     cache.set(key, entry);
     dirty = region;
@@ -311,7 +314,10 @@ function cachedMaskRows(mask, map, width, y0, y1, x0, out, cache) {
         entry.codes[i] = code8(mask.opacity * (mask.invert ? 1 - acc : acc));
       }
     }
+    if (from !== null) entry.version += 1;
   }
+  // What changed since the codes of version `from` (null: everything), for incremental consumers.
+  cache.lastRows = { key, version: entry.version, from, dirty: from === null ? region : dirty };
   out.set(entry.codes);
   return out;
 }
@@ -380,7 +386,12 @@ export function maskRows(mask, map, width, y0, y1, { x0 = 0, out = new Uint8Clam
 }
 
 /**
- * Coverage of a whole canvas of `size` ({ width, height, data } with one code per pixel).
+ * Coverage of a whole canvas of `size` ({ width, height, data } with one code per pixel; with a
+ * cache also `change`: { key, version, from, dirty } where dirty is the box changed since `from`).
  * :param cache: a Map kept by the caller for strokes being painted (see brushCoverage), or null
  */
-export const rasterizeMask = (mask, map, size, cache = null) => ({ width: size.width, height: size.height, data: maskRows(mask, map, size.width, 0, size.height, { cache }) });
+export function rasterizeMask(mask, map, size, cache = null) {
+  const data = maskRows(mask, map, size.width, 0, size.height, { cache });
+  // With a cache, `change` says which box differs from the raster of version `change.from`.
+  return { width: size.width, height: size.height, data, ...(cache?.lastRows ? { change: cache.lastRows } : {}) };
+}

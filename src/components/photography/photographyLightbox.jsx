@@ -1,7 +1,8 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { FaChevronLeft, FaChevronRight, FaInfoCircle, FaMinus, FaPlus, FaTimes } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight, FaCompress, FaExpand, FaInfoCircle, FaMinus, FaPlus, FaTimes } from 'react-icons/fa';
 import useOverlayLock from '../utilities/overlayLock';
+import useFullscreen from '../utilities/useFullscreen';
 
 const preloadedSources = new Set();
 const metadataFields = [
@@ -122,6 +123,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [fitSize, setFitSize] = useState({ width: 0, height: 0 });
+  const backdropRef = useRef(null);
   const viewerRef = useRef(null);
   const sheetRef = useRef(null);
   const closeButtonRef = useRef(null);
@@ -139,6 +141,8 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   latestPhotograph.current = photograph;
   scaleRef.current = scale;
   useOverlayLock();
+  // The backdrop goes fullscreen, so the information sheet (its sibling) stays reachable.
+  const fullscreen = useFullscreen(backdropRef);
 
   const measureFit = React.useCallback(() => {
     const stage = stageRef.current;
@@ -221,6 +225,9 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     return () => image.removeEventListener('load', handleLoad);
   }, [measureFit, photograph.id]);
 
+  // Entering or leaving fullscreen changes the stage; native fullscreen also fires resize.
+  useEffect(() => { measureFit(); }, [fullscreen.mode, measureFit]);
+
   useEffect(() => {
     const handleResize = () => {
       measureFit();
@@ -245,6 +252,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
       if (event.key === 'Escape') {
         event.preventDefault();
         if (infoOpen) closeInfo();
+        else if (fullscreen.active) fullscreen.exit();
         else onClose();
         return;
       }
@@ -258,6 +266,9 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
       } else if (!isEditableTarget(event.target) && (event.key === '-' || event.key === '_')) {
         event.preventDefault();
         zoom(-.25);
+      } else if (!isEditableTarget(event.target) && (event.key === 'f' || event.key === 'F') && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        fullscreen.toggle();
       } else if (!isEditableTarget(event.target) && event.key === '0') {
         event.preventDefault();
         reset();
@@ -273,7 +284,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [infoOpen, onClose, onNavigate, previous, next, reset, zoom]);
+  }, [infoOpen, onClose, onNavigate, previous, next, reset, zoom, fullscreen]);
 
   const endDrag = (event) => {
     if (dragRef.current?.pointerId !== event.pointerId) return;
@@ -284,7 +295,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   const announcement = `Photo ${index + 1} of ${collection.length}. ${photograph.caption}.`;
 
   return createPortal(
-    <div className="photography-lightbox-backdrop">
+    <div ref={backdropRef} className={`photography-lightbox-backdrop${fullscreen.mode ? ` is-fullscreen is-fullscreen--${fullscreen.mode}` : ''}`}>
       <section
         ref={viewerRef}
         className="photography-lightbox"
@@ -304,6 +315,9 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
               <button className="photography-lightbox-scale" type="button" onClick={reset} aria-label="Reset zoom">{Math.round(scale * 100)}%</button>
               <button type="button" onClick={() => zoom(.25)} disabled={scale >= 5} aria-label="Zoom in"><FaPlus aria-hidden="true" /></button>
             </div>
+            <button className="photography-lightbox-fullscreen" type="button" onClick={fullscreen.toggle} aria-pressed={fullscreen.active} aria-label={fullscreen.active ? 'Exit fullscreen' : 'Enter fullscreen'} title={fullscreen.active ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}>
+              {fullscreen.active ? <FaCompress aria-hidden="true" /> : <FaExpand aria-hidden="true" />}
+            </button>
             <button className="photography-lightbox-info" ref={infoButtonRef} type="button" onClick={() => setInfoOpen(true)} aria-label="Show photograph information"><FaInfoCircle aria-hidden="true" /></button>
             <button ref={closeButtonRef} type="button" onClick={onClose} aria-label="Close photograph"><FaTimes aria-hidden="true" /></button>
           </div>

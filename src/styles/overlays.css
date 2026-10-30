@@ -709,6 +709,13 @@
   .photography-lightbox-stage > button:first-child { justify-self: start; }
   .photography-lightbox-stage > button:last-child { justify-self: end; }
 }
+/* Fullscreen (native, or the immersive fallback where the API is missing): the photograph takes
+   the whole stage; details move to the information sheet; the toolbar stays for navigation and leaving. */
+.photography-lightbox-backdrop.is-fullscreen .photography-lightbox { gap: .4rem; }
+.photography-lightbox-backdrop.is-fullscreen .photography-lightbox-layout { grid-template-columns: 1fr; }
+.photography-lightbox-backdrop.is-fullscreen .photography-lightbox-details { display: none; }
+.photography-lightbox-backdrop.is-fullscreen .photography-lightbox-info { display: grid !important; }
+.photography-lightbox-backdrop.is-fullscreen .photography-lightbox-image-wrap { height: 100%; border-radius: 0; }
 .photography-lightbox-id { margin: 0 0 .8rem; color: var(--photography-accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .72rem; font-weight: 700; letter-spacing: .09em; }
 .photography-lightbox-caption { margin: 0; color: var(--photography-text); font-family: var(--font-display); font-size: clamp(1.15rem, 1.7vw, 1.55rem); line-height: 1.25; }
 .photography-lightbox-metadata { display: grid; gap: 0; margin: 2rem 0 0; }

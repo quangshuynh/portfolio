@@ -951,6 +951,39 @@ no longer its cost; the rest (React update, mask texture upload, the headless so
 profiled further. The gradient-drag and Detail-preview rows moved with single-run noise only (those
 paths do not use the changed code on the GPU preview); treat them as unchanged until repeated.
 
+**Interval 16.5: brush responsiveness** (same machine, 2026-10-29; `npm run check:editor:brush`
+with `CHECK_GPU=1`, one run each on `main` and this branch, 60 moves painted one per animation
+frame from inside the page, so input timing is the browser's own):
+
+| Brush on a 24 MP photo (4096 px preview) | `main` | After |
+| --- | --- | --- |
+| Chromium, real GPU: input → preview draw, p50 · p95 | 509 · 530 ms | 12 · 53 ms |
+| Chromium, real GPU: frame interval p50 · p95 (FPS) | 517 · 550 ms (2) | 16.7 · 50 ms (33) |
+| Genuine A7 III JPEG (DSC09640): input → draw p50 · p95 | 513 · 534 ms | 11 · 36 ms |
+| No WebGL2 (CPU preview): input → draw p50 · p95 | 129 · 138 ms | 3.7 · 39 ms |
+| iPhone 13 emulation (WebKit): input → draw p50 · p95 | 522 · 567 ms | 7 · 37 ms |
+
+The cost was not mask maths, React or WebGL: a CPU profile of the stroke put ~445 ms of each
+~520 ms frame in the mask overlay, which allocated a four-element array per pixel of the whole
+preview on every move. The overlay now maps coverage codes through a 256-entry table into one
+reused `ImageData` and, while painting, redraws only the box the new segment changed: the mask
+cache reports that box with a version (`rasterizeMask(...).change`), so a box is applied only
+over the raster it follows. The check asserts that the overlay painted box by box equals a full
+redraw (alpha exact; premultiplied colour within canvas rounding). What is left per frame is the
+cached mask update and the full-frame R8 texture upload (~8 ms together at 4096 px); the first
+point of a stroke still costs ~750 ms in Chromium (WebGL program link for the first masked pass
+and the first full rasterisation). Headless Chromium without `CHECK_GPU` uses SwiftShader (frames
+of seconds at 4096 px) and the Pixel 7 run is software-rendered too: use them for function, not
+speed. Exports, the GPU and CPU compositors and the codes are unchanged.
+
+**Physical iPhone (not tested by the agent).** On the phone, open the editor from a Vercel
+preview, import a camera JPEG and check: one-finger painting (no page scroll or zoom), brush size,
+hardness and Erase, the overlay (`O`), a linear and a radial dragged by their handles, two-finger
+cancel, undo/redo of a stroke as one step, Edited/Original/Split, rotation to landscape and back,
+safe-area spacing, and ten minutes of painting without reloads. Diagnostics (bottom of the
+Export panel) copies a report kept on the device; it contains no photos or file names. Nothing is
+uploaded automatically.
+
 ## Batch editing
 
 **Selection** (library list and filmstrip). The active photo is the one shown and edited,
@@ -1189,7 +1222,11 @@ Portable, reviewable settings in JSON (`model/recipes.mjs`; UI `ui/RecipeDialog.
   Previews are the import thumbnails through the CPU pipeline (no Detail), never full size.
 - **Saved recipes**: `localStorage` `photo-editor:recipes:v1`, up to 200, validated on every
   read; review, rename, duplicate, export, delete, import. Presets stay the one-click,
-  hover-preview library; recipes are the portable, reviewed one.
+  hover-preview library; recipes are the portable, reviewed one. Each origin has its own
+  library (the public editor and the CMS editor never share browser storage), so **Export
+  all** writes the library (`quangedit-recipe-library` v1: recipes only, no ids, photos or
+  file names) and **Import recipes** reads it or a single recipe; a library imports only if
+  every recipe validates, and names that already exist get a number.
 - **With an assistant**: copy the Recipe instructions, give them with a photo and ask for
   "natural edits as only a valid QuangEdit Recipe JSON object", then paste the answer and
   review it. API for later intervals: `parseRecipe`, `validateRecipe`, `serializeRecipe`,

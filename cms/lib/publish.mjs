@@ -109,12 +109,14 @@ async function writeTree(worktree, { publication, tipCatalog, workspaceDir, imag
   // keeps the original's public metadata (capture date, camera); only sizes change.
   const finalManifest = JSON.parse(await readFile(manifestFile, 'utf8'));
   const byId = new Map(finalManifest.map((entry) => [entry.id, entry]));
-  for (const { id, render, files } of images) {
+  // A removed treatment (`restore`) puts the original's images back the same way.
+  for (const { id, render, restore, files } of images) {
     const entry = byId.get(id);
     if (!entry) throw new PublishError('assets', `No image record for "${id}".`);
+    const sizes = render ?? restore;
     await copyFile(files.gallery, path.join(derivativesDir, entry.galleryFilename));
     await copyFile(files.viewer, path.join(derivativesDir, entry.viewerFilename));
-    byId.set(id, { ...entry, galleryWidth: render.gallery.width, galleryHeight: render.gallery.height, viewerWidth: render.viewer.width, viewerHeight: render.viewer.height });
+    byId.set(id, { ...entry, galleryWidth: sizes.gallery.width, galleryHeight: sizes.gallery.height, viewerWidth: sizes.viewer.width, viewerHeight: sizes.viewer.height });
   }
   const ordered = publication.photographs.map(({ id }) => byId.get(id)).filter(Boolean);
   await writeFile(manifestFile, `${JSON.stringify(ordered, null, 2)}\n`, 'utf8');

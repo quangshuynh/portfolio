@@ -3,13 +3,15 @@
 // same-origin checks on changes. Sources are served by index, never by path, and only for
 // photographs in the workspace catalog; no response contains a filesystem path.
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { mkdir, rename, rm, stat } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
 import { derivativeFilenames } from '../../scripts/photography-utils.mjs';
 import path from 'node:path';
+import { DERIVATIVE_SIZES, createDerivative } from '../../scripts/photography-derivatives.mjs';
 import { DERIVATIVES_PATH, approvedImageChanges } from './treatment-publish.mjs';
 import {
   TreatmentError, approveTreatment, attachSource, clearSources, discardTreatment, editingSources, publicSources,
-  readTreatment, rejectTreatment, renderImage, renderIsFresh, saveTreatment, storeRender,
+  readTreatment, rejectTreatment, removeApprovedTreatment, renderImage, renderIsFresh, saveTreatment, storeRender,
 } from './treatments.mjs';
 import { paths, readWorkspace } from './workspace.mjs';
 
@@ -33,6 +35,9 @@ const revisionParam = (url) => {
   return value;
 };
 
+// The camera original among editing sources, when the browser can show it (not RAW, not the public image).
+const viewableOriginal = (sources) => sources.find((source) => (source.kind === 'original' || source.kind === 'library') && source.available && ['jpeg', 'png', 'webp'].includes(source.format)) ?? null;
+
 /**
  * :param options.readJsonBody: (request) => object, from api.mjs
  * :param options.exclusive: serialises mutations with the rest of the API
@@ -54,7 +59,8 @@ export function createEditorRoutes({ repoDir, workspaceDir, libraryDir, git, exc
     const needed = treatment.document ? treatment.document.photos[0].source : null;
     const known = new Set(sources.filter(({ available }) => available).map(({ sha256 }) => sha256));
     const staleSource = Boolean(needed && (needed.hdr ? needed.hdr.inputs.map(({ sha256 }) => sha256) : [needed.sha256]).some((hash) => !known.has(hash)));
-    const live = treatment.approved && record.status === 'published' && workspace.base.photographs.some((photo) => photo.id === id && photo.status === 'published')
+    const staged = treatment.approved || treatment.restore;
+    const live = staged && record.status === 'published' && workspace.base.photographs.some((photo) => photo.id === id && photo.status === 'published')
       ? !(await approvedImageChanges({ git, commit: workspace.meta.baseCommit, workspaceDir, ids: [id] }).catch(() => [null])).length
       : false;
     return {
@@ -63,7 +69,12 @@ export function createEditorRoutes({ repoDir, workspaceDir, libraryDir, git, exc
       sources: publicSources(sources),
       staleSource,
       renderFresh: renderIsFresh(treatment),
-      approvedLive: live,
+      approvedLive: Boolean(treatment.approved && live),
+      // What "Original" shows in the comparison: the camera original, or the public image
+      // (which is an earlier approved edit once one is live) when no viewable original exists.
+      original: viewableOriginal(sources) ? 'source' : 'public',
+      // After Remove approved treatment: whether the original's images are already public.
+      originalLive: Boolean(!treatment.approved && treatment.restore && live),
     };
   }
 
@@ -92,6 +103,12 @@ export function createEditorRoutes({ repoDir, workspaceDir, libraryDir, git, exc
       await storeRender(workspaceDir, id, { request, name: url.searchParams.get('name'), documentHash: url.searchParams.get('documentHash'), revision: revisionParam(url) });
       return describe(id);
     })),
+    'POST remove-approved': json((id, request) => exclusive(async () => {
+      const { revision } = await readJsonBody(request);
+      const { sources } = await context(id);
+      await removeApprovedTreatment(workspaceDir, id, revision, sources);
+      return describe(id);
+    })),
     ...Object.fromEntries([['approve', approveTreatment], ['reject', rejectTreatment], ['discard', discardTreatment]].map(([name, action]) => [`POST ${name}`, json((id, request) => exclusive(async () => {
       const { revision } = await readJsonBody(request);
       await context(id);
@@ -112,8 +129,26 @@ export function createEditorRoutes({ repoDir, workspaceDir, libraryDir, git, exc
       return undefined;
     }
     if (request.method === 'GET' && rest === 'images/original') {
-      // The photograph as it is now: the repository's public image, or an upload's preview.
-      await context(id);
+      // The camera original at the viewer size (generated once with the public pipeline into
+      // the private workspace cache); else the photograph as it is now: the repository's public
+      // image, or an upload's preview.
+      const { sources } = await context(id);
+      const original = viewableOriginal(sources);
+      if (original) {
+        const cache = path.join(workspaceDir, 'cache', 'originals');
+        const file = path.join(cache, `${id}-${original.sha256.slice(0, 16)}-viewer.jpg`);
+        if (!(await stat(file).then(() => true, () => false))) {
+          await mkdir(cache, { recursive: true });
+          const temporary = path.join(cache, `.${randomBytes(6).toString('hex')}.jpg`);
+          try {
+            await createDerivative(original.file, temporary, DERIVATIVE_SIZES.viewer.dimensions, DERIVATIVE_SIZES.viewer.quality);
+            await rename(temporary, file);
+          } finally {
+            await rm(temporary, { force: true });
+          }
+        }
+        return sendFile(response, file, CONTENT_TYPES.jpeg);
+      }
       const { viewerFilename } = derivativeFilenames(id);
       for (const directory of [derivativesDir, paths(workspaceDir).previewDir]) {
         const file = path.join(directory, viewerFilename);

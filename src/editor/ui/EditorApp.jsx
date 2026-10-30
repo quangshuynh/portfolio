@@ -46,6 +46,7 @@ import HdrMergeDialog from './HdrMergeDialog';
 import PhotoThumb from './PhotoThumb';
 import RecipeDialog from './RecipeDialog';
 import Viewer from './Viewer';
+import useFullscreen from '../../components/utilities/useFullscreen';
 import './editor.css';
 
 export const AUTOSAVE_KEY = 'photo-editor:edits:v1';
@@ -262,6 +263,9 @@ function EditorWorkspace({ host }) {
   hdrOpenRef.current = hdrOpen;
   const fileInputRef = useRef(null);
   const editsInputRef = useRef(null);
+  // Fullscreen (or, where the API is missing, a focus mode): the photo and its controls only.
+  const rootRef = useRef(null);
+  const fullscreen = useFullscreen(rootRef);
   const [compare, setCompare] = useState('edited');
   const [split, setSplit] = useState(0.5);
   const [notice, setNotice] = useState(null);
@@ -1467,7 +1471,7 @@ function EditorWorkspace({ host }) {
   });
 
   return (
-    <div className="pe" data-engine={engine?.kind} data-mobile-panel={mobilePanel} data-dragging={dragDepth > 0 || undefined} {...dragHandlers}>
+    <div ref={rootRef} className="pe" data-fullscreen={fullscreen.mode ?? undefined} data-engine={engine?.kind} data-mobile-panel={mobilePanel} data-dragging={dragDepth > 0 || undefined} {...dragHandlers}>
       <a className="skip-link" href="#pe-workspace">Skip to workspace</a>
       <header className="pe-bar">
         <a className="pe-back" href={host ? host.backHref : appHref('/photography/')}>
@@ -1488,6 +1492,11 @@ function EditorWorkspace({ host }) {
               <button key={value} type="button" aria-pressed={compare === value} disabled={!ready} onClick={() => setCompare(value)}>{label}</button>
             ))}
           </div>
+          <button type="button" className="pe-icon-button pe-fullscreen" onClick={fullscreen.toggle} aria-pressed={fullscreen.active} aria-label={fullscreen.active ? 'Exit fullscreen' : 'Enter fullscreen'} title={fullscreen.active ? 'Exit fullscreen' : 'Fullscreen: photo and adjustments only'}>
+            <svg viewBox="0 0 16 16" aria-hidden="true">{fullscreen.active
+              ? <path d="M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              : <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />}</svg>
+          </button>
           {sessionButtons('pe-session')}
           <input ref={editsInputRef} type="file" accept="application/json,.json" hidden onChange={(event) => { openEdits(event.target.files[0]); event.target.value = ''; }} />
         </div>

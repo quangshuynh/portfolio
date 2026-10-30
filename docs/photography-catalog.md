@@ -184,3 +184,15 @@ globbed:
 They are kept until the owner approves deleting them.
 `scripts/photography-catalog.repo.test.mjs` pins this exact list, so any
 change to it is deliberate.
+
+## Fullscreen viewing
+
+The gallery viewer (Featured, collections, the archive and `#slug` links) has **Enter
+fullscreen** (or `F`). `src/components/utilities/useFullscreen.js` is the one implementation,
+also used by the CMS comparison and the editor's workspace: the Fullscreen API where the
+browser allows it for an element, otherwise (iPhone Safari, or a refused request) an
+immersive view that fills the viewport inside the browser's own chrome. Fullscreen shows the
+viewer derivative (2200 px, the largest public image) fitted without enlarging past its pixels;
+details move to the information sheet; previous/next, arrows, zoom and pan keep working; `Esc`
+leaves fullscreen before it closes the viewer; closing the viewer leaves fullscreen and returns
+focus to the thumbnail.

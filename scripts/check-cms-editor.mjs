@@ -179,6 +179,9 @@ try {
         await page.waitForURL(/\/admin\/photography\/#review=/);
         const compare = page.locator('.cms-compare img');
         await poll(() => compare.evaluateAll((imgs) => imgs.map((img) => img.complete && img.naturalWidth)), (sizes) => sizes.length === 2 && sizes.every(Boolean), 'compare images');
+        // The split's original (matched to the edit) and edited image share one box: aligned.
+        const boxes = await compare.evaluateAll((imgs) => imgs.map((img) => { const r = img.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; }));
+        assert.ok(boxes[0].every((v, i) => Math.abs(v - boxes[1][i]) <= 1), `split images not aligned: ${JSON.stringify(boxes)}`);
         await page.getByRole('button', { name: 'Approve for publication' }).click();
         await page.locator('.cms-treatment__states', { hasText: 'Approved treatment' }).waitFor();
         await page.locator('.cms-badge--edit', { hasText: 'Edit: approved' }).first().waitFor();

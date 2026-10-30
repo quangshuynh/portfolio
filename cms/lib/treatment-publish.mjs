@@ -5,7 +5,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { derivativeFilenames } from '../../scripts/photography-utils.mjs';
-import { listTreatments, renderImage } from './treatments.mjs';
+import { listTreatments, renderImage, restoreImage } from './treatments.mjs';
 
 export const DERIVATIVES_PATH = 'src/assets/photography/generated';
 
@@ -13,27 +13,31 @@ const sha256 = (data) => createHash('sha256').update(data).digest('hex');
 
 /**
  * :param ids: photographs in the publication catalog (drafts are never passed)
- * :returns: [{ id, render, files: { gallery, viewer } }] for approved renders that differ from `commit`
+ * :returns: [{ id, render, files: { gallery, viewer } }] for approved renders that differ from `commit`;
+ *   a removed treatment gives { id, restore, files }: the original's images, put back
  */
 export async function approvedImageChanges({ git, commit, workspaceDir, ids }) {
   const treatments = await listTreatments(workspaceDir);
   const changes = [];
   for (const id of ids) {
-    const approved = treatments[id]?.approved;
-    if (!approved?.render) continue;
+    const { approved, restore } = treatments[id] ?? {};
+    const staged = approved ? approved.render : restore;
+    if (!staged) continue;
     const names = derivativeFilenames(id);
-    const files = { gallery: renderImage(workspaceDir, id, approved.render, 'gallery'), viewer: renderImage(workspaceDir, id, approved.render, 'viewer') };
+    const image = approved ? renderImage : restoreImage;
+    const files = { gallery: image(workspaceDir, id, staged, 'gallery'), viewer: image(workspaceDir, id, staged, 'viewer') };
     let changed = false;
     for (const which of ['gallery', 'viewer']) {
       const bytes = await readFile(files[which]).catch(() => null);
-      if (!bytes || sha256(bytes) !== approved.render[which].sha256) {
-        throw Object.assign(new Error(`The approved render of "${id}" is missing or changed on disk; render and approve it again.`), { code: 'render-missing' });
+      if (!bytes || sha256(bytes) !== staged[which].sha256) {
+        throw Object.assign(new Error(approved ? `The approved render of "${id}" is missing or changed on disk; render and approve it again.`
+          : `The original images of "${id}" (Remove approved treatment) are missing or changed on disk; remove the treatment again.`), { code: 'render-missing' });
       }
       const local = await git(['hash-object', files[which]]);
       const base = await git(['rev-parse', '--verify', '--quiet', `${commit}:${DERIVATIVES_PATH}/${names[`${which}Filename`]}`]).catch(() => null);
       if (local !== base) changed = true;
     }
-    if (changed) changes.push({ id, render: approved.render, files });
+    if (changed) changes.push(approved ? { id, render: approved.render, files } : { id, restore, files });
   }
   return changes;
 }

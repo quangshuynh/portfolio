@@ -68,6 +68,7 @@ export const treatments = {
   approve: (id, revision) => request('POST', editorPath(id, 'approve'), { revision }),
   reject: (id, revision) => request('POST', editorPath(id, 'reject'), { revision }),
   discard: (id, revision) => request('POST', editorPath(id, 'discard'), { revision }),
+  removeApproved: (id, revision) => request('POST', editorPath(id, 'remove-approved'), { revision }),
 };
 
 export const imageUrl = (id, size = 'gallery') => `/api/images/${encodeURIComponent(`${id}-${size}.jpg`)}`;

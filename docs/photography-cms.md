@@ -129,14 +129,15 @@ recipes, geometry, layers, masks) opens CMS photographs; nothing is a second edi
 2. Edit as usual. Presets, the Filter Library, `.cube` LUTs, Copy/Paste settings and
    recipes work as on the public page: an assistant's recipe JSON is pasted, reviewed
    and applied only on Apply; a recipe's missing LUT is shown and must be reimported
-   with the same SHA-256. Recipes saved in the public editor are kept per site, so
-   export and import them to use them here.
+   with the same SHA-256. Recipes saved in the public editor are kept per site (another
+   origin), so use Recipes → **Export all** there and **Import recipes** here.
 3. **Save treatment** stores the edit privately. **Render for portfolio** renders the
    full resolution from the original (JPEG 95, never resized), then generates the
    gallery and viewer images with the public pipeline (`scripts/photography-derivatives.mjs`:
    sizes, mozjpeg, no metadata). The master is named `<source>-quangedit.jpg`
    (`<reference>-HDR-quangedit.jpg` for a merge).
-4. **Review in CMS**: original and edited under a split slider, the settings, and
+4. **Review in CMS**: original and edited (split, side by side, or the original's full
+   frame; **Enter fullscreen** enlarges it), the settings, and
    three separate states: treatment (draft, approved, rejected), render (up to date
    or not), photograph (draft or published). **Approve for publication** needs an
    up-to-date render. **Reject** keeps the proposal for reference; **Revert to
@@ -165,8 +166,28 @@ snapshot publication uses. Saves are atomic and revision-checked; a failed rende
 never touches the treatment. Renders live in `renders/<id>/<sha16>/`; unreferenced
 renders and attached files are removed when a treatment changes.
 
-**Not built:** returning a published photograph to its unedited image (approve a
-neutral treatment instead); automatic HDD discovery or AI selection.
+**Comparison framing.** Split and side by side show the *original matched to the edit*:
+the original's pixels warped through the treatment's own geometry (`cms/admin/matchedOriginal.js`,
+the editor's `geometryPlan` and `warpImage`: crop, orientation, rotation, perspective,
+stretch), so both images have the edit's aspect and show the same scene region at any width;
+nothing is stretched. **Original, full frame** shows the uncropped original. "Original" is
+the camera original at the viewer size (generated once into the private
+`cache/originals/`); without a viewable original (RAW-only or the public image) the panel
+says it shows the current public image, which may already be an earlier approved edit.
+
+**Remove approved treatment** (confirmation, revision-checked) returns a photograph to its
+original appearance without a neutral edit: the original's gallery and viewer images are made
+now from the original file (uploaded original or camera-library JPEG/PNG/WebP) with the public
+pipeline and staged in `renders/<id>/<sha16>/` as the treatment's `restore`; the edit stays as
+a draft and the removal is kept in `history`. The next publication puts the original images
+back under the same names (same id, slug and URLs); nothing public changes before that pull
+request is merged. Approving again replaces the restore. Without an original file it is
+refused. In short: **Discard** drops a working edit with nothing approved, **Revert to
+approved** drops a newer working edit, **Reject** keeps a proposal for reference while the
+approved one stands, **Remove approved treatment** withdraws the approved edit itself.
+
+**Not built:** reverting to an earlier approved treatment other than the current one;
+automatic HDD discovery or AI selection.
 
 ## What publication changes
 
