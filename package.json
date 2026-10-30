@@ -23,6 +23,7 @@
     "prepare:images": "node scripts/prepare-site-images.mjs",
     "check:assets": "node scripts/check-project-assets.mjs",
     "check:photography": "node scripts/check-photography-catalog.mjs",
+    "check:photography:viewer": "node scripts/check-photography-viewer.mjs",
     "check:editor": "node scripts/check-editor-browser.mjs",
     "check:editor:engines": "node scripts/check-editor-engines.mjs",
     "check:editor:raw": "node scripts/check-editor-raw.mjs",
