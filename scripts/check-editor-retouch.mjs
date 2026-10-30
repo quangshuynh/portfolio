@@ -19,6 +19,7 @@ import { build, preview } from 'vite';
 import { chromium, devices, firefox, webkit } from 'playwright';
 import { applyRetouch, retouchRegion } from '../src/editor/pipeline/retouch.mjs';
 import { DOCUMENT_VERSION } from '../src/editor/model/editDocument.mjs';
+import { readZip } from '../src/editor/dev/zipVerify.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const work = mkdtempSync(path.join(tmpdir(), 'editor-retouch-'));
@@ -147,6 +148,7 @@ async function runOne(run, files) {
       const toggle = page.locator('#pe-retouch-title .pe-section__toggle');
       if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
       await page.locator('.pe-retouch .pe-masks__tools button', { hasText: label }).click();
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, 'horizontal scroll with the Retouch panel open');
       await tab(1);
     } else {
       await page.locator('body').click({ position: { x: 2, y: 2 } }).catch(() => {});
@@ -158,9 +160,9 @@ async function runOne(run, files) {
   const shownLevel = async (at) => {
     const p = await photoPoint(at);
     const png = await page.screenshot({ clip: { x: p.x - 2, y: p.y - 2, width: 5, height: 5 } });
-    const { data } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
-    let sum = 0; for (let i = 0; i < data.length; i += 3) sum += data[i + 1];
-    return sum / (data.length / 3);
+    const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
+    let sum = 0; for (let i = 0; i < data.length; i += info.channels) sum += data[i + 1];
+    return sum / (data.length / info.channels);
   };
   const setExportPng = async () => {
     await tab(3);
@@ -323,6 +325,7 @@ async function runOne(run, files) {
 
     if (run.raw && RAW_FILES.length) {
       result.raw = {};
+      const plains = {};
       for (const file of RAW_FILES) {
         const name = path.basename(file);
         await step(`genuine ${name}: heal, clone, full-size export changed only inside the repairs`, async () => {
@@ -366,7 +369,55 @@ async function runOne(run, files) {
             if (regions.some((r) => x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height)) inside += 1; else outside += 1;
           }
           assert.ok(inside > 50 && outside === 0, `${name}: changed pixels inside ${inside}, outside ${outside}`);
+          plains[name] = { plain, regions, ops: value.retouch };
           result.raw[name] = { size: `${plain.width}×${plain.height}`, healMs, exportMs, changedInside: inside };
+        });
+      }
+      if (RAW_FILES.length === 2) {
+        await step('batch: the ARW and the NEF exported at full size in one ZIP, each with only its own repairs', async () => {
+          const names = RAW_FILES.map((file) => path.basename(file));
+          for (const name of names) {
+            await select(name);
+            await tab(2);
+            const panel = page.locator('#pe-retouch-title .pe-section__toggle');
+            if (await panel.getAttribute('aria-expanded') !== 'true') await panel.click();
+            for (const op of plains[name].ops) await page.locator(`[data-retouch-id="${op.id}"] .pe-layer__toggle`).click();
+            await savedWhen(name, (a) => a.retouch.every(({ enabled }) => enabled), 'repairs on');
+          }
+          await tab(1);
+          const items = page.locator('.pe-photo--list');
+          const index = async (name) => (await items.evaluateAll((list, wanted) => list.findIndex((li) => li.querySelector('.pe-photo__select')?.getAttribute('aria-label')?.startsWith(wanted)), name));
+          await select(names[0]);
+          await items.nth(await index(names[1])).locator('.pe-photo__check').check();
+          await page.click('.pe-batch__actions button:has-text("Export")');
+          const dialog = page.locator('.pe-dialog[role=dialog]');
+          await dialog.waitFor();
+          await dialog.locator('input[name=pe-batch-output][value=zip]').check();
+          await dialog.locator('input[name=pe-batch-format][value=jpeg]').check();
+          await dialog.locator('select').selectOption('original');
+          const started = Date.now();
+          const [download] = await Promise.all([page.waitForEvent('download', { timeout: 900_000 }), dialog.locator('.pe-dialog__foot button.pe-button--primary').click()]);
+          const ms = Date.now() - started;
+          const entries = readZip(readFileSync(await download.path()));
+          assert.equal(entries.length, 2);
+          result.batch = { ms, entries: [] };
+          for (const name of names) {
+            const entry = entries.find((item) => item.name.startsWith(name.replace(/\.[^.]+$/, '')));
+            assert.ok(entry, `${name} missing from the ZIP: ${entries.map((item) => item.name)}`);
+            const image = await decode(entry.data);
+            const { plain, regions } = plains[name];
+            assert.deepEqual([image.width, image.height], [plain.width, plain.height]);
+            let insideSum = 0; let insideCount = 0; let outsideSum = 0; let outsideCount = 0;
+            for (let y = 0; y < plain.height; y += 3) for (let x = 0; x < plain.width; x += 3) {
+              const i = (y * plain.width + x) * 4;
+              const d = Math.abs(image.data[i + 1] - plain.data[i + 1]);
+              if (regions.some((r) => x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height)) { insideSum += d; insideCount += 1; } else { outsideSum += d; outsideCount += 1; }
+            }
+            const inside = insideSum / insideCount; const outside = outsideSum / outsideCount;
+            assert.ok(outside < 2.5 && inside > outside + 1, `${name} in the batch: mean change inside its repairs ${inside.toFixed(2)}, elsewhere ${outside.toFixed(2)}`);
+            result.batch.entries.push({ name: entry.name, size: `${image.width}×${image.height}`, inside: Math.round(inside * 100) / 100, outside: Math.round(outside * 100) / 100 });
+          }
+          await page.locator('.pe-dialog__foot button:has-text("Close")').click();
         });
       }
     }

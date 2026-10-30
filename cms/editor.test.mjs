@@ -7,6 +7,8 @@ import { request as httpRequest } from 'node:http';
 import path from 'node:path';
 import { createEditDocument, serializeEditDocument } from '../src/editor/model/editDocument.mjs';
 import { neutralAdjustments } from '../src/editor/model/adjustments.mjs';
+import { WATERMARK_DEFAULTS } from '../src/editor/watermark/watermark.mjs';
+import { watermarkStatus } from './lib/watermark-rules.mjs';
 import { fixtureRepo, photograph } from './test-helpers.mjs';
 import { createSessions } from './lib/session.mjs';
 import { startCmsServer } from './server.mjs';
@@ -234,6 +236,30 @@ describe('treatments', () => {
     expect(removed.treatment).toMatchObject({ approved: null, status: 'draft' });
     expect(removed.treatment.restore.viewer.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(removed.approvedLive).toBe(false);
+  });
+
+  test('retouch (clone and heal) is kept with the treatment; changing it makes the watermarked render stale, the approved version untouched', async () => {
+    const { id } = await uploadDraft();
+    const source = (await describe_(id)).json.sources[0];
+    const watermark = { ...WATERMARK_DEFAULTS };
+    const retouch = [
+      { id: 'h1', type: 'heal', enabled: true, points: [[0.4, 0.41]], radius: 0.02, hardness: 0.5, opacity: 1, spacing: 0.25, offset: { x: 0.05, y: -0.01 } },
+      { id: 'c1', type: 'clone', enabled: true, points: [[0.1, 0.2], [0.12, 0.21]], radius: 0.01, hardness: 0.8, opacity: 0.6, spacing: 0.2, offset: { x: 0.2, y: 0 } },
+    ];
+    await save(id, documentFor(source, { exposure: 0.2, retouch, watermark }));
+    let { json } = await describe_(id);
+    expect(json.treatment.document.photos[0].adjustments.retouch).toEqual(retouch);
+    await render(id, await photograph({ width: 3000, height: 2000 }));
+    expect(watermarkStatus((await describe_(id)).json.treatment)).toBe('needs-review');
+    const approved = (await review(id, 'approve')).json.treatment;
+    expect(watermarkStatus(approved)).toBe('approved');
+    // Moving a repair's source is a change to the photograph: a new draft, its render stale.
+    await save(id, documentFor(source, { exposure: 0.2, retouch: [{ ...retouch[0], offset: { x: -0.05, y: 0.02 } }, retouch[1]], watermark }));
+    ({ json } = await describe_(id));
+    expect(json.treatment.status).toBe('draft');
+    expect(watermarkStatus(json.treatment)).toBe('needs-regeneration');
+    expect(json.treatment.approved.documentHash).toBe(approved.approved.documentHash);
+    expect(json.treatment.approved.document.photos[0].adjustments.retouch[0].offset).toEqual({ x: 0.05, y: -0.01 });
   });
 
   test('a treatment without an approval discards to nothing', async () => {
