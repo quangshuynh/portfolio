@@ -1175,6 +1175,55 @@ on two, then three full-size JPEGs (6024×4024, names `DSC0964x-quangedit.jpg`):
 Not verified: physical phones (iPhone, Android), Safari on macOS, batches of 50 full-size
 RAWs, ZIP parts above 1 GB.
 
+## Watermark (HUYNH Photography)
+
+One fixed mark: **HUYNH** (Schibsted Grotesk 800), **PHOTOGRAPHY** (500, wide
+tracking) between two rules, **quanghuynh.com**, in a thin square-cornered frame.
+`src/editor/watermark/watermark.mjs` is the only design specification (text,
+proportions, glyph advances, defaults, limits); `watermarkRender.mjs` draws it.
+Settings never change the text or typography.
+
+| Setting | Default | Range |
+| --- | --- | --- |
+| Position | bottom right | four corners, centre |
+| Size | 11% (of a 3:2 frame's width) | 4–30% |
+| Opacity / margin | 65% / 2.5% | 5–100% / 0–15% |
+| Colour | white | white, charcoal `#1f1f22`, auto |
+| Border, accent lines | on | on/off |
+
+- **Where it lives:** `adjustments.watermark` (edit document v11, `null` =
+  none), so it is in undo/redo, saved documents, autosave and CMS treatments.
+  Not part of QuangEdit Recipes; portable settings use their own file
+  (`quanghuynh.watermark` v1, ≤ 16 KB, validated, preset fixed). Sync copies it
+  only with **Watermark** ticked. "Save as default" keeps a per-browser default.
+- **Size and placement:** computed from the output frame (after crop, rotation
+  and the export resize). The mark covers the same share of the picture's area
+  at any aspect ratio (width = size × √(1.5·W·H)), at least 180 px wide, at
+  most 50% of the width and 30% of the height; equal margins of
+  margin × √(W·H). Box and strokes snap to whole pixels at each resolution.
+- **Order:** last, over the photo, local adjustments and layers, at the
+  export's own size (never upscaled), as one sprite composited at the opacity
+  (no doubled alpha where strokes meet). Every export path (raster, RAW, HDR,
+  batch, CMS render) goes through `exportPhoto`'s compose step. **Include
+  watermark** (export settings, also in Export selected) leaves it out of one
+  export without changing any photo.
+- **Auto colour:** mean linear luminance of the pixels behind the box (plus one
+  stroke): charcoal above 0.26, else white. The export decides from its own
+  pixels; the preview from the shown frame, so they can differ only for
+  backdrops within a few percent of the threshold.
+- **Preview:** the export-size layout drawn at screen resolution on its own
+  small canvas over the photo; a watermark change never re-renders the photo.
+- **Fonts:** static 500/800 faces (~25 kB each, same site): Playwright WebKit
+  draws variable faces on canvas at their default weight. Letter positions come
+  from a fixed advance table, so they match across engines; anti-aliasing
+  differs (measured ink ≤ 5%, box positions 0 px apart).
+- **Measured** (`check:editor:watermark`): the watermark step costs 2–12 ms at
+  6000 × 4000 and ~5 ms on an A7 III RAW export; pixels outside the box are
+  unchanged; border pixels are within 2 levels of the exact blend (8-bit
+  premultiplied canvas); preview box within 0.5 screen px of the export.
+- **Limits:** a visible mark deters casual reuse; it can be cropped, cloned or
+  retouched out, and it is not a signature or metadata. No custom logos yet.
+
 ## Edit documents and persistence
 
 ```json
