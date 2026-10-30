@@ -101,6 +101,10 @@ publication code.
    - It builds a branch in a temporary worktree, pushes it, and opens a pull
      request describing what is added, withdrawn, edited and reordered.
    - **Dry run** builds the branch locally without pushing or calling GitHub.
+   - **Watermark coverage:** it refuses while any published photograph has no
+     approved treatment with an enabled watermark, and lists them with a link to
+     the Watermark view. **Publish without the watermark** is an explicit
+     override; the pull request then lists those photographs.
 
    ![Publish](photography-cms/05-publish.webp)
 8. **Review and merge the pull request on GitHub.** CI runs on it. Merging
@@ -210,6 +214,11 @@ The **Watermark** view uses the editor's own renderer (no CMS renderer).
      confirm "I compared each". Shows the estimated change (2 public images per
      photo, same names and URLs).
   3. **Publish:** the usual pull request (Publish view); only approved renders.
+- **No camera original:** attach the published viewer image as the editing
+  source (QuangEdit renders the mark at its native size; derivatives never
+  upscale). DIBS2164, NTIO3912 and TERM5977 were watermarked this way: their
+  camera files (D3100 `_DSC0051`, `_DSC0027`, `_DSC0061`, 2026-04-04) are
+  ungraded, so rendering from them would change the published colours.
 - **Not eligible / flagged:** no original (only the 2200 px public image), HDR
   treatments (merge manually), treatments with **unapproved edits** (would
   publish unreviewed changes). Already staged with the same settings: re-runs

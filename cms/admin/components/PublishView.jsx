@@ -35,12 +35,16 @@ export default function PublishView({ ws, onNotice }) {
   const { server, catalog, derived } = ws;
   const [busy, setBusy] = useState(null);
   const [failure, setFailure] = useState(null);
+  const [allowUnwatermarked, setAllowUnwatermarked] = useState(false);
   const publication = server.publication;
   const summary = derived.summary;
   const problems = derived.problems;
   const unfinished = publication && ['committed', 'pushed'].includes(publication.status);
   const open = publication?.status === 'pr-open';
-  const canPublish = !problems.publication.length && (summary.count > 0 || unfinished) && !open && ws.save.status === 'saved';
+  const unwatermarked = server.unwatermarked ?? [];
+  const caption = (id) => catalog.photographs.find((record) => record.id === id)?.caption ?? id;
+  const watermarkBlocks = unwatermarked.length > 0 && !allowUnwatermarked && !unfinished;
+  const canPublish = !problems.publication.length && (summary.count > 0 || unfinished) && !open && ws.save.status === 'saved' && !watermarkBlocks;
 
   async function act(name, action, success) {
     setBusy(name);
@@ -84,6 +88,13 @@ export default function PublishView({ ws, onNotice }) {
           {problems.publication.length ? (
             <ul className="cms-errors">{problems.publication.map((error) => <li key={error}>{error}</li>)}</ul>
           ) : <p className="cms-ok">The publication catalog is valid.</p>}
+          {unwatermarked.length > 0 ? (
+            <div className="cms-warning" role="status" data-unwatermarked={unwatermarked.length}>
+              <p>{unwatermarked.length} published photograph{unwatermarked.length === 1 ? ' has' : 's have'} no HUYNH Photography watermark: {unwatermarked.map((id) => `${caption(id)} (${id})`).join(', ')}.</p>
+              <p><a href="#watermark">Stage and approve the watermark</a>, or publish without it:</p>
+              <label className="cms-check"><input type="checkbox" checked={allowUnwatermarked} onChange={(event) => setAllowUnwatermarked(event.target.checked)} /> Publish {unwatermarked.length === 1 ? 'this photograph' : 'these photographs'} without the watermark</label>
+            </div>
+          ) : <p className="cms-ok">Every published photograph carries the watermark.</p>}
           {Object.keys(problems.drafts).length > 0 && (
             <p className="cms-field-hint">{Object.keys(problems.drafts).length} draft(s) are incomplete. Drafts are not published, so they do not block publication.</p>
           )}
@@ -117,6 +128,7 @@ export default function PublishView({ ws, onNotice }) {
           <strong>{failure.message}</strong>
           {failure.details?.errors && <ul>{failure.details.errors.map((error) => <li key={error}>{error}</li>)}</ul>}
           {failure.details?.conflicts && <ul>{failure.details.conflicts.map((conflict) => <li key={conflict}>{conflict}</li>)}</ul>}
+          {failure.details?.ids && <ul>{failure.details.ids.map((id) => <li key={id}>{caption(id)} ({id})</li>)}</ul>}
           {failure.details?.url && <p><a href={failure.details.url} target="_blank" rel="noreferrer">Open the pull request</a></p>}
         </div>
       )}
@@ -124,11 +136,11 @@ export default function PublishView({ ws, onNotice }) {
       <div className="cms-publish-actions">
         <a className="cms-button" href="/photography/" target="_blank" rel="noreferrer">Preview gallery ↗</a>
         <button type="button" className="cms-button cms-button--primary" disabled={!canPublish || !server.github.available || Boolean(busy)}
-          onClick={() => act('prepare', () => api.prepare(false), (data) => `Pull request #${data.result.number} opened. Review and merge it on GitHub.`)}>
+          onClick={() => act('prepare', () => api.prepare(false, allowUnwatermarked), (data) => `Pull request #${data.result.number} opened. Review and merge it on GitHub.`)}>
           {busy === 'prepare' ? 'Preparing…' : unfinished ? 'Retry publication' : 'Prepare publication'}
         </button>
         <button type="button" className="cms-button" disabled={!canPublish || unfinished || Boolean(busy)}
-          onClick={() => act('dry', () => api.prepare(true), (data) => `Dry run committed to local branch ${data.result.branch}; nothing was pushed.`)}>
+          onClick={() => act('dry', () => api.prepare(true, allowUnwatermarked), (data) => `Dry run committed to local branch ${data.result.branch}; nothing was pushed.`)}>
           Dry run
         </button>
         <button type="button" className="cms-button" disabled={!publication?.number || Boolean(busy)}

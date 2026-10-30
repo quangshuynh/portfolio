@@ -201,7 +201,7 @@ describe('publication API', () => {
     const refused = await call('POST', '/api/publication/prepare', { ...mutate(cookie), body: { dryRun: false } });
     expect(refused.status).toBe(400);
     expect(refused.json.error.code).toBe('publishing-unavailable');
-    const dry = await call('POST', '/api/publication/prepare', { ...mutate(cookie), body: { dryRun: true } });
+    const dry = await call('POST', '/api/publication/prepare', { ...mutate(cookie), body: { dryRun: true, allowUnwatermarked: true } });
     expect(dry.status).toBe(200);
     expect(dry.json.result).toMatchObject({ status: 'dry-run' });
     expect(dry.json.result).not.toHaveProperty('submittedCatalog');

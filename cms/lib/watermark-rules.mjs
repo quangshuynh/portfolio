@@ -26,6 +26,20 @@ const withoutMark = (adjustments) => ({ ...adjustments, watermark: null });
  *   approved, so the photo is left for review
  *   upToDate: it already has exactly `target` and a fresh render (re-running changes nothing)
  */
+/**
+ * Published photographs whose public image carries no HUYNH watermark: no approved treatment
+ * with an active one. Publication refuses while any are listed, unless the owner overrides.
+ * :param catalog: { photographs } (the catalog to publish)
+ * :param treatments: { id: treatment } (listTreatments)
+ * :returns: ids, in catalog order
+ */
+export function unwatermarkedPhotographs(catalog, treatments) {
+  return catalog.photographs
+    .filter(({ status }) => status === 'published')
+    .filter(({ id }) => !watermarkActive(normalizeWatermark(firstPhoto(treatments[id]?.approved?.document)?.adjustments.watermark ?? null)))
+    .map(({ id }) => id);
+}
+
 export function watermarkTreatmentState(treatment, target = null) {
   const working = firstPhoto(treatment?.document);
   const approved = firstPhoto(treatment?.approved?.document);

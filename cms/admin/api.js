@@ -31,7 +31,7 @@ export const api = {
   saveCatalog: (catalog, revision) => request('PUT', '/api/catalog', { catalog, revision }),
   discard: (revision) => request('POST', '/api/workspace/discard', { revision }),
   rebase: () => request('POST', '/api/workspace/rebase', {}),
-  prepare: (dryRun) => request('POST', '/api/publication/prepare', { dryRun }),
+  prepare: (dryRun, allowUnwatermarked = false) => request('POST', '/api/publication/prepare', { dryRun, allowUnwatermarked }),
   status: () => request('GET', '/api/publication/status'),
   forget: () => request('POST', '/api/publication/forget', {}),
   signOut: () => fetch('/api/session/sign-out', { method: 'POST', headers: { 'X-CMS-Request': '1' } }),
