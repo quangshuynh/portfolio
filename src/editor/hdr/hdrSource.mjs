@@ -13,7 +13,7 @@ export const HDR_MODES = Object.freeze({
   fusion: { label: 'Exposure fusion' },
 });
 export const HDR_NAME_SUFFIX = '-HDR';
-const INPUT_FORMATS = ['arw', 'dng', 'jpeg', 'png', 'webp'];
+const INPUT_FORMATS = ['arw', 'nef', 'dng', 'jpeg', 'png', 'webp'];
 
 /**
  * Name of a merged photo: the reference (normal) exposure's base name plus "-HDR",

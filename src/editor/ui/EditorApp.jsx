@@ -54,7 +54,7 @@ import './editor.css';
 export const AUTOSAVE_KEY = 'photo-editor:edits:v1';
 const THUMBNAIL_EDGE = 320;
 const PROXY_CACHE_SIZE = 2;
-const ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.arw,.dng,image/x-sony-arw,image/x-adobe-dng';
+const ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.arw,.nef,.dng,image/x-sony-arw,image/x-nikon-nef,image/x-adobe-dng';
 const formatLabel = (format) => (format === 'hdr' ? 'HDR merge' : FORMATS[format]?.label ?? RAW_FORMATS[format]?.label ?? format);
 const IMPORT_PROGRESS = { waiting: 'Waiting for the RAW decoder…', decoding: 'Decoding RAW sensor data…' };
 const EDITOR_THEME_COLOR = '#151515';
@@ -393,7 +393,7 @@ function EditorWorkspace({ host }) {
       if (!resource) continue;
       try {
         // Identified by content: TIFF-structured files go to the RAW decoder, which
-        // accepts Sony ARW and DNG and explains anything else.
+        // accepts Sony ARW, Nikon NEF and DNG and explains anything else.
         const head = new Uint8Array(await resource.file.slice(0, RAW_SNIFF_BYTES).arrayBuffer());
         let inspected;
         if (isTiff(head)) {
@@ -1629,7 +1629,7 @@ function EditorWorkspace({ host }) {
         {state.photos.length ? (
           <ul className="pe-photo-list">{photoList('list')}</ul>
         ) : (
-          <p className="pe-note">JPEG, PNG, WebP, or RAW (Sony ARW, DNG), up to {LIMITS.maxPixels / 1e6} MP and {LIMITS.maxFileBytes / (1024 * 1024)} MB each. Drag files anywhere onto the editor.</p>
+          <p className="pe-note">JPEG, PNG, WebP, or RAW (Sony ARW, Nikon NEF, DNG), up to {LIMITS.maxPixels / 1e6} MP and {LIMITS.maxFileBytes / (1024 * 1024)} MB each. Drag files anywhere onto the editor.</p>
         )}
       </aside>
 
@@ -1685,7 +1685,7 @@ function EditorWorkspace({ host }) {
         {!state.photos.length && (
           <div className="pe-empty">
             <p className="pe-empty__title">Edit photographs in your browser</p>
-            <p>Drop JPEG, PNG, WebP or RAW (Sony ARW, DNG) files here, or</p>
+            <p>Drop JPEG, PNG, WebP or RAW (Sony ARW, Nikon NEF, DNG) files here, or</p>
             <button type="button" className="pe-button pe-button--primary pe-button--large" onClick={openPicker}>Choose photos</button>
             <p className="pe-note">Your photographs are decoded, edited and exported on this device. They are never uploaded, and no account is needed.</p>
           </div>

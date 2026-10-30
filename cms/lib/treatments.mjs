@@ -39,8 +39,8 @@ export const MAX_RENDER_PIXELS = 120_000_000;
 export const MAX_ATTACHED = 3;
 const ID = /^[A-Za-z0-9_-]+$/;
 const SHA = /^[0-9a-f]{64}$/;
-const EXTENSIONS = { jpeg: '.jpg', png: '.png', webp: '.webp', arw: '.arw', dng: '.dng' };
-const RAW_EXTENSIONS = { '.arw': 'arw', '.dng': 'dng' };
+const EXTENSIONS = { jpeg: '.jpg', png: '.png', webp: '.webp', arw: '.arw', nef: '.nef', dng: '.dng' };
+const RAW_EXTENSIONS = { '.arw': 'arw', '.nef': 'nef', '.dng': 'dng' };
 
 export class TreatmentError extends Error {
   constructor(code, message, status = 422, details) {
@@ -189,7 +189,7 @@ export async function editingSources({ workspaceDir, libraryDir, record, treatme
     if (await exists(file)) {
       return [{ kind: 'derivative', limited: true, name: viewerFilename, format: 'jpeg', size: (await stat(file)).size, sha256: hash ? await fileHash(file) : null, file, available: true,
         problem: library ? 'The camera-library original was not found (moved or renamed); only the 2200 px public image is available.'
-          : 'Only the 2200 px public image is available. Attach the original (JPEG, ARW or DNG) to edit at full quality.' }];
+          : 'Only the 2200 px public image is available. Attach the original (JPEG, ARW, NEF or DNG) to edit at full quality.' }];
     }
   }
   return [];
@@ -257,7 +257,7 @@ export async function attachSource(dir, id, { request, filename, revision }) {
     const tiff = received.head.length >= 4 && ((received.head[0] === 0x49 && received.head[1] === 0x49 && received.head[2] === 0x2a && received.head[3] === 0)
       || (received.head[0] === 0x4d && received.head[1] === 0x4d && received.head[2] === 0 && received.head[3] === 0x2a));
     if (!format && tiff) format = RAW_EXTENSIONS[path.extname(String(filename ?? '')).toLowerCase()] ?? null;
-    if (!format) throw new TreatmentError('unsupported', 'Attach a JPEG, PNG, WebP, Sony ARW or DNG file.', 415);
+    if (!format) throw new TreatmentError('unsupported', 'Attach a JPEG, PNG, WebP, Sony ARW, Nikon NEF or DNG file.', 415);
     const treatment = await readTreatment(dir, id);
     if (treatment.attached.some((entry) => entry.sha256 === received.sha256)) return treatment;
     if (treatment.attached.length >= MAX_ATTACHED) throw new TreatmentError('too-many', `A photograph has at most ${MAX_ATTACHED} editing sources (an HDR bracket).`, 409);

@@ -12,7 +12,7 @@ import { exportGeometry, LIMITS, proxyDimensions } from '../io/files.mjs';
 import { finishRows, warpImage, warpSpec } from '../pipeline/warp.mjs';
 import { contentHash } from '../io/hash.mjs';
 import { RawDecodeError, decodeRaw, downsampleRaw } from './rawDecoder.mjs';
-import { RAW_SNIFF_BYTES, sniffRaw } from './rawFormat.mjs';
+import { RAW_SNIFF_BYTES, RAW_SUPPORT, sniffRaw } from './rawFormat.mjs';
 
 export const RAW_BAND_ROWS = 256;
 
@@ -42,7 +42,7 @@ async function openRaw(file, loadModule) {
   } catch (error) {
     throw new RawDecodeError(error.code ?? 'unsupported', error.message);
   }
-  if (!format) throw new RawDecodeError('unsupported', 'This is not a Sony ARW or DNG file.');
+  if (!format) throw new RawDecodeError('unsupported', `This is not a ${RAW_SUPPORT.replace(' and ', ' or ')} file.`);
   let Module;
   try {
     Module = await loadModule();

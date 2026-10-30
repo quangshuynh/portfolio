@@ -5,7 +5,9 @@
 // undo, comparison, and PNG/JPEG exports checked against the Node reference (same
 // LibRaw build). With RAW_FIXTURE_DIR set (DSC09420.ARW, a genuine A7 III 14-bit file)
 // it also imports that file and exports it at full resolution, with timings and,
-// on Windows, browser memory. Usage: npm run check:editor:raw
+// on Windows, browser memory. NEF_FIXTURE_DIR (a folder with _DSC0051.NEF, a genuine Nikon
+// D3100 file) adds a NEF developed with exposure, a square crop and the watermark, exported
+// at full resolution. Usage: npm run check:editor:raw
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -30,6 +32,7 @@ const PORT = 4183;
 const DEV_PORT = 5183;
 const URL_EDITOR = `http://localhost:${PORT}/photography/editor/`;
 const GENUINE = process.env.RAW_FIXTURE_DIR ? path.join(process.env.RAW_FIXTURE_DIR, 'DSC09420.ARW') : null;
+const GENUINE_NEF = process.env.NEF_FIXTURE_DIR ? path.join(process.env.NEF_FIXTURE_DIR, '_DSC0051.NEF') : null;
 const ONLY = process.env.EDITOR_ENGINES?.split(',');
 
 const RUNS = [
@@ -139,7 +142,7 @@ async function runOne(run, files, reference) {
       const rows = await poll(() => page.$$eval('.pe-photo--list', (items) => items.map((li) => `${li.dataset.status}: ${li.querySelector('.pe-photo__detail').textContent}`)), (r) => r.length === 3 && !r.some((row) => row.startsWith('importing')), 'imports', 60_000);
       result.importMs = Date.now() - started;
       assert.match(rows[0], /^ready: 400×600 · DNG/);
-      assert.match(rows[1], /^error: .*Canon are not supported/);
+      assert.match(rows[1], /^error: .*Canon CR2 files are not supported yet/);
       assert.match(rows[2], /^error: .*(could not read|damaged)/i);
       await poll(() => page.evaluate(() => !document.querySelector('.pe-stage-message') && !document.querySelector('.pe-canvas-host').hidden), Boolean, 'RAW preview', 60_000);
     });
@@ -223,6 +226,61 @@ async function runOne(run, files, reference) {
         result.genuine = genuine;
       });
     }
+    if (run.genuine && GENUINE_NEF && existsSync(GENUINE_NEF)) {
+      await step('genuine D3100 NEF: import, preview, exposure, square crop, watermark, full-resolution export', async () => {
+        const nef = {};
+        nef.baselineMb = memoryMb(profile);
+        await tab(1);
+        let started = Date.now();
+        await page.setInputFiles('input[type=file][multiple]', GENUINE_NEF);
+        await poll(() => page.$$eval('.pe-photo--list', (items) => items.at(-1).dataset.status), (status) => status !== 'importing', 'NEF import', 120_000);
+        nef.importMs = Date.now() - started;
+        const row = await page.$$eval('.pe-photo--list', (items) => items.at(-1).querySelector('.pe-photo__detail').textContent);
+        assert.match(row, /^3084×4644 · Nikon NEF/);
+        started = Date.now();
+        await page.click('.pe-photo--list:last-child button.pe-photo__select');
+        await poll(() => page.evaluate(() => [document.querySelector('.pe-canvas')?.width, document.querySelector('.pe-canvas')?.height, Boolean(document.querySelector('.pe-stage-message'))]), ([w, h, busy]) => w === 1542 && h === 2322 && !busy, 'NEF preview', 120_000);
+        nef.previewMs = Date.now() - started;
+        await tab(2);
+        const exposure = page.getByRole('textbox', { name: 'Exposure value' });
+        await exposure.scrollIntoViewIfNeeded();
+        await exposure.fill('0.5');
+        await exposure.press('Enter');
+        await poll(() => exposure.inputValue(), (text) => text === '+0.50 EV', 'exposure applied');
+        const section = async (id) => {
+          const toggle = page.locator(`.pe-section[data-section-id=${id}] .pe-section__toggle`);
+          await toggle.scrollIntoViewIfNeeded();
+          if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+        };
+        await section('geometry');
+        await page.selectOption('.pe-geometry__ratio select', '1:1');
+        await section('watermark');
+        await page.getByRole('checkbox', { name: /Add the HUYNH Photography watermark/ }).check();
+        await tab(3);
+        const format = await page.isEnabled('input[name=pe-format][value=jpeg]') ? 'jpeg' : 'png';
+        await page.check(`input[name=pe-format][value=${format}]`);
+        const peaks = [];
+        const sampler = setInterval(() => { const m = memoryMb(profile); if (m) peaks.push(m); }, 500);
+        started = Date.now();
+        const [download] = await Promise.all([page.waitForEvent('download', { timeout: 240_000 }), page.click('.pe-export-button')]);
+        clearInterval(sampler);
+        nef.exportMs = Date.now() - started;
+        assert.equal(download.suggestedFilename(), `_DSC0051-quangedit.${format === 'jpeg' ? 'jpg' : 'png'}`);
+        const { data, info } = await sharp(await download.path()).raw().toBuffer({ resolveWithObject: true });
+        assert.deepEqual([info.width, info.height], [3084, 3084]);
+        // The mark (bottom right, 65% white with a charcoal outline over saturated grass) leaves light, near-neutral pixels there.
+        let bright = 0;
+        for (let y = Math.round(info.height * 0.85); y < info.height; y += 2) for (let x = Math.round(info.width * 0.75); x < info.width; x += 2) {
+          const i = (y * info.width + x) * info.channels;
+          if (Math.min(data[i], data[i + 1], data[i + 2]) > 150 && Math.max(data[i], data[i + 1], data[i + 2]) - Math.min(data[i], data[i + 1], data[i + 2]) < 30) bright += 1;
+        }
+        assert.ok(bright > 200, `watermark not found in the NEF export (${bright} light neutral pixels)`);
+        nef.markPixels = bright;
+        nef.peakDuringExportMb = peaks.length ? Math.max(...peaks) : null;
+        nef.format = format;
+        result.nef = nef;
+      });
+    }
     const csp = await page.evaluate(() => window.__csp);
     assert.deepEqual(csp, [], `CSP violations: ${csp.join(', ')}`);
     assert.deepEqual(problems, [], problems.join('\n'));
@@ -262,6 +320,7 @@ async function main() {
     rmSync(work, { recursive: true, force: true });
   }
   if (!GENUINE) console.log('Genuine ARW not checked: set RAW_FIXTURE_DIR to a folder with DSC09420.ARW.');
+  if (!GENUINE_NEF) console.log('Genuine NEF not checked: set NEF_FIXTURE_DIR to a folder with _DSC0051.NEF.');
   if (results.some(({ ok }) => !ok)) process.exitCode = 1;
 }
 

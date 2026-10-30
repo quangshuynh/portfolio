@@ -246,10 +246,10 @@ function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, 
         {busy === 'render' && progress?.stage !== 'uploading' && <button type="button" className="pe-button" onClick={cancelRender}>Cancel</button>}
         <a className="pe-button" href={`/admin/photography/#review=${encodeURIComponent(photoId)}`}>Review in CMS</a>
         <button type="button" className="pe-button" onClick={() => attachRef.current?.click()} disabled={Boolean(busy)}
-          title="Attach the original (JPEG, PNG, WebP, ARW or DNG), or three bracketed exposures for HDR">
+          title="Attach the original (JPEG, PNG, WebP, ARW, NEF or DNG), or three bracketed exposures for HDR">
           Attach source…
         </button>
-        <input ref={attachRef} type="file" hidden multiple accept=".jpg,.jpeg,.png,.webp,.arw,.dng,image/jpeg,image/png,image/webp"
+        <input ref={attachRef} type="file" hidden multiple accept=".jpg,.jpeg,.png,.webp,.arw,.nef,.dng,image/jpeg,image/png,image/webp"
           onChange={(event) => { const files = [...event.target.files]; event.target.value = ''; if (files.length) attach(files); }} />
       </div>
       {status?.state === 'error' && <p className="cms-host__note cms-host__note--error" role="alert">{status.message}</p>}
