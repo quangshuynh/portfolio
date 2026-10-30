@@ -58,3 +58,54 @@ export function watermarkTreatmentState(treatment, target = null) {
     upToDate: Boolean(target && watermarkActive(watermark) && watermarksEqual(watermark, normalizeWatermark(target)) && fresh),
   };
 }
+
+/**
+ * Where a photograph's watermark stands, from its treatment alone (so it survives restarts):
+ * - missing: the working treatment has no enabled watermark (or there is no treatment)
+ * - draft: the watermark is in the working treatment but it was never rendered
+ * - needs-regeneration: rendered, but the treatment changed since (edits, crop, geometry or
+ *   watermark settings), so the render is out of date
+ * - needs-review: a fresh watermarked render waits for approval
+ * - approved: the approved treatment carries the watermark and nothing changed since
+ * An approved version stays what publication uses until a newer draft is approved.
+ */
+export function watermarkStatus(treatment) {
+  const working = firstPhoto(treatment?.document);
+  if (!watermarkActive(normalizeWatermark(working?.adjustments.watermark ?? null))) return 'missing';
+  if (!treatment.render) return 'draft';
+  if (treatment.render.documentHash !== treatment.documentHash) return 'needs-regeneration';
+  return treatment.status === 'approved' && treatment.approved?.documentHash === treatment.documentHash ? 'approved' : 'needs-review';
+}
+
+/** Statuses automatic drafting works on: it adds, renders or re-renders the watermark. */
+export const AUTO_STATUSES = Object.freeze(['missing', 'draft', 'needs-regeneration']);
+
+/**
+ * The photographs automatic drafting should process, with the watermark settings for each.
+ * A photograph that already has a watermark keeps its own (per-photo) settings, so a stale
+ * draft is re-rendered as it was; a missing one gets the policy, at the calmer corner when
+ * the placement check flags the policy's. Approved and awaiting-review photographs are left
+ * alone; nothing approved is replaced here.
+ * :param photos: portfolio overview entries ({ id, source, treatment: { watermarkStatus, watermark, hdr } })
+ * :param policy: the CMS watermark preference (settings)
+ * :param placements: { id: { flags, suggestion } } from placementReport, where known
+ * :param skip: ids not to touch now (open in the editor, failed in this session)
+ * :returns: { ids, settings: { id: settings } }
+ */
+export function autoDraftPlan(photos, policy, placements = {}, skip = new Set()) {
+  const ids = [];
+  const settings = {};
+  for (const photo of photos) {
+    if (ids.includes(photo.id) || skip.has(photo.id)) continue;
+    if (!AUTO_STATUSES.includes(photo.treatment.watermarkStatus)) continue;
+    if (!photo.source?.available || photo.source.limited || photo.treatment.hdr) continue;
+    const own = watermarkActive(photo.treatment.watermark) ? photo.treatment.watermark : null;
+    const placement = placements[photo.id];
+    const position = !own && placement?.flags?.length && placement.suggestion ? placement.suggestion : undefined;
+    const target = normalizeWatermark({ ...(own ?? policy), ...(position ? { position } : {}), enabled: true });
+    if (!target) continue;
+    ids.push(photo.id);
+    settings[photo.id] = target;
+  }
+  return { ids, settings };
+}

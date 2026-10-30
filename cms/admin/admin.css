@@ -354,3 +354,10 @@ body { background: var(--bg-primary); color: var(--text-primary); }
 .cms-watermark-stats div { padding: .6rem .75rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
 .cms-watermark-stats dt { font-size: var(--step--2); color: var(--text-tertiary); }
 .cms-watermark-stats dd { margin: 0; font-size: var(--step-1); font-weight: 600; }
+
+/* Automatic watermark drafts: status chip, background progress and the off-screen editor frame. */
+.cms-watermark-status { justify-self: start; padding: .1rem .5rem; border-radius: 999px; border: 1px solid currentColor; color: var(--text-secondary); font-size: var(--step--2); font-weight: 700; }
+.cms-watermark-status--approved, .cms-watermark-status--needs-review { color: var(--accent); }
+.cms-watermark-status--missing, .cms-watermark-status--needs-regeneration { color: var(--signal); }
+.cms-autopilot { position: fixed; z-index: 40; left: 1rem; bottom: 1rem; display: flex; gap: .75rem; align-items: center; max-width: calc(100vw - 2rem); padding: .5rem .85rem; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface-elevated); box-shadow: var(--shadow-lift); font-size: var(--step--1); }
+.cms-autopilot-frame { position: fixed; left: -20000px; top: 0; width: 1280px; height: 900px; border: 0; opacity: 0; pointer-events: none; }

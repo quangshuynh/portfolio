@@ -11,6 +11,7 @@ import StatsBar from './components/StatsBar.jsx';
 import Toolbar from './components/Toolbar.jsx';
 import UploadPanel from './components/UploadPanel.jsx';
 import WatermarkView from './components/WatermarkView.jsx';
+import WatermarkAutopilot from './components/WatermarkAutopilot.jsx';
 import { useWorkspace } from './useWorkspace.js';
 
 const THEME_KEY = 'portfolio-theme';
@@ -165,6 +166,7 @@ export default function App() {
         onSessionExpired={onSessionExpired}
         onUploaded={(data) => { ws.replace(data); if (!data.duplicate) setActiveId(data.id); }}
       />
+      <WatermarkAutopilot onChanged={() => ws.refresh().catch(() => {})} />
       {notice && <div className={`cms-toast cms-toast--${notice.tone}`} role={notice.tone === 'error' ? 'alert' : 'status'}>{notice.text}</div>}
     </div>
   );

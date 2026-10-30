@@ -30,6 +30,8 @@ const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Cross-Origin-Opener-Policy': 'same-origin',
 };
+// QuangEdit may be framed by the CMS itself (automatic watermark drafts), never by another origin.
+const EDITOR_HEADERS = { ...SECURITY_HEADERS, 'X-Frame-Options': 'SAMEORIGIN', 'Content-Security-Policy': "frame-ancestors 'self'" };
 
 const escapeHtml = (text) => String(text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -133,7 +135,7 @@ export async function startCmsServer({
       }
       if (url.pathname === EDITOR_PATH || url.pathname === '/admin/photography/editor') {
         const html = await readFile(path.join(repoDir, 'cms', 'admin', 'editor.html'), 'utf8');
-        response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
+        response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...EDITOR_HEADERS });
         return response.end(await viteServer.transformIndexHtml(EDITOR_PATH, html));
       }
       if (url.pathname === '/photography/' || url.pathname === '/photography') {

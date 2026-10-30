@@ -10,7 +10,7 @@ import {
 } from '../../src/editor/watermark/watermark.mjs';
 import { readGeneratedManifest } from '../../scripts/photography-catalog-files.mjs';
 import { editingSources, listTreatments, renderIsFresh } from './treatments.mjs';
-import { watermarkTreatmentState } from './watermark-rules.mjs';
+import { watermarkStatus, watermarkTreatmentState } from './watermark-rules.mjs';
 import { readJson, readWorkspace, writeAtomic } from './workspace.mjs';
 
 export class WatermarkError extends Error {
@@ -26,7 +26,8 @@ const preferenceFile = (dir) => path.join(dir, 'watermark.json');
 /** :returns: { settings, saved, updatedAt } (the approved defaults until one is saved) */
 export async function readWatermarkPreference(dir) {
   const stored = await readJson(preferenceFile(dir), null);
-  if (!stored) return { settings: { ...WATERMARK_DEFAULTS }, saved: false, updatedAt: null };
+  // Until the owner saves one: the approved defaults with automatic white or charcoal.
+  if (!stored) return { settings: { ...WATERMARK_DEFAULTS, color: 'auto' }, saved: false, updatedAt: null };
   try {
     const { settings } = parseWatermarkConfig(JSON.stringify(stored.config));
     return { settings, saved: true, updatedAt: typeof stored.updatedAt === 'string' ? stored.updatedAt : null };
@@ -54,8 +55,12 @@ export async function portfolioOverview({ workspaceDir, libraryDir, derivativesD
   const treatments = await listTreatments(workspaceDir);
   const generated = new Map([...(await readGeneratedManifest(manifestFile)), ...workspace.previewManifest].map((entry) => [entry.id, entry]));
   const published = workspace.catalog.photographs.filter(({ status }) => status === 'published');
+  // Drafts with an uploaded original are eligible as soon as they are imported (they get a
+  // watermark draft before they are published); drafts without one are not listed.
+  const uploaded = new Set(Object.values(workspace.originals).map(({ id }) => id));
+  const imported = workspace.catalog.photographs.filter(({ id, status }) => status !== 'published' && uploaded.has(id));
   const photographs = [];
-  for (const record of published) {
+  for (const record of [...published, ...imported]) {
     const treatment = treatments[record.id] ?? { attached: [], document: null, status: 'none', approved: null };
     const [source] = await editingSources({ workspaceDir, libraryDir, record, treatment, derivativesDir, hash: false });
     const meta = generated.get(record.id);
@@ -64,6 +69,7 @@ export async function portfolioOverview({ workspaceDir, libraryDir, derivativesD
       id: record.id,
       caption: record.caption,
       alt: record.alt,
+      published: record.status === 'published',
       featured: Boolean(record.featured),
       // Proportions only (the public viewer image); the original's size is not read.
       width: meta?.viewerWidth ?? null,
@@ -79,8 +85,9 @@ export async function portfolioOverview({ workspaceDir, libraryDir, derivativesD
         approvedWatermarked: watermarkActive(state.approvedWatermark),
         // Edits in the working treatment nobody approved: bulk staging leaves the photo alone.
         unapprovedEdits: state.unapprovedEdits,
+        watermarkStatus: watermarkStatus(treatment),
       },
     });
   }
-  return { count: photographs.length, photographs, preference: await readWatermarkPreference(workspaceDir) };
+  return { count: published.length, drafts: imported.length, photographs, preference: await readWatermarkPreference(workspaceDir) };
 }

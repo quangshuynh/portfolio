@@ -203,6 +203,22 @@ The **Watermark** view uses the editor's own renderer (no CMS renderer).
   changing the preference never changes saved, approved or published photos,
   and removing an approved treatment never touches the preference. A photo's
   differences from it are shown as its overrides.
+- **Automatic drafts** (on by default; toggle in the Watermark view, per browser):
+  while the CMS is open, every published photograph and every imported draft
+  with an original whose watermark is **Missing**, **Draft** (never rendered)
+  or **Needs regeneration** (the treatment changed: edits, crop, geometry or
+  watermark settings) gets a watermark draft from QuangEdit, one photograph at a
+  time in an off-screen frame (`WatermarkAutopilot.jsx`, the queue below in
+  `auto` mode); progress and **Stop** sit at the bottom left, and a reload or
+  restart resumes. Missing photographs get the preference (11%, 65%, bottom
+  right, outline, automatic white or charcoal; the calmer corner when the
+  placement check flags it); stale drafts keep their own settings. The mark joins
+  the photo's own edits, and approval reviews both. It never approves, never
+  replaces an approved version (that stays live until a newer draft is approved),
+  and skips photographs open in QuangEdit, HDR treatments and photographs with
+  only the public image. Statuses come from the treatment on disk
+  (`watermarkStatus`): Missing, Draft, Needs regeneration, **Needs review**,
+  **Approved**.
 - **Apply HUYNH Watermark to Portfolio**, three separate steps:
   1. **Stage:** lists every published photograph from the catalog with a
      preview over its gallery image, source, treatment, placement and colour;

@@ -9,6 +9,9 @@
 // saves the treatment and renders it from the original (a draft, never approved here), then opens
 // the next photo. Photos with unapproved edits, or already staged with the same settings, are
 // left as they are (cms/lib/watermark-rules.mjs). Nothing is published.
+// Automatic drafts (WatermarkAutopilot.jsx) run the same queue with `mode: 'auto'` in an
+// off-screen frame of the CMS: there the watermark joins the photo's own edits (review covers
+// both), and the frame tells the CMS when the run ends instead of navigating back to it.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeWatermark, watermarksEqual } from '../../src/editor/watermark/watermark.mjs';
 import { ApiError, treatments, watermark as watermarkApi } from './api.js';
@@ -27,6 +30,24 @@ export function readWatermarkQueue() {
 export const writeWatermarkQueue = (queue) => { try { localStorage.setItem(WATERMARK_QUEUE_KEY, JSON.stringify(queue)); } catch { /* the queue stops */ } };
 export const clearWatermarkQueue = () => { try { localStorage.removeItem(WATERMARK_QUEUE_KEY); } catch { /* nothing kept */ } };
 export const queueEditorHref = (id) => `/admin/photography/editor/?photo=${encodeURIComponent(id)}&queue=watermark`;
+/** Posted by an automatic run's frame to the CMS when the queue has ended. */
+export const QUEUE_DONE_MESSAGE = 'cms-watermark-queue-done';
+// Photographs open in QuangEdit (another tab): automatic drafts leave them alone.
+const OPEN_KEY = 'cms-editor-open';
+export function openInEditor(now = Date.now()) {
+  try {
+    const open = JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}');
+    return new Set(Object.entries(open).filter(([, at]) => now - at < 30_000).map(([id]) => id));
+  } catch {
+    return new Set();
+  }
+}
+function markOpen(photoId) {
+  try {
+    const open = JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}');
+    localStorage.setItem(OPEN_KEY, JSON.stringify({ ...Object.fromEntries(Object.entries(open).filter(([, at]) => Date.now() - at < 30_000)), [photoId]: Date.now() }));
+  } catch { /* best effort */ }
+}
 
 const SOURCE_KINDS = {
   attached: 'attached editing source',
@@ -175,7 +196,13 @@ function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, 
     setQueueStage('done');
     // The treatment is saved; leave without the unsaved-changes prompt.
     leaving.current = true;
-    window.location.assign(next.index < next.ids.length && !next.stopped ? queueEditorHref(next.ids[next.index]) : '/admin/photography/#watermark');
+    const nextHref = next.index < next.ids.length && !next.stopped ? queueEditorHref(next.ids[next.index]) : null;
+    if (latest.mode === 'auto' && window.parent !== window) {
+      if (nextHref) window.location.assign(nextHref);
+      else window.parent.postMessage({ type: QUEUE_DONE_MESSAGE }, window.location.origin);
+      return;
+    }
+    window.location.assign(nextHref ?? '/admin/photography/#watermark');
   }, [queue, photoId]);
   useEffect(() => {
     if (queueStage !== 'waiting') return;
@@ -185,7 +212,7 @@ function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, 
     if (info.sources?.[0]?.limited) { finishQueued('skipped', 'Only the 2200 px public image is available; attach the original first.'); return; }
     if (isHdrTreatment(info) && !photo.hdr) { finishQueued('skipped', 'HDR treatment: open it, Merge HDR, then add the watermark.'); return; }
     const state = watermarkTreatmentState(info.treatment, target);
-    if (state.unapprovedEdits) { finishQueued('skipped', 'Its treatment has edits that are not approved; approve or discard them first.'); return; }
+    if (state.unapprovedEdits && queue.mode !== 'auto') { finishQueued('skipped', 'Its treatment has edits that are not approved; approve or discard them first.'); return; }
     if (state.upToDate) { finishQueued('unchanged', 'Already staged with these watermark settings.'); return; }
     applySettings({ watermark: target });
     setQueueStage('applied');
@@ -200,6 +227,14 @@ function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, 
     const latest = readWatermarkQueue();
     if (latest) writeWatermarkQueue({ ...latest, stopped: true });
   }, []);
+
+  // Tell automatic drafts (in the CMS tab) that this photograph is being edited here.
+  useEffect(() => {
+    if (queue) return undefined;
+    markOpen(photoId);
+    const timer = setInterval(() => markOpen(photoId), 10_000);
+    return () => clearInterval(timer);
+  }, [queue, photoId]);
 
   useEffect(() => {
     const warn = (event) => { if ((dirty || busy) && !leaving.current) { event.preventDefault(); event.returnValue = ''; } };

@@ -7,8 +7,11 @@ import path from 'node:path';
 import { createEditDocument, parseEditDocument, serializeEditDocument } from '../src/editor/model/editDocument.mjs';
 import { neutralAdjustments } from '../src/editor/model/adjustments.mjs';
 import { WATERMARK_DEFAULTS } from '../src/editor/watermark/watermark.mjs';
-import { fixtureRepo } from './test-helpers.mjs';
-import { unwatermarkedPhotographs, watermarkTreatmentState } from './lib/watermark-rules.mjs';
+import { fixtureRepo, photograph } from './test-helpers.mjs';
+import { addDraft } from './lib/catalog-ops.mjs';
+import { ingestUpload } from './lib/uploads.mjs';
+import { readWorkspace, saveCatalog } from './lib/workspace.mjs';
+import { autoDraftPlan, unwatermarkedPhotographs, watermarkStatus, watermarkTreatmentState } from './lib/watermark-rules.mjs';
 import { createSessions } from './lib/session.mjs';
 import { startCmsServer } from './server.mjs';
 
@@ -69,7 +72,8 @@ test('the watermark routes need the session, the header and the same origin', as
 
 test('the global preference: approved defaults, validated, clamped, stored as a watermark file', async () => {
   let { json } = await call('GET', '/api/watermark');
-  expect(json).toEqual({ settings: { ...WATERMARK_DEFAULTS }, saved: false, updatedAt: null });
+  // Until one is saved: the approved defaults (11%, 65%, bottom right, outline) with automatic white or charcoal.
+  expect(json).toEqual({ settings: { ...WATERMARK_DEFAULTS, color: 'auto' }, saved: false, updatedAt: null });
   expect((await call('PUT', '/api/watermark', { body: { settings: { preset: 'someone-else' } } })).status).toBe(422);
   ({ json } = await call('PUT', '/api/watermark', { body: { settings: { position: 'top-left', size: 50, opacity: 0.4, text: 'NOT HUYNH' } } }));
   expect(json.saved).toBe(true);
@@ -105,6 +109,29 @@ test('the portfolio overview lists published photographs without paths, and a pr
   expect(parseEditDocument(JSON.stringify(saved)).photos[0].adjustments.watermark).toEqual(watermark);
 });
 
+test('an imported photograph is listed as missing a watermark; statuses come from disk and survive a restart', async () => {
+  const workspace = await readWorkspace(fixture.workspace);
+  const { record } = await ingestUpload(fixture.workspace, { filename: 'new-lake.jpg', bytes: await photograph({ color: { r: 20, g: 140, b: 90 } }) }, workspace.catalog);
+  await saveCatalog(fixture.workspace, addDraft(workspace.catalog, { ...record, caption: 'New lake', alt: 'A lake' }), workspace.revision);
+  const describe = await call('GET', '/api/editor/photos/alpha');
+  const [source] = describe.json.sources;
+  const text = serializeEditDocument(createEditDocument([{ name: source.name, size: source.size, lastModified: 0, sha256: source.sha256, format: 'jpeg', width: 2200, height: 1467, adjustments: { ...neutralAdjustments(), watermark: { ...WATERMARK_DEFAULTS } } }], {}));
+  await call('PUT', '/api/editor/photos/alpha/treatment', { body: { document: text, revision: describe.json.treatment.revision } });
+  const statuses = async () => {
+    const { json } = await call('GET', '/api/watermark/portfolio');
+    return { count: json.count, drafts: json.drafts, rows: json.photographs.map(({ id, published, source: from, treatment }) => [id, published, from?.kind, treatment.watermarkStatus]) };
+  };
+  const before = await statuses();
+  expect(before.count).toBe(3);
+  expect(before.drafts).toBe(1);
+  expect(before.rows).toContainEqual([record.id, false, 'original', 'missing']);
+  expect(before.rows).toContainEqual(['alpha', true, 'derivative', 'draft']);
+  await cms.close();
+  cms = await startCmsServer({ port: 0, repoDir: fixture.repo, workspace: fixture.workspace, offline: true, vite: false, sessions, log: () => {} });
+  port = new URL(cms.url).port;
+  expect(await statuses()).toEqual(before);
+});
+
 describe('bulk staging rules', () => {
   const source = { name: 'a.jpg', size: 3, lastModified: 0, sha256: 'a'.repeat(64), format: 'jpeg', width: 600, height: 400 };
   const doc = (adjustments, sha = source.sha256) => JSON.parse(serializeEditDocument(createEditDocument([{ ...source, sha256: sha, adjustments: { ...neutralAdjustments(), ...adjustments } }], {})));
@@ -127,6 +154,47 @@ describe('bulk staging rules', () => {
     expect(watermarkTreatmentState({ ...approved, document: doc({ exposure: 0.9, geometry: { angle: 2 } }), status: 'draft' }, mark).unapprovedEdits).toBe(true);
     expect(watermarkTreatmentState({ ...approved, document: doc({ exposure: 0.4, geometry: { angle: 2 } }, 'b'.repeat(64)), status: 'draft' }, mark).unapprovedEdits).toBe(true);
     expect(watermarkTreatmentState({ document: doc({ contrast: 10 }), approved: null, status: 'draft' }, mark).unapprovedEdits).toBe(true);
+  });
+
+  test('watermark status from the treatment: missing, draft, needs regeneration, needs review, approved', () => {
+    const marked = doc({ watermark: mark });
+    const edited = doc({ exposure: 0.5, watermark: mark });
+    expect(watermarkStatus(null)).toBe('missing');
+    expect(watermarkStatus({ document: doc({ exposure: 0.5 }), documentHash: 'e', render: null })).toBe('missing');
+    expect(watermarkStatus({ document: marked, documentHash: 'h', render: null, status: 'draft' })).toBe('draft');
+    // A treatment edit (exposure, crop, geometry, watermark settings) changes the document hash: the render is stale.
+    expect(watermarkStatus({ document: edited, documentHash: 'h2', render: { documentHash: 'h' }, status: 'draft' })).toBe('needs-regeneration');
+    expect(watermarkStatus({ document: marked, documentHash: 'h', render: { documentHash: 'h' }, status: 'draft', approved: null })).toBe('needs-review');
+    const approved = { document: marked, documentHash: 'h', render: { documentHash: 'h' }, status: 'approved', approved: { document: marked, documentHash: 'h' } };
+    expect(watermarkStatus(approved)).toBe('approved');
+    // A newer draft over an approved version needs review; the approved one stays what publication uses.
+    expect(watermarkStatus({ ...approved, document: edited, documentHash: 'h3', render: { documentHash: 'h3' }, status: 'draft' })).toBe('needs-review');
+  });
+
+  test('automatic drafts: missing photos get the policy (calmer corner when flagged), stale ones keep their own settings', () => {
+    const policy = { ...WATERMARK_DEFAULTS, color: 'auto' };
+    const own = { ...WATERMARK_DEFAULTS, position: 'top-left', color: 'dark', size: 0.09 };
+    const photo = (id, watermarkStatus, extra = {}) => ({ id, source: { available: true, limited: false }, treatment: { watermarkStatus, watermark: null, hdr: false, ...extra.treatment }, ...extra.photo });
+    const photos = [
+      photo('new', 'missing'),
+      photo('busy', 'missing'),
+      photo('stale', 'needs-regeneration', { treatment: { watermark: own } }),
+      photo('unrendered', 'draft', { treatment: { watermark: own } }),
+      photo('waiting', 'needs-review', { treatment: { watermark: own } }),
+      photo('done', 'approved', { treatment: { watermark: policy } }),
+      photo('hdr', 'missing', { treatment: { hdr: true } }),
+      photo('public-only', 'missing', { photo: { source: { available: true, limited: true } } }),
+      photo('no-source', 'missing', { photo: { source: null } }),
+      photo('editing', 'missing'),
+      photo('new', 'missing'),
+    ];
+    const plan = autoDraftPlan(photos, policy, { busy: { flags: ['busy'], suggestion: 'bottom-left' }, new: { flags: [] } }, new Set(['editing']));
+    expect(plan.ids).toEqual(['new', 'busy', 'stale', 'unrendered']);
+    expect(plan.settings.new).toMatchObject({ position: 'bottom-right', color: 'auto', size: 0.11, opacity: 0.65, outline: true, enabled: true });
+    expect(plan.settings.busy.position).toBe('bottom-left');
+    expect(plan.settings.stale).toMatchObject({ position: 'top-left', color: 'dark', size: 0.09 });
+    // Running it again over the result changes nothing: drafts awaiting review and approved photos are left alone.
+    expect(autoDraftPlan(photos.map((entry) => ({ ...entry, treatment: { ...entry.treatment, watermarkStatus: plan.ids.includes(entry.id) ? 'needs-review' : entry.treatment.watermarkStatus } })), policy).ids).toEqual(['editing']);
   });
 
   test('publication coverage: only an approved, enabled watermark counts; drafts and unpublished photos do not', () => {
