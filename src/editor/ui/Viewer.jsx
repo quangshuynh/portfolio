@@ -178,7 +178,7 @@ export default function Viewer({ photo, adjustments, lut = null, previewing = nu
   const localPreviewRef = useRef(null);
   localPreviewRef.current ??= createLocalPreview({
     renderDetail: (image, pass) => (renderLocalRef.current ? renderLocalRef.current(image, pass) : Promise.resolve().then(() => renderDetailFrame(image, pass))),
-    onReady: (error) => { if (error) setStatus({ state: 'error', message: error.message }); else setLocalVersion((value) => value + 1); },
+    onReady: (error) => { if (error) setStatus({ state: 'error', message: error.message }); else { performance.mark?.('pe-local-ready'); setLocalVersion((value) => value + 1); } },
   });
   // The Detail frame at the canvas's size, made once per frame; the GPU frame read back for
   // local Detail over GPU settings.

@@ -49,7 +49,7 @@ const INIT = {
 // Records when the preview draws, so a move's latency is "input → next draw call".
 const DRAW_PROBE = () => {
   window.__brushDraws = [];
-  const mark = () => window.__brushDraws.push(performance.now());
+  const mark = () => { window.__brushDraws.push(performance.now()); if (window.__drawStacks) window.__drawStacks.push(new Error().stack.split('\n').slice(2, 14).join(' | ')); };
   const wrap = (proto, name) => {
     const original = proto?.[name];
     if (!original) return;
@@ -121,6 +121,56 @@ function topFunctions(profile, count = 15) {
   return [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, count).map(([name, ms]) => `${ms.toFixed(0).padStart(6)} ms  ${name}`);
 }
 
+// Hovering with the brush (no button): real pointer input (CDP), one move per ~frame, across the
+// photo. Per move: the event's timestamp → the brush outline's DOM update → the next frame after
+// it, and every preview draw call in the window (must be none: hovering renders nothing).
+async function hover(page, moves = 90, offset = 0) {
+  const host = await page.evaluate((stacks) => {
+    window.__hover = { events: [], updates: [], frames: [] };
+    const tool = document.querySelector('.pe-masktool');
+    window.__hoverListener ??= (event) => { if (!event.buttons) window.__hover.events.push(event.timeStamp); };
+    tool.addEventListener('pointermove', window.__hoverListener, { capture: true });
+    window.__hoverObserver?.disconnect();
+    window.__hoverObserver = new MutationObserver(() => {
+      const now = performance.now();
+      window.__hover.updates.push(now);
+      requestAnimationFrame((t) => window.__hover.frames.push({ update: now, frame: t }));
+    });
+    window.__hoverObserver.observe(tool, { attributes: true, subtree: true, childList: true, attributeFilter: ['cx', 'cy', 'style', 'hidden'] });
+    window.__hoverDraws = window.__brushDraws.length;
+    window.__drawStacks = stacks ? [] : null;
+    window.__hoverLong = window.__brushFrames.length;
+    window.__hoverReady = performance.getEntriesByName('pe-local-ready').length;
+    const r = document.querySelector('.pe-canvas-host').getBoundingClientRect();
+    return { left: r.left, top: r.top, width: r.width, height: r.height };
+  }, Boolean(process.env.BRUSH_STACKS));
+  for (let k = 0; k <= moves; k += 1) {
+    await page.mouse.move(host.left + host.width * (0.1 + (0.8 * k) / moves), host.top + host.height * (0.5 + offset + 0.3 * Math.sin((k / moves) * Math.PI * 3))); // eslint-disable-line no-await-in-loop
+    await page.waitForTimeout(16); // eslint-disable-line no-await-in-loop
+  }
+  await page.waitForTimeout(100);
+  const measured = await page.evaluate(() => {
+    window.__hoverObserver.disconnect();
+    const { events, updates, frames } = window.__hover;
+    const toUpdate = [];
+    const toFrame = [];
+    events.forEach((t, i) => {
+      const next = events[i + 1] ?? Infinity;
+      const update = updates.find((u) => u >= t);
+      if (update === undefined || update > next + 200) return;
+      toUpdate.push(update - t);
+      const frame = frames.find((f) => f.update === update);
+      if (frame) toFrame.push(frame.frame - t);
+    });
+    const long = window.__brushFrames.slice(window.__hoverLong);
+    const drawStacks = window.__drawStacks;
+    window.__drawStacks = null;
+    return { events: events.length, updates: updates.length, toUpdate, toFrame, draws: window.__brushDraws.length - window.__hoverDraws, ready: performance.getEntriesByName('pe-local-ready').length - window.__hoverReady, longFrames: long.length, longMs: long.reduce((s, f) => s + f.duration, 0), drawStacks };
+  });
+  if (measured.drawStacks?.length) console.log(measured.drawStacks.join('\n'));
+  return { moves: measured.events, outlineUpdates: measured.updates, inputToOutlineMs: stats(measured.toUpdate), inputToFrameMs: stats(measured.toFrame), previewDraws: measured.draws, filteredFramesArrived: measured.ready, longFrames: measured.longFrames, longFramesMs: Math.round(measured.longMs) };
+}
+
 async function runOne(run, file) {
   const browser = await run.type.launch({ args: run.args ?? [] });
   const context = await browser.newContext(run.device ? devices[run.device] : { viewport: { width: 1440, height: 900 } });
@@ -159,6 +209,15 @@ async function runOne(run, file) {
     // Local Detail: the stroke starts once the frame with the setting is final.
     if (LOCAL.section) await poll(() => page.evaluate(() => document.querySelector('[data-detail-preview]')?.dataset.detailPreview ?? null), (q) => q === null || q === 'final', 'Detail preview', 120_000);
     result.engine = await page.evaluate(() => (document.querySelector('.pe-canvas-host canvas')?.getContext ? document.querySelector('.pe-engine')?.textContent ?? null : null));
+    if (!run.device) {
+      step('hover');
+      // A local Detail's warm pass may still finish (and draw) after the preview reads "final".
+      await poll(async () => { const n = await page.evaluate(() => window.__brushDraws.length); await page.waitForTimeout(1000); return n === await page.evaluate(() => window.__brushDraws.length); }, Boolean, 'an idle preview', 60_000);
+      result.hover = await hover(page);
+      // Only a local Detail frame arriving from its worker meanwhile may draw (one draw each).
+      assert.ok(result.hover.previewDraws <= result.hover.filteredFramesArrived, `hovering drew the preview: ${JSON.stringify(result.hover)}`);
+      assert.ok(result.hover.outlineUpdates > 0, 'the brush outline follows the pointer');
+    }
     const cdp = run.profile && process.env.BRUSH_PROFILE ? await context.newCDPSession(page) : null;
     const startProfile = async () => { if (cdp) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); } };
     // With BRUSH_LOCAL the profile covers the second stroke only.
@@ -310,6 +369,13 @@ async function runOne(run, file) {
     await poll(strokes, (n) => n === painted - 1, 'undo removes the whole stroke', 15_000);
     await page.keyboard.press('Control+y');
     await poll(strokes, (n) => n === painted, 'redo restores it', 15_000);
+    if (LOCAL.section && !run.device) {
+      // Hovering while a local Detail preview renders (a new value starts it); its own draws are expected.
+      step('hover while rendering');
+      await field.fill('30');
+      await field.press('Enter');
+      result.hoverWhileRendering = await hover(page, 60, 0.1);
+    }
     assert.deepEqual(problems, []);
     const median = result.handlerMs.p50 + (result.inputToDrawMs.p50 ?? 0);
     result.ok = !(process.env.BRUSH_STRICT && run.gate) || median <= MAX_MAIN_MS;
