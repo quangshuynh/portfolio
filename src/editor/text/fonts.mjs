@@ -1,14 +1,22 @@
 // Fonts for text overlays: the two OFL-1.1 families the site already ships (Schibsted
-// Grotesk, variable 400–900 with italic; Martian Mono 400 and 700), loaded from this site's
+// Grotesk and Martian Mono, static 400 and 700; Schibsted also italic), loaded from this site's
 // own hashed assets with the FontFace API under editor-only family names. No font service,
 // no network request beyond these same-origin files (CSP font-src 'self'). Characters outside
 // their subsets (Latin, Latin Extended; Cyrillic for Martian Mono) fall back to a system font;
 // the Text panel says which.
+// Static instances, not the variable font: WebKit draws a variable face on a canvas at its
+// default weight whatever weight is asked for (bold text came out regular, at bold spacing).
+// The static 400 and 700 advances equal the variable font's within 0.07 px at 64 px, so saved
+// documents keep their layout. `TEXT_FACES` is exported for tests.
 
-import sansLatin from '@fontsource-variable/schibsted-grotesk/files/schibsted-grotesk-latin-wght-normal.woff2?url';
-import sansLatinExt from '@fontsource-variable/schibsted-grotesk/files/schibsted-grotesk-latin-ext-wght-normal.woff2?url';
-import sansItalicLatin from '@fontsource-variable/schibsted-grotesk/files/schibsted-grotesk-latin-wght-italic.woff2?url';
-import sansItalicLatinExt from '@fontsource-variable/schibsted-grotesk/files/schibsted-grotesk-latin-ext-wght-italic.woff2?url';
+import sans400Latin from '@fontsource/schibsted-grotesk/files/schibsted-grotesk-latin-400-normal.woff2?url';
+import sans400LatinExt from '@fontsource/schibsted-grotesk/files/schibsted-grotesk-latin-ext-400-normal.woff2?url';
+import sans700Latin from '@fontsource/schibsted-grotesk/files/schibsted-grotesk-latin-700-normal.woff2?url';
+import sans700LatinExt from '@fontsource/schibsted-grotesk/files/schibsted-grotesk-latin-ext-700-normal.woff2?url';
+import sans400ItalicLatin from '@fontsource/schibsted-grotesk/files/schibsted-grotesk-latin-400-italic.woff2?url';
+import sans400ItalicLatinExt from '@fontsource/schibsted-grotesk/files/schibsted-grotesk-latin-ext-400-italic.woff2?url';
+import sans700ItalicLatin from '@fontsource/schibsted-grotesk/files/schibsted-grotesk-latin-700-italic.woff2?url';
+import sans700ItalicLatinExt from '@fontsource/schibsted-grotesk/files/schibsted-grotesk-latin-ext-700-italic.woff2?url';
 import mono400Latin from '@fontsource/martian-mono/files/martian-mono-latin-400-normal.woff2?url';
 import mono400LatinExt from '@fontsource/martian-mono/files/martian-mono-latin-ext-400-normal.woff2?url';
 import mono400Cyrillic from '@fontsource/martian-mono/files/martian-mono-cyrillic-400-normal.woff2?url';
@@ -27,9 +35,10 @@ const CYRILLIC_EXT = 'U+0460-052F,U+1C80-1C8A,U+20B4,U+2DE0-2DFF,U+A640-A69F,U+F
 
 const FAMILIES = { sans: 'PE Schibsted Grotesk', mono: 'PE Martian Mono' };
 
-const FACES = [
-  ...[[sansLatin, LATIN], [sansLatinExt, LATIN_EXT]].map(([url, range]) => ({ font: 'sans', url, range, weight: '400 900', style: 'normal' })),
-  ...[[sansItalicLatin, LATIN], [sansItalicLatinExt, LATIN_EXT]].map(([url, range]) => ({ font: 'sans', url, range, weight: '400 900', style: 'italic' })),
+export const TEXT_FACES = [
+  ...[[sans400Latin, LATIN, '400', 'normal'], [sans400LatinExt, LATIN_EXT, '400', 'normal'], [sans700Latin, LATIN, '700', 'normal'], [sans700LatinExt, LATIN_EXT, '700', 'normal'],
+    [sans400ItalicLatin, LATIN, '400', 'italic'], [sans400ItalicLatinExt, LATIN_EXT, '400', 'italic'], [sans700ItalicLatin, LATIN, '700', 'italic'], [sans700ItalicLatinExt, LATIN_EXT, '700', 'italic'],
+  ].map(([url, range, weight, style]) => ({ font: 'sans', url, range, weight, style })),
   ...[[mono400Latin, LATIN], [mono400LatinExt, LATIN_EXT], [mono400Cyrillic, CYRILLIC], [mono400CyrillicExt, CYRILLIC_EXT]].map(([url, range]) => ({ font: 'mono', url, range, weight: '400', style: 'normal' })),
   ...[[mono700Latin, LATIN], [mono700LatinExt, LATIN_EXT], [mono700Cyrillic, CYRILLIC], [mono700CyrillicExt, CYRILLIC_EXT]].map(([url, range]) => ({ font: 'mono', url, range, weight: '700', style: 'normal' })),
 ];
@@ -69,7 +78,7 @@ let loading = null;
  */
 export function loadTextFonts(fontSet = globalThis.document?.fonts) {
   if (!fontSet || typeof FontFace !== 'function') return Promise.resolve(false);
-  loading ??= Promise.all(FACES.map(async (face) => {
+  loading ??= Promise.all(TEXT_FACES.map(async (face) => {
     const fontFace = new FontFace(FAMILIES[face.font], `url(${face.url}) format('woff2')`, { weight: face.weight, style: face.style, unicodeRange: face.range });
     fontSet.add(fontFace);
     await fontFace.load();
