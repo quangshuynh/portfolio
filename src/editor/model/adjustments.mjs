@@ -22,6 +22,7 @@ import { DAYLIGHT_KELVIN, RAW_KELVIN, RAW_TINT, WHITE_BALANCE_MODES } from '../r
 import { compactLayers, layersEqual, normalizeLayers, textLayers } from './layers.mjs';
 import { MASK_LIMITS, compactLocals, localsEqual, normalizeLocalAdjustments } from './masks.mjs';
 import { normalizeWatermark, watermarksEqual } from '../watermark/watermark.mjs';
+import { normalizeRetouch, retouchEqual } from './retouch.mjs';
 
 /** Colour ranges for HSL, with their hue centres in degrees (HSV hue of sRGB values). */
 export const HSL_RANGES = Object.freeze([
@@ -140,6 +141,7 @@ export const ADJUSTMENTS = Object.freeze([
 
 /** Panel groups in display order. `curves` and `lut` also own the structured values. */
 export const ADJUSTMENT_GROUPS = Object.freeze([
+  { id: 'retouch', label: 'Retouch' },
   { id: 'geometry', label: 'Crop & Transform' },
   { id: 'light', label: 'Light' },
   { id: 'color', label: 'Color' },
@@ -228,6 +230,7 @@ export function neutralAdjustments() {
     local: [],
     filter: null,
     watermark: null,
+    retouch: [],
   };
 }
 
@@ -251,6 +254,8 @@ export function normalizeAdjustments(input = {}) {
     local,
     filter: normalizeFilterRef(source.filter),
     watermark: normalizeWatermark(source.watermark),
+    // Clone and heal operations on the source (documents before version 12 have none).
+    retouch: normalizeRetouch(source.retouch),
   };
 }
 
@@ -260,7 +265,7 @@ const lutRefsEqual = (a, b) => (a === null || b === null ? a === b : a.sha256 ==
 export const adjustmentsEqual = (a, b) => ADJUSTMENT_KEYS.every((key) => a[key] === b[key])
   && curvesEqual(a.curves, b.curves) && lutRefsEqual(a.lut, b.lut) && rawEqual(a.raw ?? RAW_DEFAULTS, b.raw ?? RAW_DEFAULTS)
   && geometryEqual(a.geometry ?? NEUTRAL_GEOMETRY, b.geometry ?? NEUTRAL_GEOMETRY) && layersEqual(a.layers ?? [], b.layers ?? []) && localsEqual(a.local ?? [], b.local ?? []) && filterRefsEqual(a.filter ?? null, b.filter ?? null)
-  && watermarksEqual(a.watermark ?? null, b.watermark ?? null);
+  && watermarksEqual(a.watermark ?? null, b.watermark ?? null) && retouchEqual(a.retouch ?? [], b.retouch ?? []);
 
 const numericNeutral = (adjustments, keys) => keys.every((key) => (adjustments[key] ?? byKey.get(key).default) === byKey.get(key).default);
 
@@ -277,6 +282,7 @@ export function groupIsNeutral(adjustments, group) {
   if (group === 'layers') return !adjustments.layers?.length;
   if (group === 'masks') return !adjustments.local?.length;
   if (group === 'watermark') return !adjustments.watermark;
+  if (group === 'retouch') return !adjustments.retouch?.length;
   return numericNeutral(adjustments, groupKeys(group));
 }
 
@@ -296,6 +302,7 @@ export function neutralGroup(group, current = null) {
   if (group === 'text') patch.layers = (current?.layers ?? []).filter((layer) => layer.type !== 'text' || layer.locked);
   if (group === 'creative') patch.filter = null;
   if (group === 'watermark') patch.watermark = null;
+  if (group === 'retouch') patch.retouch = [];
   return patch;
 }
 
@@ -327,5 +334,6 @@ export function compactAdjustments(adjustments) {
   if (a.local.length) out.local = compactLocals(a.local);
   if (a.filter) out.filter = a.filter;
   if (a.watermark) out.watermark = a.watermark;
+  if (a.retouch.length) out.retouch = a.retouch;
   return out;
 }
