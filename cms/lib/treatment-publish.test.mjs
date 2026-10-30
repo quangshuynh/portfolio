@@ -59,7 +59,7 @@ test('the canonical document is stable and drops what the editor would drop', ()
 
 test('an approved render replaces a published photograph\'s images under the same names', async () => {
   const treatment = await treat('alpha', { source: { name: 'DSC09640.ARW', bytes: Buffer.concat([Buffer.from([0x49, 0x49, 0x2a, 0]), Buffer.alloc(2048, 3)]) } });
-  const state = await preparePublication({ git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });
+  const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });
   expect(state.summary.images).toEqual(['alpha']);
   expect(state.title).toMatch(/new images for 1/);
   expect(state.body).toContain('New images from QuangEdit (1)');
@@ -86,7 +86,7 @@ test('draft treatments, rejected proposals and draft photographs are not publish
   await saveCatalog(fixture.workspace, addDraft(workspace.catalog, { ...record, caption: 'Secret', alt: 'Secret' }), workspace.revision);
   await treat(record.id);
 
-  const state = await preparePublication({ git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });
+  const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });
   expect(state.summary.images).toEqual(['gamma']);
   expect(sha256(show(state.branch, 'src/assets/photography/generated/gamma-viewer.jpg'))).toBe(before.approved.render.viewer.sha256);
   expect(changed(state.branch).some((file) => file.includes('beta') || file.includes(record.id))).toBe(false);
@@ -99,7 +99,7 @@ test('a newly published upload uses its approved render and keeps the original\'
   const treatment = await treat(record.id);
   const fresh = await readWorkspace(fixture.workspace);
   await saveCatalog(fixture.workspace, setStatus(fresh.catalog, [record.id], 'published'), fresh.revision);
-  const state = await preparePublication({ git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });
+  const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });
   expect(state.summary.added).toEqual([record.id]);
   expect(state.summary.images).toEqual([record.id]);
   expect(sha256(show(state.branch, `src/assets/photography/generated/${record.id}-gallery.jpg`))).toBe(treatment.approved.render.gallery.sha256);
@@ -111,7 +111,7 @@ test('a render changed on disk after approval stops publication', async () => {
   const treatment = await treat('alpha');
   const { writeFileSync } = await import('node:fs');
   writeFileSync(`${fixture.workspace}/renders/alpha/${treatment.approved.render.folder}/alpha-viewer.jpg`, await photograph({ width: 10, height: 10 }));
-  await expect(preparePublication({ git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true })).rejects.toMatchObject({ code: 'render-missing' });
+  await expect(preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true })).rejects.toMatchObject({ code: 'render-missing' });
 });
 
 test('removing an approved treatment stages the original images for the next publication', async () => {
@@ -130,7 +130,7 @@ test('removing an approved treatment stages the original images for the next pub
   expect(removed.history).toEqual([expect.objectContaining({ action: 'remove-approved', documentHash: approved.documentHash, approvedAt: approved.approved.approvedAt })]);
   await expect(removeApprovedTreatment(fixture.workspace, record.id, removed.revision, sources)).rejects.toMatchObject({ code: 'no-approved' });
 
-  const state = await preparePublication({ git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });
+  const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });
   const viewer = sha256(show(state.branch, `src/assets/photography/generated/${record.id}-viewer.jpg`));
   expect(viewer).toBe(removed.restore.viewer.sha256);
   expect(viewer).not.toBe(approved.approved.render.viewer.sha256);

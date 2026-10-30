@@ -54,7 +54,7 @@ describe('preparing a publication', () => {
     await edit((catalog) => updatePhotograph(catalog, 'gamma', { caption: 'Renamed' }));
     const github = fakeGitHub();
 
-    const state = await preparePublication({ git, workspaceDir: fixture.workspace, github });
+    const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github });
     expect(state).toMatchObject({ status: 'pr-open', number: 101 });
     const [, request] = github.calls.find(([name]) => name === 'createPullRequest');
     expect(request).toMatchObject({ head: state.branch, base: 'main' });
@@ -91,10 +91,22 @@ describe('preparing a publication', () => {
     expect(execFileSync('git', ['rev-parse', 'main'], { cwd: fixture.origin, encoding: 'utf8' }).trim()).toBe((await readWorkspace(fixture.workspace)).meta.baseCommit);
   }, 120_000);
 
+  test('photographs without an approved watermark block publication unless the owner overrides', async () => {
+    await edit((catalog) => movePhotograph(catalog, 'gamma', 0));
+    const github = fakeGitHub();
+    const refused = preparePublication({ git, workspaceDir: fixture.workspace, github, dryRun: true });
+    await expect(refused).rejects.toMatchObject({ code: 'unwatermarked', details: { ids: expect.arrayContaining(['alpha', 'gamma']) } });
+    expect(fixture.git('branch', '--list', 'cms/*')).toBe('');
+    const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github, dryRun: true });
+    expect(state.summary.unwatermarked).toEqual(expect.arrayContaining(['alpha', 'gamma']));
+    expect(state.body).toContain('Published without the watermark');
+    expect(state.body).toContain('The owner chose to publish these without the HUYNH Photography watermark.');
+  }, 120_000);
+
   test('a dry run commits a local branch but pushes nothing and calls no GitHub API', async () => {
     await edit((catalog) => movePhotograph(catalog, 'gamma', 0));
     const github = fakeGitHub();
-    const state = await preparePublication({ git, workspaceDir: fixture.workspace, github, dryRun: true });
+    const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github, dryRun: true });
     expect(state.status).toBe('dry-run');
     expect(github.calls).toEqual([]);
     expect(fixture.git('branch', '--list', state.branch)).toContain(state.branch);
@@ -103,23 +115,23 @@ describe('preparing a publication', () => {
 
   test('refuses invalid catalogs, empty publications and duplicate attempts', async () => {
     const github = fakeGitHub();
-    await expect(preparePublication({ git, workspaceDir: fixture.workspace, github })).rejects.toMatchObject({ code: 'nothing' });
+    await expect(preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github })).rejects.toMatchObject({ code: 'nothing' });
     await edit((catalog) => updatePhotograph(catalog, 'alpha', { alt: '' }));
-    await expect(preparePublication({ git, workspaceDir: fixture.workspace, github })).rejects.toMatchObject({ code: 'invalid' });
+    await expect(preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github })).rejects.toMatchObject({ code: 'invalid' });
     await edit((catalog) => updatePhotograph(catalog, 'alpha', { alt: 'Fixed' }));
-    const first = await preparePublication({ git, workspaceDir: fixture.workspace, github });
+    const first = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github });
     await edit((catalog) => updatePhotograph(catalog, 'beta', { caption: 'Another' }));
-    await expect(preparePublication({ git, workspaceDir: fixture.workspace, github })).rejects.toMatchObject({ code: 'already-open', details: { url: first.url } });
+    await expect(preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github })).rejects.toMatchObject({ code: 'already-open', details: { url: first.url } });
     // Once that pull request is closed, a new publication may start.
     github.pulls.get(first.number).state = 'closed';
-    await expect(preparePublication({ git, workspaceDir: fixture.workspace, github })).resolves.toMatchObject({ status: 'pr-open', number: 102 });
+    await expect(preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github })).resolves.toMatchObject({ status: 'pr-open', number: 102 });
   }, 120_000);
 
   test('a publication whose original is missing fails without leaving branches behind', async () => {
     await edit((catalog) => setStatus(addDraft(catalog, {
       id: 'ghost', slug: 'ghost', status: 'draft', sourceFilename: 'ghost.jpg', caption: 'Ghost', alt: 'Ghost', shape: 'landscape', category: 'Places',
     }), ['ghost'], 'published'));
-    await expect(preparePublication({ git, workspaceDir: fixture.workspace, github: fakeGitHub() })).rejects.toMatchObject({ code: 'missing-original' });
+    await expect(preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub() })).rejects.toMatchObject({ code: 'missing-original' });
     expect(fixture.git('branch', '--list', 'cms/*')).toBe('');
     expect(fixture.git('worktree', 'list').split('\n')).toHaveLength(1);
   }, 120_000);
@@ -134,7 +146,7 @@ describe('stale bases and conflicts', () => {
       catalog.photographs[1].alt = 'Changed upstream';
       writeFileSync(file, serializeCatalog(catalog));
     });
-    const state = await preparePublication({ git, workspaceDir: fixture.workspace, github: fakeGitHub() });
+    const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub() });
     const catalog = JSON.parse(show(state.branch, 'src/data/photography.catalog.json'));
     expect(catalog.photographs[0].caption).toBe('Ours');
     expect(catalog.photographs[1].alt).toBe('Changed upstream');
@@ -150,7 +162,7 @@ describe('stale bases and conflicts', () => {
       catalog.photographs[0].caption = 'Theirs';
       writeFileSync(file, serializeCatalog(catalog));
     });
-    await expect(preparePublication({ git, workspaceDir: fixture.workspace, github: fakeGitHub() }))
+    await expect(preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub() }))
       .rejects.toMatchObject({ code: 'conflict', details: { conflicts: ['"alpha": caption changed on both sides'] } });
     expect(fixture.git('branch', '--list', 'cms/*')).toBe('');
   }, 120_000);
@@ -160,18 +172,18 @@ describe('recovery and status', () => {
   test('a failed push or pull request is resumed without redoing the commit', async () => {
     await edit((catalog) => updatePhotograph(catalog, 'beta', { caption: 'Resumed' }));
     fixture.git('remote', 'set-url', '--push', 'origin', path.join(fixture.root, 'missing.git'));
-    await expect(preparePublication({ git, workspaceDir: fixture.workspace, github: fakeGitHub() })).rejects.toMatchObject({ name: 'GitError' });
+    await expect(preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub() })).rejects.toMatchObject({ name: 'GitError' });
     const committed = (await readWorkspace(fixture.workspace)).publication;
     expect(committed.status).toBe('committed');
 
     fixture.git('remote', 'set-url', '--push', 'origin', fixture.origin);
     const failing = fakeGitHub({ createPullRequest: async () => { throw new GitHubError('auth', 'GitHub rejected the token (401).', 401); } });
-    await expect(preparePublication({ git, workspaceDir: fixture.workspace, github: failing })).rejects.toMatchObject({ code: 'auth' });
+    await expect(preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: failing })).rejects.toMatchObject({ code: 'auth' });
     const pushed = (await readWorkspace(fixture.workspace)).publication;
     expect(pushed).toMatchObject({ status: 'pushed', commit: committed.commit, branch: committed.branch });
 
     const github = fakeGitHub();
-    const done = await preparePublication({ git, workspaceDir: fixture.workspace, github });
+    const done = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github });
     expect(done).toMatchObject({ status: 'pr-open', branch: committed.branch, commit: committed.commit });
     expect(github.calls.map(([name]) => name)).toEqual(['findOpenPullRequest', 'createPullRequest']);
   }, 120_000);
@@ -179,7 +191,7 @@ describe('recovery and status', () => {
   test('status distinguishes an open pull request, a merge and a finished deployment', async () => {
     await edit((catalog) => updatePhotograph(catalog, 'beta', { caption: 'Merged' }));
     const github = fakeGitHub();
-    const state = await preparePublication({ git, workspaceDir: fixture.workspace, github });
+    const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github });
     expect((await publicationStatus({ github, workspaceDir: fixture.workspace })).status).toBe('pr-open');
     Object.assign(github.pulls.get(state.number), { state: 'merged', mergeCommit: 'f'.repeat(40) });
     const merged = await publicationStatus({ github, workspaceDir: fixture.workspace });

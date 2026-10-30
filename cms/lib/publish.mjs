@@ -23,6 +23,8 @@ import { pullRequestBody, summarizeChanges } from './changes.mjs';
 import { prepareDerivatives } from './derivatives.mjs';
 import { mergeCatalogs } from './merge.mjs';
 import { approvedImageChanges } from './treatment-publish.mjs';
+import { listTreatments } from './treatments.mjs';
+import { unwatermarkedPhotographs } from './watermark-rules.mjs';
 import { paths, readWorkspace, saveCatalog, setBase, withPublishLock, writePublication } from './workspace.mjs';
 
 export const CATALOG_PATH = 'src/data/photography.catalog.json';
@@ -151,9 +153,11 @@ async function checkDiff(git, worktree, { workspace, publication }) {
  * :param options.workspaceDir: CMS workspace
  * :param options.github: client from github.mjs, or null with dryRun
  * :param options.dryRun: build and commit the branch locally, but do not push or open a PR
+ * :param options.allowUnwatermarked: publish even though some published photographs have no
+ *   approved watermarked treatment (the owner's explicit override; recorded in the PR body)
  */
 export async function preparePublication({
-  git, workspaceDir, github, remote = 'origin', baseBranch = 'main', offline = false, dryRun = false, now = new Date(),
+  git, workspaceDir, github, remote = 'origin', baseBranch = 'main', offline = false, dryRun = false, allowUnwatermarked = false, now = new Date(),
 }) {
   return withPublishLock(workspaceDir, async () => {
     const workspace = await readWorkspace(workspaceDir);
@@ -179,6 +183,12 @@ export async function preparePublication({
     summary.count += images.length;
     if (!summary.count) throw new PublishError('nothing', `Nothing to publish: the public gallery on ${tip.ref} already matches the workspace.`);
     if (catalogErrors(publication).length) throw new PublishError('invalid', 'The merged catalog is invalid.', { errors: catalogErrors(publication) });
+    // Every published photograph carries the HUYNH watermark unless the owner says otherwise.
+    const unwatermarked = unwatermarkedPhotographs(publication, await listTreatments(workspaceDir));
+    if (unwatermarked.length && !allowUnwatermarked) {
+      throw new PublishError('unwatermarked', `${unwatermarked.length} published photograph${unwatermarked.length === 1 ? ' has' : 's have'} no approved watermark. Stage and approve the watermark in the Watermark view, or publish without it explicitly.`, { ids: unwatermarked });
+    }
+    summary.unwatermarked = unwatermarked;
 
     // Timestamp plus a random suffix, so two publications in the same second never collide.
     const branch = `cms/photography-${timestamp(now)}-${randomBytes(3).toString('hex')}`;

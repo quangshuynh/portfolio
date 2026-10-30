@@ -8,7 +8,7 @@ import { createEditDocument, parseEditDocument, serializeEditDocument } from '..
 import { neutralAdjustments } from '../src/editor/model/adjustments.mjs';
 import { WATERMARK_DEFAULTS } from '../src/editor/watermark/watermark.mjs';
 import { fixtureRepo } from './test-helpers.mjs';
-import { watermarkTreatmentState } from './lib/watermark-rules.mjs';
+import { unwatermarkedPhotographs, watermarkTreatmentState } from './lib/watermark-rules.mjs';
 import { createSessions } from './lib/session.mjs';
 import { startCmsServer } from './server.mjs';
 
@@ -127,5 +127,18 @@ describe('bulk staging rules', () => {
     expect(watermarkTreatmentState({ ...approved, document: doc({ exposure: 0.9, geometry: { angle: 2 } }), status: 'draft' }, mark).unapprovedEdits).toBe(true);
     expect(watermarkTreatmentState({ ...approved, document: doc({ exposure: 0.4, geometry: { angle: 2 } }, 'b'.repeat(64)), status: 'draft' }, mark).unapprovedEdits).toBe(true);
     expect(watermarkTreatmentState({ document: doc({ contrast: 10 }), approved: null, status: 'draft' }, mark).unapprovedEdits).toBe(true);
+  });
+
+  test('publication coverage: only an approved, enabled watermark counts; drafts and unpublished photos do not', () => {
+    const catalog = { photographs: ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, status: id === 'e' ? 'draft' : 'published' })) };
+    const marked = doc({ watermark: mark });
+    const treatments = {
+      a: { document: marked, approved: { document: marked }, status: 'approved' },
+      b: { document: marked, approved: null, status: 'draft' },
+      c: { document: marked, approved: { document: doc({ watermark: { ...mark, enabled: false } }) }, status: 'draft' },
+      e: { document: marked, approved: null, status: 'draft' },
+    };
+    expect(unwatermarkedPhotographs(catalog, treatments)).toEqual(['b', 'c', 'd']);
+    expect(unwatermarkedPhotographs(catalog, { ...treatments, b: treatments.a, c: treatments.a, d: treatments.a })).toEqual([]);
   });
 });

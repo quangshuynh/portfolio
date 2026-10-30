@@ -14,6 +14,7 @@ import { DERIVATIVES_PATH, approvedImageChanges } from './treatment-publish.mjs'
 import { TreatmentError, listTreatments, treatmentSummary } from './treatments.mjs';
 import { MAX_UPLOAD_BYTES, UploadError, ingestUpload } from './uploads.mjs';
 import { WatermarkError, portfolioOverview, readWatermarkPreference, saveWatermarkPreference } from './watermark.mjs';
+import { unwatermarkedPhotographs } from './watermark-rules.mjs';
 import { WorkspaceError, paths, readWorkspace, saveCatalog, setBase, writePublication } from './workspace.mjs';
 
 const MAX_JSON_BYTES = 4 * 1024 * 1024;
@@ -90,6 +91,8 @@ export function createApi({ repoDir, workspaceDir, libraryDir = null, git, githu
       summary: summarizeChanges(workspace.base, workspace.catalog),
       // Approved QuangEdit images that publication would replace (published photographs only).
       images: images.map(({ id }) => id),
+      // Published photographs without an approved watermark (publication refuses them unless overridden).
+      unwatermarked: unwatermarkedPhotographs(workspace.catalog, treatments),
       treatments: Object.fromEntries(Object.entries(treatments).map(([id, treatment]) => [id, treatmentSummary(treatment)])),
       publication: workspace.publication && { ...workspace.publication, submittedCatalog: undefined },
       submittedUnchanged: Boolean(submitted && submitted === serializeCatalog(workspace.catalog)),
@@ -154,13 +157,13 @@ export function createApi({ repoDir, workspaceDir, libraryDir = null, git, githu
     }),
 
     'POST /api/publication/prepare': (request) => exclusive(async () => {
-      const { dryRun } = await readJsonBody(request);
+      const { dryRun, allowUnwatermarked } = await readJsonBody(request);
       if (!dryRun && (offline || !github)) {
         throw new HttpError(400, 'publishing-unavailable', offline
           ? 'The CMS was started with --offline, so it can only prepare a local branch (dry run).'
           : 'No GitHub token: set CMS_GITHUB_TOKEN or run `gh auth login`, then restart the CMS.');
       }
-      const publication = await preparePublication({ git, workspaceDir, github, remote, baseBranch, offline, dryRun: Boolean(dryRun) });
+      const publication = await preparePublication({ git, workspaceDir, github, remote, baseBranch, offline, dryRun: Boolean(dryRun), allowUnwatermarked: allowUnwatermarked === true });
       onCatalogChanged();
       return { result: { ...publication, submittedCatalog: undefined }, ...(await state()) };
     }),

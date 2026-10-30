@@ -92,6 +92,9 @@ export function pullRequestBody(summary, workspace, { baseRef, baseCommit }) {
   add(`New images from QuangEdit (${summary.images?.length ?? 0})`, summary.images?.length && `${list(summary.images, caption)}
 
 Approved treatments rendered from the originals; same file names, so links are unchanged.`);
+  add(`Published without the watermark (${summary.unwatermarked?.length ?? 0})`, summary.unwatermarked?.length && `${list(summary.unwatermarked, caption)}
+
+The owner chose to publish these without the HUYNH Photography watermark.`);
   add('Featured', summary.featured && `Before: ${summary.featured.before.join(', ') || 'none'}\nAfter: ${summary.featured.after.join(', ') || 'none'}`);
   add('Hero', summary.hero && `\`${summary.hero.before}\` → \`${summary.hero.after}\``);
   add('Collections', summary.collections && `Before: ${summary.collections.before.join(', ')}\nAfter: ${summary.collections.after.join(', ')}`);
