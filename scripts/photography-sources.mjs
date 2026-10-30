@@ -36,6 +36,8 @@ export const photographLibraryPaths = {
   DSC00002: 'sony-a7iii/2026-10-28/DSC00002.JPG',
   DSC00006: 'sony-a7iii/2026-10-28/DSC00006.JPG',
   DSC00009: 'sony-a7iii/2026-10-28/DSC00009.JPG',
+  DSC00034: 'sony-a7iii/2026-10-29/DSC00034.JPG',
+  DSC00043: 'sony-a7iii/2026-10-29/DSC00043.JPG',
   DSC09579: 'sony-a7iii/2026-10-20/DSC09579.JPG',
   DSC09587: 'sony-a7iii/2026-10-20/DSC09587.JPG',
   DSC09622: 'sony-a7iii/2026-10-22/DSC09622.JPG',

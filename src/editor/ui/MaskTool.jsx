@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { invert3, project } from '../pipeline/geometry.mjs';
 import { addComponent, appendStroke, componentLabel, createBrush, createLinear, createRadial, updateComponent } from '../model/masks.mjs';
 
@@ -16,6 +16,8 @@ const MIN_GRADIENT_PX = 4;
  * keeps its place at any zoom, pan and export size. While a tool is on, one pointer paints or
  * drags (the photo does not pan and the page does not scroll); a second touch cancels the stroke.
  * Handles are focusable: arrow keys move the gradient (Shift: larger steps), Delete removes it.
+ * The brush outline follows the pointer outside React: each move writes its transform directly,
+ * so hovering re-renders nothing and the outline is in the same frame as the move.
  * :param mask: the mask being edited; `map`: maskMap at `output` (the canvas at full resolution)
  * :param box: the photo's displayed rectangle in stage pixels
  * :param tool: 'brush' | 'linear' | 'radial' | null (handles only)
@@ -24,7 +26,8 @@ const MIN_GRADIENT_PX = 4;
 export default function MaskTool({ mask, map, box, output, tool, brush, selectedId, newId, onSelect, onPreview, onCommit, onRemove }) {
   const dragRef = useRef(null);
   const frameRef = useRef(0);
-  const [cursor, setCursor] = useState(null);
+  const cursorRef = useRef(null);
+  const rectRef = useRef(null);
   const inverse = useMemo(() => invert3(map.matrix), [map]);
   const k = box.width / output.width;
   const short = Math.min(map.width, map.height);
@@ -41,10 +44,26 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
   };
   // Space pixels per stage pixel, for radii.
   const spacePerStage = map.scale / k;
+  // The stage's position is read at most once per frame (moves and coalesced events reuse it).
   const local = (event) => {
-    const rect = event.currentTarget.closest('.pe-stage-area').getBoundingClientRect();
+    let rect = rectRef.current;
+    if (!rect) {
+      rect = event.currentTarget.closest('.pe-stage-area').getBoundingClientRect();
+      rectRef.current = rect;
+      requestAnimationFrame(() => { rectRef.current = null; });
+    }
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   };
+  const moveCursor = (event, point) => {
+    const cursor = cursorRef.current;
+    if (!cursor) return;
+    if (event.pointerType === 'touch') { cursor.hidden = true; return; }
+    cursor.style.transform = `translate(${point.x}px, ${point.y}px)`;
+    const erase = (brush.mode === 'erase') !== Boolean(event.altKey);
+    if (cursor.dataset.mode !== (erase ? 'erase' : 'add')) cursor.dataset.mode = erase ? 'erase' : 'add';
+    cursor.hidden = false;
+  };
+  const hideCursor = () => { if (cursorRef.current) cursorRef.current.hidden = true; };
 
   useEffect(() => () => cancelAnimationFrame(frameRef.current), []);
   const preview = (next) => {
@@ -160,7 +179,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
   };
   const onPointerMove = (event) => {
     const point = local(event);
-    if (tool === 'brush' && event.pointerType !== 'touch') setCursor(point);
+    if (tool === 'brush') moveCursor(event, point);
     const drag = dragRef.current;
     if (!drag || drag.pointer !== event.pointerId) return;
     if (event.pointerType !== 'touch') event.stopPropagation();
@@ -302,18 +321,19 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
-      onPointerLeave={() => setCursor(null)}
+      onPointerLeave={hideCursor}
     >
       <svg className="pe-masktool__shapes" aria-hidden="true">
         {shapes}
-        {tool === 'brush' && cursor && (
-          <>
-            <circle cx={cursor.x} cy={cursor.y} r={cursorRadius} className="pe-masktool__cursor" />
-            {brush.hardness < 1 && <circle cx={cursor.x} cy={cursor.y} r={cursorRadius * brush.hardness} className="pe-masktool__cursor pe-masktool__cursor--inner" />}
-          </>
-        )}
       </svg>
       {handles}
+      {tool === 'brush' && (
+        // Positioned by moveCursor; React sets only its size, so a re-render never moves it.
+        <div ref={cursorRef} className="pe-masktool__cursor" aria-hidden="true" hidden data-mode={brush.mode}>
+          <span className="pe-masktool__ring" style={{ width: 2 * cursorRadius, height: 2 * cursorRadius, left: -cursorRadius, top: -cursorRadius }} />
+          {brush.hardness < 1 && <span className="pe-masktool__ring pe-masktool__ring--inner" style={{ width: 2 * cursorRadius * brush.hardness, height: 2 * cursorRadius * brush.hardness, left: -cursorRadius * brush.hardness, top: -cursorRadius * brush.hardness }} />}
+        </div>
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@
 // the live dedicated workers. Repeated runs of the same workflow must not keep growing, and
 // workers must not outlive their jobs. Files come from MEMORY_FIXTURE_DIR (Sony .ARW and
 // their camera .JPG, read only); results go to MEMORY_OUT (JSON), never into the repository.
-// Usage: MEMORY_FIXTURE_DIR=… [MEMORY_REPEATS=3] npm run check:editor:memory
+// Usage: MEMORY_FIXTURE_DIR=… [MEMORY_REPEATS=3] [MEMORY_CYCLES=2] [CHECK_GPU=1] [MEMORY_SKIP_BUILD=1] npm run check:editor:memory
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -26,6 +26,8 @@ const PORT = 4189;
 const URL_EDITOR = `http://localhost:${PORT}/photography/editor/`;
 // A workflow repeated on the same files may settle higher once, but not keep climbing.
 const GROWTH_LIMIT_MB = Number(process.env.MEMORY_GROWTH_LIMIT_MB ?? 200);
+// More than two cycles tell a leak (growing every cycle) from memory kept once.
+const CYCLES = Math.max(2, Number(process.env.MEMORY_CYCLES ?? 2));
 
 async function poll(read, done, label, timeout = 30_000) {
   const end = Date.now() + timeout;
@@ -38,71 +40,124 @@ async function poll(read, done, label, timeout = 30_000) {
   throw new Error(`Timed out waiting for ${label} (last value ${JSON.stringify(value)})`);
 }
 
-async function workingSetMb(profile) {
+// The browser's processes (found by the profile folder on their command line, then their
+// children), with working set and private commit in MB, summed per Chromium process type.
+async function processMemory(profile) {
   if (process.platform !== 'win32') return null;
   const command = [
     '$all = Get-CimInstance Win32_Process',
-    `$ids = @($all | Where-Object { $_.CommandLine -like '*${path.basename(profile)}*' } | ForEach-Object { $_.ProcessId })`,
+    // Roots: browser executables started with this run's own temporary folder (unique), never
+    // just "profile", which also matched this PowerShell (-NoProfile), other browsers
+    // (--profile-directory) and concurrent Playwright runs (playwright_chromiumdev_profile-*).
+    `$ids = @($all | Where-Object { $_.Name -match '^(chrome|headless_shell|chromium)\.exe$' -and $_.CommandLine -like '*${path.basename(path.dirname(profile))}*' } | ForEach-Object { $_.ProcessId })`,
     'do { $before = $ids.Count; $ids = @($ids + ($all | Where-Object { $ids -contains $_.ParentProcessId } | ForEach-Object { $_.ProcessId }) | Sort-Object -Unique) } while ($ids.Count -gt $before)',
-    '($all | Where-Object { $ids -contains $_.ProcessId } | Measure-Object -Property WorkingSetSize -Sum).Sum',
+    '$all | Where-Object { $ids -contains $_.ProcessId } | ForEach-Object { $t = if ($_.CommandLine -match "--type=([a-z-]+)") { $matches[1] } else { "browser" }; if ($_.CommandLine -match "--utility-sub-type=([A-Za-z.]+)") { $t = "utility:" + $matches[1].Split(".")[-1] }; "$t $($_.WorkingSetSize) $($_.PrivatePageCount)" }',
   ].join('; ');
   try {
     const { stdout } = await promisify(execFile)('powershell', ['-NoProfile', '-Command', command]);
-    return Math.round(Number(stdout.trim()) / 1048576) || null;
+    const byType = {};
+    let total = 0;
+    let privateTotal = 0;
+    for (const line of stdout.trim().split(/\r?\n/)) {
+      const [type, ws, priv] = line.trim().split(' ');
+      if (!type || !Number(ws)) continue; // eslint-disable-line no-continue
+      const mb = Math.round(Number(ws) / 1048576);
+      const privateMb = Math.round(Number(priv) / 1048576);
+      byType[type] = byType[type] ?? { workingSetMb: 0, privateMb: 0, count: 0 };
+      byType[type].workingSetMb += mb;
+      byType[type].privateMb += privateMb;
+      byType[type].count += 1;
+      total += mb;
+      privateTotal += privateMb;
+    }
+    return total ? { workingSetMb: total, privateMb: privateTotal, byType } : null;
   } catch { return null; }
 }
+const workingSetMb = async (profile) => (await processMemory(profile))?.workingSetMb ?? null;
 
-function sampler(profile) {
-  const peaks = [];
+// Samples every 250 ms; keeps the timeline and the breakdown at the peak.
+function sampler(profile, label, timeline) {
+  const samples = [];
   let running = true;
+  const started = Date.now();
   const loop = (async () => {
     while (running) {
-      const mb = await workingSetMb(profile);
-      if (mb) peaks.push(mb);
+      const memory = await processMemory(profile);
+      if (memory) samples.push({ t: Date.now() - started, ...memory });
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
   })();
-  return async () => { running = false; await loop; return peaks.length ? Math.max(...peaks) : null; };
+  return async () => {
+    running = false;
+    await loop;
+    timeline.push({ label, samples: samples.map(({ t, workingSetMb: ws, privateMb, byType }) => ({ t, ws, privateMb, gpu: byType['gpu-process']?.workingSetMb ?? 0, renderer: byType.renderer?.workingSetMb ?? 0 })) });
+    if (!samples.length) return { peakMb: null };
+    const peak = samples.reduce((a, b) => (b.workingSetMb > a.workingSetMb ? b : a));
+    return { peakMb: peak.workingSetMb, peakAtMs: peak.t, peakPrivateMb: peak.privateMb, peakByType: Object.fromEntries(Object.entries(peak.byType).map(([type, v]) => [type, v.workingSetMb])) };
+  };
 }
 
 async function main() {
   if (RAWS.length < 3 || JPEGS.length < 1) throw new Error('Set MEMORY_FIXTURE_DIR to a folder with three Sony .ARW files (a bracket) and their .JPG.');
   if (OUT) mkdirSync(OUT, { recursive: true });
-  await build({ root, logLevel: 'silent', configFile: path.join(root, 'vite.config.mjs') });
+  if (!process.env.MEMORY_SKIP_BUILD) await build({ root, logLevel: 'silent', configFile: path.join(root, 'vite.config.mjs') });
   const server = await preview({ root, configFile: path.join(root, 'vite.config.mjs'), preview: { port: PORT, strictPort: true }, logLevel: 'silent' });
   const work = mkdtempSync(path.join(tmpdir(), 'editor-memory-'));
   const profile = path.join(work, 'profile');
-  const context = await chromium.launchPersistentContext(profile, { acceptDownloads: true, viewport: { width: 1440, height: 900 } });
+  // CHECK_GPU=1: the real GPU (its memory is mostly on the card, outside the working set);
+  // otherwise headless SwiftShader, whose textures and framebuffers live in the GPU process.
+  const args = process.env.CHECK_GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : [];
+  const context = await chromium.launchPersistentContext(profile, { acceptDownloads: true, viewport: { width: 1440, height: 900 }, args });
   const page = context.pages()[0] ?? await context.newPage();
   const cdp = await context.newCDPSession(page);
   await cdp.send('Performance.enable');
   const problems = [];
   page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`));
   page.on('crash', () => problems.push('page crashed'));
-  const results = { browser: `chromium ${context.browser()?.version() ?? ''}`.trim(), files: [...RAWS, ...JPEGS].map((file) => path.basename(file)), steps: [] };
+  const results = { browser: `chromium ${context.browser()?.version() ?? ''}`.trim(), files: [...RAWS, ...JPEGS].map((file) => path.basename(file)), gpu: Boolean(process.env.CHECK_GPU), steps: [], timeline: [] };
 
   const names = (files) => files.map((file) => path.basename(file));
   const photoButton = (name) => page.locator(`.pe-photo--list button.pe-photo__select[aria-label^="${name},"]`);
   const readyCount = () => page.$$eval('.pe-photo--list', (items) => items.filter((li) => li.dataset.status === 'ready').length);
   const previewShown = () => poll(() => page.evaluate(() => !document.querySelector('.pe-stage-message') && !document.querySelector('.pe-canvas-host').hidden), Boolean, 'preview', 180_000);
   /** Settles, collects garbage and measures. */
+  // What the page still holds outside its JS heap: live ArrayBuffers (typed arrays' memory),
+  // canvases (their pixels live in the renderer or the GPU process) and ImageBitmaps.
+  const live = async (constructor, reduce) => {
+    try {
+      // Held in a group of its own and released: otherwise the result array keeps every
+      // object it found alive (and the check would measure its own leak).
+      const { result: proto } = await cdp.send('Runtime.evaluate', { expression: `${constructor}.prototype`, objectGroup: 'memory-check' });
+      const { objects } = await cdp.send('Runtime.queryObjects', { prototypeObjectId: proto.objectId, objectGroup: 'memory-check' });
+      const { result } = await cdp.send('Runtime.callFunctionOn', { objectId: objects.objectId, functionDeclaration: reduce, returnByValue: true });
+      return result.value;
+    } catch { return null; } finally {
+      await cdp.send('Runtime.releaseObjectGroup', { objectGroup: 'memory-check' }).catch(() => {});
+    }
+  };
+  const pageObjects = async () => ({
+    pageBuffersMb: await live('ArrayBuffer', 'function () { return Math.round(this.reduce((sum, b) => sum + b.byteLength, 0) / 1048576); }'),
+    canvases: await live('HTMLCanvasElement', 'function () { return { count: this.length, attached: this.filter((c) => c.isConnected).length, megapixels: Math.round(this.reduce((sum, c) => sum + c.width * c.height, 0) / 1e5) / 10 }; }'),
+    bitmaps: await live('ImageBitmap', 'function () { return this.filter((b) => b.width > 0).length; }'),
+  });
   const measure = async (label, extra = {}) => {
     await new Promise((resolve) => setTimeout(resolve, 1500));
     await cdp.send('HeapProfiler.collectGarbage').catch(() => {});
     await new Promise((resolve) => setTimeout(resolve, 500));
     const { metrics } = await cdp.send('Performance.getMetrics');
     const heap = metrics.find(({ name }) => name === 'JSHeapUsedSize')?.value ?? 0;
-    const entry = { label, workingSetMb: await workingSetMb(profile), pageHeapMb: Math.round(heap / 1048576), workers: page.workers().length, ...extra };
+    const memory = await processMemory(profile);
+    const entry = { label, workingSetMb: memory?.workingSetMb ?? null, privateMb: memory?.privateMb ?? null, gpuMb: memory?.byType['gpu-process']?.workingSetMb ?? null, pageHeapMb: Math.round(heap / 1048576), ...(await pageObjects()), workers: page.workers().length, ...extra };
     results.steps.push(entry);
     console.log(JSON.stringify(entry));
     return entry;
   };
   const timed = async (label, fn) => {
-    const stop = sampler(profile);
+    const stop = sampler(profile, label, results.timeline);
     const started = Date.now();
     await fn();
     const ms = Date.now() - started;
-    return measure(label, { ms, peakMb: await stop() });
+    return measure(label, { ms, ...(await stop()) });
   };
   const importFiles = async (files) => {
     const total = (await readyCount()) + files.length;
@@ -163,7 +218,7 @@ async function main() {
     await page.waitForSelector('.pe[data-engine]', { timeout: 30_000 });
     const baseline = await measure('editor loaded');
 
-    for (let cycle = 1; cycle <= 2; cycle += 1) {
+    for (let cycle = 1; cycle <= CYCLES; cycle += 1) {
       await timed(`cycle ${cycle}: import 3 ARW + ${JPEGS.length} JPEG`, () => importFiles([...RAWS, ...JPEGS]));
       await timed(`cycle ${cycle}: switch between photos ${REPEATS * 3}×`, async () => {
         for (let i = 0; i < REPEATS * 3; i += 1) {
@@ -232,11 +287,14 @@ async function main() {
     await new Promise((resolve) => setTimeout(resolve, 35_000));
     const idle = await measure('empty workspace, 35 s later');
     const end = results.steps.at(-2);
-    const firstEmpty = results.steps.find(({ label }) => label === 'cycle 1: remove every photo');
+    // Growth between the last two cycles (the first may settle higher once).
+    const empties = results.steps.filter(({ label }) => / remove every photo$/.test(label));
+    const firstEmpty = empties.at(-2);
     results.summary = {
       baselineMb: baseline.workingSetMb,
-      afterCycle1Mb: firstEmpty.workingSetMb,
-      afterCycle2Mb: end.workingSetMb,
+      afterEachCycleMb: empties.map(({ workingSetMb: mb }) => mb),
+      afterEachCyclePrivateMb: empties.map(({ privateMb }) => privateMb),
+      afterEachCycleGpuMb: empties.map(({ gpuMb }) => gpuMb),
       idleMb: idle.workingSetMb,
       growthMb: end.workingSetMb && firstEmpty.workingSetMb ? end.workingSetMb - firstEmpty.workingSetMb : null,
       workersAtEnd: end.workers,

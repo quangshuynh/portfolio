@@ -155,6 +155,49 @@ describe('mask tool on the photo', () => {
     window.requestAnimationFrame.mockRestore();
   });
 
+  test('hovering moves only the brush outline: no render, no preview, no mask change', () => {
+    const renders = vi.fn();
+    const handlers = { onSelect: vi.fn(), onPreview: vi.fn(), onCommit: vi.fn(), onRemove: vi.fn() };
+    const view = render(
+      <React.Profiler id="tool" onRender={renders}>
+        <div className="pe-stage-area">
+          <MaskTool mask={createMask('image')} map={map} box={box} output={output} tool="brush" brush={DEFAULT_BRUSH} selectedId={null} newId={newId} {...handlers} />
+        </div>
+      </React.Profiler>,
+    );
+    const layer = view.container.querySelector('.pe-masktool');
+    const cursor = view.container.querySelector('.pe-masktool__cursor');
+    expect(cursor.hidden).toBe(true);
+    renders.mockClear();
+    for (let k = 0; k < 50; k += 1) pointer(layer, 'pointerMove', 10 + 10 * k, 120, { buttons: 0 });
+    expect(renders).not.toHaveBeenCalled();
+    expect(Object.values(handlers).every((fn) => fn.mock.calls.length === 0)).toBe(true);
+    expect(cursor.hidden).toBe(false);
+    expect(cursor.style.transform).toBe('translate(500px, 120px)');
+    expect(cursor.dataset.mode).toBe('add');
+    pointer(layer, 'pointerMove', 20, 30, { buttons: 0, altKey: true });
+    expect(cursor.dataset.mode).toBe('erase');
+    fireEvent.pointerLeave(layer);
+    expect(cursor.hidden).toBe(true);
+    pointer(layer, 'pointerMove', 20, 30, { buttons: 0, pointerType: 'touch' });
+    expect(cursor.hidden).toBe(true);
+  });
+
+  test('the brush outline has the brush size in image pixels at the displayed zoom, and its hardness', () => {
+    const brush = { ...DEFAULT_BRUSH, radius: 0.05, hardness: 0.5 };
+    const { layer, view, rerender } = renderTool({ tool: 'brush', brush });
+    pointer(layer, 'pointerMove', 100, 100, { buttons: 0 });
+    const rings = () => [...view.container.querySelectorAll('.pe-masktool__ring')].map((ring) => parseFloat(ring.style.width));
+    // 0.05 of the short edge (800 px) = 40 image px radius; shown at half size: 40 stage px across.
+    expect(rings()).toEqual([40, 20]);
+    // Zoomed to 2×: the same brush covers twice the stage pixels; the outline stays where it was.
+    rerender({ box: { x: -300, y: -200, width: 1200, height: 800 } });
+    expect(rings()).toEqual([80, 40]);
+    expect(view.container.querySelector('.pe-masktool__cursor').style.transform).toBe('translate(100px, 100px)');
+    rerender({ brush: { ...brush, hardness: 1 } });
+    expect(rings()).toEqual([40]);
+  });
+
   test('Alt erases; a second touch cancels the stroke', () => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { callback(); return 1; });
     const { layer, onCommit, onPreview } = renderTool({ tool: 'brush' });
