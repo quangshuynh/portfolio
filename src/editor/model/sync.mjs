@@ -16,6 +16,8 @@
 // Local adjustments (masks) are copied only when "Local gradients" is ticked: their linear and
 // radial gradients and settings replace the target's local adjustments; brush strokes follow
 // one photo's content and are never copied (a brush-only adjustment is left out).
+// The watermark (placement, size, colour, enabled) is copied only when Watermark is ticked; it is
+// relative to each target's own output frame, so it lands in the same place on any photo.
 
 import { adjustmentsEqual, groupKeys, neutralAdjustments, normalizeAdjustments } from './adjustments.mjs';
 import { presetPatch } from './presets.mjs';
@@ -53,6 +55,7 @@ export const SYNC_GROUPS = Object.freeze([
   },
   { id: 'layers', label: 'Layers (whole stack, with their masks)', keys: [], structured: 'layers' },
   { id: 'localGradients', label: 'Local gradients (masks without brush strokes)', keys: [], structured: 'local', reuse: gradientLocals },
+  { id: 'watermark', label: 'Watermark (HUYNH Photography settings)', keys: [], structured: 'watermark' },
 ].map(Object.freeze));
 const groupById = new Map(SYNC_GROUPS.map((group) => [group.id, group]));
 
