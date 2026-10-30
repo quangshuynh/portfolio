@@ -1,4 +1,7 @@
-import { ADJUSTMENTS, clampAdjustment, formatAdjustment, neutralAdjustments, normalizeAdjustments } from './adjustments.mjs';
+import { ADJUSTMENTS, clampAdjustment, compactAdjustments, formatAdjustment, neutralAdjustments, normalizeAdjustments } from './adjustments.mjs';
+import { DEFAULT_SYNC_GROUPS, SYNC_GROUPS, planSync } from './sync.mjs';
+import { PRESET_GROUPS, createPreset } from './presets.mjs';
+import { RECIPE_GROUPS, recipeFromAdjustments } from './recipes.mjs';
 import * as history from './history.mjs';
 import { editorReducer, initialEditorState } from './editorState.mjs';
 import {
@@ -236,4 +239,34 @@ describe('edit document', () => {
     expect(parsed.exportSettings).toMatchObject({ format: 'jpeg', quality: 1, suffix: 'script', resize: { mode: 'original', longEdge: 3840 } });
     expect({}.polluted).toBeUndefined();
   });
+});
+
+describe('retouch in edit documents (version 12)', () => {
+  test('clone and heal strokes are saved and reopened exactly; version 11 files open without any', () => {
+    const retouch = [
+      { id: 'h1', type: 'heal', enabled: true, points: [[0.4, 0.41]], radius: 0.02, hardness: 0.5, opacity: 1, spacing: 0.25, offset: { x: 0.03, y: -0.01 } },
+      { id: 'c1', type: 'clone', enabled: false, points: [[0.1, 0.2], [0.12, 0.21]], radius: 0.01, hardness: 0.8, opacity: 0.6, spacing: 0.2, offset: { x: 0.2, y: 0 } },
+    ];
+    const photo = { name: 'DSC09420.ARW', size: 10, lastModified: 0, sha256: 'a'.repeat(64), format: 'arw', width: 4024, height: 6024, adjustments: normalizeAdjustments({ exposure: 0.3, retouch }) };
+    const text = serializeEditDocument(createEditDocument([photo], {}));
+    expect(JSON.parse(text).version).toBe(12);
+    expect(parseEditDocument(text).photos[0].adjustments.retouch).toEqual(retouch);
+    const v11 = JSON.stringify({ type: DOCUMENT_TYPE, version: 11, photos: [{ source: { name: 'a.jpg', size: 3 }, adjustments: { exposure: 1, retouch } }] });
+    expect(parseEditDocument(v11).photos[0].adjustments.retouch).toEqual(retouch);
+    expect(parseEditDocument(JSON.stringify({ type: DOCUMENT_TYPE, version: 11, photos: [{ source: { name: 'a.jpg', size: 3 }, adjustments: { exposure: 1 } }] })).photos[0].adjustments.retouch).toEqual([]);
+    expect(compactAdjustments(normalizeAdjustments({})).retouch).toBeUndefined();
+  });
+});
+
+test('retouch belongs to one photo: sync, paste, presets and recipes never carry it', () => {
+  const retouch = [{ id: 'h1', type: 'heal', points: [[0.4, 0.4]], radius: 0.02, offset: { x: 0.03, y: 0 } }];
+  const source = normalizeAdjustments({ exposure: 0.7, retouch });
+  const target = { id: 'b', name: 'b.jpg', status: 'ready', history: { present: normalizeAdjustments({}) } };
+  const every = SYNC_GROUPS.map(({ id }) => id);
+  const { items } = planSync(source, [target], { groups: every });
+  expect(items[0].after.exposure).toBe(0.7);
+  expect(items[0].after.retouch).toEqual([]);
+  expect(DEFAULT_SYNC_GROUPS).not.toContain('retouch');
+  expect(JSON.stringify(createPreset('All', source, PRESET_GROUPS.map(({ id }) => id)))).not.toContain('h1');
+  expect(JSON.stringify(recipeFromAdjustments(source, { groups: RECIPE_GROUPS.map(({ id }) => id) }))).not.toContain('retouch');
 });

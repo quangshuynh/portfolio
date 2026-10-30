@@ -59,10 +59,10 @@ describe('settings', () => {
     expect(() => parseWatermarkConfig(`{"type":"quanghuynh.watermark","version":1,"settings":{},"pad":"${'x'.repeat(20000)}"}`)).toThrow(/16 KB/);
   });
 
-  test('edit documents (version 11) keep the watermark; older documents read without one', () => {
+  test('edit documents (version 11 and later) keep the watermark; older documents read without one', () => {
     const photo = { name: 'a.jpg', size: 10, lastModified: 0, sha256: 'a'.repeat(64), format: 'jpeg', width: 600, height: 400, adjustments: normalizeAdjustments({ exposure: 0.5, watermark: on({ position: 'top-left' }) }) };
     const text = serializeEditDocument(createEditDocument([photo], {}));
-    expect(DOCUMENT_VERSION).toBe(11);
+    expect(DOCUMENT_VERSION).toBeGreaterThanOrEqual(11);
     const parsed = parseEditDocument(text);
     expect(parsed.photos[0].adjustments.watermark).toEqual(on({ position: 'top-left' }));
     const v10 = JSON.stringify({ type: 'quanghuynh.photo-editor.edits', version: 10, photos: [{ source: { name: 'a.jpg', size: 3 }, adjustments: { exposure: 1 } }] });

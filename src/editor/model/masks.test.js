@@ -121,9 +121,10 @@ describe('settings, documents and history', () => {
     const before = JSON.parse(fixture('parsed-by-v9-editor.json'));
     expect(document.version).toBe(9);
     document.photos.forEach((photo, i) => {
-      const { local, watermark, ...rest } = photo.adjustments;
+      const { local, watermark, retouch, ...rest } = photo.adjustments;
       expect(local).toEqual([]);
       expect(watermark).toBeNull();
+      expect(retouch).toEqual([]);
       expect(rest).toEqual(before[i]);
       photo.adjustments.layers.forEach((layer) => expect(layer).not.toHaveProperty('mask'));
     });

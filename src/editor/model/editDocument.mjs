@@ -25,8 +25,10 @@ export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // (model/masks.mjs): `local` adjustments and a layer's optional `mask`, as geometry and stroke
 // paths, never bitmaps; version 9 files read with no masks. Version 11 added the watermark
 // (`watermark`, watermark/watermark.mjs: settings of the fixed HUYNH Photography mark, never text
-// or images); older files read without one.
-export const DOCUMENT_VERSION = 11;
+// or images); older files read without one. Version 12 added retouch (`retouch`,
+// model/retouch.mjs: clone and heal strokes as normalised paths, radii and source offsets, never
+// pixels); older files read without any.
+export const DOCUMENT_VERSION = 12;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).
@@ -120,11 +122,11 @@ function parseSource(source, index) {
   };
 }
 
-/** Settings from untrusted JSON: finite numbers, curves, a LUT reference, geometry, layers (or pre-v9 text overlays) and local adjustments, all validated. */
+/** Settings from untrusted JSON: finite numbers, curves, a LUT reference, geometry, layers (or pre-v9 text overlays), local adjustments, watermark and retouch, all validated. */
 export function parseAdjustments(input) {
   const values = isObject(input) ? input : {};
   const numeric = Object.fromEntries(Object.entries(values).filter(([, value]) => typeof value === 'number' && Number.isFinite(value)));
-  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw, geometry: values.geometry, layers: values.layers, overlays: values.overlays, local: values.local, filter: values.filter, watermark: values.watermark });
+  return normalizeAdjustments({ ...numeric, curves: values.curves, lut: values.lut, raw: values.raw, geometry: values.geometry, layers: values.layers, overlays: values.overlays, local: values.local, filter: values.filter, watermark: values.watermark, retouch: values.retouch });
 }
 
 /** Reads an edit file, refusing an oversized one before any of it is read into memory. */

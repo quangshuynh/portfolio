@@ -339,6 +339,52 @@ export class GlRenderer {
   }
 
   /**
+   * Retouched source pixels (pipeline/retouch.mjs): the same kind and size as the source,
+   * drawn by every processed pass while the untouched source stays for "before". `dirty`
+   * ({ x0, y0, x1, y1 }) updates only that box of an existing retouched texture; null clears it.
+   */
+  setRetouched(image, dirty = null) {
+    const { gl } = this;
+    if (!image || !this.texture) {
+      if (this.retouched) gl.deleteTexture(this.retouched);
+      this.retouched = null;
+      return;
+    }
+    const { width, height } = image;
+    if (this.retouched && dirty && width === this.width && height === this.height) {
+      const unit = this.raw ? UNIT.raw : this.hdr ? UNIT.hdr : 0;
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_2D, this.retouched);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.pixelStorei(gl.UNPACK_ROW_LENGTH, width);
+      gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, dirty.x0);
+      gl.pixelStorei(gl.UNPACK_SKIP_ROWS, dirty.y0);
+      const [format, type] = this.raw ? [gl.RGB_INTEGER, gl.UNSIGNED_SHORT] : this.hdr ? [gl.RGB, gl.FLOAT] : [gl.RGBA, gl.UNSIGNED_BYTE];
+      const data = this.raw || this.hdr ? image.data : (image.data instanceof Uint8Array ? image.data : new Uint8Array(image.data.buffer, image.data.byteOffset, image.data.byteLength));
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, dirty.x0, dirty.y0, dirty.x1 - dirty.x0, dirty.y1 - dirty.y0, format, type, data);
+      gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0);
+      gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, 0);
+      gl.pixelStorei(gl.UNPACK_SKIP_ROWS, 0);
+      return;
+    }
+    if (this.retouched) gl.deleteTexture(this.retouched);
+    if (this.raw) this.retouched = rawTexture(gl, width, height, image.data);
+    else if (this.hdr) this.retouched = hdrTexture(gl, width, height, image.data);
+    else {
+      this.retouched = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.retouched);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, image.data instanceof Uint8Array ? image.data : new Uint8Array(image.data.buffer, image.data.byteOffset, image.data.byteLength));
+      [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER].forEach((name) => gl.texParameteri(gl.TEXTURE_2D, name, gl.NEAREST));
+      [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T].forEach((name) => gl.texParameteri(gl.TEXTURE_2D, name, gl.CLAMP_TO_EDGE));
+    }
+  }
+
+  /**
    * Draws the source through the pipeline.
    * :param params: deriveParams() result
    * :param options: { split, before } `split` is the fraction of the width (from the
@@ -369,7 +415,7 @@ export class GlRenderer {
       gl.useProgram(this.program);
       gl.enable(gl.SCISSOR_TEST);
       gl.scissor(0, 0, columns, height);
-      this.draw(before ?? { ...params, neutral: true });
+      this.draw(before ?? { ...params, neutral: true }, null, false, true);
       gl.disable(gl.SCISSOR_TEST);
     }
   }
@@ -571,20 +617,22 @@ export class GlRenderer {
    * :param frame: a texture drawn as is (neutral) instead of the photo's source, or with
    *   `direct` the composite an adjustment layer's `params` apply to
    */
-  draw(params, frame = null, direct = false) {
+  draw(params, frame = null, direct = false, original = false) {
     const { gl, uniforms: u } = this;
     const raw = this.raw && !frame;
     const hdr = this.hdr && !frame;
+    // "Before" (original) reads the untouched source; every processed pass the retouched one.
+    const source = original ? this.texture : (this.retouched ?? this.texture);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, frame ?? (raw || hdr ? this.sourcePlaceholder : this.texture));
+    gl.bindTexture(gl.TEXTURE_2D, frame ?? (raw || hdr ? this.sourcePlaceholder : source));
     gl.uniform1i(u.uSource, 0);
     gl.uniform1i(u.uDirect, direct ? 1 : 0);
     gl.activeTexture(gl.TEXTURE0 + UNIT.raw);
-    gl.bindTexture(gl.TEXTURE_2D, raw ? this.texture : this.rawPlaceholder);
+    gl.bindTexture(gl.TEXTURE_2D, raw ? source : this.rawPlaceholder);
     gl.uniform1i(u.uRawSource, UNIT.raw);
     gl.uniform1i(u.uRaw, raw ? 1 : 0);
     gl.activeTexture(gl.TEXTURE0 + UNIT.hdr);
-    gl.bindTexture(gl.TEXTURE_2D, hdr ? this.texture : this.hdrPlaceholder);
+    gl.bindTexture(gl.TEXTURE_2D, hdr ? source : this.hdrPlaceholder);
     gl.uniform1i(u.uHdrSource, UNIT.hdr);
     gl.uniform1i(u.uHdr, hdr ? 1 : 0);
     // A CPU-rendered frame is already in output coordinates.
@@ -730,6 +778,8 @@ export class GlRenderer {
 
   releaseSource() {
     this.uploaded = null;
+    if (this.retouched) this.gl.deleteTexture(this.retouched);
+    this.retouched = null;
     if (this.texture) this.gl.deleteTexture(this.texture);
     if (this.renderedTexture) this.gl.deleteTexture(this.renderedTexture);
     this.texture = null;

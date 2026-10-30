@@ -825,6 +825,47 @@ the RAW queue (one decoder at a time), so a RAW layer appears after its half-siz
 Repeated project switching with layers was not measured separately; the raster cache is bounded
 (8 rasters, 384 MB) and cleared when the workspace empties. No physical iPhone was tested.
 
+## Retouch (Spot Heal and Clone Stamp)
+
+`model/retouch.mjs` (data), `pipeline/retouch.mjs` (rendering), `ui/RetouchTool.jsx` (on the
+photo), `ui/RetouchPanel.jsx`. Edit document v12 adds `adjustments.retouch`; v11 and older read
+with none.
+
+- **Data, never pixels:** each operation is one stroke `{ id, type: 'heal' | 'clone', enabled,
+  points, radius, hardness, opacity, spacing, offset }`, in the photo's space before Crop &
+  Transform: points normalised to its oriented width and height, radius a share of the short
+  edge, `offset` source − target. So repairs stay put at any zoom, pan, preview or export size
+  and after any crop, turn, perspective or RAW development change. Limits: 200 operations,
+  1 000 points per stroke, 20 000 per photo.
+- **Order:** stage 0, on the source pixels (decoded JPEG/PNG/WebP, developed RAW sensor data,
+  or the finished HDR merge) before white balance, every other adjustment, Detail, geometry,
+  masks, layers and the watermark. Operations run in order, each reading the result of the ones
+  before. Image and text layers are not retouched (the base photo only).
+- **Clone:** a feathered copy (hardness, opacity, stamp spacing) from the offset source; the
+  offset is fixed at the stroke's first point. Aligned keeps it for later strokes until a new
+  source is set (Alt/Option-click, or Set source then a tap).
+- **Heal:** the same copy plus a correction field: target − source on a ring around the stroke,
+  interpolated inside by relaxing Laplace's equation on a grid of 48 cells across the stroke's
+  box (400 Gauss–Seidel passes). Texture from the source, tone and colour from the target's
+  surroundings; no patch edge, halo or seam (tested). The source is found when the stroke ends
+  (`findHealSource`: 120 nearby offsets scored on surrounding luminance and texture, clear of
+  the stroke and the photo's edges) and saved, so exports never search again; drag the source
+  handle to choose another. Not content-aware fill: large or structured areas need Clone.
+- **Preview:** a retouched copy of the proxy. Appended operations are applied in place and only
+  their box is uploaded to a second GPU texture (before/split still read the untouched one); a
+  clone stroke in progress is drawn from one snapshot per stroke. Other changes rebuild the copy.
+  The 1:1 view decodes its crop with retouch applied.
+- **Export:** applied in every path (worker, band workers, RAW, HDR) to the source at the export's
+  decode size; canvas paths read one operation's region at a time (no full-size copy). Preview
+  and export share the code: a PNG export equals the Node reference exactly.
+- **Never copied:** presets, recipes, paste and sync leave retouch out (tested); a clone source
+  is forgotten when another photo is selected.
+- **Measured** (`check:editor:retouch`, Chromium 141 on the real GPU): stroke preview 3.6 ms per
+  pointer move in the page (~35 ms per move including two frames), commit 5.5 ms, first heal on
+  a 4096 px proxy 28 ms (24 MP JPEG proxy 42 ms), heal click to visible preview ~0.5 s; 24 MP JPEG
+  export 0.66 s; genuine A7 III ARW 4024×6024 PNG 4.8 s, D3100 NEF 3084×4644 3.4 s, changed only
+  inside the repairs. Headless SwiftShader redraws are ~0.75 s per move (software WebGL).
+
 ## Masks and local adjustments
 
 **Using them** (Masks panel, below Layers; Adjust tab on phones). **New local adjustment →
