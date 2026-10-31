@@ -278,7 +278,7 @@ test('version 13: removals keep their source area; version 12 files open unchang
   ];
   const photo = { name: '_DSC0051.NEF', size: 10, lastModified: 0, sha256: 'b'.repeat(64), format: 'nef', width: 3084, height: 4644, adjustments: normalizeAdjustments({ retouch }) };
   const text = serializeEditDocument(createEditDocument([photo], {}));
-  expect(JSON.parse(text).version).toBe(13);
+  expect(JSON.parse(text).version).toBe(DOCUMENT_VERSION);
   expect(parseEditDocument(text).photos[0].adjustments.retouch).toEqual(retouch);
   // A removal never carries a clone offset; a tiny or out-of-photo area is dropped.
   const cleaned = normalizeAdjustments({ retouch: [{ ...retouch[0], offset: { x: 0.3, y: 0 }, source: { x: 2, y: 0, width: 0.001, height: 0.5 } }] }).retouch[0];

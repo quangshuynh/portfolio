@@ -5,8 +5,8 @@
 //
 // A photo's settings are these numbers plus four structured values: `curves` (tone
 // curve control points, see pipeline/curves.mjs), `lut` (a reference to an
-// imported .cube LUT by content hash, or null), `raw` (white balance of a RAW
-// photo's development; ignored for JPEG, PNG and WebP) and `geometry` (crop, rotation,
+// imported .cube LUT by content hash, or null), `raw` (white balance and rendering profile of a
+// RAW photo's development; ignored for JPEG, PNG and WebP) and `geometry` (crop, rotation,
 // flips, perspective, stretch and resize; pipeline/geometry.mjs) and `layers` (image, text and
 // adjustment layers composited over the finished photo; model/layers.mjs) and `local` (masked local adjustments
 // over the finished photo, below the layers; model/masks.mjs) and `filter` (which Filter Library
@@ -19,6 +19,7 @@ import { CURVE_CHANNELS, curvesEqual, curvesNeutral, isNeutralCurve, neutralCurv
 import { MAX_LUT_SIZE, MIN_LUT_SIZE } from '../pipeline/lut.mjs';
 import { compactGeometry, geometryEqual, geometryNeutral, neutralGeometry, normalizeGeometry } from '../pipeline/geometry.mjs';
 import { DAYLIGHT_KELVIN, RAW_KELVIN, RAW_TINT, WHITE_BALANCE_MODES } from '../raw/rawColor.mjs';
+import { LEGACY_RAW_PROFILE, RAW_PROFILE_IDS } from '../raw/rawProfiles.mjs';
 import { compactLayers, layersEqual, normalizeLayers, textLayers } from './layers.mjs';
 import { MASK_LIMITS, compactLocals, localsEqual, normalizeLocalAdjustments } from './masks.mjs';
 import { normalizeWatermark, watermarksEqual } from '../watermark/watermark.mjs';
@@ -205,18 +206,34 @@ export function normalizeFilterRef(input) {
 
 const filterRefsEqual = (a, b) => (a === null || b === null ? a === b : a.id === b.id && a.strength === b.strength);
 
-export const RAW_DEFAULTS = Object.freeze({ whiteBalance: 'as-shot' });
+// Settings without a profile (every edit saved before document version 14) keep the legacy
+// rendering; new RAW imports start with Camera Natural (editorState.mjs).
+export const RAW_DEFAULTS = Object.freeze({ whiteBalance: 'as-shot', profile: LEGACY_RAW_PROFILE });
 
 /**
  * RAW development settings beyond the numeric controls: the white balance mode (as
- * shot, daylight, or custom from rawTemperature and rawTint).
+ * shot, daylight, or custom from rawTemperature and rawTint) and the rendering profile
+ * (raw/rawProfiles.mjs).
  */
 export function normalizeRawSettings(input) {
-  const mode = input !== null && typeof input === 'object' && WHITE_BALANCE_MODES.includes(input.whiteBalance) ? input.whiteBalance : 'as-shot';
-  return { whiteBalance: mode };
+  const source = input !== null && typeof input === 'object' ? input : {};
+  return {
+    whiteBalance: WHITE_BALANCE_MODES.includes(source.whiteBalance) ? source.whiteBalance : 'as-shot',
+    profile: RAW_PROFILE_IDS.includes(source.profile) ? source.profile : LEGACY_RAW_PROFILE,
+  };
 }
 
-const rawEqual = (a, b) => a.whiteBalance === b.whiteBalance;
+const rawEqual = (a, b) => a.whiteBalance === b.whiteBalance && (a.profile ?? LEGACY_RAW_PROFILE) === (b.profile ?? LEGACY_RAW_PROFILE);
+
+/**
+ * Neutral settings that keep the photo's RAW rendering profile: what Reset gives and what
+ * Before shows. The profile is the photo's starting point, not an edit.
+ */
+export function developmentBase(current = null) {
+  const neutral = neutralAdjustments();
+  neutral.raw.profile = normalizeRawSettings(current?.raw).profile;
+  return neutral;
+}
 
 /** A fresh all-neutral settings object. */
 export function neutralAdjustments() {
@@ -276,7 +293,7 @@ export const groupKeys = (group) => ADJUSTMENTS.filter((spec) => spec.group === 
 export function groupIsNeutral(adjustments, group) {
   if (group === 'curves') return curvesNeutral(adjustments.curves);
   if (group === 'lut') return !adjustments.lut;
-  if (group === 'raw') return rawEqual(normalizeRawSettings(adjustments.raw), RAW_DEFAULTS) && numericNeutral(adjustments, groupKeys('raw'));
+  if (group === 'raw') return normalizeRawSettings(adjustments.raw).whiteBalance === RAW_DEFAULTS.whiteBalance && numericNeutral(adjustments, groupKeys('raw'));
   if (group === 'geometry') return geometryNeutral(adjustments.geometry ?? NEUTRAL_GEOMETRY);
   if (group === 'text') return !textLayers(adjustments.layers ?? []).length;
   if (group === 'layers') return !adjustments.layers?.length;
@@ -295,7 +312,7 @@ export function neutralGroup(group, current = null) {
   const patch = Object.fromEntries(groupKeys(group).map((key) => [key, neutral[key]]));
   if (group === 'curves') patch.curves = neutral.curves;
   if (group === 'lut') patch.lut = null;
-  if (group === 'raw') patch.raw = neutral.raw;
+  if (group === 'raw') patch.raw = developmentBase(current).raw;
   if (group === 'geometry') patch.geometry = neutral.geometry;
   if (group === 'layers') patch.layers = [];
   if (group === 'masks') patch.local = [];
@@ -327,7 +344,8 @@ export function compactAdjustments(adjustments) {
   });
   if (!curvesNeutral(a.curves)) out.curves = Object.fromEntries(CURVE_CHANNELS.filter((c) => !isNeutralCurve(a.curves[c])).map((c) => [c, a.curves[c].map((point) => [...point])]));
   if (a.lut) out.lut = a.lut;
-  if (!rawEqual(a.raw, RAW_DEFAULTS)) out.raw = a.raw;
+  // A legacy profile is never written, so documents saved before profiles keep their exact form.
+  if (!rawEqual(a.raw, RAW_DEFAULTS)) out.raw = a.raw.profile === LEGACY_RAW_PROFILE ? { whiteBalance: a.raw.whiteBalance } : a.raw;
   const geometry = compactGeometry(a.geometry);
   if (geometry) out.geometry = geometry;
   if (a.layers.length) out.layers = compactLayers(a.layers);

@@ -1,7 +1,8 @@
 // Multi-camera RAW check of /photography/editor on a production build: every file in
 // RAW_COMPAT_DIR imported at once (one decoder at a time), each validated format developed,
 // edited and exported at full size, unsupported files refused with a readable message while the
-// rest keep loading. Per photo, a v13 edit document applies tone, HSL, a curve, colour grading,
+// rest keep loading. Each new import starts with the Camera Natural profile. Per photo, a v14 edit
+// document applies a RAW profile (Camera Natural and Linear alternating), tone, HSL, a curve, colour grading,
 // sharpening, noise reduction, a custom white balance, grain, crop and straighten, a radial local
 // adjustment, a Spot Heal and the HUYNH watermark; exports are checked for their size, against
 // the preview, and with and without the watermark (the difference sits in its corner). Then a
@@ -182,10 +183,13 @@ async function runOne(run) {
     }
 
     let document;
-    await step('a v13 document with tone, colour, Detail, geometry, a mask, a heal and the watermark on every RAW photo', async () => {
+    await step('a v14 document with a RAW profile, tone, colour, Detail, geometry, a mask, a heal and the watermark on every RAW photo', async () => {
       document = await saveDocument();
       assert.equal(document.version, DOCUMENT_VERSION);
-      for (const entry of document.photos) Object.assign(entry.adjustments, structuredClone(EDIT));
+      const fresh = document.photos.filter((entry) => entry.adjustments.raw?.profile !== 'camera-natural').map((entry) => entry.source.name);
+      assert.deepEqual(fresh, [], `new imports without the Camera Natural profile: ${fresh.join(', ')}`);
+      // Alternating profiles, so the batch ZIP mixes them.
+      document.photos.forEach((entry, index) => Object.assign(entry.adjustments, structuredClone(EDIT), { raw: { ...EDIT.raw, profile: index % 2 ? 'linear' : 'camera-natural' } }));
       await loadDocument(document, 'formats');
       for (const { name } of ready) await savedWhen(name, (a) => a.exposure === 0.3 && a.local?.length === 1 && a.retouch?.length === 1 && a.watermark?.enabled, `${name}: document applied`);
     });
@@ -302,6 +306,7 @@ async function runOne(run) {
         assert.deepEqual(after.geometry, original.geometry);
         assert.deepEqual(after.local, original.local);
         assert.deepEqual(after.retouch, original.retouch);
+        assert.deepEqual(after.raw, original.raw);
       }
       result.reopened = ready.length;
     });

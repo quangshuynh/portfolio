@@ -51,6 +51,9 @@ uniform sampler2D uHdrSource;
 uniform float uShadowLift;
 uniform float uRolloffWhite;
 uniform float uRolloffKnee;
+// Camera Natural RAW profile (raw/rawProfiles.mjs): contrast, pivot, shoulder, white.
+uniform bool uProfileActive;
+uniform vec4 uProfileCurve;
 uniform bool uWhiteBalanceActive;
 uniform mat3 uWhiteBalance;
 uniform float uExposureGain;
@@ -196,6 +199,12 @@ float highlightRolloff(float y) {
   return uRolloffKnee + excess / (1.0 + excess * a);
 }
 
+float naturalTone(float y) {
+  float q = uProfileCurve.y * pow(y / uProfileCurve.y, uProfileCurve.x) / uProfileCurve.z;
+  float w = uProfileCurve.y * pow(uProfileCurve.w / uProfileCurve.y, uProfileCurve.x) / uProfileCurve.z;
+  return q * (1.0 + q / (w * w)) / (1.0 + q);
+}
+
 vec3 process(vec3 rgb) {
   if (uWhiteBalanceActive) rgb = max(uWhiteBalance * rgb, 0.0);
   rgb *= uExposureGain;
@@ -207,6 +216,11 @@ vec3 process(vec3 rgb) {
   }
   if (uRolloffWhite > 0.0 && y > uRolloffKnee) {
     float ratio = highlightRolloff(y) / y;
+    rgb *= ratio;
+    y *= ratio;
+  }
+  if (uProfileActive && y > BLACK_EPSILON) {
+    float ratio = naturalTone(y) / y;
     rgb *= ratio;
     y *= ratio;
   }

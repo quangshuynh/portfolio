@@ -149,7 +149,7 @@ developed with wrong colour. A half-size import rounds an odd sensor width down 
 | 1–5 | Sensor decode, black-level subtraction, white-level normalisation, AHD demosaic (previews: half size, each 2×2 block one pixel), as-shot white balance normalised by the largest multiplier so nothing clips | LibRaw in a worker; 16-bit linear camera RGB (`DECODE_SETTINGS`) |
 | 6 | White balance: per-channel gain from as shot to the chosen multipliers, then LibRaw's clip at the sensor white | `developRaw`, both renderers |
 | 7 | Camera RGB → linear sRGB (Rec.709, D65) with LibRaw's `rgb_cam` (the camera's Adobe-derived D65 matrix, or a DNG's own ColorMatrix) | `developRaw` |
-| 8 | Relative white balance, exposure, RAW highlight rolloff (only when exposure is raised), tone, vibrance, saturation, range fit | `processLinear` |
+| 8 | Relative white balance, exposure (plus the profile's baseline), Camera Natural tone or RAW highlight rolloff, tone, vibrance, saturation, range fit | `processLinear` |
 | 9 | sRGB encode, tone curves, HSL, LUT | `processDisplay` |
 | 10–11 | 8-bit quantisation; canvas encoding | renderer; page |
 
@@ -167,14 +167,36 @@ accurate enough to offer. The Color panel's Temperature and Tint remain a relati
 shift after development, as for JPEGs, so presets behave the same on every format;
 presets never change RAW white balance.
 
-**Default rendering** is colorimetric: sensor white maps to display white, with no
-added contrast, saturation or curve. Against the camera's embedded JPEG of both
-A7 III frames the median L* differs by about 0.7 (test bound: 4). The camera JPEG
-(Sony "Standard") has about 1.4× the chroma and compresses highlights; that look is
-not imitated (use Vibrance or a preset). Not compared with Lightroom or another
-converter (none available here), so no equivalence is claimed. Limits: one D65
-matrix for every illuminant (tungsten colour less accurate than dual-illuminant
-profiles), no DCP or camera profiles, no lens corrections.
+**Rendering profiles** (`raw/rawProfiles.mjs`, `raw.profile` in the settings, RAW panel
+"Profile"). Interval 22 found no decoder error behind dark RAW renders: black and white
+levels, white balance and matrices check out (clipped areas reach exactly 1.0), but
+linear sensor values were shown with no scene-to-display rendering, and cameras keep
+2–3.5 stops of headroom above middle grey. DNG BaselineExposure was also ignored.
+
+| Profile | Exposure added | Curve | Used for |
+| --- | --- | --- | --- |
+| Camera Natural | +1.35 EV + DNG BaselineExposure | Toe (luminance^1.25 about 18% grey), extended-Reinhard shoulder pinned to the sensor white | New RAW imports |
+| Linear / Neutral | DNG BaselineExposure | None (highlight rolloff only when exposure pushes white past 1) | Technical editing |
+| Legacy | None | None | Edits saved before document version 14; shown in the list only for them |
+
+The curve acts on luminance (hue kept; out-of-gamut colours fitted toward luminance),
+after Exposure and before the tone sliders, curves and everything else. The profile's
+baseline is never written into the Exposure slider. Positive Exposure moves the shoulder
+with the sensor white, so highlights roll into white instead of clipping. Constants were
+fitted to the tone response (camera luminance against our linear development) of 19
+camera models: 34 Nikon D3100 NEF+JPEG pairs, 24 A7 III frames and one embedded preview
+per other camera; RMS 7.8 L* across all, ≤ 4 L* for D3100, A7 III, X100V and OM-1. One
+curve for all cameras, no per-model constants: modern Canon bodies stay 0.45–0.8 EV
+darker than their previews, older CCD cameras 0.3–0.75 EV brighter, which Exposure
+covers. The fitted toe contrast (1.37) was lowered to 1.25 so shadows are not crushed.
+Merged HDR photos keep their own tone stage. Reset, Before and Original keep the photo's
+profile; recipes and presets leave it out; Sync's RAW group copies it. Results per camera:
+[raw-compatibility.md](raw-compatibility.md).
+
+Not compared with Lightroom or another converter, so no equivalence is claimed. Limits:
+one D65 matrix for every illuminant (tungsten colour less accurate than dual-illuminant
+profiles), no DCP or camera profiles, no lens corrections. Image layers made from RAW
+sources keep the legacy neutral development.
 
 **Highlights.** Clipped sensor channels stay clipped, as in LibRaw mode 0; there is
 no reconstruction and so no "highlight recovery" control. Raising Exposure on a RAW
@@ -190,7 +212,7 @@ of the same ramp from an 8-bit file). Output is 8-bit sRGB.
 **Preview, before/after, export.** Previews and thumbnails come from half-size
 sensor data (3012×2012 for an A7 III, downscaled in linear light where the device
 limit is smaller), so zooming past about 50% is upscaled. Original and Split show
-the neutral development (as shot, no edits). Export decodes the RAW again: half
+the neutral development (as shot, no edits, in the photo's profile). Export decodes the RAW again: half
 size when the output fits, else the full AHD demosaic, area-averaged to the output
 size, rendered in 256-row bands that the page writes into its canvas and encodes.
 GPU preview vs CPU: ≤ 1 code value (7 RAW cases; Chromium, Firefox, WebKit). PNG
@@ -1412,6 +1434,8 @@ Settings never change the text or typography.
   `sharpening`, `luminanceNoise`, `colorNoise`; older files open with Detail neutral.
 - Version 4 added merged HDR sources (see [Merge HDR](#merge-hdr)) and the HDR tone
   controls `hdrHighlights`, `hdrShadows`.
+- Version 14 added the RAW rendering profile (`"raw": { "profile": "camera-natural" }`);
+  RAW photos in older files read as `legacy` and render exactly as before.
 - Version 2 added curves, HSL and LUTs; version 3 RAW sources (`"format": "arw"`
   or `"dng"`) and RAW white balance (`"raw": { "whiteBalance": "custom" }`,
   `rawTemperature`, `rawTint`). Older files still open; an older editor rejects a

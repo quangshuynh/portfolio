@@ -150,7 +150,22 @@ async function runOne(run, files, reference) {
       await tab(2);
       const panel = page.locator('.pe-section[data-section-id=raw]');
       assert.match(await panel.textContent(), /Synthetic Test DNG.*1\/125 s · f\/5\.6/);
-      const select = panel.locator('select');
+      // A new import starts with Camera Natural; switching re-renders the cached proxy (time to the next frames).
+      const profile = panel.getByRole('combobox', { name: 'Profile' });
+      assert.equal(await profile.inputValue(), 'camera-natural');
+      const switchMs = [];
+      for (const value of ['linear', 'camera-natural', 'linear', 'camera-natural']) {
+        const started = Date.now();
+        await profile.selectOption(value);
+        await page.evaluate(() => new Promise((resolve) => { requestAnimationFrame(() => requestAnimationFrame(resolve)); }));
+        switchMs.push(Date.now() - started);
+      }
+      result.profileSwitchMs = switchMs;
+      await page.click('button[aria-label=Undo]');
+      assert.equal(await profile.inputValue(), 'linear');
+      await page.click('button[aria-label=Redo]');
+      assert.equal(await profile.inputValue(), 'camera-natural');
+      const select = panel.getByRole('combobox', { name: 'White balance' });
       assert.match(await select.locator('option[value=as-shot]').textContent(), /As shot \(\d+ K/);
       await select.selectOption('custom');
       const temperature = page.locator('input[aria-label="RAW temperature value"]');
@@ -176,7 +191,7 @@ async function runOne(run, files, reference) {
       assert.equal(download.suggestedFilename(), 'synthetic-quangedit.png');
       const pixels = await sharp(await download.path()).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
       assert.deepEqual([pixels.info.width, pixels.info.height], [400, 600]);
-      const expected = renderRawRgba8(reference.image.data, deriveParams(normalizeAdjustments({ exposure: 0.5, raw: { whiteBalance: 'custom' }, rawTemperature: 4000, rawTint: reference.asShotTint }), { raw: reference.info }));
+      const expected = renderRawRgba8(reference.image.data, deriveParams(normalizeAdjustments({ exposure: 0.5, raw: { whiteBalance: 'custom', profile: 'camera-natural' }, rawTemperature: 4000, rawTint: reference.asShotTint }), { raw: reference.info }));
       result.pngMaxDifference = maxDifference(expected, pixels.data);
       assert.ok(result.pngMaxDifference <= 1, `PNG differs from the reference by ${result.pngMaxDifference}`);
       if (await page.isEnabled('input[name=pe-format][value=jpeg]')) {

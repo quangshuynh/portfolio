@@ -54,6 +54,31 @@ describe('RAW panel', () => {
     expect(exposureSummary({ shutter: 1.3, aperture: 4.5 })).toBe('1.3 s · f/4.5');
   });
 
+  test('profile: Camera Natural for a new import, labelled, switchable and undoable; Legacy only for edits that have it', () => {
+    setup();
+    const select = screen.getByRole('combobox', { name: 'Profile' });
+    expect(select).toHaveValue('camera-natural');
+    expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual(['Camera Natural', 'Linear / Neutral']);
+    expect(screen.getByTestId('raw-profile-note')).toHaveTextContent('does not imitate the camera');
+    fireEvent.change(select, { target: { value: 'linear' } });
+    expect(present()).toMatchObject({ exposure: 0, raw: { whiteBalance: 'as-shot', profile: 'linear' } });
+    // Changing the white balance keeps the profile.
+    fireEvent.change(screen.getByRole('combobox', { name: 'White balance' }), { target: { value: 'daylight' } });
+    expect(present().raw).toEqual({ whiteBalance: 'daylight', profile: 'linear' });
+    act(() => dispatch({ type: 'undo' }));
+    act(() => dispatch({ type: 'undo' }));
+    expect(present().raw.profile).toBe('camera-natural');
+    act(() => dispatch({ type: 'applySettings', patch: { raw: { whiteBalance: 'as-shot', profile: 'legacy' } } }));
+    expect(within(screen.getByRole('combobox', { name: 'Profile' })).getAllByRole('option')).toHaveLength(3);
+    act(() => dispatch({ type: 'applySettings', patch: { raw: { whiteBalance: 'as-shot', profile: 'linear' } } }));
+    expect(screen.getByTestId('raw-profile-note')).not.toHaveTextContent('BaselineExposure');
+  });
+
+  test('profile note names a DNG BaselineExposure', () => {
+    setup({ ...RAW, format: 'dng', baselineExposure: -0.5 });
+    expect(screen.getByTestId('raw-profile-note')).toHaveTextContent("Includes the file's DNG BaselineExposure (-0.50 EV).");
+  });
+
   test('white balance: as shot, daylight and custom, with undo and group reset', () => {
     setup();
     const select = screen.getByRole('combobox', { name: 'White balance' });
@@ -75,17 +100,18 @@ describe('RAW panel', () => {
     expect(present()).toMatchObject({ raw: { whiteBalance: 'daylight' }, rawTemperature: 5500, rawTint: 0 });
     expect(screen.getByRole('button', { name: 'RAW (edited)' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reset RAW' }));
-    expect(present().raw).toEqual({ whiteBalance: 'as-shot' });
+    // Reset keeps the rendering profile: it is the photo's starting point, not an edit.
+    expect(present().raw).toEqual({ whiteBalance: 'as-shot', profile: 'camera-natural' });
   });
 
   test('presets leave the RAW white balance alone; saved edits keep it', () => {
     setup();
     fireEvent.change(screen.getByRole('combobox', { name: 'White balance' }), { target: { value: 'daylight' } });
     act(() => dispatch({ type: 'applyPreset', preset: BUILT_IN_PRESETS[0] }));
-    expect(present().raw).toEqual({ whiteBalance: 'daylight' });
+    expect(present().raw).toEqual({ whiteBalance: 'daylight', profile: 'camera-natural' });
     const photo = { ...state.photos[0], adjustments: present() };
     const document = JSON.parse(serializeEditDocument(createEditDocument([photo], state.exportSettings)));
-    expect(document).toMatchObject({ version: DOCUMENT_VERSION, photos: [{ source: { format: 'arw', name: 'DSC09420.ARW' }, adjustments: { raw: { whiteBalance: 'daylight' } } }] });
+    expect(document).toMatchObject({ version: DOCUMENT_VERSION, photos: [{ source: { format: 'arw', name: 'DSC09420.ARW' }, adjustments: { raw: { whiteBalance: 'daylight', profile: 'camera-natural' } } }] });
     expect(parseEditDocument(JSON.stringify(document)).photos[0]).toMatchObject({ source: { format: 'arw' }, adjustments: { raw: { whiteBalance: 'daylight' } } });
   });
 });

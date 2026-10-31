@@ -4,7 +4,7 @@
 // is tabulated per render, and 8-bit encoding uses code thresholds instead of a power.
 
 import { SRGB_TO_LINEAR_8BIT, linearToSrgb, srgbToLinear } from './colorMath.mjs';
-import { developRaw, exactToneLuminance, processDisplay, processLinear } from './spec.mjs';
+import { developRaw, exactProfileLuminance, exactToneLuminance, processDisplay, processLinear } from './spec.mjs';
 import { applyCreative } from './creative.mjs';
 
 // Tabulated transfer functions for the display stages (curves, HSL, LUT), linear between
@@ -44,17 +44,20 @@ export function encodeSrgb8(value) {
 const TONE_TABLE_SIZE = 8192;
 
 /** Tabulated tone mapping of linear luminance for one parameter set. */
-export function toneTable(tone, maxLuminance) {
+export const toneTable = (tone, maxLuminance) => luminanceTable(exactToneLuminance, tone, maxLuminance);
+
+/** Tabulated `exact(y, args)` for luminance up to `maxLuminance` (exact beyond it). */
+function luminanceTable(exact, args, maxLuminance) {
   const maxRoot = Math.sqrt(Math.max(1, maxLuminance));
   const scale = (TONE_TABLE_SIZE - 1) / maxRoot;
   const table = new Float64Array(TONE_TABLE_SIZE);
   for (let i = 0; i < TONE_TABLE_SIZE; i += 1) {
     const root = i / scale;
-    table[i] = exactToneLuminance(root * root, tone);
+    table[i] = exact(root * root, args);
   }
   return (y) => {
     const position = Math.sqrt(y) * scale;
-    if (position >= TONE_TABLE_SIZE - 1) return exactToneLuminance(y, tone);
+    if (position >= TONE_TABLE_SIZE - 1) return exact(y, args);
     const index = Math.floor(position);
     const fraction = position - index;
     return table[index] + (table[index + 1] - table[index]) * fraction;
@@ -79,7 +82,11 @@ const assertPerPixel = (p) => {
 
 /** Per-render state for renderRgba8: build once, reuse across bands. */
 export function prepareRender(params) {
-  return { params, tone: params.toneActive ? toneTable(params.tone, maxLuminance(params)) : exactToneLuminance };
+  return {
+    params,
+    tone: params.toneActive ? toneTable(params.tone, maxLuminance(params)) : exactToneLuminance,
+    profile: params.profileCurve ? luminanceTable(exactProfileLuminance, params, maxLuminance(params)) : exactProfileLuminance,
+  };
 }
 
 /**
@@ -97,7 +104,7 @@ export function renderRgba8(source, params, {
   flattenAlpha = false,
 } = {}) {
   const prepared = params.tone && params.params ? params : prepareRender(params);
-  const { params: p, tone } = prepared;
+  const { params: p, tone, profile } = prepared;
   assertPerPixel(p);
   const rgb = [0, 0, 0];
   for (let pixel = start; pixel < end; pixel += 1) {
@@ -112,7 +119,7 @@ export function renderRgba8(source, params, {
         rgb[0] = SRGB_TO_LINEAR_8BIT[source[i]];
         rgb[1] = SRGB_TO_LINEAR_8BIT[source[i + 1]];
         rgb[2] = SRGB_TO_LINEAR_8BIT[source[i + 2]];
-        processLinear(rgb, p, tone);
+        processLinear(rgb, p, tone, profile);
         rgb[0] = fastTransfer.toSrgb(rgb[0]); rgb[1] = fastTransfer.toSrgb(rgb[1]); rgb[2] = fastTransfer.toSrgb(rgb[2]);
       }
       processDisplay(rgb, p, fastTransfer);
@@ -124,7 +131,7 @@ export function renderRgba8(source, params, {
       rgb[0] = SRGB_TO_LINEAR_8BIT[source[i]];
       rgb[1] = SRGB_TO_LINEAR_8BIT[source[i + 1]];
       rgb[2] = SRGB_TO_LINEAR_8BIT[source[i + 2]];
-      processLinear(rgb, p, tone);
+      processLinear(rgb, p, tone, profile);
       target[i] = encodeSrgb8(rgb[0]);
       target[i + 1] = encodeSrgb8(rgb[1]);
       target[i + 2] = encodeSrgb8(rgb[2]);
@@ -171,7 +178,7 @@ export function renderRawRgba8(source, params, {
   end = source.length / 3,
 } = {}) {
   const prepared = params.tone && params.params ? params : prepareRender(params);
-  const { params: p, tone } = prepared;
+  const { params: p, tone, profile } = prepared;
   assertPerPixel(p);
   const rgb = [0, 0, 0];
   const scale = source instanceof Float32Array ? 1 : 1 / 65535;
@@ -179,7 +186,7 @@ export function renderRawRgba8(source, params, {
     const i = pixel * 3;
     const o = pixel * 4;
     developRaw(source[i] * scale, source[i + 1] * scale, source[i + 2] * scale, p.raw, rgb);
-    processLinear(rgb, p, tone);
+    processLinear(rgb, p, tone, profile);
     if (p.postActive) {
       rgb[0] = fastTransfer.toSrgb(rgb[0]); rgb[1] = fastTransfer.toSrgb(rgb[1]); rgb[2] = fastTransfer.toSrgb(rgb[2]);
       processDisplay(rgb, p, fastTransfer);

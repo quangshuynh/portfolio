@@ -9,7 +9,8 @@
 // (settings before and after per photo, never pixels), so it can be undone per photo or
 // as a whole; undoing a batch skips photos edited since.
 
-import { adjustmentsEqual, clampAdjustment, neutralAdjustments, neutralGroup, normalizeAdjustments } from './adjustments.mjs';
+import { adjustmentsEqual, clampAdjustment, developmentBase, neutralAdjustments, neutralGroup, normalizeAdjustments } from './adjustments.mjs';
+import { DEFAULT_RAW_PROFILE } from '../raw/rawProfiles.mjs';
 import { presetPatch } from './presets.mjs';
 import { layerAdjustments, normalizeLayerSettings, updateLayer } from './layers.mjs';
 import { normalizeLocalSettings } from './masks.mjs';
@@ -90,6 +91,13 @@ function retarget(present, { layerId, localId }, change) {
   return { ...present, layers: updateLayer(present.layers, layerId, { settings: normalizeLayerSettings(change(layerAdjustments(layer.settings))) }) };
 }
 
+/** Settings of a newly imported photo: neutral, and a RAW (not a merged HDR) starts with Camera Natural. */
+export function importedAdjustments(info) {
+  const neutral = neutralAdjustments();
+  if (info?.raw && !info.hdr && !(info.raw.hdrWhite > 1)) neutral.raw.profile = DEFAULT_RAW_PROFILE;
+  return neutral;
+}
+
 export function editorReducer(state, action) {
   const target = (h, change) => retarget(h.present, action, change);
   switch (action.type) {
@@ -115,7 +123,7 @@ export function editorReducer(state, action) {
         ...action.info,
         status: 'ready',
         restored: Boolean(match),
-        history: history.createHistory(match ? match.adjustments : neutralAdjustments()),
+        history: history.createHistory(match ? match.adjustments : importedAdjustments(action.info)),
       }));
       return match ? { ...next, pendingEdits: next.pendingEdits.filter((entry) => entry !== match) } : next;
     }
@@ -217,7 +225,7 @@ export function editorReducer(state, action) {
     case 'resetGroup':
       return updateHistory(state, (h) => history.apply(h, target(h, (a) => normalizeAdjustments({ ...a, ...neutralGroup(action.group, a) }))));
     case 'resetAll':
-      return updateHistory(state, (h) => history.apply(h, target(h, () => neutralAdjustments())));
+      return updateHistory(state, (h) => history.apply(h, target(h, (a) => developmentBase(a))));
     case 'undo':
       return updateHistory(state, history.undo);
     case 'redo':

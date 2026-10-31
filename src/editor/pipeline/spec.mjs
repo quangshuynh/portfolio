@@ -15,7 +15,9 @@
 //
 // RAW photos start before that from 16-bit linear camera RGB (see raw/rawColor.mjs):
 //   per-channel white balance gain, clip at the sensor white -> camera matrix to
-//   linear sRGB -> the steps above, with a highlight rolloff right after exposure.
+//   linear sRGB -> the steps above. Exposure includes the rendering profile's baseline
+//   (raw/rawProfiles.mjs); right after it comes either the Camera Natural tone (toe and
+//   highlight shoulder on luminance) or, for the other profiles, a highlight rolloff.
 // Their "decode" step is this development, never the sRGB EOTF, and nothing is
 // rounded to 8 bits before the final quantisation.
 //
@@ -29,6 +31,7 @@ import { HSL_RANGES, hslKey, normalizeAdjustments } from '../model/adjustments.m
 import { curveTables, sampleCurve } from './curves.mjs';
 import { sampleLut } from './lut.mjs';
 import { rawDevelopParams } from '../raw/rawColor.mjs';
+import { LEGACY_RAW_PROFILE, naturalTone, rawProfileParams } from '../raw/rawProfiles.mjs';
 import { detailParams } from './detail.mjs';
 import { creativeParams } from './creative.mjs';
 
@@ -101,20 +104,28 @@ export function deriveParams(adjustments, { lut = null, raw = null } = {}) {
   };
   const toneActive = Object.values(tone).some((value) => value !== 0);
   const whiteBalanceActive = a.temperature !== 0 || a.tint !== 0;
+  const developed = raw ? rawDevelopParams(raw, { ...a.raw, temperature: a.rawTemperature, tint: a.rawTint }) : null;
+  // Merged HDR photos have their own tone stage and keep the legacy rendering.
+  const profile = developed ? rawProfileParams(developed.white > 1 ? LEGACY_RAW_PROFILE : a.raw.profile, raw) : null;
   const params = {
     whiteBalanceActive,
     whiteBalance: whiteBalanceMatrix(a.temperature, a.tint),
-    exposureGain: 2 ** a.exposure,
+    // The profile's baseline adds to the gain; the Exposure slider keeps its own value.
+    exposureGain: 2 ** (a.exposure + (profile?.exposureEv ?? 0)),
     toneActive,
     tone,
     vibrance: a.vibrance / 100,
     saturation: 1 + a.saturation / 100,
   };
-  params.raw = raw ? rawDevelopParams(raw, { ...a.raw, temperature: a.rawTemperature, tint: a.rawTint }) : null;
+  params.raw = developed;
   params.hdr = Boolean(params.raw && params.raw.white > 1);
+  params.profile = profile?.id ?? null;
+  params.profileCurve = profile?.curve ?? null;
+  // The sensor white's luminance at this exposure, never below the profile's own.
+  params.profileWhite = params.profileCurve ? Math.max(2 ** profile.exposureEv, params.exposureGain) : 0;
   // The rolloff keeps the sensor (or merged) white at display white when it would clip.
   const white = (params.raw?.white ?? 1) * params.exposureGain;
-  params.rolloffWhite = params.raw && white > 1 ? white : 0;
+  params.rolloffWhite = params.raw && !params.profileCurve && white > 1 ? white : 0;
   params.rolloffKnee = params.hdr ? hdrKnee(a.hdrHighlights) : ROLLOFF_KNEE;
   params.shadowLift = params.hdr ? a.hdrShadows / 100 : 0;
   // A RAW source always needs developing, so its base stage is never the identity.
@@ -176,14 +187,18 @@ export function toneCurve(p, tone) {
 /** Exact tone mapping of linear luminance. */
 export const exactToneLuminance = (y, tone) => srgbToLinear(toneCurve(linearToSrgb(y), tone));
 
+/** Exact Camera Natural tone of linear luminance for a parameter set. */
+export const exactProfileLuminance = (y, params) => naturalTone(y, params.profileCurve, params.profileWhite);
+
 /**
  * Reference implementation for one pixel of linear RGB. Mutates and returns `rgb`.
  * :param rgb: [r, g, b] linear, usually in [0, 1]
  * :param params: deriveParams() result
  * :param toneLuminance: (y, tone) -> y'; the CPU renderer passes a tabulated version
+ * :param profileLuminance: (y, params) -> y' for the Camera Natural tone; likewise
  * :returns: linear RGB in [0, 1]
  */
-export function processLinear(rgb, params, toneLuminance = exactToneLuminance) {
+export function processLinear(rgb, params, toneLuminance = exactToneLuminance, profileLuminance = exactProfileLuminance) {
   let [r, g, b] = rgb;
   if (params.whiteBalanceActive) {
     const m = params.whiteBalance;
@@ -203,6 +218,11 @@ export function processLinear(rgb, params, toneLuminance = exactToneLuminance) {
   }
   if (params.rolloffWhite && y > params.rolloffKnee) {
     const ratio = highlightRolloff(y, params.rolloffWhite, params.rolloffKnee) / y;
+    r *= ratio; g *= ratio; b *= ratio;
+    y *= ratio;
+  }
+  if (params.profileCurve && y > BLACK_EPSILON) {
+    const ratio = profileLuminance(y, params) / y;
     r *= ratio; g *= ratio; b *= ratio;
     y *= ratio;
   }

@@ -19,7 +19,7 @@
 // The watermark (placement, size, colour, enabled) is copied only when Watermark is ticked; it is
 // relative to each target's own output frame, so it lands in the same place on any photo.
 
-import { adjustmentsEqual, groupKeys, neutralAdjustments, normalizeAdjustments } from './adjustments.mjs';
+import { adjustmentsEqual, developmentBase, groupKeys, neutralAdjustments, normalizeAdjustments } from './adjustments.mjs';
 import { presetPatch } from './presets.mjs';
 import { filterPatch } from './filters.mjs';
 import { gradientLocals } from './masks.mjs';
@@ -42,7 +42,7 @@ export const SYNC_GROUPS = Object.freeze([
   { id: 'curves', label: 'Tone curve', keys: [], structured: 'curves' },
   { id: 'lut', label: 'LUT', keys: groupKeys('lut'), structured: 'lut' },
   { id: 'creative', label: 'Creative', keys: groupKeys('creative'), structured: 'filter' },
-  { id: 'raw', label: 'RAW white balance', keys: groupKeys('raw'), structured: 'raw', applies: developed, needs: 'RAW photos' },
+  { id: 'raw', label: 'RAW white balance and profile', keys: groupKeys('raw'), structured: 'raw', applies: developed, needs: 'RAW photos' },
   { id: 'hdr', label: 'HDR tone mapping', keys: groupKeys('hdr'), applies: radianceHdr, needs: 'merged RAW HDR photos' },
   { id: 'outputSize', label: 'Output size (resize)', keys: [], geometry: ['resize'] },
   {
@@ -189,8 +189,8 @@ export function planRecipe(recipe, targets, { groups = recipeGroups(recipe), mod
   return { ...plan(targets, (photo, before) => ({ patch: applyRecipe(before, recipe, { groups: usable, mode, lut }) })), errors };
 }
 
-/** Resets every target to neutral settings (its RAW and merge data are untouched). */
-export const planReset = (targets) => ({ ...plan(targets, () => ({ patch: neutralAdjustments() })), errors: [] });
+/** Resets every target to neutral settings (its RAW and merge data and RAW profile are untouched). */
+export const planReset = (targets) => ({ ...plan(targets, (photo, before) => ({ patch: developmentBase(before) })), errors: [] });
 
 /** What a photo's source is, for compatibility with copied settings. */
 export const sourceKind = (photo) => ({ raw: developed(photo), hdr: radianceHdr(photo), proportions: proportions(photo) });

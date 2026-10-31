@@ -28,8 +28,10 @@ export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // or images); older files read without one. Version 12 added retouch (`retouch`,
 // model/retouch.mjs: clone and heal strokes as normalised paths, radii and source offsets, never
 // pixels); older files read without any. Version 13 added the Remove type (content-aware fill
-// of a brushed area, with an optional source area); version 12 files read unchanged.
-export const DOCUMENT_VERSION = 13;
+// of a brushed area, with an optional source area); version 12 files read unchanged. Version 14
+// added the RAW rendering profile (`raw.profile`, raw/rawProfiles.mjs); RAW photos in older files
+// read without one and keep the legacy rendering.
+export const DOCUMENT_VERSION = 14;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).

@@ -19,7 +19,7 @@ import { noiseCell } from './digital.mjs';
 
 const UNIFORMS = ['uSource', 'uDirect', 'uWhiteBalanceActive', 'uWhiteBalance', 'uExposureGain', 'uToneActive', 'uContrast',
   'uHighlights', 'uShadows', 'uWhites', 'uBlacks', 'uVibrance', 'uSaturation', 'uNeutral',
-  'uRaw', 'uRawSource', 'uRawGain', 'uRawMatrix', 'uRawWhite', 'uRolloffWhite', 'uRolloffKnee', 'uShadowLift', 'uHdr', 'uHdrSource',
+  'uRaw', 'uRawSource', 'uRawGain', 'uRawMatrix', 'uRawWhite', 'uRolloffWhite', 'uRolloffKnee', 'uProfileActive', 'uProfileCurve', 'uShadowLift', 'uHdr', 'uHdrSource',
   'uBaseNeutral', 'uCurvesActive', 'uCurveActive', 'uCurves', 'uHslActive', 'uHslHue', 'uHslSat', 'uHslLum',
   'uLutActive', 'uLut', 'uLutSize', 'uLutDomainMin', 'uLutDomainMax', 'uLutIntensity',
   'uGeometry', 'uGeometryMatrix', 'uOutputSize', 'uCoverage', 'uCoverageScale', 'uSourceSize', 'uBackground', 'uOpaque',
@@ -650,6 +650,9 @@ export class GlRenderer {
     gl.uniform1f(u.uRawWhite, params.raw?.white ?? 1);
     gl.uniform1f(u.uRolloffWhite, params.rolloffWhite ?? 0);
     gl.uniform1f(u.uRolloffKnee, params.rolloffKnee ?? 0.5);
+    const curve = params.profileCurve;
+    gl.uniform1i(u.uProfileActive, curve ? 1 : 0);
+    gl.uniform4f(u.uProfileCurve, curve?.contrast ?? 1, curve?.pivot ?? 0.18, curve?.shoulder ?? 1, params.profileWhite || 1);
     gl.uniform1f(u.uShadowLift, params.shadowLift ?? 0);
     gl.uniform1i(u.uNeutral, params.neutral ? 1 : 0);
     gl.uniform1i(u.uWhiteBalanceActive, params.whiteBalanceActive ? 1 : 0);

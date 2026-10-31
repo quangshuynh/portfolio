@@ -1,4 +1,4 @@
-# RAW compatibility (Interval 21)
+# RAW compatibility (Intervals 21–22)
 
 Genuine files tested with the editor's own pipeline (LibRaw 0.22.1 via `libraw-wasm` 1.6.0,
 unchanged). The sample files are private and never committed. Rerun both checks against a
@@ -12,10 +12,15 @@ RAW_COMPAT_DIR=C:/path/to/raws npm run check:editor:raw-formats
 `check:raw:compat` (Node) runs identification, LibRaw metadata, half and full decodes, white
 balance re-application against LibRaw's own decode (99.9th percentile within 8/65535), colour
 against the camera's embedded JPEG (neutral R/G and B/G within 0.15 log, brightness within 6 L*
-at some exposure from −1 to +2 EV, no magenta where green clipped) and a full-size export through
-the worker's export handler (tone, colour, Detail, custom white balance, heal, crop, straighten).
-`check:editor:raw-formats` (production build, browser) imports every file at once and, per photo,
-applies a v13 document (tone, HSL, curve, grading, sharpening, noise reduction, white balance,
+at some exposure from −1 to +2 EV, no magenta where green clipped), the three RAW rendering
+profiles against that reference (Camera Natural must be brighter than legacy, clip no more to
+white than legacy + 0.5 %, and keep neutral balance within 0.15 log; a camera JPEG with the
+RAW's name is used instead of the embedded preview when present) and a full-size export through
+the worker's export handler (Camera Natural, tone, colour, Detail, custom white balance, heal,
+crop, straighten).
+`check:editor:raw-formats` (production build, browser) imports every file at once (each must
+start with Camera Natural) and, per photo, applies a v14 document (Camera Natural and Linear
+alternating) (tone, HSL, curve, grading, sharpening, noise reduction, white balance,
 grain, crop and straighten, radial mask, Spot Heal, HUYNH watermark), then exports at full size,
 compares preview and export, and checks that the watermark changes only its corner; then a
 mixed-format ZIP with a cancelled first attempt, and saving, reloading and reopening the edits.
@@ -57,11 +62,10 @@ from one Windows desktop run (Node 24, Chromium 141, Firefox 142, CPU preview of
 - **Colour.** As-shot white balance matches the camera JPEG on neutral tones for every
   validated file (worst: COOLPIX P1000 red −0.12 log, a sunset with few neutral pixels). Colour
   charts (5D Mark IV, X-T4) render with correct hues.
-- **Brightness.** Neutral development is scene-linear, with no camera tone curve or baseline
-  exposure, so it is darker than in-camera JPEGs: about +1.5 to +2 EV is needed to match the
-  5D Mark IV, 5DS, EOS R, Nikon Z 6, OM-1, G9 and DJI (Mavic 3) files, +0.5 to +1 EV for most others.
-  Colours and white balance are unaffected; Exposure corrects it. Same nature as the D3100
-  NEF gap (0.4–0.9 EV) recorded in Interval 17.
+- **Brightness.** The legacy (and Linear) development is scene-linear, with no tone curve or
+  baseline exposure, so it is darker than in-camera JPEGs: about +1.5 to +2 EV for the 5D Mark
+  IV, 5DS, EOS R, Nikon Z 6, OM-1, G9 and DJI files, +0.5 to +1 EV for most others. Interval 22
+  added Camera Natural for new imports (below).
 - **X-Trans** (X-T4, X100V) uses LibRaw's 3-pass Markesteijn demosaic: full decodes take 16–24 s
   in Node (versus 1–6 s for Bayer files of similar size). Half-size previews are fast.
 - **Odd sensor width.** The DSC-R1 develops 3925 px wide but half-size import reports 3924;
@@ -102,6 +106,46 @@ leaves its photos "Cancelled" and the retry saves all six; preview and export ag
 crash on Windows (docs/photography-editor.md, Known issues) did not occur in this run; it is
 intermittent, so this is not evidence that it is fixed. Firefox exports X-Trans RAF about 2.6×
 slower than Chromium.
+
+## Rendering profiles (Interval 22)
+
+Median L* difference from the camera's rendering with no edits (as-shot white balance), legacy →
+Camera Natural; chroma is the mean max−min channel spread relative to the camera's. Reference:
+embedded preview unless noted (not ground truth; phones apply local tone mapping).
+
+| File | Camera | Legacy L* gap | Camera Natural L* gap | Natural chroma vs camera | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| Apple-iPhone-12-Pro.DNG | iPhone 12 Pro (BaselineExposure −0.30) | −7.2 | +4.6 | 0.61 | Better |
+| Canon-5D-Mark-IV.CR2 | 5D Mark IV | −26.9 | −15.7 | 0.60 | Better, still dark |
+| Canon-EOS-D60.CRW | EOS D60 | −3.6 | +12.5 | 1.00 | Worse (too bright) |
+| Canon-EOS-R.CR3 | EOS R | −27.3 | −11.2 | 0.66 | Better, still dark |
+| DJI_0020.DNG | Mavic 3 (BaselineExposure +0.40) | −19.7 | −1.0 | 0.63 | Better |
+| DSCF3103.RAF | X100V | −5.5 | +1.8 | 0.85 | Better |
+| Fujifilm-X-T4.RAF | X-T4 | −6.2 | +4.7 | 0.80 | Similar |
+| IMG20231031184843.dng | OPPO Find X6 Pro (−0.40) | +1.4 | +8.1 | 0.94 | Worse (too bright) |
+| IMG_6266.CR3 | EOS R8 | −7.6 | +1.1 | 0.74 | Better |
+| Nikon-Coolpix-P1000.NRW | COOLPIX P1000 | −4.4 | +10.2 | 0.77 | Worse (too bright) |
+| Nikon-Z6.NEF | Z 6 | −19.3 | −5.2 | 0.75 | Better |
+| OM-System-OM-1.ORF | OM-1 | −21.4 | −6.6 | 0.84 | Better |
+| Panasonic-G9.RW2 | G9 | −20.3 | −7.5 | 0.70 | Better |
+| Ricoh-GR-III.DNG | GR III (−0.51) | −8.6 | −2.8 | 0.90 | Better |
+| Sony-DSC-R1.SR2 | DSC-R1 | −7.8 | +4.8 | 0.80 | Similar |
+| sample-nrw-files-sample1.nrw | COOLPIX P7100 | −7.9 | +8.6 | 1.16 | Worse (too bright) |
+| sample-orf-files-sample1.orf | E-300 | 0.0 | +13.7 | 1.05 | Worse (too bright) |
+| sample-pef-files-sample1.pef | K-5 | −3.4 | +10.4 | 0.92 | Worse (too bright) |
+| sample-rw2-files-sample1.rw2 | DMC-FZ70 | −6.8 | +9.5 | 0.75 | Worse (too bright) |
+| sample1.cr2 | 5DS | −27.9 | −12.6 | 0.83 | Better, still dark |
+| D3100 `_DSC0114`–`0117` (camera JPEG) | D3100 | −6.3 to −12.4 | +2.2 to +6.6 | 0.95–1.14 | Better |
+| A7 III `DSC09410`–`09418` | ILCE-7M3 | −2.5 to −18.7 | −4.8 to +2.3 | 0.66–1.02 | Better |
+| A7 III `DSC09419`, `09420` (bright scenes) | ILCE-7M3 | −0.8, −1.7 | +15.1, +14.6 | 0.98, 1.01 | Worse (too bright) |
+
+Camera Natural improves 2010s–2020s interchangeable-lens cameras (where the legacy gap was
+largest) and is too bright by 8–14 L* (about 0.5–0.75 EV) for older CCD-era compacts and DSLRs
+and for already-bright scenes; −0.5 to −0.7 Exposure corrects those. Pixels clipped to white:
+within 0.13 % of legacy and never above the camera's own on the seven files with the most clipping (others: at most 0.4 % more pixels with any channel at 255); more pixels reach
+255 in one channel (bright saturated colours, hue kept by the range fit). Neutral balance is
+unchanged (≤ 0.12 log). No crushed blacks (≤ 0.17 % of pixels at 0–2). Render cost on the CPU
+is about 20 % above legacy (tabulated curve); export times are unchanged within noise.
 
 ## CMS
 
