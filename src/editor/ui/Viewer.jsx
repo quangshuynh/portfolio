@@ -182,7 +182,7 @@ function overlayTable(view, hex) {
  *   canvas over the photo, so moving or resizing it never renders the photo again
  * :param onWatermarkAuto: receives { variant, mean } of the preview's backdrop when the colour is Auto
  */
-export default function Viewer({ photo, adjustments: settings, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, renderLocalDetail = null, deferWork = false, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, layerTool = null, maskTool = null, retouchTool = null, layerRasters = null, lutFor = () => null, exportSize: exportSizeProp = null, onWatermarkAuto = null }) {
+export default function Viewer({ photo, adjustments: settings, lut = null, previewing = null, compare, split, onSplitChange, loadProxy, renderInWorker, renderLocalDetail = null, deferWork = false, onEngine, onProxy = null, zoomCommand, inspect = null, transform = null, layerTool = null, maskTool = null, retouchTool = null, onCancelFill = null, layerRasters = null, lutFor = () => null, exportSize: exportSizeProp = null, onWatermarkAuto = null }) {
   // The photo's settings keep their identity while only the watermark changes, so a watermark
   // edit redraws only its own overlay, never the photo or its layers.
   const settingsRef = useRef(settings);
@@ -1116,8 +1116,8 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
         {retouchBusy && proxy && (
           <div className="pe-retouch-progress" role={retouchBusy.error ? 'alert' : 'status'} data-retouch-busy={retouchBusy.error ? 'error' : 'filling'}>
             {retouchBusy.error ? `Remove failed: ${retouchBusy.error}` : `Removing… ${Math.round((retouchBusy.fraction ?? 0) * 100)}%`}
-            {!retouchBusy.error && retouchTool?.onCancelFill && (
-              <button type="button" className="pe-text-button" onClick={() => { removerRef.current?.cancel(); retouchTool.onCancelFill(retouchBusy.ids); setRetouchBusy(null); }}>Cancel</button>
+            {!retouchBusy.error && onCancelFill && (
+              <button type="button" className="pe-text-button" onClick={() => { removerRef.current?.cancel(); onCancelFill(retouchBusy.ids); setRetouchBusy(null); }}>Cancel</button>
             )}
           </div>
         )}

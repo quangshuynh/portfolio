@@ -53,7 +53,8 @@ const INIT = {
 const SPOT = { u: 0.3, v: 0.4, r: 0.009 };
 const SCRATCH = [{ u: 0.6, v: 0.62 }, { u: 0.7, v: 0.64 }];
 // An object for Remove: a bright square sign.
-const OBJECT = { u: 0.45, v: 0.78, half: 0.022 };
+// Smaller than the default brush (radius 2% of the short edge), as one paints it: a little past its edge.
+const OBJECT = { u: 0.45, v: 0.78, half: 0.014 };
 
 /** A textured photo with a dark blemish and a dark scratch (RGBA). */
 function photo(width, height) {
@@ -172,6 +173,13 @@ async function runOne(run, files) {
     let sum = 0; for (let i = 0; i < data.length; i += info.channels) sum += data[i + 1];
     return sum / (data.length / info.channels);
   };
+  // The preview's own pixels at a point of the photo (the drawn frame read back).
+  const drawnLevel = (at = OBJECT) => page.evaluate(({ u, v }) => {
+    const frame = window.__photoEditorPreview?.read();
+    if (!frame) return null;
+    const i = (Math.round(v * (frame.height - 1)) * frame.width + Math.round(u * (frame.width - 1))) * 4;
+    return frame.data[i + 1];
+  }, at);
   const setExportPng = async () => {
     await tab(3);
     await page.check('input[name=pe-format][value=png]');
@@ -196,7 +204,7 @@ async function runOne(run, files) {
     await step('import', async () => { await importFiles([files.base], 1); await select('retouch.png'); });
 
     await step('Spot Heal: a click on the blemish heals it in the preview', async () => {
-      const before = await shownLevel(SPOT);
+      const before = await drawnLevel(SPOT);
       await choose('Spot Heal', 'j');
       await clearMarks();
       const at = await photoPoint(SPOT);
@@ -207,7 +215,7 @@ async function runOne(run, files) {
       const op = value.retouch[0];
       assert.equal(op.type, 'heal');
       assert.ok(Math.hypot(op.offset.x, op.offset.y) > 0.02, `heal source offset ${JSON.stringify(op.offset)}`);
-      const after = await poll(() => shownLevel(SPOT), (level) => level > before + 40, 'healed preview', 15_000);
+      const after = await poll(() => drawnLevel(SPOT), (level) => level !== null && level > before + 40, 'healed preview (drawn frame)', 15_000);
       result.heal = { clickToPreviewMs: Date.now() - started, applyMs: stats(await marks('pe-retouch-applied')), before: Math.round(before), after: Math.round(after) };
     });
 
@@ -247,7 +255,7 @@ async function runOne(run, files) {
     });
 
     await step('Remove: paint over an object; it is filled in the background and disappears', async () => {
-      const before = await shownLevel(OBJECT);
+      const before = await drawnLevel();
       await choose('Remove', 'r');
       await clearMarks();
       const from = await photoPoint({ u: OBJECT.u - 0.012, v: OBJECT.v - 0.005 });
@@ -259,8 +267,17 @@ async function runOne(run, files) {
       const value = await savedWhen('retouch.png', (a) => a.retouch?.length === 3, 'removal saved');
       assert.equal(value.retouch[2].type, 'remove');
       await poll(() => page.locator('[data-retouch-busy]').count(), (n) => n === 0, 'fill finished', 120_000);
-      const after = await poll(() => shownLevel(OBJECT), (level) => level < before - 60, 'object removed from the preview', 30_000);
-      result.remove = { strokeToFilledMs: Date.now() - started, fillMs: stats(await marks('pe-retouch-applied')), before: Math.round(before), after: Math.round(after) };
+      // Tool off and nothing selected: no repair outlines over the photo while sampling it.
+      await page.keyboard.press('Escape');
+      await page.keyboard.press('Escape');
+      await tool().waitFor({ state: 'detached' });
+      // Asserted on the drawn frame: Playwright's WebKit on Windows showed the redrawn WebGL canvas
+      // only at the next page update in screenshots (the frame itself was right); the
+      // screenshot value is kept for comparison.
+      const drawnBefore = before;
+      const after = await poll(drawnLevel, (level) => level !== null && level < drawnBefore - 60, 'object removed from the drawn preview', 30_000);
+      const shown = await shownLevel(OBJECT);
+      result.remove = { strokeToFilledMs: Date.now() - started, fillMs: stats(await marks('pe-retouch-applied')), before: Math.round(before), after: Math.round(after), screenshot: Math.round(shown) };
     });
 
     if (!phone) {
@@ -486,6 +503,12 @@ async function runOne(run, files) {
     result.ok = false;
     result.error = error.message.split('\n').slice(0, 3).join(' ');
     result.problems = problems.slice(0, 5);
+    // What the page knew when it failed: saved operations, timing marks, the fill indicator.
+    result.debug = await page.evaluate((key) => ({
+      operations: (JSON.parse(localStorage.getItem(key) ?? 'null')?.photos ?? []).map((photo) => photo.adjustments.retouch?.map(({ type, enabled, points, radius }) => `${type}:${enabled}:${radius}:${points.map(([u, v]) => `${u.toFixed(3)},${v.toFixed(3)}`).join(' ')}`)),
+      applied: performance.getEntriesByName('pe-retouch-applied').map((entry) => entry.detail),
+      busy: document.querySelector('[data-retouch-busy]')?.textContent ?? null,
+    }), AUTOSAVE_KEY).catch(() => null);
     await page.screenshot({ path: path.join(work, `${run.id}-failure.png`) }).catch(() => {});
   } finally {
     await context.close();

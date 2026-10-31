@@ -25,8 +25,9 @@ const HEAL_MARGIN = 0.35;
 // pixels) is where the fill copies from, unless a source area is chosen.
 const REMOVE_MARGIN = 1;
 const REMOVE_MIN_MARGIN = 24;
-// Pixels this close to the brushed area are never copied (the object's own soft edge).
-const REMOVE_GUARD = 2;
+// Pixels this close to the brushed area (a share of the brush radius, at least 2 px) are never
+// copied: they are often the object's own fringe, which would grow the object back.
+const REMOVE_GUARD = 0.15;
 
 // `image.region` ({ x, y, width, height }) says `data` holds only that part of the photo (a canvas
 // read); coordinates stay those of the whole photo.
@@ -345,11 +346,12 @@ export function removeJob(image, op) {
   }
   // Allowed: not in or right next to the hole, and inside the chosen source area if there is one.
   const allowed = new Uint8Array(cw * ch).fill(1);
+  const guard = Math.max(2, Math.round(REMOVE_GUARD * op.radius * Math.min(width, height)));
   for (let y = 0; y < ch; y += 1) {
     for (let x = 0; x < cw; x += 1) {
       if (!hole[y * cw + x]) continue; // eslint-disable-line no-continue
-      for (let dy = -REMOVE_GUARD; dy <= REMOVE_GUARD; dy += 1) {
-        for (let dx = -REMOVE_GUARD; dx <= REMOVE_GUARD; dx += 1) {
+      for (let dy = -guard; dy <= guard; dy += 1) {
+        for (let dx = -guard; dx <= guard; dx += 1) {
           const nx = x + dx; const ny = y + dy;
           if (nx >= 0 && ny >= 0 && nx < cw && ny < ch) allowed[ny * cw + nx] = 0;
         }

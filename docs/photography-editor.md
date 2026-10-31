@@ -856,9 +856,11 @@ with none.
   coarse-to-fine pyramid (coarsest level ~24 px across the hole), at each level PatchMatch
   (7×7 patches compared on colour and luminance gradient, propagation and random search) and
   weighted voting, sharper at the finest level, which then takes each pixel from its best patch.
-  It copies from the photo within one hole-extent around the stroke (never from 2 px next to it),
+  It copies from the photo within one hole-extent around the stroke (never from a guard band of 15% of
+  the brush radius next to it, which is often the object's own fringe),
   or only from the chosen source area. The inner brush is replaced outright; only the outer half
-  of the falloff feathers. Deterministic (seed from the operation id); same code in preview and
+  of the falloff feathers: paint a little past the object, or uncovered parts can be copied back in.
+  Deterministic (seed from the operation id); same code in preview and
   export. Fills run in a worker (`inpaintClient.mjs`) with progress and Cancel in the page,
   synchronously inside export workers. Measured: 24 MP fill 0.12 s (40 px radius), 0.52 s
   (120 px), 2.0 s (240 px), +50 MB at most; preview fill ~0.2 s, about 0.7 s from stroke end to

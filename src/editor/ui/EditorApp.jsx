@@ -1410,6 +1410,7 @@ function EditorWorkspace({ host }) {
     else if ((key === 'delete' || key === 'backspace') && retouchSelected) { applyRetouch(removeRetouchOperation(adjustments.retouch, retouchSelected)); setRetouchSelected(null); }
     else if (key === 'escape' && retouchArea) setRetouchArea(null);
     else if (key === 'escape' && retouchTool) chooseRetouchTool(null);
+    else if (key === 'escape' && retouchSelected) setRetouchSelected(null);
     else return false;
     return true;
   } : null;
@@ -1715,7 +1716,8 @@ function EditorWorkspace({ host }) {
             onCommit: (mask, coalesceKey = null) => applyMask(mask, coalesceKey),
             onRemove: removeMaskComponent,
           } : null}
-          retouchTool={ready && !transformMode && (retouchTool || retouchSelected || adjustments.retouch.some(({ type }) => type === 'remove')) ? {
+          onCancelFill={(ids) => applyRetouch(adjustments.retouch.filter((op) => !ids.includes(op.id)))}
+          retouchTool={ready && !transformMode && (retouchTool || retouchSelected || retouchArea) ? {
             tool: retouchTool,
             brush: retouchBrush,
             clone: retouchClone,
@@ -1735,7 +1737,6 @@ function EditorWorkspace({ host }) {
             onError: setRetouchMessage,
             areaFor: retouchArea,
             onArea: (id, source) => { applyRetouch(updateRetouchOperation(adjustments.retouch, id, { source })); setRetouchArea(null); },
-            onCancelFill: (ids) => applyRetouch(adjustments.retouch.filter((op) => !ids.includes(op.id))),
           } : null}
           layerRasters={layerRasters}
           lutFor={lutFor}
