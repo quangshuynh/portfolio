@@ -1114,7 +1114,7 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
           />
         )}
         {retouchBusy && proxy && (
-          <div className="pe-retouch-progress" role={retouchBusy.error ? 'alert' : 'status'} data-retouch-busy={retouchBusy.error ? 'error' : 'filling'}>
+          <div className="pe-retouch-progress" role={retouchBusy.error ? 'alert' : 'status'} data-retouch-busy={retouchBusy.error ? 'error' : 'filling'} onPointerDown={(event) => event.stopPropagation()}>
             {retouchBusy.error ? `Remove failed: ${retouchBusy.error}` : `Removing… ${Math.round((retouchBusy.fraction ?? 0) * 100)}%`}
             {!retouchBusy.error && onCancelFill && (
               <button type="button" className="pe-text-button" onClick={() => { removerRef.current?.cancel(); onCancelFill(retouchBusy.ids); setRetouchBusy(null); }}>Cancel</button>

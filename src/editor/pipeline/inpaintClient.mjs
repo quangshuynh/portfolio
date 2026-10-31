@@ -10,7 +10,8 @@ export function createInpaintRunner(spawn = () => new Worker(new URL('./inpaintW
   return {
     /** :returns: a promise of the filled colour; `onProgress(fraction)` while it runs */
     run(payload, onProgress = () => {}) {
-      if (pending) pending.reject(new InpaintCancelled());
+      // A superseded fill is abandoned with its worker, so the new one does not queue behind it.
+      if (pending) { pending.reject(new InpaintCancelled()); pending = null; stop(); }
       worker ??= spawn();
       const id = nextId;
       nextId += 1;

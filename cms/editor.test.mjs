@@ -8,7 +8,7 @@ import path from 'node:path';
 import { createEditDocument, serializeEditDocument } from '../src/editor/model/editDocument.mjs';
 import { neutralAdjustments } from '../src/editor/model/adjustments.mjs';
 import { WATERMARK_DEFAULTS } from '../src/editor/watermark/watermark.mjs';
-import { watermarkStatus } from './lib/watermark-rules.mjs';
+import { autoDraftPlan, watermarkStatus } from './lib/watermark-rules.mjs';
 import { fixtureRepo, photograph } from './test-helpers.mjs';
 import { createSessions } from './lib/session.mjs';
 import { startCmsServer } from './server.mjs';
@@ -261,6 +261,13 @@ describe('treatments', () => {
     expect(watermarkStatus(json.treatment)).toBe('needs-regeneration');
     expect(json.treatment.approved.documentHash).toBe(approved.approved.documentHash);
     expect(json.treatment.approved.document.photos[0].adjustments.retouch[0].offset).toEqual({ x: 0.05, y: -0.01 });
+    // Automatic drafting picks it up and re-renders it with its own watermark, never the policy's.
+    const overview = (await call('GET', '/api/watermark/portfolio')).json;
+    const entry = overview.photographs.find((photo) => photo.id === id);
+    expect(entry.treatment.watermarkStatus).toBe('needs-regeneration');
+    const plan = autoDraftPlan([entry], { ...WATERMARK_DEFAULTS, position: 'top-left' });
+    expect(plan.ids).toEqual([id]);
+    expect(plan.settings[id].position).toBe(watermark.position);
     // Changing a removal's source area is a change too: stale again, the approved version kept.
     await render(id, await photograph({ width: 3000, height: 2000 }));
     await save(id, documentFor(source, { exposure: 0.2, retouch: [{ ...retouch[0], offset: { x: -0.05, y: 0.02 } }, retouch[1], { ...retouch[2], source: null }], watermark }));

@@ -855,21 +855,35 @@ with none.
   normalised rectangle) fills the brushed area content-aware (`pipeline/inpaint.mjs`): a
   coarse-to-fine pyramid (coarsest level ~24 px across the hole), at each level PatchMatch
   (7×7 patches compared on colour and luminance gradient, propagation and random search) and
-  weighted voting, sharper at the finest level, which then takes each pixel from its best patch.
-  It copies from the photo within one hole-extent around the stroke (never from a guard band of 15% of
-  the brush radius next to it, which is often the object's own fringe),
-  or only from the chosen source area. The inner brush is replaced outright; only the outer half
-  of the falloff feathers: paint a little past the object, or uncovered parts can be copied back in.
-  Deterministic (seed from the operation id); same code in preview and
-  export. Fills run in a worker (`inpaintClient.mjs`) with progress and Cancel in the page,
-  synchronously inside export workers. Measured: 24 MP fill 0.12 s (40 px radius), 0.52 s
-  (120 px), 2.0 s (240 px), +50 MB at most; preview fill ~0.2 s, about 0.7 s from stroke end to
-  the filled preview (Chromium, real GPU).
-  **Quality:** clean on skies, walls and regular patterns (brick), grass and pavement for small
-  and medium objects, thin wires, and at the photo's edge. Large areas of complex texture (dense
-  foliage, an object beside strong structure) come out softer or as repeated patches; choose a
-  source area or use Clone there. It does not reconstruct objects behind the removed one, and is
-  not reliable for large objects or people.
+  voting weighted by match quality and by confidence (patches anchored near the hole's edge count
+  more, ×1.3^-distance), sharper at the finest level, which then takes each pixel from its best
+  patch. Each further target reusing a source patch pays half the typical patch distance, so large
+  fills do not repeat one patch. It copies from the photo within one hole-extent around the
+  stroke (never from a round guard band of 15% of the brush radius next to it, often the object's
+  fringe), or only from the chosen source area. The inner brush is replaced outright; the outer
+  half of the falloff feathers, except rim pixels whose colour is much closer to the brushed
+  interior than to the photo just outside the guard (the object reaching into the soft edge):
+  those are replaced fully, so no faint ring of the object survives. Deterministic (seed from the
+  operation id); same code in preview and export. Fills run in a worker (`inpaintClient.mjs`)
+  with progress and Cancel; a newer edit or a superseding fill ends the worker (a fresh one starts),
+  so fills never queue behind abandoned ones; export workers fill synchronously.
+  **Measured** (`npm run bench:remove`, Node 24, same 24 MP photo and machine for both
+  versions): 40 px radius 0.18 s, 120 px 1.02 → 0.91 s, 240 px 4.7 → 3.4 s; peak memory above the
+  loaded photo +10, +66 → +45, +216 → +162 MB (the Interval 20 figures of 0.12/0.52/2.0 s and
+  +50 MB came from a different set-up and are not comparable). Preview fill ~0.2 s, about 0.7 s
+  from stroke end to the filled preview (Chromium, real GPU).
+  **Quality** (17 scenes × 3 seeds: 9 that already worked, 8 large objects on structure and
+  texture; truth known for each): against Interval 20, the already-good set's colour error
+  4.0 → 2.8 and seam 1.7 → 1.0 (small brick 14.5 → 4.7); the hard set's repetition 0.15 → 0.0,
+  object leak 2.1 → 0.8, seam 6.9 → 5.6, colour error 17.9 → 17.5. Tried and rejected: a coarser
+  start (36/48 px; easy scenes 2.8 → 6.7), 5×5 or 9×9 patches (worse, or +50% time for a small
+  gain), a max-pooled edge channel (helped fences, hurt small brick), other weights (noise).
+  Clean on skies, walls, brick, grass, gravel and pavement for small and medium objects, thin
+  wires, and at the photo's edge; large objects on irregular texture no longer repeat patches.
+  **Limits:** thin straight structures (lane markings, rails, sleepers) that cross a large hole
+  are not continued (they vanish at the coarse levels); dense foliage comes out softer. It never
+  reconstructs what was hidden behind an object and is not suited to removing people: choose a
+  source area or use Clone there.
 - **Preview:** a retouched copy of the proxy. Appended operations are applied in place and only
   their box is uploaded to a second GPU texture (before/split still read the untouched one); a
   clone stroke in progress is drawn from one snapshot per stroke. Other changes rebuild the copy.
@@ -885,7 +899,19 @@ with none.
   export 0.66 s; genuine A7 III ARW 4024×6024 PNG 4.8 s, D3100 NEF 3084×4644 3.4 s, changed only
   inside the repairs. Headless SwiftShader redraws are ~0.75 s per move (software WebGL).
 
-## Masks and local adjustments
+**Manual iPhone Safari check** (emulation is not Safari; run on the phone, Vercel preview):
+1. Open a 24 MP JPEG and a RAW; Adjust tab → Retouch → Remove. Paint one finger over a small
+   object at 100% and at 3× zoom: the red stroke tint follows the finger with no lag or page scroll.
+2. Start a stroke, put a second finger down: the stroke disappears and the photo pinch-zooms;
+   lift both: no repair was added. Pan with two fingers: no stroke.
+3. Paint a large removal (a third of the photo): "Removing… n%" appears; tap Cancel: the photo
+   is unchanged and the repair list has not grown. Paint again: it fills.
+4. Paint along the left and right screen edges: no Safari back/forward swipe, no page scroll.
+5. Select the removal → Choose source area → drag a rectangle; drag a clone source handle: both
+   follow the finger and the fill updates.
+6. Undo and Redo buttons step through repairs one by one; turn a repair off and on.
+7. Rotate 90° and crop, then export full size: repairs stay on their objects.
+
 
 **Using them** (Masks panel, below Layers; Adjust tab on phones). **New local adjustment →
 Brush, Linear or Radial** adds an empty local adjustment with that tool on: paint, or drag on the
