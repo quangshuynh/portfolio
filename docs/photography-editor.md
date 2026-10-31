@@ -185,18 +185,61 @@ baseline is never written into the Exposure slider. Positive Exposure moves the 
 with the sensor white, so highlights roll into white instead of clipping. Constants were
 fitted to the tone response (camera luminance against our linear development) of 19
 camera models: 34 Nikon D3100 NEF+JPEG pairs, 24 A7 III frames and one embedded preview
-per other camera; RMS 7.8 L* across all, ≤ 4 L* for D3100, A7 III, X100V and OM-1. One
-curve for all cameras, no per-model constants: modern Canon bodies stay 0.45–0.8 EV
-darker than their previews, older CCD cameras 0.3–0.75 EV brighter, which Exposure
-covers. The fitted toe contrast (1.37) was lowered to 1.25 so shadows are not crushed.
-Merged HDR photos keep their own tone stage. Reset, Before and Original keep the photo's
-profile; recipes and presets leave it out; Sync's RAW group copies it. Results per camera:
+per other camera; RMS 7.8 L* across all, ≤ 4 L* for D3100, A7 III, X100V and OM-1. The
+fitted toe contrast (1.37) was lowered to 1.25 so shadows are not crushed. Merged HDR photos
+keep their own tone stage. Reset, Before and Original keep the photo's profile; recipes and
+presets leave it out; Sync's RAW group copies it (not Auto Exposure). Results per camera:
 [raw-compatibility.md](raw-compatibility.md).
+
+**Camera Natural version 2** (Interval 22.1, new imports; `raw.profileVersion`). Measured on
+120 photographs with camera references, the remaining brightness differences are a per-camera
+exposure calibration, not the curve: the offset that aligns the curve with a camera's tone
+response is stable within a model (D3100 −0.30 EV, MAD 0.10 over 62 NEF+JPEG pairs; A7 III
++0.25 EV, MAD 0.30, 27 frames; A6400 +0.10) and follows sensor generation across models
+(cameras before about 2012 −0.5 to −0.7, 2016+ full frame +0.2 to +0.8). The global baseline
+is already centred (median model offset +0.05 EV), and a more camera-like toe (1.45) would
+lower the error only from 4.2 to 3.3 L*. So version 2 keeps the curve and adds the calibration
+for the two models with that evidence (`CAMERA_CALIBRATION`); single-sample models get none.
+Version 1 (Interval 22 edits) stays available for the edits that use it. Auto Exposure
+covers the rest per photo.
+
+**Auto Exposure** (`raw/rawAutoExposure.mjs`, RAW panel). A suggestion, never applied by itself:
+Preview, Apply (stored as `raw.autoExposure`, added to the gain like Exposure, never written into
+the slider), Reset and Dismiss (per session); undo, save and export include it. Inputs come from
+the import's half-size decode (no second decode): luminance samples (192 px, 123 KB, 86 ms) and
+the median lightness of the camera's embedded JPEG preview, decoded small by the browser in the
+RAW worker (only its brightness is used; previews under 320 px are ignored). A suggestion takes
+about 3 ms.
+
+- **Camera match** (when there is a preview): the exposure, on the 0.05 EV grid within ±1.5 EV, at
+  which the profile's median lightness meets the preview's. The preview is the camera's own
+  rendering of that photo, so night, backlit and high-key intent is kept rather than normalised.
+  On 40 D3100 files the preview's median lightness equals the camera JPEG's within 0.05 L*.
+  Differences under 0.3 EV are not offered; brightening never adds more than 1 % near-white
+  unclipped pixels.
+- **Scene fallback** (no usable preview): cameras do not normalise scene brightness (the key that
+  matched each camera varied ±0.64 EV), so this is corrective: a centre-weighted log-average key
+  against 0.18, lowered by up to two stops for dark scenes from EV100; keys within 1 EV are left
+  alone and only the excess is suggested. Nothing is brightened below EV100 7; darkening needs 5 %
+  of the frame near white or clipped (else high-key); +0.7 EV at most from ISO 3200.
+- Either way no suggestion when more than 35 % is clipped at the sensor.
+
+Measured against camera brightness (the exposure at which Camera Natural v2 matches the camera's
+median L*): D3100 against its genuine JPEGs, mean error 0.15 → 0.10 EV (62 photos, 9 offered, none
+worse); Sony A7 III/A6400 previews 0.34 → 0.12 EV (39, 17 offered); the Interval 21 cameras
+0.52 → 0.04 EV (19, 15 offered; Canon bodies +0.75 to +1.0, CCD-era −0.55 to −0.95). The last two
+are measured against the same previews the suggestion reads, so they show it reaches its target,
+not independent accuracy. Scene fallback, on daylight photos underexposed by 1/1.5/2 EV:
++0.26/+0.51/+0.84 on average, never the wrong direction.
+
+**RAW image layers** develop with their own profile (`rawProfile` on the layer, Layers panel
+"RAW profile") through the same layer render path: new RAW layers Camera Natural, layers
+saved before document version 15 legacy (no field, so their saved form is unchanged).
 
 Not compared with Lightroom or another converter, so no equivalence is claimed. Limits:
 one D65 matrix for every illuminant (tungsten colour less accurate than dual-illuminant
-profiles), no DCP or camera profiles, no lens corrections. Image layers made from RAW
-sources keep the legacy neutral development.
+profiles), no DCP or camera profiles, no lens corrections. Auto Exposure is not offered for
+RAW layers or merged HDR.
 
 **Highlights.** Clipped sensor channels stay clipped, as in LibRaw mode 0; there is
 no reconstruction and so no "highlight recovery" control. Raising Exposure on a RAW
@@ -1434,6 +1477,9 @@ Settings never change the text or typography.
   `sharpening`, `luminanceNoise`, `colorNoise`; older files open with Detail neutral.
 - Version 4 added merged HDR sources (see [Merge HDR](#merge-hdr)) and the HDR tone
   controls `hdrHighlights`, `hdrShadows`.
+- Version 15 added `raw.profileVersion` (2 for new imports; absent = 1), an accepted Auto
+  Exposure (`raw.autoExposure`, EV) and a RAW image layer's `rawProfile`; version 14 files
+  read and save unchanged.
 - Version 14 added the RAW rendering profile (`"raw": { "profile": "camera-natural" }`);
   RAW photos in older files read as `legacy` and render exactly as before.
 - Version 2 added curves, HSL and LUTs; version 3 RAW sources (`"format": "arw"`

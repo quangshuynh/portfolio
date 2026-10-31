@@ -5,7 +5,7 @@
 
 import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
-import { DEFAULT_RAW_PROFILE, LEGACY_RAW_PROFILE, NATURAL_CURVE, RAW_PROFILE_IDS, dngBaselineEv, naturalTone, rawProfileParams } from './rawProfiles.mjs';
+import { CAMERA_CALIBRATION, DEFAULT_RAW_PROFILE, LEGACY_RAW_PROFILE, NATURAL_CURVE, RAW_PROFILE_CHOICES, RAW_PROFILE_IDS, cameraCalibrationEv, dngBaselineEv, naturalTone, profileChoiceOf, rawProfileParams } from './rawProfiles.mjs';
 import { deriveParams, developRaw, processLinear } from '../pipeline/spec.mjs';
 import { encodeSrgb8, renderRawRgba8 } from '../pipeline/cpuRenderer.mjs';
 import { compactAdjustments, developmentBase, groupIsNeutral, neutralAdjustments, neutralGroup, normalizeAdjustments } from '../model/adjustments.mjs';
@@ -13,6 +13,7 @@ import { DOCUMENT_TYPE, DOCUMENT_VERSION, createEditDocument, parseEditDocument,
 import { editorReducer, importedAdjustments, initialEditorState } from '../model/editorState.mjs';
 import { planReset, planSync } from '../model/sync.mjs';
 import { RECIPE_GROUPS, recipeFromAdjustments } from '../model/recipes.mjs';
+import { compactLayers, createImageLayer, layerDevelopment, normalizeLayers } from '../model/layers.mjs';
 
 const RAW = {
   asShot: [2.33984375, 1, 1.53515625],
@@ -180,8 +181,8 @@ describe('rendering with profiles', () => {
 describe('profiles in the settings model', () => {
   test('profiles normalise; settings without one are legacy', () => {
     expect(RAW_PROFILE_IDS).toEqual(['camera-natural', 'linear', 'legacy']);
-    expect(normalizeAdjustments({}).raw).toEqual({ whiteBalance: 'as-shot', profile: 'legacy' });
-    expect(normalizeAdjustments({ raw: { whiteBalance: 'daylight', profile: 'filmic' } }).raw).toEqual({ whiteBalance: 'daylight', profile: 'legacy' });
+    expect(normalizeAdjustments({}).raw).toEqual({ whiteBalance: 'as-shot', profile: 'legacy', profileVersion: 1, autoExposure: null });
+    expect(normalizeAdjustments({ raw: { whiteBalance: 'daylight', profile: 'filmic' } }).raw).toEqual({ whiteBalance: 'daylight', profile: 'legacy', profileVersion: 1, autoExposure: null });
     expect(compactAdjustments(normalizeAdjustments({})).raw).toBeUndefined();
     // Legacy is never written: older documents keep their exact saved form (and CMS hashes).
     expect(compactAdjustments(normalizeAdjustments({ raw: { whiteBalance: 'daylight' } })).raw).toEqual({ whiteBalance: 'daylight' });
@@ -214,16 +215,16 @@ describe('profiles in the settings model', () => {
     state = editorReducer(state, { type: 'resetAll' });
     expect(present(state)).toMatchObject({ exposure: 0, raw: { whiteBalance: 'as-shot', profile: 'linear' } });
     expect(groupIsNeutral(present(state), 'raw')).toBe(true);
-    expect(neutralGroup('raw', present(state)).raw).toEqual({ whiteBalance: 'as-shot', profile: 'linear' });
-    expect(developmentBase(present(state))).toEqual({ ...neutralAdjustments(), raw: { whiteBalance: 'as-shot', profile: 'linear' } });
+    expect(neutralGroup('raw', present(state)).raw).toEqual({ whiteBalance: 'as-shot', profile: 'linear', profileVersion: 1, autoExposure: null });
+    expect(developmentBase(present(state))).toEqual({ ...neutralAdjustments(), raw: { whiteBalance: 'as-shot', profile: 'linear', profileVersion: 1, autoExposure: null } });
   });
 
   test('profiles save and reopen; a version 13 file reopens with the legacy rendering', () => {
     const state = imported();
     const photo = { ...state.photos[0], adjustments: present(state) };
     const text = serializeEditDocument(createEditDocument([photo], state.exportSettings));
-    expect(JSON.parse(text)).toMatchObject({ version: DOCUMENT_VERSION, photos: [{ adjustments: { raw: { profile: 'camera-natural' } } }] });
-    expect(DOCUMENT_VERSION).toBe(14);
+    expect(JSON.parse(text)).toMatchObject({ version: DOCUMENT_VERSION, photos: [{ adjustments: { raw: { profile: 'camera-natural', profileVersion: 2 } } }] });
+    expect(DOCUMENT_VERSION).toBe(15);
     const reopened = imported(parseEditDocument(text).photos);
     expect(present(reopened).raw.profile).toBe('camera-natural');
     const v13 = JSON.stringify({ type: DOCUMENT_TYPE, version: 13, photos: [{ source: { name: 'DSC0001.ARW', size: 10, sha256: 'a'.repeat(64), format: 'arw', width: 6000, height: 4000 }, adjustments: { exposure: 0.4, raw: { whiteBalance: 'daylight' } } }] });
@@ -240,5 +241,97 @@ describe('profiles in the settings model', () => {
     expect(planSync(settings, [target], { groups: ['raw'], kind: { raw: true } }).items[0].after.raw.profile).toBe('camera-natural');
     const own = { ...target, history: { present: settings } };
     expect(planReset([own]).items[0].after).toMatchObject({ exposure: 0, contrast: 0, raw: { profile: 'camera-natural' } });
+  });
+});
+
+describe('Camera Natural version 2, Auto Exposure and RAW layers (document version 15)', () => {
+  const D3100 = { ...RAW, make: 'Nikon', model: 'D3100' };
+  const A7III = { ...RAW, make: 'Sony', model: 'ILCE-7M3' };
+  const V2 = { raw: { profile: 'camera-natural', profileVersion: 2 } };
+
+  test('version 2 adds only the measured calibration; version 1 and uncalibrated cameras are unchanged', () => {
+    expect(CAMERA_CALIBRATION.map(({ ev }) => ev)).toEqual([-0.3, 0.25]);
+    expect([cameraCalibrationEv(D3100), cameraCalibrationEv(A7III), cameraCalibrationEv({ make: 'Sony', model: 'ILCE-6400' }), cameraCalibrationEv({ make: 'Canon', model: 'EOS R' })]).toEqual([-0.3, 0.25, 0, 0]);
+    expect(rawProfileParams('camera-natural', D3100, 2).exposureEv).toBeCloseTo(NATURAL_CURVE.baselineEv - 0.3, 12);
+    expect(rawProfileParams('camera-natural', D3100, 1).exposureEv).toBe(NATURAL_CURVE.baselineEv);
+    expect(rawProfileParams('linear', D3100, 2).exposureEv).toBe(0);
+    const pixels = greys(16);
+    // A calibration is an exposure offset of the whole profile, white included: v2 on a D3100 is v1 at −0.3 EV.
+    const v2 = deriveParams(normalizeAdjustments(V2), { raw: D3100 });
+    const v1 = deriveParams(normalizeAdjustments({ raw: { profile: 'camera-natural' } }), { raw: D3100 });
+    expect(v2.exposureGain).toBeCloseTo(v1.exposureGain * 2 ** -0.3, 12);
+    expect(v2.profileWhite).toBeCloseTo(v2.exposureGain, 12);
+    expect(render(V2, pixels, RAW)).toEqual(render({ raw: { profile: 'camera-natural' } }, pixels, RAW));
+  });
+
+  test('an accepted Auto Exposure acts like Exposure but leaves the slider alone; it is an edit Reset removes', () => {
+    const pixels = greys(16);
+    const auto = normalizeAdjustments({ ...V2, raw: { ...V2.raw, autoExposure: 0.6 } });
+    expect(auto.exposure).toBe(0);
+    expect(render(auto, pixels)).toEqual(render({ ...V2, exposure: 0.6 }, pixels));
+    expect(deriveParams(auto, { raw: { ...RAW, hdrWhite: 4 } }).exposureGain).toBe(1);
+    expect(normalizeAdjustments({ raw: { autoExposure: 7.33 } }).raw.autoExposure).toBe(3);
+    expect(normalizeAdjustments({ raw: { autoExposure: 0.612 } }).raw.autoExposure).toBe(0.6);
+    expect(normalizeAdjustments({ raw: { autoExposure: 'x' } }).raw.autoExposure).toBeNull();
+    expect(groupIsNeutral(auto, 'raw')).toBe(false);
+    expect(developmentBase(auto).raw).toEqual({ whiteBalance: 'as-shot', profile: 'camera-natural', profileVersion: 2, autoExposure: null });
+    expect(compactAdjustments(auto).raw).toEqual({ whiteBalance: 'as-shot', profile: 'camera-natural', profileVersion: 2, autoExposure: 0.6 });
+  });
+
+  test('version 14 documents keep their exact saved form and rendering; version 15 saves and reopens', () => {
+    const v1 = normalizeAdjustments({ raw: { whiteBalance: 'daylight', profile: 'camera-natural' } });
+    expect(v1.raw.profileVersion).toBe(1);
+    expect(compactAdjustments(v1).raw).toEqual({ whiteBalance: 'daylight', profile: 'camera-natural' });
+    expect(compactAdjustments(normalizeAdjustments({ raw: { profile: 'linear' } })).raw).toEqual({ whiteBalance: 'as-shot', profile: 'linear' });
+    const photo = { name: 'DSC0001.ARW', size: 10, lastModified: 0, sha256: 'a'.repeat(64), format: 'arw', width: 6000, height: 4000, adjustments: normalizeAdjustments({ ...V2, raw: { ...V2.raw, autoExposure: -0.45 } }) };
+    const text = serializeEditDocument(createEditDocument([photo], {}));
+    expect(JSON.parse(text).version).toBe(15);
+    expect(parseEditDocument(text).photos[0].adjustments.raw).toEqual({ whiteBalance: 'as-shot', profile: 'camera-natural', profileVersion: 2, autoExposure: -0.45 });
+  });
+
+  test('undo and redo cover accepting and resetting Auto Exposure; batch reset and sync keep it per photo', () => {
+    let state = { ...initialEditorState(), pendingEdits: [] };
+    state = editorReducer(state, { type: 'photosAdded', photos: [{ id: 'p', name: 'a.ARW', size: 1, lastModified: 0 }] });
+    state = editorReducer(state, { type: 'importSucceeded', id: 'p', info: { format: 'arw', width: 10, height: 10, orientation: 1, sha256: null, raw: A7III } });
+    const present = () => state.photos[0].history.present;
+    expect(present().raw).toMatchObject({ profile: 'camera-natural', profileVersion: 2, autoExposure: null });
+    state = editorReducer(state, { type: 'previewSettings', patch: { raw: { ...present().raw, autoExposure: 0.8 } } });
+    state = editorReducer(state, { type: 'applySettings', patch: { raw: { ...present().raw, autoExposure: 0.8 } } });
+    expect(present().raw.autoExposure).toBe(0.8);
+    state = editorReducer(state, { type: 'undo' });
+    expect(present().raw.autoExposure).toBeNull();
+    state = editorReducer(state, { type: 'redo' });
+    expect(present().raw.autoExposure).toBe(0.8);
+    const source = normalizeAdjustments({ ...V2, raw: { ...V2.raw, whiteBalance: 'daylight', autoExposure: -1 } });
+    const target = { id: 'b', name: 'b.arw', status: 'ready', raw: RAW, history: { present: present() } };
+    const synced = planSync(source, [target], { groups: ['raw'], kind: { raw: true } }).items[0].after.raw;
+    expect(synced).toEqual({ whiteBalance: 'daylight', profile: 'camera-natural', profileVersion: 2, autoExposure: 0.8 });
+    expect(planReset([target]).items[0].after.raw.autoExposure).toBeNull();
+  });
+
+  test('menu choices: superseded profiles appear only for the edits that use them', () => {
+    expect(RAW_PROFILE_CHOICES.filter((choice) => !choice.superseded).map(({ label }) => label)).toEqual(['Camera Natural', 'Linear / Neutral']);
+    expect(profileChoiceOf('camera-natural', 2).value).toBe('camera-natural');
+    expect(profileChoiceOf('camera-natural', 1).value).toBe('camera-natural@1');
+    expect(profileChoiceOf('legacy', 1).value).toBe('legacy');
+  });
+
+  test('RAW image layers: saved layers stay legacy in their exact form; new ones develop with Camera Natural', () => {
+    const source = { sha256: 'c'.repeat(64), name: 'DSC0002.ARW', size: 10, format: 'arw', width: 6000, height: 4000 };
+    const saved = { id: 'l1', type: 'image', name: '', source, x: 0.5, y: 0.5, width: 0.5, height: 0.3, settings: { exposure: 0.2 } };
+    const [legacy] = normalizeLayers([saved]);
+    expect(legacy).not.toHaveProperty('rawProfile');
+    expect(layerDevelopment(legacy).raw.profile).toBe('legacy');
+    const fresh = createImageLayer('l2', source, { width: 6000, height: 4000 });
+    expect(fresh.rawProfile).toEqual({ profile: 'camera-natural', profileVersion: 2 });
+    expect(layerDevelopment(fresh)).toMatchObject({ exposure: 0, raw: { profile: 'camera-natural', profileVersion: 2 } });
+    expect(compactLayers([fresh])[0].rawProfile).toEqual({ profile: 'camera-natural', profileVersion: 2 });
+    // JPEG layers never carry one; a legacy choice is stored as none.
+    expect(createImageLayer('l3', { ...source, format: 'jpeg' }, { width: 6000, height: 4000 })).not.toHaveProperty('rawProfile');
+    expect(normalizeLayers([{ ...saved, rawProfile: { profile: 'legacy' } }])[0]).not.toHaveProperty('rawProfile');
+    // Developed in the layer's profile, through the same renderer as the photo.
+    const pixels = greys(8);
+    const layerParams = deriveParams(layerDevelopment({ ...fresh, settings: {} }), { raw: RAW });
+    expect(renderRawRgba8(Uint16Array.from(pixels.flat()), layerParams)).toEqual(render(V2, pixels));
   });
 });

@@ -10,7 +10,7 @@
 // as a whole; undoing a batch skips photos edited since.
 
 import { adjustmentsEqual, clampAdjustment, developmentBase, neutralAdjustments, neutralGroup, normalizeAdjustments } from './adjustments.mjs';
-import { DEFAULT_RAW_PROFILE } from '../raw/rawProfiles.mjs';
+import { DEFAULT_RAW_PROFILE, NATURAL_VERSION } from '../raw/rawProfiles.mjs';
 import { presetPatch } from './presets.mjs';
 import { layerAdjustments, normalizeLayerSettings, updateLayer } from './layers.mjs';
 import { normalizeLocalSettings } from './masks.mjs';
@@ -91,10 +91,10 @@ function retarget(present, { layerId, localId }, change) {
   return { ...present, layers: updateLayer(present.layers, layerId, { settings: normalizeLayerSettings(change(layerAdjustments(layer.settings))) }) };
 }
 
-/** Settings of a newly imported photo: neutral, and a RAW (not a merged HDR) starts with Camera Natural. */
+/** Settings of a newly imported photo: neutral, and a RAW (not a merged HDR) starts with Camera Natural (current version). */
 export function importedAdjustments(info) {
   const neutral = neutralAdjustments();
-  if (info?.raw && !info.hdr && !(info.raw.hdrWhite > 1)) neutral.raw.profile = DEFAULT_RAW_PROFILE;
+  if (info?.raw && !info.hdr && !(info.raw.hdrWhite > 1)) neutral.raw = { ...neutral.raw, profile: DEFAULT_RAW_PROFILE, profileVersion: NATURAL_VERSION };
   return neutral;
 }
 

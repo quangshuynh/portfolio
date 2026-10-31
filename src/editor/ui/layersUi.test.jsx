@@ -40,6 +40,28 @@ function Harness({ initial = stack(), onApplySpy = () => {}, sourceProps = {} })
 const rows = () => screen.getAllByRole('listitem').map((li) => li.querySelector('.pe-layer__label').textContent);
 
 describe('Layers panel', () => {
+  test('a RAW image layer has a profile menu: new layers Camera Natural, saved ones Legacy until changed', () => {
+    const raw = { ...source, name: 'DSC0002.ARW', format: 'arw' };
+    const spy = vi.fn();
+    const saved = normalizeLayers([{ ...createImageLayer('old', raw, canvas), rawProfile: undefined }])[0];
+    render(<Harness initial={normalizeLayers([createImageLayer('img', raw, canvas), { ...saved, id: 'old' }])} onApplySpy={spy} />);
+    fireEvent.click(screen.getAllByRole('button', { name: /^DSC0002\.ARW/ })[1]);
+    const select = screen.getByRole('combobox', { name: 'RAW profile' });
+    expect(select).toHaveValue('camera-natural');
+    fireEvent.change(select, { target: { value: 'linear' } });
+    expect(spy.mock.calls.at(-1)[0].find(({ id }) => id === 'img').rawProfile).toEqual({ profile: 'linear', profileVersion: 1 });
+    fireEvent.click(screen.getAllByRole('button', { name: /^DSC0002\.ARW/ })[0]);
+    const legacy = screen.getByRole('combobox', { name: 'RAW profile' });
+    expect(legacy).toHaveValue('legacy');
+    expect(within(legacy).getAllByRole('option')).toHaveLength(3);
+  });
+
+  test('JPEG, PNG and WebP layers have no RAW profile menu', () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: /^sky\.png/ }));
+    expect(screen.queryByRole('combobox', { name: 'RAW profile' })).toBeNull();
+  });
+
   test('lists the stack top first above the Background; image, text and adjustment rows differ', () => {
     render(<Harness />);
     expect(rows()).toEqual(['Adjustment', 'Title', 'sky.png', 'Background']);

@@ -191,7 +191,7 @@ async function runOne(run, files, reference) {
       assert.equal(download.suggestedFilename(), 'synthetic-quangedit.png');
       const pixels = await sharp(await download.path()).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
       assert.deepEqual([pixels.info.width, pixels.info.height], [400, 600]);
-      const expected = renderRawRgba8(reference.image.data, deriveParams(normalizeAdjustments({ exposure: 0.5, raw: { whiteBalance: 'custom', profile: 'camera-natural' }, rawTemperature: 4000, rawTint: reference.asShotTint }), { raw: reference.info }));
+      const expected = renderRawRgba8(reference.image.data, deriveParams(normalizeAdjustments({ exposure: 0.5, raw: { whiteBalance: 'custom', profile: 'camera-natural', profileVersion: 2 }, rawTemperature: 4000, rawTint: reference.asShotTint }), { raw: reference.info }));
       result.pngMaxDifference = maxDifference(expected, pixels.data);
       assert.ok(result.pngMaxDifference <= 1, `PNG differs from the reference by ${result.pngMaxDifference}`);
       if (await page.isEnabled('input[name=pe-format][value=jpeg]')) {
@@ -224,6 +224,10 @@ async function runOne(run, files, reference) {
         await poll(() => page.evaluate(() => [document.querySelector('.pe-canvas')?.width, document.querySelector('.pe-canvas')?.height, Boolean(document.querySelector('.pe-stage-message'))]), ([w, h, busy]) => w === 2012 && h === 3012 && !busy, 'ARW preview', 120_000);
         genuine.previewMs = Date.now() - started;
         genuine.afterPreviewMb = memoryMb(profile);
+        // Auto Exposure read the camera's embedded preview in the RAW worker (browser JPEG decoder).
+        await tab(2);
+        genuine.autoExposure = (await page.getByTestId('raw-auto-exposure').textContent()).trim();
+        assert.match(genuine.autoExposure, /camera's own rendering|matches the camera/, `Auto Exposure did not use the camera preview: ${genuine.autoExposure}`);
         await tab(3);
         const format = await page.isEnabled('input[name=pe-format][value=jpeg]') ? 'jpeg' : 'png';
         await page.check(`input[name=pe-format][value=${format}]`);
@@ -256,6 +260,9 @@ async function runOne(run, files, reference) {
         await page.click('.pe-photo--list:last-child button.pe-photo__select');
         await poll(() => page.evaluate(() => [document.querySelector('.pe-canvas')?.width, document.querySelector('.pe-canvas')?.height, Boolean(document.querySelector('.pe-stage-message'))]), ([w, h, busy]) => w === 1542 && h === 2322 && !busy, 'NEF preview', 120_000);
         nef.previewMs = Date.now() - started;
+        await tab(2);
+        nef.autoExposure = (await page.getByTestId('raw-auto-exposure').textContent()).trim();
+        assert.match(nef.autoExposure, /camera's own rendering|matches the camera/, `Auto Exposure did not use the camera preview: ${nef.autoExposure}`);
         await tab(2);
         const exposure = page.getByRole('textbox', { name: 'Exposure value' });
         await exposure.scrollIntoViewIfNeeded();

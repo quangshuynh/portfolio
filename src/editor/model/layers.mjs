@@ -29,6 +29,7 @@ import { ADJUSTMENTS, groupIsNeutral, normalizeAdjustments } from './adjustments
 import { CURVE_CHANNELS, isNeutralCurve } from '../pipeline/curves.mjs';
 import { MASK_LIMITS, normalizeMask } from './masks.mjs';
 import { RAW_FORMATS } from '../raw/rawFormat.mjs';
+import { DEFAULT_RAW_PROFILE, LEGACY_RAW_PROFILE, NATURAL_VERSION, RAW_PROFILE_IDS, profileVersionOf } from '../raw/rawProfiles.mjs';
 
 /** The space of a layer type's mask. */
 export const layerMaskSpace = (type) => (type === 'image' ? 'layer' : 'canvas');
@@ -149,6 +150,22 @@ function normalizeSource(input) {
   };
 }
 
+/**
+ * A RAW image layer's rendering profile ({ profile, profileVersion }, raw/rawProfiles.mjs), or null
+ * for the legacy development. Layers saved before document version 15 have none (null), so
+ * they keep their appearance and their exact saved form; new RAW layers get Camera Natural.
+ */
+export function normalizeLayerRawProfile(input, format) {
+  if (!Object.hasOwn(RAW_FORMATS, format) || !isObject(input) || !RAW_PROFILE_IDS.includes(input.profile) || input.profile === LEGACY_RAW_PROFILE) return null;
+  return { profile: input.profile, profileVersion: profileVersionOf(input.profile, input.profileVersion) };
+}
+
+/** The settings a RAW image layer is developed with: its own, in its rendering profile. */
+export function layerDevelopment(layer) {
+  const adjustments = layerAdjustments(layer.settings);
+  return layer.rawProfile ? { ...adjustments, raw: { ...adjustments.raw, ...layer.rawProfile } } : adjustments;
+}
+
 function common(input) {
   return {
     id: input.id,
@@ -180,9 +197,11 @@ function normalizeLayerFields(input) {
   if (input.type === 'adjustment') return { ...common(input), settings: normalizeLayerSettings(input.settings) };
   const source = normalizeSource(input.source);
   if (!source) return null;
+  const rawProfile = normalizeLayerRawProfile(input.rawProfile, source.format);
   return {
     ...common(input),
     source,
+    ...(rawProfile ? { rawProfile } : {}),
     x: round(number(input.x, [-1, 2], 0.5)),
     y: round(number(input.y, [-1, 2], 0.5)),
     width: round(number(input.width, LAYER_LIMITS.size, 0.5)),
@@ -301,6 +320,8 @@ export function createImageLayer(id, source, canvas, fit = 0.6) {
     type: 'image',
     name: '',
     source,
+    // A new RAW layer develops like a new RAW photo.
+    rawProfile: { profile: DEFAULT_RAW_PROFILE, profileVersion: NATURAL_VERSION },
     x: 0.5,
     y: 0.5,
     width: (source.width * scale) / short,

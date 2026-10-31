@@ -81,6 +81,23 @@ test('RAW profiles: a treatment saved before profiles keeps its hash and approva
   expect(treatment.approved.documentHash).toBe(approvedHash);
 });
 
+test('Interval 22 treatments keep their hash; Auto Exposure, a profile version or a RAW layer profile is a change', () => {
+  const source = { name: 'DSC09640.ARW', size: 10, sha256: 'b'.repeat(64), format: 'arw' };
+  const layerSource = { sha256: 'c'.repeat(64), name: 'DSC09641.ARW', size: 10, format: 'arw', width: 6000, height: 4000 };
+  const layer = { id: 'l1', type: 'image', name: '', source: layerSource, x: 0.5, y: 0.5, width: 0.4, height: 0.3 };
+  // Saved by the Interval 22 editor (document version 14): Camera Natural without a version, a legacy RAW layer.
+  const v14 = JSON.stringify({ ...JSON.parse(document(source, { exposure: 0.2, raw: { whiteBalance: 'as-shot', profile: 'camera-natural' }, layers: [layer] })), version: 14 });
+  const before = canonicalDocument(v14);
+  expect(before.document.photos[0].adjustments.raw).toEqual({ whiteBalance: 'as-shot', profile: 'camera-natural' });
+  expect(before.document.photos[0].adjustments.layers[0]).not.toHaveProperty('rawProfile');
+  expect(canonicalDocument(JSON.stringify(before.document)).documentHash).toBe(before.documentHash);
+  const changed = (patch) => canonicalDocument(document(source, { exposure: 0.2, raw: { whiteBalance: 'as-shot', profile: 'camera-natural', ...patch.raw }, layers: [{ ...layer, ...patch.layer }] })).documentHash;
+  expect(changed({})).toBe(before.documentHash);
+  expect(changed({ raw: { autoExposure: 0.4 } })).not.toBe(before.documentHash);
+  expect(changed({ raw: { profileVersion: 2 } })).not.toBe(before.documentHash);
+  expect(changed({ layer: { rawProfile: { profile: 'camera-natural', profileVersion: 2 } } })).not.toBe(before.documentHash);
+});
+
 test('a treatment developed from a Nikon NEF publishes only its JPEG derivatives', async () => {
   await treat('beta', { source: { name: '_DSC0051.NEF', bytes: fakeRaw({ make: 'NIKON CORPORATION', model: 'NIKON D3100', bigEndian: true, size: 2048, fill: 5 }) } });
   const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });

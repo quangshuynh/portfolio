@@ -59,7 +59,7 @@ function Section({ id, title, open, onToggle, edited, onReset, resetDisabled, ch
  *   Tone Curve, LUT, the colour parts of Creative and Presets are shown; with `local: true` (a
  *   local adjustment) only Light, Color, HSL and Detail
  */
-export default function AdjustPanel({ adjustments, disabled, dispatch, lut, presets, recipes = null, raw = null, hdr = null, geometry = null, text = null, thumbnails = null, layer = null, watermark = null }) {
+export default function AdjustPanel({ adjustments, disabled, dispatch, lut, presets, recipes = null, raw = null, exposureSamples = null, hdr = null, geometry = null, text = null, thumbnails = null, layer = null, watermark = null }) {
   const [open, setOpen] = useState(readOpenSections);
   // Editing a text's wording from the photo opens the Text section.
   useEffect(() => { if (text?.focusRequest) setOpen((current) => ({ ...current, text: true })); }, [text?.focusRequest]);
@@ -104,7 +104,7 @@ export default function AdjustPanel({ adjustments, disabled, dispatch, lut, pres
         ? <GeometryPanel geometry={adjustments.geometry} disabled={disabled} {...geometry} />
         : <p className="pe-note">Open a photo to crop, rotate or transform it.</p>)}
       {!layer && hdr && section('hdr', 'HDR', <HdrPanel hdr={hdr} adjustments={adjustments} disabled={disabled} dispatch={dispatch} />, { reset: hdr.mode === 'radiance' })}
-      {!layer && raw && section('raw', 'RAW', <RawPanel raw={raw} adjustments={adjustments} disabled={disabled} dispatch={dispatch} />)}
+      {!layer && raw && section('raw', 'RAW', <RawPanel raw={raw} adjustments={adjustments} disabled={disabled} dispatch={dispatch} exposureSamples={exposureSamples} />)}
       {section('light', 'Light', rows('light'))}
       {section('color', 'Color', rows('color'))}
       {section('hsl', 'HSL', <HslPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} />)}

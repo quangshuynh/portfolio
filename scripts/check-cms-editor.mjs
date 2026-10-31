@@ -21,7 +21,7 @@
 // dry run in a temporary clone, whose commit holds no camera file. RAW profiles: a new RAW attachment
 // starts with Camera Natural; an approved, watermarked RAW treatment saved before profiles reopens
 // with the legacy profile, and switching it to Camera Natural makes a new draft with one watermark
-// while the approved version and its render stay untouched.
+// while the approved version and its render stay untouched; so does accepting Auto Exposure.
 // Usage: npm run check:cms:editor (CMS_EDITOR_RUNS=chromium,firefox to limit the runs)
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -465,7 +465,40 @@ try {
           const mean = async (kind) => (await sharp(Buffer.from(await page.evaluate(async ([photo, which]) => [...new Uint8Array(await (await fetch(`/api/editor/photos/${photo}/images/${which}`)).arrayBuffer())], [rawId, kind]))).stats()).channels[1].mean;
           const [legacyMean, naturalMean] = [await mean('approved-full'), await mean('current-full')];
           assert.ok(naturalMean > legacyMean, `Camera Natural ${naturalMean} vs legacy ${legacyMean}`);
-          return { legacyMeanGreen: Math.round(legacyMean), naturalMeanGreen: Math.round(naturalMean) };
+          // Auto Exposure: applied in the RAW panel when it suggests something (else written as the
+          // panel would), saved as a new draft; the approved version and render are still untouched.
+          const note = await page.getByTestId('raw-auto-exposure').textContent();
+          const apply = page.locator('.pe-raw__auto button', { hasText: /^Apply$/ });
+          let autoExposure;
+          if (await apply.count()) {
+            await apply.click();
+            await page.getByRole('button', { name: 'Save treatment' }).click();
+            await poll(() => page.locator('.cms-host__status').textContent(), (text) => !/unsaved/.test(text), 'saved');
+            info = (await api(page, 'GET', `/api/editor/photos/${rawId}`)).json;
+            autoExposure = info.treatment.document.photos[0].adjustments.raw.autoExposure;
+            assert.ok(Number.isFinite(autoExposure) && autoExposure !== 0, 'Auto Exposure saved');
+          } else {
+            const document = JSON.parse(JSON.stringify(info.treatment.document));
+            autoExposure = 0.5;
+            document.photos[0].adjustments.raw.autoExposure = autoExposure;
+            assert.equal((await api(page, 'PUT', `/api/editor/photos/${rawId}/treatment`, { document: JSON.stringify(document), revision: info.treatment.revision })).status, 200);
+            info = (await api(page, 'GET', `/api/editor/photos/${rawId}`)).json;
+          }
+          assert.equal(info.treatment.status, 'draft');
+          assert.equal(info.renderFresh, false);
+          assert.equal(info.treatment.document.photos[0].adjustments.exposure ?? 0, 0, 'the Exposure slider is untouched');
+          assert.ok(info.treatment.document.photos[0].adjustments.watermark?.enabled, 'one watermark setting, kept');
+          assert.equal(info.treatment.approved.render.sha256, approved.render.sha256, 'the approved render was not replaced');
+          // The draft renders again with Auto Exposure (and is not left for the automatic queue).
+          await page.reload();
+          await page.waitForSelector('.pe-photo[data-status=ready]', { state: 'attached', timeout: 300_000 });
+          await page.getByRole('button', { name: 'Render for portfolio' }).click();
+          await poll(() => page.locator('.cms-host__status').textContent(), (text) => /render up to date/.test(text), 'Auto Exposure render', 900_000);
+          info = (await api(page, 'GET', `/api/editor/photos/${rawId}`)).json;
+          assert.equal(info.renderFresh, true);
+          assert.equal(info.treatment.document.photos[0].adjustments.raw.autoExposure, autoExposure);
+          assert.equal(info.treatment.approved.render.sha256, approved.render.sha256, 'the approved render was not replaced');
+          return { legacyMeanGreen: Math.round(legacyMean), naturalMeanGreen: Math.round(naturalMean), autoExposureNote: note.trim(), autoExposure };
         });
         if (FORMAT_FILES.valid.length) {
           await step('other cameras: each validated RAW format attached by content, rendered at full size and reopened; an unsupported file refused', async () => {

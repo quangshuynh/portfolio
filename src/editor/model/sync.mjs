@@ -77,6 +77,8 @@ export function groupPatch(source, groups, target = neutralAdjustments()) {
     if (!group) throw new Error(`Unknown sync group: ${id}`);
     group.keys.forEach((key) => { patch[key] = values[key]; });
     if (group.structured) patch[group.structured] = group.reuse ? group.reuse(values[group.structured]) : values[group.structured];
+    // An accepted Auto Exposure belongs to its photo: the target keeps its own.
+    if (id === 'raw') patch.raw = { ...patch.raw, autoExposure: normalizeAdjustments(target).raw.autoExposure };
     if (group.geometry) {
       const base = patch.geometry ?? normalizeAdjustments(target).geometry;
       patch.geometry = { ...base, ...Object.fromEntries(group.geometry.map((part) => [part, values.geometry[part]])) };

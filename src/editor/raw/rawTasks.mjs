@@ -14,6 +14,33 @@ import { contentHash } from '../io/hash.mjs';
 import { RawDecodeError, cropToSize, decodeRaw, downsampleRaw, sameSize } from './rawDecoder.mjs';
 import { RAW_SNIFF_BYTES, RAW_SUPPORT, sniffRaw } from './rawFormat.mjs';
 import { applyRetouch } from '../pipeline/retouch.mjs';
+import { rawDevelopParams } from './rawColor.mjs';
+import { AUTO_EXPOSURE, luminanceSamples, previewLightness } from './rawAutoExposure.mjs';
+
+/**
+ * The embedded preview decoded small (RGBA8) with the browser's image decoder in this worker, or
+ * null where it cannot (Node, old browsers, a damaged preview).
+ */
+async function decodePreview({ bytes, width, height }) {
+  if (typeof createImageBitmap !== 'function' || typeof OffscreenCanvas !== 'function') return null;
+  const scale = Math.min(1, AUTO_EXPOSURE.sampleEdge / Math.max(width || 1, height || 1));
+  const target = { width: Math.max(1, Math.round((width || 1) * scale)), height: Math.max(1, Math.round((height || 1) * scale)) };
+  const blob = new Blob([bytes], { type: 'image/jpeg' });
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(blob, { resizeWidth: target.width, resizeHeight: target.height, resizeQuality: 'medium' });
+  } catch {
+    bitmap = await createImageBitmap(blob);
+  }
+  try {
+    const canvas = new OffscreenCanvas(target.width, target.height);
+    const context = canvas.getContext('2d');
+    context.drawImage(bitmap, 0, 0, target.width, target.height);
+    return { width: target.width, height: target.height, data: context.getImageData(0, 0, target.width, target.height).data };
+  } finally {
+    bitmap.close?.();
+  }
+}
 
 export const RAW_BAND_ROWS = 256;
 
@@ -60,19 +87,33 @@ async function openRaw(file, loadModule) {
  */
 export const needsFullDecode = (info, { width, height }) => width > Math.floor(info.width / 2) || height > Math.floor(info.height / 2);
 
-/** :param loadModule: () => Promise of the libraw-wasm Emscripten module */
-export function createRawHandlers(loadModule) {
+/**
+ * :param loadModule: () => Promise of the libraw-wasm Emscripten module
+ * :param options: { decodePreview } (bytes, width, height) => RGBA8 preview or null; the default
+ *   uses the browser's decoder in the worker
+ */
+export function createRawHandlers(loadModule, { decodePreview: readPreview = decodePreview } = {}) {
   return {
-    /** Validates, hashes and develops a thumbnail from half-size sensor data. */
+    /**
+     * Validates, hashes and develops a thumbnail from half-size sensor data, with the luminance
+     * samples Auto Exposure reads (from the same decode, so it costs no second one).
+     */
     async inspect({ file, thumbnailEdge }, progress) {
       const { Module, bytes, format } = await openRaw(file, loadModule);
       const sha256 = await contentHash(bytes);
       progress({ stage: 'decoding' });
-      const { info, image } = decodeRaw(Module, bytes, { format, halfSize: true });
+      const { info, image, preview } = decodeRaw(Module, bytes, { format, halfSize: true, preview: true });
       const size = proxyDimensions(image, thumbnailEdge);
       const thumbnail = downsampleRaw(image, size.width, size.height);
+      const exposureSamples = luminanceSamples(image, rawDevelopParams(info, { whiteBalance: 'as-shot' }));
+      let decoded = null;
+      try { decoded = preview ? await readPreview(preview) : null; } catch { decoded = null; }
+      exposureSamples.previewLightness = previewLightness(decoded, Math.max(preview?.width ?? 0, preview?.height ?? 0));
       const header = { format, width: info.width, height: info.height, displayWidth: info.width, displayHeight: info.height, orientation: 1 };
-      return { result: { header, sha256, raw: info, thumbnail }, transfer: [thumbnail.data.buffer] };
+      return {
+        result: { header, sha256, raw: info, thumbnail, exposureSamples },
+        transfer: [thumbnail.data.buffer, exposureSamples.y.buffer, exposureSamples.clipped.buffer],
+      };
     },
 
     /**

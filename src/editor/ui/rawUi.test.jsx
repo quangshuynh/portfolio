@@ -17,10 +17,10 @@ const RAW = {
 
 beforeEach(() => localStorage.clear());
 
-function Harness({ raw, onState }) {
+function Harness({ raw, onState, exposureSamples = null }) {
   const [state, dispatch] = useReducer(editorReducer, undefined, () => {
     let s = editorReducer(initialEditorState(), { type: 'photosAdded', photos: [{ id: 'a', name: 'DSC09420.ARW', size: 1, lastModified: 0 }] });
-    s = editorReducer(s, { type: 'importSucceeded', id: 'a', info: { format: raw ? 'arw' : 'jpeg', width: 4024, height: 6024, orientation: 1, sha256: null, raw } });
+    s = editorReducer(s, { type: 'importSucceeded', id: 'a', info: { format: raw ? 'arw' : 'jpeg', width: 4024, height: 6024, orientation: 1, sha256: null, raw, exposureSamples } });
     return s;
   });
   onState(state, dispatch);
@@ -30,6 +30,7 @@ function Harness({ raw, onState }) {
       disabled={false}
       dispatch={dispatch}
       raw={state.photos[0].raw ?? null}
+      exposureSamples={state.photos[0].exposureSamples ?? null}
       lut={{ library: [], onImport: () => {}, status: {} }}
       presets={{ userPresets: [], onChange: () => {}, onPreview: () => {}, onDownload: () => {}, newId: () => 'x' }}
     />
@@ -39,7 +40,9 @@ function Harness({ raw, onState }) {
 let state;
 let dispatch;
 const present = () => state.photos[0].history.present;
-const setup = (raw = RAW) => render(<Harness raw={raw} onState={(s, d) => { state = s; dispatch = d; }} />);
+const setup = (raw = RAW, exposureSamples = null) => render(<Harness raw={raw} exposureSamples={exposureSamples} onState={(s, d) => { state = s; dispatch = d; }} />);
+/** Uniform luminance samples (1 = sensor white) of a frame that is `stops` under a normal key. */
+const samples = (value) => ({ width: 32, height: 24, y: new Float32Array(32 * 24).fill(value), clipped: new Uint8Array(32 * 24) });
 
 describe('RAW panel', () => {
   test('appears only for RAW photos, with the camera details', () => {
@@ -64,7 +67,7 @@ describe('RAW panel', () => {
     expect(present()).toMatchObject({ exposure: 0, raw: { whiteBalance: 'as-shot', profile: 'linear' } });
     // Changing the white balance keeps the profile.
     fireEvent.change(screen.getByRole('combobox', { name: 'White balance' }), { target: { value: 'daylight' } });
-    expect(present().raw).toEqual({ whiteBalance: 'daylight', profile: 'linear' });
+    expect(present().raw).toEqual({ whiteBalance: 'daylight', profile: 'linear', profileVersion: 1, autoExposure: null });
     act(() => dispatch({ type: 'undo' }));
     act(() => dispatch({ type: 'undo' }));
     expect(present().raw.profile).toBe('camera-natural');
@@ -72,6 +75,44 @@ describe('RAW panel', () => {
     expect(within(screen.getByRole('combobox', { name: 'Profile' })).getAllByRole('option')).toHaveLength(3);
     act(() => dispatch({ type: 'applySettings', patch: { raw: { whiteBalance: 'as-shot', profile: 'linear' } } }));
     expect(screen.getByTestId('raw-profile-note')).not.toHaveTextContent('BaselineExposure');
+  });
+
+  test('Auto Exposure: suggested in EV, previewed, applied apart from the Exposure slider, undone, reset and dismissed', () => {
+    // A daylight frame (1/250 s, f/8, ISO 100) three stops under the target key.
+    setup(RAW, samples(0.18 / 2 ** (1.35 + 0.25) / 8));
+    const note = () => screen.getByTestId('raw-auto-exposure').textContent;
+    expect(note()).toMatch(/^Auto Exposure suggests \+1\.50 EV/);
+    const preview = screen.getByRole('button', { name: 'Preview' });
+    fireEvent.click(preview);
+    expect(preview).toHaveAttribute('aria-pressed', 'true');
+    expect(present().raw.autoExposure).toBe(1.5);
+    fireEvent.click(preview);
+    expect(present().raw.autoExposure).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(present()).toMatchObject({ exposure: 0, raw: { autoExposure: 1.5 } });
+    expect(note()).toBe('Auto Exposure +1.50 EV applied, added to the Exposure slider.');
+    act(() => dispatch({ type: 'undo' }));
+    expect(present().raw.autoExposure).toBeNull();
+    act(() => dispatch({ type: 'redo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Auto Exposure' }));
+    expect(present().raw.autoExposure).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(note()).toBe('Auto Exposure: suggestion dismissed.');
+    expect(present().raw.autoExposure).toBeNull();
+  });
+
+  test('Auto Exposure says when it matches the camera preview', () => {
+    setup({ ...RAW }, { ...samples(0.18 / 2 ** (1.35 + 0.25)), previewLightness: 58 });
+    expect(screen.getByTestId('raw-auto-exposure').textContent).toMatch(/^Auto Exposure suggests \+\d\.\d\d EV to match the camera's own rendering of this photo\.$/);
+  });
+
+  test('Auto Exposure offers nothing for a normal frame or a night scene, and says why', () => {
+    const { unmount } = setup(RAW, samples(0.18 / 2 ** (1.35 + 0.25)));
+    expect(screen.getByTestId('raw-auto-exposure')).toHaveTextContent('no suggestion. The exposure is within the normal range.');
+    unmount();
+    setup({ ...RAW, shutter: 1 / 15, aperture: 2, iso: 6400 }, samples(0.002));
+    expect(screen.getByTestId('raw-auto-exposure')).toHaveTextContent(/low-light scene/);
+    expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
   });
 
   test('profile note names a DNG BaselineExposure', () => {
@@ -101,17 +142,17 @@ describe('RAW panel', () => {
     expect(screen.getByRole('button', { name: 'RAW (edited)' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reset RAW' }));
     // Reset keeps the rendering profile: it is the photo's starting point, not an edit.
-    expect(present().raw).toEqual({ whiteBalance: 'as-shot', profile: 'camera-natural' });
+    expect(present().raw).toEqual({ whiteBalance: 'as-shot', profile: 'camera-natural', profileVersion: 2, autoExposure: null });
   });
 
   test('presets leave the RAW white balance alone; saved edits keep it', () => {
     setup();
     fireEvent.change(screen.getByRole('combobox', { name: 'White balance' }), { target: { value: 'daylight' } });
     act(() => dispatch({ type: 'applyPreset', preset: BUILT_IN_PRESETS[0] }));
-    expect(present().raw).toEqual({ whiteBalance: 'daylight', profile: 'camera-natural' });
+    expect(present().raw).toEqual({ whiteBalance: 'daylight', profile: 'camera-natural', profileVersion: 2, autoExposure: null });
     const photo = { ...state.photos[0], adjustments: present() };
     const document = JSON.parse(serializeEditDocument(createEditDocument([photo], state.exportSettings)));
-    expect(document).toMatchObject({ version: DOCUMENT_VERSION, photos: [{ source: { format: 'arw', name: 'DSC09420.ARW' }, adjustments: { raw: { whiteBalance: 'daylight', profile: 'camera-natural' } } }] });
+    expect(document).toMatchObject({ version: DOCUMENT_VERSION, photos: [{ source: { format: 'arw', name: 'DSC09420.ARW' }, adjustments: { raw: { whiteBalance: 'daylight', profile: 'camera-natural', profileVersion: 2 } } }] });
     expect(parseEditDocument(JSON.stringify(document)).photos[0]).toMatchObject({ source: { format: 'arw' }, adjustments: { raw: { whiteBalance: 'daylight' } } });
   });
 });
