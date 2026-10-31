@@ -128,10 +128,10 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
       if (!offset) { onError?.('Set a source first: Alt-click (Option-click) the area to copy from, or use Set source.'); return; }
     }
     try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* a synthetic pointer */ }
-    dragRef.current = { kind: 'paint', pointer: event.pointerId, id: newId(tool), points: [[u, v]], offset, last: point, path: liveRef.current };
-    // Heal: the stroke's outline while painting (its source is chosen when it ends).
+    dragRef.current = { kind: 'paint', pointer: event.pointerId, id: newId(tool), points: [[u, v]], offset, last: point, path: liveRef.current, d: pathOf([[u, v]]) };
+    // Heal and Remove: the stroke's outline while painting (a heal source is chosen when it ends).
     if (liveRef.current) {
-      liveRef.current.setAttribute('d', pathOf(dragRef.current.points));
+      liveRef.current.setAttribute('d', dragRef.current.d);
       liveRef.current.style.strokeWidth = `${Math.max(2, 2 * (brush.radius * short) / spacePerStage)}px`;
       liveRef.current.removeAttribute('visibility');
     }
@@ -175,11 +175,14 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
       const at = toSpace(p.x, p.y);
       drag.points.push([at.u, at.v]);
       drag.last = p;
+      // The outline grows by a segment per point: a long stroke never rebuilds its whole path.
+      const s = toStage(at.u, at.v);
+      drag.d += ` L${s.x.toFixed(1)} ${s.y.toFixed(1)}`;
       added = true;
     }
     if (added) {
       preview(drag);
-      if (drag.path) drag.path.setAttribute('d', pathOf(drag.points));
+      if (drag.path) drag.path.setAttribute('d', drag.d);
     }
   };
   const onPointerUp = (event) => {
