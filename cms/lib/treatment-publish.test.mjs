@@ -57,6 +57,30 @@ test('the canonical document is stable and drops what the editor would drop', ()
   expect(first.document.savedAt).toBeUndefined();
 });
 
+test('RAW profiles: a treatment saved before profiles keeps its hash and approval; a profile change is a new draft', async () => {
+  const source = { name: 'DSC09640.ARW', size: 10, sha256: 'b'.repeat(64), format: 'arw' };
+  // What a version 13 editor saved: RAW white balance, no profile.
+  const v13 = JSON.stringify({ ...JSON.parse(document(source, { exposure: 0.5, raw: { whiteBalance: 'daylight' } })), version: 13 });
+  const before = canonicalDocument(v13);
+  expect(before.document.photos[0].adjustments.raw).toEqual({ whiteBalance: 'daylight' });
+  // Reopened and saved by this editor without changes: same hash, so approval and render stand.
+  const resaved = canonicalDocument(serializeEditDocument(createEditDocument([{ ...before.source, adjustments: { ...neutralAdjustments(), exposure: 0.5, raw: { whiteBalance: 'daylight' } } }], {})));
+  expect(resaved.documentHash).toBe(before.documentHash);
+  const natural = canonicalDocument(document(source, { exposure: 0.5, raw: { whiteBalance: 'daylight', profile: 'camera-natural' } }));
+  expect(natural.documentHash).not.toBe(before.documentHash);
+  expect(natural.document.photos[0].adjustments.raw).toEqual({ whiteBalance: 'daylight', profile: 'camera-natural' });
+
+  const dir = fixture.workspace;
+  let treatment = await treat('alpha', { source: { name: 'DSC09640.ARW', bytes: fakeRaw({ size: 2048, fill: 3 }) } });
+  const approvedHash = treatment.approved.documentHash;
+  const [attached] = treatment.attached;
+  const sources = await editingSources({ workspaceDir: dir, record: (await readWorkspace(dir)).catalog.photographs.find((photo) => photo.id === 'alpha'), treatment, derivativesDir: `${fixture.repo}/src/assets/photography/generated` });
+  const raw = sources.find((entry) => entry.sha256 === attached.sha256) ?? sources[0];
+  treatment = await saveTreatment(dir, 'alpha', { text: document(raw, { exposure: 0.5, raw: { profile: 'camera-natural' } }), revision: treatment.revision, sources });
+  expect(treatment.status).toBe('draft');
+  expect(treatment.approved.documentHash).toBe(approvedHash);
+});
+
 test('a treatment developed from a Nikon NEF publishes only its JPEG derivatives', async () => {
   await treat('beta', { source: { name: '_DSC0051.NEF', bytes: fakeRaw({ make: 'NIKON CORPORATION', model: 'NIKON D3100', bigEndian: true, size: 2048, fill: 5 }) } });
   const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });
