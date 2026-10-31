@@ -14,7 +14,7 @@ import { createImageWorker, usingMainThread } from '../io/workerClient.mjs';
 import { detailWorkerCount, exportImageInBands } from '../io/detailPool.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { renderRawRgba8 } from '../pipeline/cpuRenderer.mjs';
-import { RAW_FORMATS, RAW_SNIFF_BYTES, isTiff } from '../raw/rawFormat.mjs';
+import { RAW_ACCEPT, RAW_EXTENSION_LIST, RAW_FORMATS, RAW_SNIFF_BYTES, isRawContainer } from '../raw/rawFormat.mjs';
 import { constrainedDevice, createRawQueue, exportRaw } from '../raw/rawClient.mjs';
 import { browserCapabilities, diagnosticReport } from '../io/diagnostics.mjs';
 import { readRasterExposure } from '../hdr/hdrMetadata.mjs';
@@ -56,7 +56,7 @@ import './editor.css';
 export const AUTOSAVE_KEY = 'photo-editor:edits:v1';
 const THUMBNAIL_EDGE = 320;
 const PROXY_CACHE_SIZE = 2;
-const ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.arw,.nef,.dng,image/x-sony-arw,image/x-nikon-nef,image/x-adobe-dng';
+const ACCEPT = ['image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp', ...RAW_ACCEPT].join(',');
 const formatLabel = (format) => (format === 'hdr' ? 'HDR merge' : FORMATS[format]?.label ?? RAW_FORMATS[format]?.label ?? format);
 const IMPORT_PROGRESS = { waiting: 'Waiting for the RAW decoder…', decoding: 'Decoding RAW sensor data…' };
 const EDITOR_THEME_COLOR = '#151515';
@@ -407,11 +407,11 @@ function EditorWorkspace({ host }) {
       const resource = resources.current.get(entry.id);
       if (!resource) continue;
       try {
-        // Identified by content: TIFF-structured files go to the RAW decoder, which
-        // accepts Sony ARW, Nikon NEF and DNG and explains anything else.
+        // Identified by content: RAW containers go to the RAW decoder, which accepts the
+        // validated formats (rawFormat.mjs) and explains anything else.
         const head = new Uint8Array(await resource.file.slice(0, RAW_SNIFF_BYTES).arrayBuffer());
         let inspected;
-        if (isTiff(head)) {
+        if (isRawContainer(head)) {
           const job = raws().run('inspect', { file: resource.file, thumbnailEdge: THUMBNAIL_EDGE }, {
             onProgress: ({ stage }) => stage === 'decoding' && dispatch({ type: 'importProgress', id: entry.id, progress: 'decoding' }),
           });
@@ -868,7 +868,7 @@ function EditorWorkspace({ host }) {
     setLayerMessage(null);
     try {
       const head = new Uint8Array(await file.slice(0, RAW_SNIFF_BYTES).arrayBuffer());
-      const inspected = isTiff(head)
+      const inspected = isRawContainer(head)
         ? await raws().run('inspect', { file, thumbnailEdge: THUMBNAIL_EDGE }).promise
         : await worker('import').call('inspect', { file, thumbnailEdge: THUMBNAIL_EDGE });
       const resource = { file, header: inspected.header, sha256: inspected.sha256, thumbnail: inspected.thumbnail, raw: inspected.raw ?? null };
@@ -1231,7 +1231,7 @@ function EditorWorkspace({ host }) {
   const rasterExposure = async (file) => readRasterExposure(new Uint8Array(await file.slice(0, 512 * 1024).arrayBuffer()));
   const inspectBracketFile = useCallback(async (file) => {
     const head = new Uint8Array(await file.slice(0, RAW_SNIFF_BYTES).arrayBuffer());
-    if (isTiff(head)) {
+    if (isRawContainer(head)) {
       const { header, sha256, thumbnail, raw } = await raws().run('inspect', { file, thumbnailEdge: THUMBNAIL_EDGE }).promise;
       return bracketInput({ file, header, sha256, thumbnail, raw });
     }
@@ -1698,7 +1698,7 @@ function EditorWorkspace({ host }) {
         {state.photos.length ? (
           <ul className="pe-photo-list">{photoList('list')}</ul>
         ) : (
-          <p className="pe-note">JPEG, PNG, WebP, or RAW (Sony ARW, Nikon NEF, DNG), up to {LIMITS.maxPixels / 1e6} MP and {LIMITS.maxFileBytes / (1024 * 1024)} MB each. Drag files anywhere onto the editor.</p>
+          <p className="pe-note">JPEG, PNG, WebP, or RAW ({RAW_EXTENSION_LIST}), up to {LIMITS.maxPixels / 1e6} MP and {LIMITS.maxFileBytes / (1024 * 1024)} MB each. Drag files anywhere onto the editor.</p>
         )}
       </aside>
 
@@ -1776,7 +1776,7 @@ function EditorWorkspace({ host }) {
         {!state.photos.length && (
           <div className="pe-empty">
             <p className="pe-empty__title">Edit photographs in your browser</p>
-            <p>Drop JPEG, PNG, WebP or RAW (Sony ARW, Nikon NEF, DNG) files here, or</p>
+            <p>Drop JPEG, PNG, WebP or RAW ({RAW_EXTENSION_LIST}) files here, or</p>
             <button type="button" className="pe-button pe-button--primary pe-button--large" onClick={openPicker}>Choose photos</button>
             <p className="pe-note">Your photographs are decoded, edited and exported on this device. They are never uploaded, and no account is needed.</p>
           </div>

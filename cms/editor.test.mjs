@@ -9,7 +9,7 @@ import { createEditDocument, serializeEditDocument } from '../src/editor/model/e
 import { neutralAdjustments } from '../src/editor/model/adjustments.mjs';
 import { WATERMARK_DEFAULTS } from '../src/editor/watermark/watermark.mjs';
 import { autoDraftPlan, watermarkStatus } from './lib/watermark-rules.mjs';
-import { fixtureRepo, photograph } from './test-helpers.mjs';
+import { fakeRaw, fixtureRepo, photograph } from './test-helpers.mjs';
 import { createSessions } from './lib/session.mjs';
 import { startCmsServer } from './server.mjs';
 
@@ -285,7 +285,7 @@ describe('treatments', () => {
 });
 
 describe('attached editing sources', () => {
-  const fakeArw = () => Buffer.concat([Buffer.from([0x49, 0x49, 0x2a, 0x00]), Buffer.alloc(4096, 7)]);
+  const fakeArw = () => fakeRaw();
 
   test('a RAW file is stored once by content and becomes the editing source', async () => {
     const { json } = await describe_('alpha');
@@ -302,17 +302,29 @@ describe('attached editing sources', () => {
 
   test('a Nikon NEF is accepted as an editing source and stored privately by content', async () => {
     const { json } = await describe_('gamma');
-    const raw = Buffer.concat([Buffer.from([0x4d, 0x4d, 0x00, 0x2a]), Buffer.alloc(4096, 9)]);
+    const raw = fakeRaw({ make: 'NIKON CORPORATION', model: 'NIKON D3100', bigEndian: true, fill: 9 });
     const attached = await call('POST', `/api/editor/photos/gamma/sources?filename=_DSC0051.NEF&revision=${json.treatment.revision}`, { body: raw });
     expect(attached.status).toBe(200);
     expect(attached.json.sources).toEqual([expect.objectContaining({ kind: 'attached', format: 'nef', name: '_DSC0051.NEF', sha256: sha256(raw), available: true })]);
     expect(readdirSync(path.join(fixture.workspace, 'sources'))).toContain(`${sha256(raw)}.nef`);
   });
 
-  test('unsupported files, a fourth source and a TIFF that is not ARW or DNG are refused', async () => {
+  test('RAW sources are identified by content: a CR3 named .ARW is a CR3, an unvalidated format is refused by name', async () => {
+    const { json } = await describe_('gamma');
+    const cr3 = Buffer.concat([Buffer.from('\0\0\0\x18ftypcrx \0\0\0\x01', 'latin1'), Buffer.alloc(4096, 4)]);
+    const attached = await call('POST', `/api/editor/photos/gamma/sources?filename=IMG_6266.ARW&revision=${json.treatment.revision}`, { body: cr3 });
+    expect(attached.status).toBe(200);
+    expect(attached.json.sources.at(-1)).toMatchObject({ format: 'cr3', name: 'IMG_6266.ARW' });
+    expect(readdirSync(path.join(fixture.workspace, 'sources'))).toContain(`${sha256(cr3)}.cr3`);
+    const srf = await call('POST', `/api/editor/photos/gamma/sources?filename=F828.SRF&revision=${attached.json.treatment.revision}`, { body: fakeRaw({ model: 'DSC-F828' }) });
+    expect(srf.status).toBe(415);
+    expect(JSON.stringify(srf.json)).toMatch(/Sony SRF files are not supported/);
+  });
+
+  test('unsupported files, a fourth source and a TIFF that is not a camera RAW file are refused', async () => {
     let revision = (await describe_('beta')).json.treatment.revision;
     expect((await call('POST', `/api/editor/photos/beta/sources?filename=a.txt&revision=${revision}`, { body: Buffer.from('hello') })).status).toBe(415);
-    expect((await call('POST', `/api/editor/photos/beta/sources?filename=scan.tif&revision=${revision}`, { body: fakeArw() })).status).toBe(415);
+    expect((await call('POST', `/api/editor/photos/beta/sources?filename=scan.tif&revision=${revision}`, { body: fakeRaw({ make: 'EPSON', model: 'Perfection V600' }) })).status).toBe(415);
     for (const shade of [10, 120, 230]) {
       const response = await call('POST', `/api/editor/photos/beta/sources?filename=b${shade}.jpg&revision=${revision}`, { body: await photograph({ color: { r: shade, g: 50, b: 50 } }) });
       expect(response.status).toBe(200);

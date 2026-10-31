@@ -97,7 +97,11 @@ export function summarizeMetadata(meta, format) {
 /** Checks the opened file before any pixels are allocated. Throws RawDecodeError. */
 export function checkDecodable(meta, info) {
   if ((meta.colors ?? 3) !== 3 || !info.width || !info.height) {
-    throw new RawDecodeError('unsupported', 'This RAW variant is not supported: it is not a three-colour sensor image.');
+    throw new RawDecodeError('unsupported', 'This RAW variant is not supported: its sensor records four colours (such as RGB + emerald), not three.');
+  }
+  // Nikon High Efficiency (HE, HE*) NEFs use TicoRAW, which open-source LibRaw cannot decode.
+  if ([13, 14].includes(meta.nikon?.NEFCompression)) {
+    throw new RawDecodeError('unsupported', 'Nikon High Efficiency (HE and HE*) NEF compression is not supported. Use lossless compressed or uncompressed NEF, or convert the file to DNG.');
   }
   if (!validColorMatrix(info.rgbCam) || info.camXyz.every((value) => value === 0)) {
     throw new RawDecodeError('unsupported', `LibRaw has no colour data for ${info.model || 'this camera'}, so it cannot be developed accurately.`);
@@ -105,6 +109,21 @@ export function checkDecodable(meta, info) {
   if (Math.max(info.width, info.height) > LIMITS.maxSide || info.width * info.height > LIMITS.maxPixels) {
     throw new RawDecodeError('too-large', `${info.width}×${info.height} px is larger than this editor can develop.`);
   }
+}
+
+/**
+ * Half-size decodes report an odd sensor size rounded down to even (the Sony DSC-R1's SR2 is
+ * 3925 px wide, 3924 at import), so a full decode may be a pixel or two larger than the size
+ * the photo was imported with: cropped to it, never resampled. Larger gaps are left alone.
+ */
+export const sameSize = (info, raw) => [info.width - raw.width, info.height - raw.height].every((excess) => excess >= 0 && excess <= 2);
+
+export function cropToSize(image, { width, height }) {
+  const excess = [image.width - width, image.height - height];
+  if (excess.every((value) => value === 0) || excess.some((value) => value < 0 || value > 2)) return image;
+  const data = new Uint16Array(width * height * 3);
+  for (let y = 0; y < height; y += 1) data.set(image.data.subarray(y * image.width * 3, (y * image.width + width) * 3), y * width * 3);
+  return { kind: 'raw', width, height, data };
 }
 
 /**

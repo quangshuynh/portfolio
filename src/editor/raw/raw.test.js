@@ -12,8 +12,8 @@ import {
   channelGains, kelvinTintToXy, multipliersForXy, multipliersToKelvinTint, planckianXy,
   rawDevelopParams, validColorMatrix, xyForMultipliers, xyToKelvinTint,
 } from './rawColor.mjs';
-import { decodeRaw, downsampleRaw } from './rawDecoder.mjs';
-import { isTiff, sniffRaw, unsupportedRawLabel } from './rawFormat.mjs';
+import { checkDecodable, cropToSize, decodeRaw, downsampleRaw, sameSize } from './rawDecoder.mjs';
+import { RAW_EXTENSION_LIST, isRawContainer, isTiff, sniffRaw, unsupportedRawLabel } from './rawFormat.mjs';
 import { readImageHeader } from '../io/imageHeader.mjs';
 import { createRawHandlers, needsFullDecode } from './rawTasks.mjs';
 import { constrainedDevice, createRawQueue } from './rawClient.mjs';
@@ -74,44 +74,66 @@ describe('RAW colour math', () => {
 });
 
 describe('RAW format sniffing (content, not file names)', () => {
-  const tiff = ({ make = '', dng = false } = {}) => {
-    const makeBytes = new TextEncoder().encode(`${make}\0`);
-    const count = (make ? 1 : 0) + (dng ? 1 : 0) + 1;
-    const bytes = new Uint8Array(64 + makeBytes.length);
+  // IFD0 at 16 (after an optional CR2 marker), then Make and Model strings.
+  const tiff = ({ make = '', model = '', dng = false, magic = [0x49, 0x49, 42, 0], cr2 = false } = {}) => {
+    const strings = [make, model].map((text) => new TextEncoder().encode(`${text}\0`));
+    const count = 1 + (make ? 1 : 0) + (model ? 1 : 0) + (dng ? 1 : 0);
+    const bytes = new Uint8Array(200);
     const view = new DataView(bytes.buffer);
-    bytes.set([0x49, 0x49, 42, 0]);
-    view.setUint32(4, 8, true);
-    view.setUint16(8, count, true);
-    let at = 10;
+    bytes.set(magic);
+    view.setUint32(4, 16, true);
+    if (cr2) bytes.set([0x43, 0x52, 2, 0], 8);
+    view.setUint16(16, count, true);
+    let at = 18;
     const entry = (tag, type, n, value) => { view.setUint16(at, tag, true); view.setUint16(at + 2, type, true); view.setUint32(at + 4, n, true); view.setUint32(at + 8, value, true); at += 12; };
     entry(256, 4, 1, 100);
-    if (make) entry(0x010f, 2, makeBytes.length, 56);
+    if (make) entry(0x010f, 2, strings[0].length, 120);
+    if (model) entry(0x0110, 2, strings[1].length, 160);
     if (dng) entry(0xc612, 1, 4, 0x00000401);
-    bytes.set(makeBytes, 56);
+    bytes.set(strings[0], 120);
+    bytes.set(strings[1], 160);
     return bytes;
   };
+  const text = (value) => { const out = new Uint8Array(64); out.set([...value].map((char) => char.charCodeAt(0))); return out; };
 
-  test('identifies Sony ARW, Nikon NEF and DNG, and rejects other TIFF-based files with a reason', () => {
-    expect(sniffRaw(tiff({ make: 'SONY' }))).toBe('arw');
-    expect(sniffRaw(tiff({ make: 'NIKON CORPORATION' }))).toBe('nef');
+  test('identifies each validated format by maker, model and container', () => {
+    expect(sniffRaw(tiff({ make: 'SONY', model: 'ILCE-7M3' }))).toBe('arw');
+    expect(sniffRaw(tiff({ make: 'SONY', model: 'DSC-R1' }))).toBe('sr2');
+    expect(sniffRaw(tiff({ make: 'NIKON CORPORATION', model: 'NIKON D3100' }))).toBe('nef');
+    expect(sniffRaw(tiff({ make: 'NIKON', model: 'COOLPIX P1000' }))).toBe('nrw');
+    expect(sniffRaw(tiff({ make: 'Canon', model: 'Canon EOS 5DS', cr2: true }))).toBe('cr2');
+    expect(sniffRaw(tiff({ make: 'PENTAX', model: 'PENTAX K-5' }))).toBe('pef');
+    expect(sniffRaw(tiff({ make: 'OM Digital Solutions', magic: [0x49, 0x49, 0x52, 0x4f] }))).toBe('orf');
+    expect(sniffRaw(tiff({ make: 'OLYMPUS IMAGING CORP.', magic: [0x49, 0x49, 0x52, 0x53] }))).toBe('orf');
+    expect(sniffRaw(tiff({ make: 'Panasonic', magic: [0x49, 0x49, 0x55, 0] }))).toBe('rw2');
     expect(sniffRaw(tiff({ make: 'Canon', dng: true }))).toBe('dng');
+    expect(sniffRaw(tiff({ make: 'Apple', model: 'iPhone 12 Pro', dng: true }))).toBe('dng');
     expect(sniffRaw(createSyntheticDng())).toBe('dng');
-    // Known but unvalidated RAW formats are named in the refusal.
-    expect(() => sniffRaw(tiff({ make: 'Canon' }))).toThrow(/Canon CR2 files are not supported yet/);
-    expect(() => sniffRaw(tiff({ make: 'PENTAX' }))).toThrow(/Pentax PEF files are not supported yet/);
-    expect(() => sniffRaw(tiff({ make: 'Leaf' }))).toThrow(/files from Leaf are not supported\. RAW support covers Sony ARW, Nikon NEF and DNG/);
+    expect(sniffRaw(text('\0\0\0\x18ftypcrx '))).toBe('cr3');
+    expect(sniffRaw(text('II\x1a\0\0\0HEAPCCDR'))).toBe('crw');
+    expect(sniffRaw(text('FUJIFILMCCD-RAW 0201'))).toBe('raf');
+    expect(isRawContainer(text('FUJIFILMCCD-RAW 0201'))).toBe(true);
+    expect(isRawContainer(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toBe(false);
+    expect(RAW_EXTENSION_LIST).toBe('ARW, SR2, NEF, NRW, CR2, CR3, CRW, RAF, RW2, ORF, PEF, DNG');
+  });
+
+  test('refuses other RAW and TIFF files with a reason', () => {
+    expect(() => sniffRaw(tiff({ make: 'SONY', model: 'DSC-F828' }))).toThrow(/Sony SRF files are not supported: its four-colour/);
+    expect(() => sniffRaw(tiff({ make: 'SAMSUNG', model: 'NX1' }))).toThrow(/Samsung SRW files are not supported: no genuine Samsung SRW file/);
+    expect(() => sniffRaw(tiff({ make: 'Leica Camera AG', magic: [0x49, 0x49, 0x55, 0] }))).toThrow(/Leica RWL files are not supported/);
+    // Canon's TIFF files without the CR2 marker (EOS-1D .TIF) are not CR2.
+    expect(() => sniffRaw(tiff({ make: 'Canon' }))).toThrow(/RAW or TIFF files from Canon are not supported/);
+    expect(() => sniffRaw(tiff({ make: 'Leaf' }))).toThrow(/files from Leaf are not supported\. RAW support covers Sony ARW, Sony SR2, .* and DNG/);
     expect(() => sniffRaw(tiff())).toThrow(expect.objectContaining({ code: 'unsupported' }));
+    expect(() => sniffRaw(text('FOVb\0\0\0\0'))).toThrow(/Sigma X3F files are not supported/);
     expect(sniffRaw(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toBeNull();
     expect(isTiff(new Uint8Array([0x4d, 0x4d, 0, 42, 0, 0, 0, 8]))).toBe(true);
   });
 
-  test('Canon CR3 and Fujifilm RAF are recognised by content and refused by name', () => {
-    const bytes = (text) => { const out = new Uint8Array(64); out.set([...text].map((char) => char.charCodeAt(0))); return out; };
-    const cr3 = bytes('\0\0\0\x18ftypcrx ');
-    expect(unsupportedRawLabel(cr3)).toBe('Canon CR3');
-    expect(unsupportedRawLabel(bytes('FUJIFILMCCD-RAW 0201'))).toBe('Fujifilm RAF');
-    expect(unsupportedRawLabel(bytes('\0\0\0\x18ftypheic'))).toBeNull();
-    expect(() => readImageHeader(cr3)).toThrow(/Canon CR3 files are not supported yet/);
+  test('unsupported non-TIFF RAW is recognised by content and refused by name', () => {
+    expect(unsupportedRawLabel(text('\0MRM\0\0\0\0'))).toBe('Minolta MRW');
+    expect(unsupportedRawLabel(text('\0\0\0\x18ftypheic'))).toBeNull();
+    expect(() => readImageHeader(text('FOVb\0\0\0\0'))).toThrow(/Sigma X3F files are not supported yet/);
   });
 
   test('a damaged header is reported, never read out of bounds', () => {
@@ -419,5 +441,27 @@ describe('RAW job queue', () => {
     started[0].progress({ stage: 'decoding' });
     started[0].crash();
     await expect(job.promise).rejects.toMatchObject({ code: 'memory', message: expect.stringMatching(/ran out of memory/) });
+  });
+});
+
+describe('decoder edge cases from genuine cameras', () => {
+  const info = { width: 4, height: 2, model: 'X', rgbCam: [1, 0, 0, 0, 1, 0, 0, 0, 1], camXyz: [1, 0, 0, 0, 1, 0, 0, 0, 1] };
+
+  test('an odd sensor width reported even at import is cropped, never resampled', () => {
+    const image = { kind: 'raw', width: 5, height: 2, data: Uint16Array.from({ length: 30 }, (_, i) => i) };
+    expect(sameSize({ width: 5, height: 2 }, info)).toBe(true);
+    expect(sameSize({ width: 7, height: 2 }, info)).toBe(false);
+    expect(sameSize({ width: 3, height: 2 }, info)).toBe(false);
+    const cropped = cropToSize(image, info);
+    expect([cropped.width, cropped.height]).toEqual([4, 2]);
+    expect(Array.from(cropped.data)).toEqual([...Array.from({ length: 12 }, (_, i) => i), ...Array.from({ length: 12 }, (_, i) => 15 + i)]);
+    expect(cropToSize(image, { width: 5, height: 2 })).toBe(image);
+  });
+
+  test('Nikon High Efficiency NEFs and four-colour sensors are refused with their reason', () => {
+    expect(() => checkDecodable({ colors: 3, nikon: { NEFCompression: 14 } }, info)).toThrow(/Nikon High Efficiency \(HE and HE\*\) NEF compression is not supported/);
+    expect(() => checkDecodable({ colors: 3, nikon: { NEFCompression: 13 } }, info)).toThrow(expect.objectContaining({ code: 'unsupported' }));
+    expect(() => checkDecodable({ colors: 4 }, info)).toThrow(/four colours/);
+    expect(() => checkDecodable({ colors: 3, nikon: { NEFCompression: 3 } }, info)).not.toThrow();
   });
 });

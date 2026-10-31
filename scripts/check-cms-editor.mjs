@@ -22,7 +22,7 @@
 // Usage: npm run check:cms:editor (CMS_EDITOR_RUNS=chromium,firefox to limit the runs)
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -35,11 +35,27 @@ import { createGit } from '../cms/lib/git.mjs';
 import { preparePublication } from '../cms/lib/publish.mjs';
 import { WATERMARK_DEFAULTS, layoutWatermark, normalizeWatermark } from '../src/editor/watermark/watermark.mjs';
 import { startCmsServer } from '../cms/server.mjs';
+import { RAW_SNIFF_BYTES, sniffRaw } from '../src/editor/raw/rawFormat.mjs';
 
 const work = mkdtempSync(path.join(tmpdir(), 'cms-editor-check-'));
 const ONLY_RUNS = process.env.CMS_EDITOR_RUNS?.split(',');
 const GENUINE_DIR = process.env.CMS_EDITOR_FIXTURE_DIR ?? '';
 const RAW_FILES = GENUINE_DIR && existsSync(GENUINE_DIR) ? readdirSync(GENUINE_DIR).filter((name) => /\.arw$/i.test(name)).sort().map((name) => path.join(GENUINE_DIR, name)) : [];
+// CMS_RAW_FORMATS_DIR (genuine files of other cameras, e.g. the Interval 21 samples): one file per
+// validated format is attached by content, rendered at full size and reopened; refused files are attached too.
+const FORMATS_DIR = process.env.CMS_RAW_FORMATS_DIR ?? '';
+const FORMAT_FILES = (() => {
+  if (!FORMATS_DIR || !existsSync(FORMATS_DIR)) return { valid: [], refused: [] };
+  const valid = new Map();
+  const refused = [];
+  for (const name of readdirSync(FORMATS_DIR).sort()) {
+    const file = path.join(FORMATS_DIR, name);
+    let format = null;
+    try { format = sniffRaw(new Uint8Array(readFileSync(file).subarray(0, RAW_SNIFF_BYTES))); } catch { refused.push(file); }
+    if (format && format !== 'arw' && !valid.has(format)) valid.set(format, file);
+  }
+  return { valid: [...valid].map(([format, file]) => ({ format, file })), refused: refused.slice(0, 1) };
+})();
 const RUNS = [
   { id: 'chromium', type: chromium, genuine: true },
   { id: 'firefox', type: firefox },
@@ -401,6 +417,55 @@ try {
           assert.equal(json.treatment.document.photos[0].source.format, 'arw');
           return { size: `${json.treatment.render.width}×${json.treatment.render.height}`, name: json.treatment.render.file };
         });
+        if (FORMAT_FILES.valid.length) {
+          await step('other cameras: each validated RAW format attached by content, rendered at full size and reopened; an unsupported file refused', async () => {
+            const outcome = [];
+            let lastId = null;
+            for (const { format, file } of FORMAT_FILES.valid) {
+              const bytes = await syntheticJpeg(seed += 1, 1200, 800);
+              const id = await page.evaluate(async (data) => {
+                const response = await fetch(`/api/uploads?filename=format-check-${Date.now()}.jpg`, { method: 'POST', headers: { 'X-CMS-Request': '1' }, body: new Uint8Array(data) });
+                return (await response.json()).id;
+              }, [...bytes]);
+              await page.goto(`${origin}/admin/photography/editor/?photo=${id}`);
+              await page.locator('.cms-host').waitFor();
+              await page.waitForSelector('.pe-photo[data-status=ready]', { state: 'attached', timeout: 60_000 });
+              await page.setInputFiles('.cms-host input[type=file]', file);
+              await page.waitForURL(/editor/);
+              await page.waitForSelector('.pe-photo[data-status=ready]', { state: 'attached', timeout: 300_000 });
+              await poll(() => page.locator('.cms-host__meta').textContent(), (text) => text.includes(`${path.basename(file)} (attached`), `${format} source`);
+              const started = Date.now();
+              await page.getByRole('button', { name: 'Render for portfolio' }).click();
+              await poll(() => page.locator('.cms-host__status').textContent(), (text) => /render up to date/.test(text), `${format} render`, 900_000);
+              const { json } = await api(page, 'GET', `/api/editor/photos/${id}`);
+              assert.equal(json.treatment.attached[0].format, format);
+              assert.equal(json.treatment.document.photos[0].source.format, format);
+              const source = json.treatment.document.photos[0].source;
+              assert.equal(`${json.treatment.render.width}×${json.treatment.render.height}`, `${source.width}×${source.height}`, `${format}: full-size render`);
+              // Reopen: the saved treatment and its fresh render come back with the same source.
+              await page.reload();
+              await page.waitForSelector('.pe-photo[data-status=ready]', { state: 'attached', timeout: 300_000 });
+              const again = (await api(page, 'GET', `/api/editor/photos/${id}`)).json;
+              assert.equal(again.renderFresh, true);
+              assert.equal(again.treatment.document.photos[0].source.sha256, source.sha256);
+              outcome.push({ format, size: `${json.treatment.render.width}×${json.treatment.render.height}`, renderMs: Date.now() - started });
+              lastId = id;
+            }
+            for (const file of FORMAT_FILES.refused) {
+              // The header is enough: the CMS identifies attachments by content before storing them.
+              // Sent with the page's session outside the page, so the expected 415 is no console error.
+              const { json } = await api(page, 'GET', `/api/editor/photos/${lastId}`);
+              const response = await page.request.post(`${origin}/api/editor/photos/${lastId}/sources?filename=refused.raw&revision=${json.treatment.revision}`, {
+                headers: { 'X-CMS-Request': '1' }, data: readFileSync(file).subarray(0, RAW_SNIFF_BYTES),
+              });
+              const status = { status: response.status(), text: await response.text() };
+              assert.equal(status.status, 415, status.text);
+              assert.match(status.text, /not supported/);
+              outcome.push({ refused: path.basename(file), message: JSON.parse(status.text).error?.message ?? status.text.slice(0, 120) });
+            }
+            return outcome;
+          });
+        }
         await step('genuine HDR: attach three exposures, merge, save, render', async () => {
           const bytes = await syntheticJpeg(seed += 1, 1200, 800);
           const hdrId = await page.evaluate(async (data) => {

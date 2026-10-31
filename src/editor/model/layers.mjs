@@ -28,6 +28,7 @@ import { DEFAULT_OUTLINE, DEFAULT_SHADOW, TEXT_LIMITS, normalizeTextOverlay } fr
 import { ADJUSTMENTS, groupIsNeutral, normalizeAdjustments } from './adjustments.mjs';
 import { CURVE_CHANNELS, isNeutralCurve } from '../pipeline/curves.mjs';
 import { MASK_LIMITS, normalizeMask } from './masks.mjs';
+import { RAW_FORMATS } from '../raw/rawFormat.mjs';
 
 /** The space of a layer type's mask. */
 export const layerMaskSpace = (type) => (type === 'image' ? 'layer' : 'canvas');
@@ -67,7 +68,7 @@ export const LAYER_LIMITS = Object.freeze({
   sourceSide: 65_535,
 });
 
-export const IMAGE_SOURCE_FORMATS = Object.freeze(['jpeg', 'png', 'webp', 'arw', 'nef', 'dng']);
+export const IMAGE_SOURCE_FORMATS = Object.freeze(['jpeg', 'png', 'webp', ...Object.keys(RAW_FORMATS)]);
 
 // Settings an image or adjustment layer may carry: the per-pixel colour controls, which the
 // compositor applies to the layer's pixels or to the composite below. Detail, glow, grain,

@@ -6,14 +6,14 @@
 import { safeBaseName } from '../io/files.mjs';
 import { contentHash } from '../io/hash.mjs';
 import { DEFAULT_MERGE_SETTINGS } from './hdrMerge.mjs';
-import { ROLES } from './hdrMetadata.mjs';
+import { HDR_RAW_FORMATS, ROLES } from './hdrMetadata.mjs';
 
 export const HDR_MODES = Object.freeze({
   radiance: { label: 'RAW HDR merge' },
   fusion: { label: 'Exposure fusion' },
 });
 export const HDR_NAME_SUFFIX = '-HDR';
-const INPUT_FORMATS = ['arw', 'nef', 'dng', 'jpeg', 'png', 'webp'];
+const INPUT_FORMATS = [...HDR_RAW_FORMATS, 'jpeg', 'png', 'webp'];
 
 /**
  * Name of a merged photo: the reference (normal) exposure's base name plus "-HDR",

@@ -16,6 +16,7 @@
 // the saved roles and settings, so the saved edits and the watermark land on the same merge.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeWatermark, watermarksEqual } from '../../src/editor/watermark/watermark.mjs';
+import { RAW_ACCEPT, RAW_SUPPORT } from '../../src/editor/raw/rawFormat.mjs';
 import { ApiError, treatments, watermark as watermarkApi } from './api.js';
 import { watermarkTreatmentState } from '../lib/watermark-rules.mjs';
 
@@ -300,10 +301,10 @@ function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, 
         {busy === 'render' && progress?.stage !== 'uploading' && <button type="button" className="pe-button" onClick={cancelRender}>Cancel</button>}
         <a className="pe-button" href={`/admin/photography/#review=${encodeURIComponent(photoId)}`}>Review in CMS</a>
         <button type="button" className="pe-button" onClick={() => attachRef.current?.click()} disabled={Boolean(busy)}
-          title="Attach the original (JPEG, PNG, WebP, ARW, NEF or DNG), or three bracketed exposures for HDR">
+          title={`Attach the original (JPEG, PNG, WebP or RAW: ${RAW_SUPPORT}), or three bracketed exposures for HDR`}>
           Attach source…
         </button>
-        <input ref={attachRef} type="file" hidden multiple accept=".jpg,.jpeg,.png,.webp,.arw,.nef,.dng,image/jpeg,image/png,image/webp"
+        <input ref={attachRef} type="file" hidden multiple accept={[".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp", ...RAW_ACCEPT].join(",")}
           onChange={(event) => { const files = [...event.target.files]; event.target.value = ''; if (files.length) attach(files); }} />
       </div>
       {status?.state === 'error' && <p className="cms-host__note cms-host__note--error" role="alert">{status.message}</p>}

@@ -1,6 +1,7 @@
 # Photo editor (`/photography/editor`)
 
-A public, local-first editor for JPEG, PNG, WebP and RAW (Sony ARW, Nikon NEF, DNG). No
+A public, local-first editor for JPEG, PNG, WebP and camera RAW (12 formats, see
+[RAW compatibility](raw-compatibility.md)). No
 account, no upload, no server: files are decoded, edited and exported in the
 visitor's browser. Built in Interval 3 (light and colour), extended in Interval 4
 (tone curves, HSL, `.cube` LUTs, presets), Interval 5 (RAW, see [RAW](#raw)) and
@@ -116,7 +117,9 @@ that was hidden in the source. Shadows lift noise and JPEG artefacts.
 
 ## RAW
 
-Sony ARW, Nikon NEF and DNG files are developed from their sensor data with LibRaw 0.22.1
+RAW files (Sony ARW and SR2, Nikon NEF and NRW, Canon CR2, CR3 and CRW, Fujifilm RAF
+including X-Trans, Panasonic RW2, Olympus/OM System ORF, Pentax PEF and DNG; per-camera
+results in [raw-compatibility.md](raw-compatibility.md)) are developed from their sensor data with LibRaw 0.22.1
 (`libraw-wasm` 1.6.0, pinned). The embedded camera JPEG is never used: not as the
 preview, thumbnail, "before" image or export. Nothing is uploaded.
 
@@ -130,12 +133,14 @@ full-size export with exposure, crop and watermark). LibRaw reads no lens name
 from D3100 maker notes (left empty). A neutral NEF development is 0.4–0.9 EV darker
 than Nikon's in-camera JPEG (its tone curve and Active D-Lighting); white balance
 on neutral tones agrees.
-**Not verified:** A7 III compressed ARW, lossless-compressed ARW, other Nikon
-bodies, camera or Adobe DNG Converter DNGs (lossless JPEG, lossy, deflate or
-float), Canon CR2/CR3, Fujifilm RAF and any other maker: no genuine file was
-available. Those are recognised by content and refused by name ("Canon CR2 files
-are not supported yet"); a file without colour data is refused rather than
-developed with wrong colour.
+Interval 21 validated 19 more genuine files from 18 cameras (Canon, Fujifilm, Nikon,
+Sony, Panasonic, OM System/Olympus, Pentax, Ricoh, DJI, Apple, OPPO): see
+[raw-compatibility.md](raw-compatibility.md). **Refused with a reason:** Sony SRF (four-colour
+sensor), Nikon High Efficiency NEF (TicoRAW, not in open-source LibRaw), and recognised
+formats without a genuine sample (Samsung SRW, Sigma X3F, Minolta MRW, Hasselblad 3FR,
+Phase One IIQ, Leica RWL, Kodak DCR). A file without colour data is refused rather than
+developed with wrong colour. A half-size import rounds an odd sensor width down (DSC-R1:
+3925 to 3924 px); full decodes are cropped to that size, never resampled.
 
 **Order of operations**
 
@@ -235,7 +240,8 @@ mode so the shutter speed changes and ISO and aperture stay fixed. **DRO bracket
 not an exposure bracket**: it records one exposure and saves it several times (with
 differently processed JPEG previews), so there is nothing to merge; the editor refuses it.
 
-**Inputs.** Exactly three files, all RAW (Sony ARW, Nikon NEF and DNG as in [RAW](#raw)) or all
+**Inputs.** Exactly three files, all RAW (Sony ARW, Nikon NEF or DNG, the formats merged from
+genuine brackets; other RAW formats are refused with a reason) or all
 JPEG/PNG/WebP. Refused with a reason: mixed kinds, duplicates (hash), different cameras
 or RAW sizes, different orientation or aspect ratio, the same recorded exposure (all three, or any two), more
 than 8 EV span, unrelated scenes, motion that would crop more than 30%, roles that
@@ -1522,10 +1528,11 @@ photo's), so `DSC09641-HDR` with layers exports as `DSC09641-HDR-quangedit.jpg`.
 ## Import limits
 
 Files are identified by content (magic bytes), never by name or MIME type. A TIFF
-structure goes to the RAW decoder, which accepts it only as DNG (DNGVersion tag)
-Sony ARW (maker "SONY") or Nikon NEF (maker "NIKON"); known unvalidated formats
-(Canon CR2 and CR3, Fujifilm RAF, Olympus, Panasonic, Pentax) are refused by name
-and anything else as "RAW or TIFF files from <maker>".
+structure (or ORF/RW2's own TIFF magic, a CR3 `crx ` brand, CRW's CIFF heap or RAF's
+`FUJIFILMCCD-RAW`) goes to the RAW decoder (`raw/rawFormat.mjs`): DNGVersion first, then
+IFD0's Make and Model (SR2/SRF and NRW are model-specific; CR2 needs its `CR` version-2
+marker). Known formats without validation are refused by name, anything else as "RAW or
+TIFF files from <maker>".
 Limits are checked from the header before decoding: 200 MB per file, 16 384 px
 per side, 100 MP, and 50 photos per workspace. Duplicates (same SHA-256) are
 reported against the original. Errors are per file: unsupported, empty,

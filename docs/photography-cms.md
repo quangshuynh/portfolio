@@ -153,7 +153,7 @@ recipes, geometry, layers, masks) opens CMS photographs; nothing is a second edi
 
 | Source | When |
 | --- | --- |
-| Attached (Attach source… in the editor: JPEG, PNG, WebP, Sony ARW, DNG; up to three for an HDR merge) | stored once by SHA-256 in `sources/`, or referenced in `originals/` |
+| Attached (Attach source… in the editor: JPEG, PNG, WebP or a validated RAW format, identified by content; up to three for an HDR merge) | stored once by SHA-256 in `sources/`, or referenced in `originals/` |
 | Uploaded original | drafts uploaded to the CMS |
 | Camera library | `--library-dir` set and the photograph listed in `scripts/photography-sources.mjs`: read in place |
 | Public 2200 px image | nothing else: editing works and is labelled as limited; a render is never larger |

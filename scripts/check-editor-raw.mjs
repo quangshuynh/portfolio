@@ -59,17 +59,17 @@ function makeFixtures() {
   const files = {
     dng: path.join(fixtures, 'synthetic.dng'),
     damaged: path.join(fixtures, 'damaged.dng'),
-    canon: path.join(fixtures, 'IMG_0001.CR2'),
+    samsung: path.join(fixtures, 'SAM_0001.SRW'),
     chart: path.join(fixtures, 'chart.png'),
   };
   const dng = createSyntheticDng({ width: 600, height: 400, orientation: 6, scene: SCENE });
   writeFileSync(files.dng, dng);
   writeFileSync(files.damaged, dng.slice(0, 2000));
-  // TIFF-based, maker Canon: identified and refused by content, whatever its name.
-  const canon = Buffer.from(createSyntheticDng({ width: 8, height: 8, make: 'Canon' }));
+  // TIFF-based, maker Samsung (no genuine file validated): identified and refused by content, whatever its name.
+  const samsung = Buffer.from(createSyntheticDng({ width: 8, height: 8, make: 'SAMSUNG' }));
   // Remove the DNGVersion tag (0xC612) so only the maker identifies it.
-  for (let i = 0; i + 1 < 600; i += 1) if (canon[i] === 0x12 && canon[i + 1] === 0xc6) { canon[i] = 0x13; canon[i + 1] = 0xc6; }
-  writeFileSync(files.canon, canon);
+  for (let i = 0; i + 1 < 600; i += 1) if (samsung[i] === 0x12 && samsung[i + 1] === 0xc6) { samsung[i] = 0x13; samsung[i + 1] = 0xc6; }
+  writeFileSync(files.samsung, samsung);
   return files;
 }
 
@@ -138,11 +138,11 @@ async function runOne(run, files, reference) {
     });
     await step('import RAW, unsupported and damaged files', async () => {
       const started = Date.now();
-      await page.setInputFiles('input[type=file][multiple]', [files.dng, files.canon, files.damaged]);
+      await page.setInputFiles('input[type=file][multiple]', [files.dng, files.samsung, files.damaged]);
       const rows = await poll(() => page.$$eval('.pe-photo--list', (items) => items.map((li) => `${li.dataset.status}: ${li.querySelector('.pe-photo__detail').textContent}`)), (r) => r.length === 3 && !r.some((row) => row.startsWith('importing')), 'imports', 60_000);
       result.importMs = Date.now() - started;
       assert.match(rows[0], /^ready: 400×600 · DNG/);
-      assert.match(rows[1], /^error: .*Canon CR2 files are not supported yet/);
+      assert.match(rows[1], /^error: .*Samsung SRW files are not supported: no genuine/);
       assert.match(rows[2], /^error: .*(could not read|damaged)/i);
       await poll(() => page.evaluate(() => !document.querySelector('.pe-stage-message') && !document.querySelector('.pe-canvas-host').hidden), Boolean, 'RAW preview', 60_000);
     });
