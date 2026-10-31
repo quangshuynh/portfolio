@@ -1,4 +1,4 @@
-# RAW compatibility (Intervals 21–22)
+# RAW compatibility (Intervals 21–22.1)
 
 Genuine files tested with the editor's own pipeline (LibRaw 0.22.1 via `libraw-wasm` 1.6.0,
 unchanged). The sample files are private and never committed. Rerun both checks against a
@@ -146,6 +146,48 @@ within 0.13 % of legacy and never above the camera's own on the seven files with
 255 in one channel (bright saturated colours, hue kept by the range fit). Neutral balance is
 unchanged (≤ 0.12 log). No crushed blacks (≤ 0.17 % of pixels at 0–2). Render cost on the CPU
 is about 20 % above legacy (tabulated curve); export times are unchanged within noise.
+
+## Camera Natural v2 and Auto Exposure (Interval 22.1)
+
+Median L* difference from the camera's rendering (embedded preview; D3100: its own JPEG), no
+edits, as-shot white balance. v2 differs from v1 only for calibrated models (D3100, A7 III).
+Auto Exposure is the camera-matched suggestion; the last column is v2 with it accepted.
+
+| File | Legacy | Natural v1 | Natural v2 | Auto Exposure | v2 + Auto |
+| --- | --- | --- | --- | --- | --- |
+| Apple-iPhone-12-Pro.DNG | −7.2 | +4.6 | +4.6 | −0.30 | −0.3 |
+| Canon-5D-Mark-IV.CR2 | −26.9 | −15.7 | −15.7 | +1.00 | −0.6 |
+| Canon-EOS-D60.CRW | −3.6 | +12.5 | +12.5 | −0.80 | −0.4 |
+| Canon-EOS-R.CR3 | −27.3 | −11.2 | −11.2 | +0.75 | −0.1 |
+| DJI_0020.DNG | −19.7 | −1.0 | −1.0 | none (matches) | −1.0 |
+| DSCF3103.RAF | −5.5 | +1.8 | +1.8 | none | +1.8 |
+| Fujifilm-X-T4.RAF | −6.2 | +4.7 | +4.7 | −0.35 | −0.1 |
+| IMG20231031184843.dng | +1.4 | +8.1 | +8.1 | −0.60 | 0.0 |
+| IMG_6266.CR3 | −7.6 | +1.1 | +1.1 | none | +1.1 |
+| Nikon-Coolpix-P1000.NRW | −4.4 | +10.2 | +10.2 | −0.65 | +0.1 |
+| Nikon-Z6.NEF | −19.3 | −5.2 | −5.2 | +0.30 | −0.5 |
+| OM-System-OM-1.ORF | −21.4 | −6.6 | −6.6 | +0.40 | −0.4 |
+| Panasonic-G9.RW2 | −20.3 | −7.5 | −7.5 | +0.45 | −0.6 |
+| Ricoh-GR-III.DNG | −8.6 | −2.8 | −2.8 | none | −2.8 |
+| Sony-DSC-R1.SR2 | −7.8 | +4.8 | +4.8 | −0.30 | +0.3 |
+| sample-nrw-files-sample1.nrw | −7.9 | +8.6 | +8.6 | −0.55 | −0.4 |
+| sample-orf-files-sample1.orf | 0.0 | +13.7 | +13.7 | −0.95 | −0.3 |
+| sample-pef-files-sample1.pef | −3.4 | +10.4 | +10.4 | −0.70 | −0.1 |
+| sample-rw2-files-sample1.rw2 | −6.8 | +9.5 | +9.5 | −0.60 | −0.3 |
+| sample1.cr2 | −27.9 | −12.6 | −12.6 | +0.80 | −0.3 |
+| D3100 `_DSC0114`–`0117` (camera JPEG) | −6.3 to −12.4 | +2.2 to +6.6 | −2.4 to +2.2 | none | −2.4 to +2.2 |
+| A7 III `DSC09410`–`09418` | −2.5 to −18.7 | −4.8 to +2.3 | −1.2 to +4.8 | −0.50 on `09412` | −1.2 to +3.4 |
+| A7 III `DSC09419`, `09420` | −0.8, −1.7 | +15.1, +14.6 | +19.0, +18.4 | −1.20, −1.15 | 0.0, +0.1 |
+
+Camera Natural v2 improves the D3100 (genuine JPEGs) and, on average, the A7 III (mean |gap|
+2.5 → 1.9 L*). Uncalibrated cameras keep their v1 offsets in the default rendering; accepting
+Auto Exposure brings the 20 Interval 21 files within 2.8 L* (16 within 0.6; the other four had no suggestion because they were already within 0.3 EV) and the D3100 and A7 III frames within 3.4 L*. Pixels clipped
+to white after Auto Exposure are never more than legacy's; neutral balance stays within 0.12
+log. Auto Exposure is withheld where the preview already matches (within 0.3 EV). Browser:
+the RAW worker decodes the preview in Chromium and Firefox (`check:editor:raw`: −1.15 EV on
+`DSC09420`, no suggestion on the D3100 NEF); WebKit was checked only with the synthetic DNG,
+which has no preview. Every validated file and both refusals pass `check:raw:compat`, and
+`check:editor:raw-formats` (20/20 in Chromium and Firefox, mixed-profile batch ZIP, reopen).
 
 ## CMS
 
