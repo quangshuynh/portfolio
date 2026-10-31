@@ -3,7 +3,8 @@
 // randomised PatchMatch for the nearest-neighbour field). Every unknown pixel is rebuilt from
 // patches of the surrounding photo that best match its neighbourhood in colour and in luminance
 // gradient (so edges and structure continue into the hole), averaged with weights that favour
-// close matches. Deterministic for the same pixels and seed; no network, no model, no server.
+// close matches and patches anchored near the hole's edge; reusing one source patch many times is
+// penalised, so large fills do not repeat the same texture. Deterministic for the same pixels and seed; no network, no model, no server.
 // Environment-free; cancellable between iterations; reports progress.
 
 const PATCH = 7;
@@ -11,6 +12,12 @@ const HALF = (PATCH - 1) >> 1;
 // The coarsest level holds the hole within about this many pixels across.
 const COARSEST_HOLE = 24;
 const GRADIENT_WEIGHT = 0.6;
+// Voting trusts patches centred near the hole's edge (anchored in real pixels) over those deep
+// inside it (built on earlier guesses): weight × CONFIDENCE_DECAY^-distance (Wexler et al.).
+const CONFIDENCE_DECAY = 1.3;
+// Each further target reusing one source patch costs this share of the typical patch distance,
+// so a large fill spreads over the photo instead of stamping the same patch again and again.
+const REUSE_PENALTY = 0.5;
 
 export class InpaintCancelled extends Error {
   constructor() {
@@ -39,8 +46,8 @@ export function seedOf(text) {
 }
 
 // One pyramid level: feature channels (r, g, b, gx, gy), the hole and where patches may come from.
-function makeLevel(width, height) {
-  return { width, height, color: new Float32Array(width * height * 3), hole: new Uint8Array(width * height), allowed: new Uint8Array(width * height), features: new Float32Array(width * height * 5) };
+function makeLevel(width, height, color = new Float32Array(width * height * 3), hole = new Uint8Array(width * height)) {
+  return { width, height, color, hole, allowed: new Uint8Array(width * height), features: new Float32Array(width * height * 5) };
 }
 
 function downsample(level) {
@@ -111,6 +118,33 @@ function computeFeatures(level) {
   }
 }
 
+/** Per pixel: 1 outside the hole, CONFIDENCE_DECAY^-d inside it (d: chamfer distance to its edge). */
+function confidenceOf(level) {
+  const { width, height, hole } = level;
+  const d = new Float32Array(width * height);
+  for (let i = 0; i < d.length; i += 1) d[i] = hole[i] ? Infinity : 0;
+  const relax = (i, j, w) => { if (d[j] + w < d[i]) d[i] = d[j] + w; };
+  for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
+    const i = y * width + x;
+    if (x > 0) relax(i, i - 1, 1);
+    if (y > 0) { relax(i, i - width, 1); if (x > 0) relax(i, i - width - 1, Math.SQRT2); if (x < width - 1) relax(i, i - width + 1, Math.SQRT2); }
+  }
+  for (let y = height - 1; y >= 0; y -= 1) for (let x = width - 1; x >= 0; x -= 1) {
+    const i = y * width + x;
+    if (x < width - 1) relax(i, i + 1, 1);
+    if (y < height - 1) { relax(i, i + width, 1); if (x < width - 1) relax(i, i + width + 1, Math.SQRT2); if (x > 0) relax(i, i + width - 1, Math.SQRT2); }
+  }
+  for (let i = 0; i < d.length; i += 1) d[i] = d[i] === Infinity ? 1e-6 : CONFIDENCE_DECAY ** -d[i];
+  return d;
+}
+
+/** The indices of the n set entries of a flag array, as typed array (no growing JS array for millions of pixels). */
+function indicesOf(flags, n) {
+  const out = new Int32Array(n);
+  for (let i = 0, k = 0; i < flags.length; i += 1) if (flags[i]) { out[k] = i; k += 1; }
+  return out;
+}
+
 /** Patch centres a fill may copy from: the whole patch inside the level and allowed. */
 function sourceCentres(level) {
   const { width, height, allowed } = level;
@@ -123,17 +157,16 @@ function sourceCentres(level) {
       sat[(y + 1) * (width + 1) + x + 1] = sat[y * (width + 1) + x + 1] + row;
     }
   }
-  const centres = [];
+  const valid = new Uint8Array(width * height);
+  let n = 0;
   for (let y = HALF; y < height - HALF; y += 1) {
     for (let x = HALF; x < width - HALF; x += 1) {
       const x0 = x - HALF; const y0 = y - HALF; const x1 = x + HALF + 1; const y1 = y + HALF + 1;
       const count = sat[y1 * (width + 1) + x1] - sat[y0 * (width + 1) + x1] - sat[y1 * (width + 1) + x0] + sat[y0 * (width + 1) + x0];
-      if (count === PATCH * PATCH) centres.push(y * width + x);
+      if (count === PATCH * PATCH) { valid[y * width + x] = 1; n += 1; }
     }
   }
-  const valid = new Uint8Array(width * height);
-  for (const c of centres) valid[c] = 1;
-  return { centres: Int32Array.from(centres), valid };
+  return { centres: indicesOf(valid, n), valid };
 }
 
 /** Patch distance between centres p (target) and q (source), over the five feature channels; stops past `limit`. */
@@ -168,16 +201,25 @@ function targetCentres(level) {
       if (nx >= 0 && ny >= 0 && nx < width && ny < height) mark[ny * width + nx] = 1;
     }
   }
-  const out = [];
-  for (let i = 0; i < mark.length; i += 1) if (mark[i]) out.push(i);
-  return Int32Array.from(out);
+  let n = 0;
+  for (let i = 0; i < mark.length; i += 1) n += mark[i];
+  return indicesOf(mark, n);
 }
 
-/** PatchMatch: propagation from scan-order neighbours, then random search in shrinking windows. */
-function patchMatch(level, targets, nnf, dist, sources, rand, iterations) {
+/**
+ * PatchMatch: propagation from scan-order neighbours, then random search in shrinking windows.
+ * A candidate costs its patch distance plus `penalty` for every other target already using it.
+ */
+function patchMatch(level, targets, nnf, dist, sources, rand, iterations, penalty) {
   const { width, height } = level;
-  const index = new Int32Array(width * height).fill(-1);
-  targets.forEach((p, i) => { index[p] = i; });
+  // Target number by pixel, over the hole's box grown by half a patch (where every target lies).
+  const bx0 = Math.max(0, level.bounds.x0 - HALF); const by0 = Math.max(0, level.bounds.y0 - HALF);
+  const bw = Math.min(width - 1, level.bounds.x1 + HALF) - bx0 + 1; const bh = Math.min(height - 1, level.bounds.y1 + HALF) - by0 + 1;
+  const index = new Int32Array(bw * bh).fill(-1);
+  const at = (x, y) => (x < bx0 || y < by0 || x >= bx0 + bw || y >= by0 + bh ? -1 : index[(y - by0) * bw + (x - bx0)]);
+  targets.forEach((p, i) => { const x = p % width; index[((p - x) / width - by0) * bw + (x - bx0)] = i; });
+  const uses = new Int32Array(width * height);
+  for (let i = 0; i < nnf.length; i += 1) uses[nnf[i]] += 1;
   for (let iteration = 0; iteration < iterations; iteration += 1) {
     const forward = iteration % 2 === 0;
     const step = forward ? 1 : -1;
@@ -187,16 +229,23 @@ function patchMatch(level, targets, nnf, dist, sources, rand, iterations) {
       const px = p % width; const py = (p - px) / width;
       let best = nnf[i];
       let bestD = dist[i];
+      uses[best] -= 1;
+      let bestCost = bestD + penalty * uses[best];
+      const consider = (q) => {
+        const extra = penalty * uses[q];
+        if (extra >= bestCost) return;
+        const d = distance(level, p, q, bestCost - extra);
+        if (d + extra < bestCost) { best = q; bestD = d; bestCost = d + extra; }
+      };
       for (const [dx, dy] of [[-step, 0], [0, -step]]) {
         const nx = px + dx; const ny = py + dy;
         if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue; // eslint-disable-line no-continue
-        const j = index[ny * width + nx];
+        const j = at(nx, ny);
         if (j < 0) continue; // eslint-disable-line no-continue
         const q = nnf[j] - dx - dy * width;
         const qx = q % width;
         if (q < 0 || q >= width * height || Math.abs(qx - ((nnf[j] % width) - dx)) > 0 || !sources.valid[q] || q === best) continue; // eslint-disable-line no-continue
-        const d = distance(level, p, q, bestD);
-        if (d < bestD) { best = q; bestD = d; }
+        consider(q);
       }
       const bx = best % width; const by = (best - bx) / width;
       for (let radius = Math.max(width, height); radius >= 1; radius >>= 1) {
@@ -205,27 +254,30 @@ function patchMatch(level, targets, nnf, dist, sources, rand, iterations) {
         if (qx < 0 || qy < 0 || qx >= width || qy >= height) continue; // eslint-disable-line no-continue
         const q = qy * width + qx;
         if (!sources.valid[q] || q === best) continue; // eslint-disable-line no-continue
-        const d = distance(level, p, q, bestD);
-        if (d < bestD) { best = q; bestD = d; }
+        consider(q);
       }
       nnf[i] = best;
       dist[i] = bestD;
+      uses[best] += 1;
     }
   }
 }
 
 /** Rebuilds the hole pixels as the weighted average of every overlapping patch's source pixel. */
-function vote(level, targets, nnf, dist, sharpness = 0.75) {
+function vote(level, targets, nnf, dist, sharpness = 0.75, confidence = null) {
   const { width, color, hole } = level;
   const sorted = Float32Array.from(dist).sort();
   // Weights fall off with the patch distance, relative to a typical match: the lower the
   // percentile, the more the closest matches dominate (sharper, at the finest level).
   const sigma2 = Math.max(1e-8, sorted[Math.floor(sorted.length * sharpness)] ?? 1);
-  const acc = new Float64Array(width * level.height * 3);
-  const weight = new Float64Array(width * level.height);
+  // Accumulators over the hole's box only (a large fill's context is many times its size).
+  const { x0, y0, x1, y1 } = level.bounds;
+  const bw = x1 - x0 + 1;
+  const acc = new Float32Array(bw * (y1 - y0 + 1) * 3);
+  const weight = new Float32Array(bw * (y1 - y0 + 1));
   for (let i = 0; i < targets.length; i += 1) {
     const p = targets[i]; const q = nnf[i];
-    const w = Math.exp(-dist[i] / (2 * sigma2)) + 1e-6;
+    const w = (Math.exp(-dist[i] / (2 * sigma2)) + 1e-6) * (confidence ? confidence[p] : 1);
     const px = p % width; const py = (p - px) / width;
     const qx = q % width; const qy = (q - qx) / width;
     for (let dy = -HALF; dy <= HALF; dy += 1) {
@@ -237,15 +289,30 @@ function vote(level, targets, nnf, dist, sharpness = 0.75) {
         const t = ty * width + tx;
         if (!hole[t]) continue; // eslint-disable-line no-continue
         const s = ((qy + dy) * width + qx + dx) * 3;
-        acc[t * 3] += w * color[s]; acc[t * 3 + 1] += w * color[s + 1]; acc[t * 3 + 2] += w * color[s + 2];
-        weight[t] += w;
+        const a = (ty - y0) * bw + (tx - x0);
+        acc[a * 3] += w * color[s]; acc[a * 3 + 1] += w * color[s + 1]; acc[a * 3 + 2] += w * color[s + 2];
+        weight[a] += w;
       }
     }
   }
-  for (let t = 0; t < weight.length; t += 1) {
-    if (!hole[t] || !weight[t]) continue; // eslint-disable-line no-continue
-    color[t * 3] = acc[t * 3] / weight[t]; color[t * 3 + 1] = acc[t * 3 + 1] / weight[t]; color[t * 3 + 2] = acc[t * 3 + 2] / weight[t];
+  for (let y = y0; y <= y1; y += 1) {
+    for (let x = x0; x <= x1; x += 1) {
+      const t = y * width + x; const a = (y - y0) * bw + (x - x0);
+      if (!hole[t] || !weight[a]) continue; // eslint-disable-line no-continue
+      color[t * 3] = acc[a * 3] / weight[a]; color[t * 3 + 1] = acc[a * 3 + 1] / weight[a]; color[t * 3 + 2] = acc[a * 3 + 2] / weight[a];
+    }
   }
+}
+
+/** The hole's pixel box { x0, y0, x1, y1 } (inclusive), or null when there is no hole. */
+function holeBounds({ width, hole }) {
+  let x0 = Infinity; let y0 = Infinity; let x1 = -1; let y1 = -1;
+  for (let i = 0; i < hole.length; i += 1) {
+    if (!hole[i]) continue; // eslint-disable-line no-continue
+    const x = i % width; const y = (i - x) / width;
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  return x1 < 0 ? null : { x0, y0, x1, y1 };
 }
 
 /**
@@ -253,26 +320,21 @@ function vote(level, targets, nnf, dist, sharpness = 0.75) {
  * :param region: { width, height, color: Float32Array RGB (normalised, any range), hole: Uint8Array
  *   (1 = to fill), allowed: Uint8Array (1 = may be copied from) }
  * :param options: { seed, signal: { cancelled }, onProgress(fraction) }
- * :returns: the filled colour (Float32Array RGB, the region's size); known pixels unchanged
- * :throws: InpaintCancelled when `signal.cancelled` turns true
+ * :returns: the filled colour: `region.color` itself, filled in place (known pixels unchanged)
+ * :throws: InpaintCancelled when `signal.cancelled` turns true (region.color is then partly filled)
  */
 export function inpaint(region, { seed = 1, signal = null, onProgress = () => {} } = {}) {
-  const base = makeLevel(region.width, region.height);
-  base.color.set(region.color);
-  base.hole.set(region.hole);
+  const base = makeLevel(region.width, region.height, region.color, region.hole);
   for (let i = 0; i < base.allowed.length; i += 1) base.allowed[i] = region.allowed[i] && !region.hole[i] ? 1 : 0;
   // The hole's extent decides the pyramid's depth, so preview and export start at the same scale.
-  let x0 = Infinity; let y0 = Infinity; let x1 = -1; let y1 = -1;
-  for (let i = 0; i < base.hole.length; i += 1) {
-    if (!base.hole[i]) continue; // eslint-disable-line no-continue
-    const x = i % base.width; const y = (i - x) / base.width;
-    x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
-  }
-  if (x1 < 0) return base.color;
+  base.bounds = holeBounds(base);
+  if (!base.bounds) return base.color;
   const levels = [base];
-  let extent = Math.max(x1 - x0 + 1, y1 - y0 + 1);
+  let extent = Math.max(base.bounds.x1 - base.bounds.x0 + 1, base.bounds.y1 - base.bounds.y0 + 1);
   while (extent > COARSEST_HOLE && levels.at(-1).width >= 4 * PATCH && levels.at(-1).height >= 4 * PATCH) {
-    levels.push(downsample(levels.at(-1)));
+    const level = downsample(levels.at(-1));
+    level.bounds = holeBounds(level);
+    levels.push(level);
     extent /= 2;
   }
   const rand = random(seed);
@@ -299,9 +361,9 @@ export function inpaint(region, { seed = 1, signal = null, onProgress = () => {}
         const p = targets[i];
         const px = p % level.width; const py = (p - px) / level.width;
         const cp = Math.min(coarse.height - 1, py >> 1) * coarse.width + Math.min(coarse.width - 1, px >> 1);
-        const cq = previous.map.get(cp);
+        const cq = previous[cp];
         let q = -1;
-        if (cq !== undefined) {
+        if (cq >= 0) {
           const qx = 2 * (cq % coarse.width) + (px & 1); const qy = 2 * Math.floor(cq / coarse.width) + (py & 1);
           if (qx < level.width && qy < level.height) q = qy * level.width + qx;
         }
@@ -316,12 +378,14 @@ export function inpaint(region, { seed = 1, signal = null, onProgress = () => {}
       for (let i = 0; i < targets.length; i += 1) nnf[i] = sources.centres[Math.floor(rand() * sources.centres.length)];
     }
     const rounds = l === levels.length - 1 ? 6 : l === 0 ? 2 : 3;
+    const confidence = confidenceOf(level);
     for (let round = 0; round < rounds; round += 1) {
       if (signal?.cancelled) throw new InpaintCancelled();
       computeFeatures(level);
       for (let i = 0; i < targets.length; i += 1) dist[i] = distance(level, targets[i], nnf[i], Infinity);
-      patchMatch(level, targets, nnf, dist, sources, rand, round === 0 ? 3 : 2);
-      vote(level, targets, nnf, dist, l === 0 ? 0.1 : 0.5);
+      const typical = Float32Array.from(dist).sort()[dist.length >> 1];
+      patchMatch(level, targets, nnf, dist, sources, rand, round === 0 ? 3 : 2, REUSE_PENALTY * typical);
+      vote(level, targets, nnf, dist, l === 0 ? 0.1 : 0.5, confidence);
       done += 1;
       onProgress(done / total);
     }
@@ -334,9 +398,9 @@ export function inpaint(region, { seed = 1, signal = null, onProgress = () => {}
         level.color.copyWithin(p * 3, nnf[i] * 3, nnf[i] * 3 + 3);
       }
     }
-    const map = new Map();
-    for (let i = 0; i < targets.length; i += 1) map.set(targets[i], nnf[i]);
-    previous = { map };
+    // Each target's source, by pixel, for the next finer level to start from.
+    previous = new Int32Array(level.width * level.height).fill(-1);
+    for (let i = 0; i < targets.length; i += 1) previous[targets[i]] = nnf[i];
   }
   return base.color;
 }

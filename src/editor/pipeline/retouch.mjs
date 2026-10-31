@@ -28,6 +28,10 @@ const REMOVE_MIN_MARGIN = 24;
 // Pixels this close to the brushed area (a share of the brush radius, at least 2 px) are never
 // copied: they are often the object's own fringe, which would grow the object back.
 const REMOVE_GUARD = 0.15;
+// The photo just outside the guard band (this share of the radius) is the background the brush's
+// feathered rim is compared with; FEATHER_SAMPLES colours of it and of the brushed interior.
+const REMOVE_RING = 0.25;
+const FEATHER_SAMPLES = 128;
 
 // `image.region` ({ x, y, width, height }) says `data` holds only that part of the photo (a canvas
 // read); coordinates stay those of the whole photo.
@@ -306,6 +310,72 @@ export function removeContext(op, width, height) {
 }
 
 /**
+ * Approximate distance from every pixel to the nearest hole pixel, in thirds of a pixel (3-4
+ * chamfer, two passes whatever the guard's width).
+ */
+function distanceToHole(hole, width, height) {
+  const d = new Uint16Array(width * height);
+  for (let o = 0; o < d.length; o += 1) d[o] = hole[o] ? 0 : 65535;
+  const relax = (o, n, w) => { if (d[n] + w < d[o]) d[o] = d[n] + w; };
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const o = y * width + x;
+      if (x > 0) relax(o, o - 1, 3);
+      if (y > 0) { relax(o, o - width, 3); if (x > 0) relax(o, o - width - 1, 4); if (x < width - 1) relax(o, o - width + 1, 4); }
+    }
+  }
+  for (let y = height - 1; y >= 0; y -= 1) {
+    for (let x = width - 1; x >= 0; x -= 1) {
+      const o = y * width + x;
+      if (x < width - 1) relax(o, o + 1, 3);
+      if (y < height - 1) { relax(o, o + width, 3); if (x < width - 1) relax(o, o + width + 1, 4); if (x > 0) relax(o, o + width - 1, 4); }
+    }
+  }
+  return d;
+}
+
+/**
+ * The feathered rim of the brush blends the fill with the photo, so any of the object reaching
+ * into it would stay faintly visible (a ring). Rim pixels whose colour is much closer to the
+ * brushed interior (mostly the object) than to the photo just outside the guard band are replaced
+ * fully instead; rim pixels that look like the surroundings keep their feather.
+ */
+function featherObject(color, coverage, near, guard, ring) {
+  const isInner = (o) => coverage[o] >= 1;
+  const isOutside = (o) => coverage[o] < 1 && near[o] > 3 * guard && near[o] <= 3 * (guard + ring);
+  // FEATHER_SAMPLES colour offsets spread evenly over the pixels that pass `test`.
+  const pick = (test) => {
+    let count = 0;
+    for (let o = 0; o < coverage.length; o += 1) if (test(o)) count += 1;
+    const step = Math.max(1, Math.floor(count / FEATHER_SAMPLES));
+    const out = [];
+    for (let o = 0, k = 0; o < coverage.length && out.length < FEATHER_SAMPLES; o += 1) if (test(o)) { if (k % step === 0) out.push(o * 3); k += 1; }
+    return out;
+  };
+  const objectSamples = pick(isInner);
+  const backgroundSamples = pick(isOutside);
+  if (!objectSamples.length || !backgroundSamples.length) return;
+  const nearest = (o, samples) => {
+    let best = Infinity;
+    for (const s of samples) {
+      const d = (color[o] - color[s]) ** 2 + (color[o + 1] - color[s + 1]) ** 2 + (color[o + 2] - color[s + 2]) ** 2;
+      if (d < best) best = d;
+    }
+    return Math.sqrt(best);
+  };
+  const clamp01 = (t) => Math.min(1, Math.max(0, t));
+  for (let o = 0; o < coverage.length; o += 1) {
+    const c = coverage[o];
+    if (c <= 0 || c >= 1) continue; // eslint-disable-line no-continue
+    const toObject = nearest(o * 3, objectSamples);
+    const toBackground = nearest(o * 3, backgroundSamples);
+    const likeObject = toBackground / (toObject + toBackground + 1e-6);
+    const boost = smooth(clamp01((likeObject - 0.6) / 0.25)) * smooth(clamp01((toBackground - 0.04) / 0.08));
+    coverage[o] = c + (1 - c) * boost;
+  }
+}
+
+/**
  * Prepares a Remove operation on `image` (whole, or a region read covering removeContext):
  * `payload` is what inpaint() needs (normalised colour, the hole, where it may copy from, the
  * seed) as plain typed arrays a worker can take; `apply(filled)` blends the fill into the image
@@ -345,19 +415,12 @@ export function removeJob(image, op) {
     }
   }
   // Allowed: not in or right next to the hole, and inside the chosen source area if there is one.
-  const allowed = new Uint8Array(cw * ch).fill(1);
-  const guard = Math.max(2, Math.round(REMOVE_GUARD * op.radius * Math.min(width, height)));
-  for (let y = 0; y < ch; y += 1) {
-    for (let x = 0; x < cw; x += 1) {
-      if (!hole[y * cw + x]) continue; // eslint-disable-line no-continue
-      for (let dy = -guard; dy <= guard; dy += 1) {
-        for (let dx = -guard; dx <= guard; dx += 1) {
-          const nx = x + dx; const ny = y + dy;
-          if (nx >= 0 && ny >= 0 && nx < cw && ny < ch) allowed[ny * cw + nx] = 0;
-        }
-      }
-    }
-  }
+  const radiusPx = op.radius * Math.min(width, height);
+  const guard = Math.max(2, Math.round(REMOVE_GUARD * radiusPx));
+  const near = distanceToHole(hole, cw, ch);
+  const allowed = new Uint8Array(cw * ch);
+  for (let o = 0; o < allowed.length; o += 1) allowed[o] = near[o] > 3 * guard ? 1 : 0;
+  featherObject(color, coverage, near, guard, Math.max(3, REMOVE_RING * radiusPx));
   if (op.source) {
     const sx0 = op.source.x * width; const sy0 = op.source.y * height;
     const sx1 = sx0 + op.source.width * width; const sy1 = sy0 + op.source.height * height;

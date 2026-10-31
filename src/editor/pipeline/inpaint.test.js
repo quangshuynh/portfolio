@@ -108,6 +108,69 @@ describe('content-aware remove', () => {
     expect(removeContext({ ...createRetouchOperation('a', 'remove', [[0.5, 0.5]], { radius: 0.05 }), source: { x: 0, y: 0, width: 0.1, height: 0.1 } }, 200, 140)).toMatchObject({ x0: 0, y0: 0 });
   });
 
+  // Interval 19 regressions (old/new values from scripts/bench-remove.mjs and these scenes).
+  const hash = (x, y) => { let h = Math.imul(x * 374761393 + y * 668265263, 1274126177); h ^= h >>> 13; h = Math.imul(h, 1103515245); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+  const gravel = (x, y) => { const v = (60 + 120 * hash(Math.floor(x) >> 1, Math.floor(y) >> 1)) / 255; return [v, v * 0.9, v * 0.8]; };
+  const magenta = (image, inside) => {
+    for (let y = 0; y < image.height; y += 1) for (let x = 0; x < image.width; x += 1) {
+      if (!inside(x, y)) continue; // eslint-disable-line no-continue
+      const i = (y * image.width + x) * 4;
+      image.data[i] = 230; image.data[i + 1] = 20; image.data[i + 2] = 190;
+    }
+  };
+  const objectness = (image, x, y) => { const i = (y * image.width + x) * 4; return Math.min(image.data[i] - image.data[i + 1], image.data[i + 2] - image.data[i + 1]); };
+
+  test('an object reaching into the feathered rim is removed whole (no ring), and the rim still feathers on background', () => {
+    const image = render(gravel, 240, 180);
+    magenta(image, disk(120, 90, 32));
+    applyRetouchOperation(image, createRetouchOperation('ring', 'remove', [[0.5, 0.5]], { radius: 38 / 180, hardness: 0.6 }));
+    let worst = 0;
+    for (let y = 0; y < 180; y += 1) for (let x = 0; x < 240; x += 1) if (disk(120, 90, 32)(x, y)) worst = Math.max(worst, objectness(image, x, y));
+    expect(worst).toBeLessThan(10); // was 48: a faint ring of the object
+    // Painted well past a small object, the outer rim is a blend of fill and photo, not a hard edge.
+    const clean = render(scenes.sky, 200, 140);
+    const sky = render(scenes.sky, 200, 140);
+    magenta(sky, disk(100, 70, 6));
+    applyRetouchOperation(sky, createRetouchOperation('rim', 'remove', [[0.5, 0.5]], { radius: 0.15, hardness: 0.2 }));
+    expect(error(sky, clean, disk(100, 70, 21))).toBeLessThan(3);
+  });
+
+  test('a large fill on irregular texture does not stamp the same patch over and over', () => {
+    const image = render(gravel, 240, 180);
+    magenta(image, disk(120, 90, 32));
+    applyRetouchOperation(image, createRetouchOperation('dup', 'remove', [[0.5, 0.5]], { radius: 38 / 180, hardness: 0.6 }));
+    const seen = new Map(); let twins = 0; let blocks = 0;
+    for (let y = 60; y < 120; y += 2) for (let x = 90; x < 150; x += 2) {
+      if (Math.hypot(x + 2 - 120, y + 2 - 90) > 28) continue; // eslint-disable-line no-continue
+      blocks += 1;
+      let key = '';
+      for (let dy = 0; dy < 4; dy += 1) for (let dx = 0; dx < 4; dx += 1) key += `${image.data[((y + dy) * 240 + x + dx) * 4]},`;
+      const at = seen.get(key);
+      if (!at) seen.set(key, [x, y]);
+      else if (Math.abs(at[0] - x) >= 4 || Math.abs(at[1] - y) >= 4) twins += 1;
+    }
+    expect(twins / blocks).toBeLessThan(0.05); // was 0.27
+  });
+
+  test('brickwork: mortar lines continue through small and large holes', () => {
+    const brick = (x, y) => {
+      const row = Math.floor(y / 12); const shift = row % 2 ? 13 : 0;
+      if (y % 12 < 2 || (x + shift) % 26 < 2) return [0.78, 0.76, 0.72];
+      const t = 0.12 * (hash(Math.floor((x + shift) / 26), row) - 0.5);
+      return [0.62 + t, 0.3 + t * 0.6, 0.24 + t * 0.5];
+    };
+    const clean = render(brick, 320, 240);
+    const small = render(brick, 320, 240);
+    magenta(small, disk(160, 120, 9));
+    applyRetouchOperation(small, createRetouchOperation('bs', 'remove', [[0.5, 0.5]], { radius: 13 / 240, hardness: 0.6 }));
+    expect(error(small, clean, disk(160, 120, 12))).toBeLessThan(11); // was 16.6
+    const large = render(brick, 320, 240);
+    magenta(large, disk(160, 120, 38));
+    applyRetouchOperation(large, createRetouchOperation('bl', 'remove', [[0.5, 0.5]], { radius: 44 / 240, hardness: 0.6 }));
+    expect(error(large, clean, disk(160, 120, 40))).toBeLessThan(6.5); // was 8.0
+    expect(detail(large, disk(160, 120, 34))).toBeGreaterThan(0.8 * detail(clean, disk(160, 120, 34)));
+  });
+
   test('deterministic for the same pixels and operation; cancellable', () => {
     const run = () => { const img = render(scenes.grass, 160, 120); paint(img, disk(80, 60, 10)); applyRetouchOperation(img, createRetouchOperation('same', 'remove', [[0.5, 0.5]], { radius: 0.1 })); return img; };
     expect(Array.from(run().data)).toEqual(Array.from(run().data));
