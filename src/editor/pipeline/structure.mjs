@@ -14,7 +14,6 @@ const MAX_PEAKS = 32;
 const MAX_GUIDES = 6;
 const MIN_CONFIDENCE = 0.45;
 const MAX_PARALLEL = 3;
-
 const PARALLEL = (6 * Math.PI) / 180;
 
 // A pair's tangents may turn at most this far from the chord between its ends (a gentle curve).
@@ -183,7 +182,7 @@ export function findStructures(level) {
     }
   }
   const minVotes = 0.5 * ringWidth * threshold;
-  const context = { strong, threshold, inRing, ringWidth, reach, guard, cx, cy, limit: Math.hypot(bw, bh) / 2 + 2 };
+  const context = { strong, inRing, reach, guard, cx, cy, limit: Math.hypot(bw, bh) / 2 + 2 };
   const segments = [];
   for (let attempt = 0; attempt < MAX_PEAKS; attempt += 1) {
     let best = -1; let bestVotes = minVotes;
@@ -240,7 +239,7 @@ export function findStructures(level) {
  * :returns: [{ points, end: [x, y] (nearest the hole, on the fitted line), dir (unit, into the
  *   hole), coverage (share of the ring stretch with edge support), profile }]
  */
-function segmentsOn(level, theta, rho, { strong, threshold, inRing, reach, guard, cx, cy, limit }) {
+function segmentsOn(level, theta, rho, { strong, inRing, reach, guard, cx, cy, limit }) {
   const { width, height, hole } = level;
   const n = [Math.cos(theta), Math.sin(theta)];
   const u = [-n[1], n[0]];
@@ -284,7 +283,7 @@ function segmentsOn(level, theta, rho, { strong, threshold, inRing, reach, guard
       const line = fitLine(points, dir);
       const along = (nearest[0] - line.cx) * line.dx + (nearest[1] - line.cy) * line.dy;
       const end = [line.cx + along * line.dx, line.cy + along * line.dy];
-      out.push({ points, end, dir: [line.dx, line.dy], coverage, threshold, profile: profileOf(level, points, [line.dx, line.dy]) });
+      out.push({ points, end, dir: [line.dx, line.dy], coverage, profile: profileOf(level, points, [line.dx, line.dy]) });
     }
   }
   return out;
