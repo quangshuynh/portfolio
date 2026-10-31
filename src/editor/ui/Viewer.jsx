@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { deriveParams } from '../pipeline/spec.mjs';
 import { glowDependencies } from '../pipeline/detailRenderer.mjs';
-import { adjustmentsEqual, neutralAdjustments, neutralGroup } from '../model/adjustments.mjs';
+import { adjustmentsEqual, developmentBase, neutralGroup } from '../model/adjustments.mjs';
 import { GeometryError, cropRatio, frameGeometry, geometryPlan, neutralGeometry } from '../pipeline/geometry.mjs';
 import { warpSpec } from '../pipeline/warp.mjs';
 import CropOverlay from './CropOverlay';
@@ -381,12 +381,13 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
   splitRef.current = splitFraction;
 
   // The "before" side of the CPU preview: the source itself, or for RAW and merged RAW
-  // HDR its neutral development; with geometry, warped like the edited side.
-  const cpuBefore = useCallback(async (image, raw, warp = null) => {
+  // HDR its neutral development in the photo's RAW profile; with geometry, warped like the edited side.
+  const cpuBefore = useCallback(async (image, raw, warp = null, adjustments = null) => {
     if (image.kind !== 'raw' && image.kind !== 'hdr' && !warp) return image;
     const cache = cpuBeforeRef.current;
-    const key = specKey(warp);
-    if (cache.image !== image || cache.key !== key) Object.assign(cache, { image, key, data: (await renderInWorker(image, neutralAdjustments(), null, raw, null, warp)).data });
+    const base = developmentBase(adjustments);
+    const key = `${specKey(warp)}|${base.raw.profile}`;
+    if (cache.image !== image || cache.key !== key) Object.assign(cache, { image, key, data: (await renderInWorker(image, base, null, raw, null, warp)).data });
     return { data: cache.data };
   }, [renderInWorker]);
 
@@ -415,7 +416,7 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
     if (!engine || image !== request.image) return;
     const split = splitRef.current;
     if (engine.kind === 'webgl2') {
-      const before = request.raw ? deriveParams(neutralAdjustments(), { raw: request.raw }) : null;
+      const before = request.raw ? deriveParams(developmentBase(request.adjustments), { raw: request.raw }) : null;
       if (engine.renderer.lost) return;
       // Local Detail runs on the CPU: then every pass is composited there, at the canvas's size.
       if (hasDetailPass(request.layers?.cpu)) {
@@ -428,7 +429,7 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
     }
     const out = request.warp ?? image;
     const sourceWidth = Math.round(out.width * split);
-    const before = sourceWidth > 0 ? await cpuBefore(originalRef.current ?? image, request.raw, request.warp) : null;
+    const before = sourceWidth > 0 ? await cpuBefore(originalRef.current ?? image, request.raw, request.warp, request.adjustments) : null;
     if (proxyRef.current !== image) return;
     const { context } = engine;
     if (context.canvas.width !== out.width || context.canvas.height !== out.height) Object.assign(context.canvas, { width: out.width, height: out.height });
@@ -517,7 +518,7 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
       const out = params.warp ?? image;
       const rendered = params.neutral && !params.warp ? image : await renderInWorker(image, params.adjustments, params.lutData, params.raw, params.nativeSize, params.warp);
       const sourceWidth = Math.round(out.width * params.split);
-      const before = sourceWidth > 0 ? await cpuBefore(originalRef.current ?? image, params.raw, params.warp) : image;
+      const before = sourceWidth > 0 ? await cpuBefore(originalRef.current ?? image, params.raw, params.warp, params.adjustments) : image;
       if (id === job.latest && proxyRef.current === image) {
         const { canvas: target } = engine.context;
         if (target.width !== out.width || target.height !== out.height) Object.assign(target, { width: out.width, height: out.height });
@@ -821,7 +822,7 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
           glow = job.image === proxyRef.current ? job.map : null;
         }
         // "Before" of a RAW photo is its neutral development, not undeveloped sensor data.
-        const before = raw ? deriveParams(neutralAdjustments(), { raw }) : null;
+        const before = raw ? deriveParams(developmentBase(values), { raw }) : null;
         if (!engine.renderer.lost) {
           engine.renderer.setCreative({ nativeWidth: nativeSize.width, nativeHeight: nativeSize.height, glow });
           if (localOnGpu || warm) {

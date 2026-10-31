@@ -12,7 +12,7 @@ import { finishRows, warpRows, warpSpec } from './warp.mjs';
 import { detailHalo, detailParams } from './detail.mjs';
 import { DIGITAL, shiftHalo } from './digital.mjs';
 import { deriveParams } from './spec.mjs';
-import { neutralAdjustments } from '../model/adjustments.mjs';
+import { developmentBase } from '../model/adjustments.mjs';
 
 /** Largest halo any Detail settings need at native size. */
 export const MAX_DETAIL_HALO = detailHalo(detailParams({ texture: 100, clarity: 100, dehaze: 100, sharpening: 100, luminanceNoise: 100, colorNoise: 100 }), 1);
@@ -129,6 +129,6 @@ export function renderRegion(kept, region, { adjustments, lut = null, raw = null
   return {
     region,
     after: finish(render(adjustments)),
-    before: finish(isRaw ? render(neutralAdjustments()) : new Uint8ClampedArray(crop.data)),
+    before: finish(isRaw ? render(developmentBase(adjustments)) : new Uint8ClampedArray(crop.data)),
   };
 }

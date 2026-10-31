@@ -125,7 +125,7 @@ describe('settings, documents and history', () => {
       expect(local).toEqual([]);
       expect(watermark).toBeNull();
       expect(retouch).toEqual([]);
-      expect(rest).toEqual(before[i]);
+      expect(rest).toEqual({ ...before[i], raw: { ...before[i].raw, profile: 'legacy' } });
       photo.adjustments.layers.forEach((layer) => expect(layer).not.toHaveProperty('mask'));
     });
   });
