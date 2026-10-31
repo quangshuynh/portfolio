@@ -4,8 +4,12 @@
 // patches of the surrounding photo that best match its neighbourhood in colour and in luminance
 // gradient (so edges and structure continue into the hole), averaged with weights that favour
 // close matches and patches anchored near the hole's edge; reusing one source patch many times is
-// penalised, so large fills do not repeat the same texture. Deterministic for the same pixels and seed; no network, no model, no server.
+// penalised, so large fills do not repeat the same texture. Structures that cross the hole from
+// side to side (pipeline/structure.mjs) add a guide channel, so lines continue and line up.
+// Deterministic for the same pixels and seed; no network, no model, no server.
 // Environment-free; cancellable between iterations; reports progress.
+
+import { DETECT_EXTENT, GUIDE_OFF, drawGuides, findStructures } from './structure.mjs';
 
 const PATCH = 7;
 const HALF = (PATCH - 1) >> 1;
@@ -18,6 +22,8 @@ const CONFIDENCE_DECAY = 1.3;
 // Each further target reusing one source patch costs this share of the typical patch distance,
 // so a large fill spreads over the photo instead of stamping the same patch again and again.
 const REUSE_PENALTY = 0.5;
+// Along a structure (few sources, which the fill must reuse) only this share of it applies.
+const GUIDED_REUSE = 0.2;
 
 export class InpaintCancelled extends Error {
   constructor() {
@@ -45,9 +51,10 @@ export function seedOf(text) {
   return h >>> 0;
 }
 
-// One pyramid level: feature channels (r, g, b, gx, gy), the hole and where patches may come from.
+// One pyramid level: the hole and where patches may come from. Its feature channels (r, g, b,
+// gx, gy, and the structure guide when there is one) exist only while the level is filled.
 function makeLevel(width, height, color = new Float32Array(width * height * 3), hole = new Uint8Array(width * height)) {
-  return { width, height, color, hole, allowed: new Uint8Array(width * height), features: new Float32Array(width * height * 5) };
+  return { width, height, color, hole, allowed: new Uint8Array(width * height), features: null, guide: null, channels: 5 };
 }
 
 function downsample(level) {
@@ -101,9 +108,9 @@ function diffuse(level) {
   }
 }
 
-/** Colour and weighted luminance gradient, the channels patches are compared on. */
+/** Colour and weighted luminance gradient (and the structure guide, when there is one): the channels patches are compared on. */
 function computeFeatures(level) {
-  const { width, height, color, features } = level;
+  const { width, height, color, features, guide, channels: C } = level;
   const lum = (x, y) => {
     const i = (Math.min(height - 1, Math.max(0, y)) * width + Math.min(width - 1, Math.max(0, x))) * 3;
     return 0.2126 * color[i] + 0.7152 * color[i + 1] + 0.0722 * color[i + 2];
@@ -111,9 +118,10 @@ function computeFeatures(level) {
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const i = y * width + x;
-      features[i * 5] = color[i * 3]; features[i * 5 + 1] = color[i * 3 + 1]; features[i * 5 + 2] = color[i * 3 + 2];
-      features[i * 5 + 3] = GRADIENT_WEIGHT * (lum(x + 1, y) - lum(x - 1, y));
-      features[i * 5 + 4] = GRADIENT_WEIGHT * (lum(x, y + 1) - lum(x, y - 1));
+      features[i * C] = color[i * 3]; features[i * C + 1] = color[i * 3 + 1]; features[i * C + 2] = color[i * 3 + 2];
+      features[i * C + 3] = GRADIENT_WEIGHT * (lum(x + 1, y) - lum(x - 1, y));
+      features[i * C + 4] = GRADIENT_WEIGHT * (lum(x, y + 1) - lum(x, y - 1));
+      if (guide) features[i * C + 5] = guide[i];
     }
   }
 }
@@ -190,6 +198,32 @@ function distance(level, p, q, limit) {
   return sum;
 }
 
+/**
+ * As distance, with the structure guide as a sixth channel. The guide only pulls: a pixel near
+ * a structure needs a source at the same place across that structure; any other pixel may come
+ * from anywhere.
+ */
+function guidedDistance(level, p, q, limit) {
+  const { width, features } = level;
+  const px = p % width; const py = (p - px) / width;
+  const qx = q % width; const qy = (q - qx) / width;
+  let sum = 0;
+  for (let dy = -HALF; dy <= HALF; dy += 1) {
+    const ty = py + dy;
+    if (ty < 0 || ty >= level.height) continue; // eslint-disable-line no-continue
+    for (let dx = -HALF; dx <= HALF; dx += 1) {
+      const tx = px + dx;
+      if (tx < 0 || tx >= width) continue; // eslint-disable-line no-continue
+      const a = (ty * width + tx) * 6;
+      const b = ((qy + dy) * width + qx + dx) * 6;
+      for (let k = 0; k < 5; k += 1) { const d = features[a + k] - features[b + k]; sum += d * d; }
+      if (features[a + 5] < GUIDE_OFF) { const d = features[a + 5] - features[b + 5]; sum += d * d; }
+      if (sum >= limit) return sum;
+    }
+  }
+  return sum;
+}
+
 /** Target centres: every pixel whose patch touches the hole. */
 function targetCentres(level) {
   const { width, height, hole } = level;
@@ -212,6 +246,7 @@ function targetCentres(level) {
  */
 function patchMatch(level, targets, nnf, dist, sources, rand, iterations, penalty) {
   const { width, height } = level;
+  const measure = level.guide ? guidedDistance : distance;
   // Target number by pixel, over the hole's box grown by half a patch (where every target lies).
   const bx0 = Math.max(0, level.bounds.x0 - HALF); const by0 = Math.max(0, level.bounds.y0 - HALF);
   const bw = Math.min(width - 1, level.bounds.x1 + HALF) - bx0 + 1; const bh = Math.min(height - 1, level.bounds.y1 + HALF) - by0 + 1;
@@ -230,11 +265,13 @@ function patchMatch(level, targets, nnf, dist, sources, rand, iterations, penalt
       let best = nnf[i];
       let bestD = dist[i];
       uses[best] -= 1;
-      let bestCost = bestD + penalty * uses[best];
+      const share
+ = level.guide && level.guide[p] < GUIDE_OFF ? GUIDED_REUSE : 1;
+      let bestCost = bestD + share * penalty * uses[best];
       const consider = (q) => {
-        const extra = penalty * uses[q];
+        const extra = share * penalty * uses[q];
         if (extra >= bestCost) return;
-        const d = distance(level, p, q, bestCost - extra);
+        const d = measure(level, p, q, bestCost - extra);
         if (d + extra < bestCost) { best = q; bestD = d; bestCost = d + extra; }
       };
       for (const [dx, dy] of [[-step, 0], [0, -step]]) {
@@ -337,6 +374,11 @@ export function inpaint(region, { seed = 1, signal = null, onProgress = () => {}
     levels.push(level);
     extent /= 2;
   }
+  // Structures are found where the hole is small enough to see them whole, then guide every level.
+  const small = levels.findIndex((level) => Math.max(level.bounds.x1 - level.bounds.x0, level.bounds.y1 - level.bounds.y0) + 1 <= DETECT_EXTENT);
+  const detect = small < 0 ? levels.length - 1 : small;
+  const guides = findStructures(levels[detect]);
+
   const rand = random(seed);
   const total = levels.reduce((sum, _, i) => sum + (i === levels.length - 1 ? 6 : i === 0 ? 2 : 3), 0);
   let done = 0;
@@ -379,17 +421,25 @@ export function inpaint(region, { seed = 1, signal = null, onProgress = () => {}
     }
     const rounds = l === levels.length - 1 ? 6 : l === 0 ? 2 : 3;
     const confidence = confidenceOf(level);
+    if (guides.length) { level.guide = drawGuides(level, guides, 2 ** (detect - l), l); level.channels = 6; }
+    level.features = new Float32Array(level.width * level.height * level.channels);
     for (let round = 0; round < rounds; round += 1) {
       if (signal?.cancelled) throw new InpaintCancelled();
       computeFeatures(level);
-      for (let i = 0; i < targets.length; i += 1) dist[i] = distance(level, targets[i], nnf[i], Infinity);
-      const typical = Float32Array.from(dist).sort()[dist.length >> 1];
+      const measure = level.guide ? guidedDistance : distance;
+      for (let i = 0; i < targets.length; i += 1) dist[i] = measure(level, targets[i], nnf[i], Infinity);
+      // The typical match among pixels away from structures (the guide adds to guided ones'
+      // distances, which would raise every pixel's reuse penalty).
+      const free = level.guide ? dist.filter((_, i) => level.guide[targets[i]] >= GUIDE_OFF) : dist;
+      const pool = free.length ? free : dist;
+      const typical = Float32Array.from(pool).sort()[pool.length >> 1];
       patchMatch(level, targets, nnf, dist, sources, rand, round === 0 ? 3 : 2, REUSE_PENALTY * typical);
       vote(level, targets, nnf, dist, l === 0 ? 0.1 : 0.5, confidence);
       done += 1;
       onProgress(done / total);
     }
     if (l === 0) {
+
       // Finest level: each hole pixel takes the centre of its own best patch, which keeps fine
       // texture (averaging overlapping patches softens it); the photo's own pixels are untouched.
       for (let i = 0; i < targets.length; i += 1) {
@@ -398,6 +448,7 @@ export function inpaint(region, { seed = 1, signal = null, onProgress = () => {}
         level.color.copyWithin(p * 3, nnf[i] * 3, nnf[i] * 3 + 3);
       }
     }
+    level.features = null; level.guide = null;
     // Each target's source, by pixel, for the next finer level to start from.
     previous = new Int32Array(level.width * level.height).fill(-1);
     for (let i = 0; i < targets.length; i += 1) previous[targets[i]] = nnf[i];
