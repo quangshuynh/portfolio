@@ -96,7 +96,7 @@ export function guideSource(image) {
  *   column `x0` (default 0), `width` columns per row
  */
 function fillBase(image, prepared, x0, y0, w, h, planes) {
-  const { params: p, tone } = prepared;
+  const { params: p, tone, profile } = prepared;
   const channels = channelsOf(image);
   const firstRow = image.y0 ?? 0;
   const firstColumn = image.x0 ?? 0;
@@ -111,14 +111,14 @@ function fillBase(image, prepared, x0, y0, w, h, planes) {
       const s = image.data;
       if (raw) {
         developRaw(s[i] * scale, s[i + 1] * scale, s[i + 2] * scale, p.raw, rgb);
-        processLinear(rgb, p, tone);
+        processLinear(rgb, p, tone, profile);
         r[o] = fastTransfer.toSrgb(rgb[0]); g[o] = fastTransfer.toSrgb(rgb[1]); b[o] = fastTransfer.toSrgb(rgb[2]);
       } else {
         if (p.baseNeutral) {
           r[o] = s[i] / 255; g[o] = s[i + 1] / 255; b[o] = s[i + 2] / 255;
         } else {
           rgb[0] = SRGB_TO_LINEAR_8BIT[s[i]]; rgb[1] = SRGB_TO_LINEAR_8BIT[s[i + 1]]; rgb[2] = SRGB_TO_LINEAR_8BIT[s[i + 2]];
-          processLinear(rgb, p, tone);
+          processLinear(rgb, p, tone, profile);
           r[o] = fastTransfer.toSrgb(rgb[0]); g[o] = fastTransfer.toSrgb(rgb[1]); b[o] = fastTransfer.toSrgb(rgb[2]);
         }
         if (alpha) alpha[o] = s[i + 3] / 255;
@@ -203,7 +203,7 @@ export function computeImageCapture(params, source, { nativeWidth, nativeHeight,
   }
   const cell = Math.max(nativeWidth, nativeHeight) / Math.max(size.width, size.height);
   const creative = { ...p.creative, capture: null, grain: null, noise: noise && { ...noise, cell } };
-  const inner = { params: { ...p, creative }, tone: prepared.tone };
+  const inner = { ...prepared, params: { ...p, creative } };
   const transparent = channelsOf(small) === 4 && rowsHaveAlpha(small, 0, small.height);
   const context = prepareDetailRender(inner, { width: size.width, height: size.height, nativeWidth, nativeHeight, guide, glow, transparent, captureGrid: true });
   const data = new Uint8ClampedArray(size.width * size.height * 4);

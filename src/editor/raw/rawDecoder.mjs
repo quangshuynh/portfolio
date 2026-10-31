@@ -84,6 +84,8 @@ export function summarizeMetadata(meta, format) {
     captured: number(meta.timestamp) ? meta.timestamp * 1000 : null,
     blackLevel: Number.isFinite(color.black) ? color.black : null,
     whiteLevel: number(color.maximum),
+    // DNG BaselineExposure in stops (LibRaw reports -999 when the file has none).
+    baselineExposure: Number.isFinite(color.dng_levels?.baseline_exposure) && color.dng_levels.baseline_exposure > -100 ? color.dng_levels.baseline_exposure : null,
     flip: meta.flip ?? 0,
     width: meta.width,
     height: meta.height,
