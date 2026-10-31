@@ -328,6 +328,104 @@ async function runOne(run, files) {
       result.export = { ms: exported.ms, ...diff };
     });
 
+    if (phone) {
+      await step('touch: a pinch drops the stroke, a finger landing again mid-pinch paints nothing, a tool change drops a stroke, Pan moves the photo, Set source follows the finger, 44 px controls, no page scroll', async () => {
+        const count = async () => (await saved('retouch.png')).retouch.length;
+        // Each gesture's first finger is the primary pointer, as on a phone.
+        const touch = (type, id, at, primary = false) => tool().dispatchEvent(type, { button: 0, pointerId: id, isPrimary: primary, clientX: at.x, clientY: at.y, pointerType: 'touch', buttons: type === 'pointerup' ? 0 : 1 });
+        await tab(1);
+        await page.getByRole('button', { name: 'Fit' }).click();
+        await choose('Spot Heal', 'j');
+        const before = await count();
+        const a = await photoPoint({ u: 0.3, v: 0.3 });
+        const b = await photoPoint({ u: 0.6, v: 0.6 });
+        await touch('pointerdown', 11, a, true);
+        await touch('pointermove', 11, { x: a.x + 10, y: a.y + 5 });
+        await touch('pointerdown', 12, b);
+        await touch('pointermove', 11, { x: a.x - 15, y: a.y - 15 });
+        await touch('pointermove', 12, { x: b.x + 15, y: b.y + 15 });
+        await touch('pointerup', 11, a);
+        await touch('pointerdown', 13, a);
+        await touch('pointermove', 13, { x: a.x + 30, y: a.y });
+        await touch('pointerup', 13, { x: a.x + 30, y: a.y });
+        await touch('pointerup', 12, b);
+        await page.waitForTimeout(1_500);
+        assert.equal(await count(), before, 'a pinch (and a finger landing again during it) made no repair');
+        // A stroke still in progress when the tool changes is dropped, not committed.
+        await page.getByRole('button', { name: 'Fit' }).click();
+        const c = await photoPoint({ u: 0.25, v: 0.75 });
+        await touch('pointerdown', 14, c, true);
+        await touch('pointermove', 14, { x: c.x + 20, y: c.y });
+        await choose('Remove', 'r');
+        await touch('pointerup', 14, { x: c.x + 20, y: c.y });
+        await page.waitForTimeout(1_000);
+        assert.equal(await count(), before, 'switching tools dropped the stroke');
+        // A single finger paints again once every finger is up.
+        await choose('Spot Heal', 'j');
+        await touch('pointerdown', 15, c, true);
+        await touch('pointerup', 15, c);
+        await savedWhen('retouch.png', (adj) => adj.retouch.length === before + 1, 'a tap heals after the pinch');
+        // Pan: zoomed in, one finger moves the photo instead of painting.
+        await page.getByRole('button', { name: 'Zoom in' }).click();
+        await page.getByRole('button', { name: 'Zoom in' }).click();
+        await twoFrames();
+        const pan = page.getByRole('button', { name: 'Pan' });
+        await pan.click();
+        assert.equal(await pan.getAttribute('aria-pressed'), 'true');
+        const hostBefore = await page.locator('.pe-canvas-host').boundingBox();
+        const d = await photoPoint({ u: 0.5, v: 0.5 });
+        await touch('pointerdown', 16, d, true);
+        for (let k = 1; k <= 5; k += 1) await touch('pointermove', 16, { x: d.x + 12 * k, y: d.y + 8 * k });
+        await touch('pointerup', 16, { x: d.x + 60, y: d.y + 40 });
+        await twoFrames();
+        const hostAfter = await page.locator('.pe-canvas-host').boundingBox();
+        assert.ok(Math.abs(hostAfter.x - hostBefore.x - 60) < 3 && Math.abs(hostAfter.y - hostBefore.y - 40) < 3, `one-finger pan moved the photo: ${JSON.stringify([hostBefore, hostAfter])}`);
+        await page.waitForTimeout(800);
+        assert.equal(await count(), before + 1, 'panning painted nothing');
+        await pan.click();
+        await page.getByRole('button', { name: 'Fit' }).click();
+        // Set source on touch: the marker follows the finger; the source is where it lifts.
+        await choose('Clone Stamp', 's');
+        await tab(2);
+        await page.locator('.pe-retouch button', { hasText: 'Set source' }).click();
+        await tab(1);
+        const p1 = await photoPoint({ u: 0.7, v: 0.2 });
+        const target = { u: 0.75, v: 0.25 };
+        const p2 = await photoPoint(target);
+        await touch('pointerdown', 17, p1, true);
+        await touch('pointermove', 17, p2);
+        assert.equal(await page.locator('.pe-retouch-marker').evaluate((marker) => !marker.hidden && marker.style.transform.includes('translate')), true, 'source marker under the finger');
+
+        await touch('pointerup', 17, p2);
+        await tab(2);
+        await page.locator('[data-clone-source=set]').waitFor();
+        await tab(1);
+        const start = { u: 0.15, v: 0.15 };
+        const s = await photoPoint(start);
+        await touch('pointerdown', 18, s, true);
+        await touch('pointermove', 18, { x: s.x + 25, y: s.y + 5 });
+        await touch('pointerup', 18, { x: s.x + 25, y: s.y + 5 });
+        const value = await savedWhen('retouch.png', (adj) => adj.retouch.length === before + 2, 'clone after a touch source pick');
+        const op = value.retouch.at(-1);
+        assert.ok(Math.abs(op.offset.x - (target.u - op.points[0][0])) < 0.006 && Math.abs(op.offset.y - (target.v - op.points[0][1])) < 0.006, `source where the finger lifted: ${JSON.stringify(op.offset)}`);
+        // Touch targets and scrolling.
+        await tab(2);
+        const small = await page.$$eval('.pe-retouch button, .pe-retouch input[type=range]', (items) => items.filter((el) => el.offsetParent && el.getBoundingClientRect().height < 43 && el.type !== 'range').map((el) => el.textContent.trim() || el.getAttribute('aria-label')));
+        assert.deepEqual(small, [], `retouch controls under 44 px: ${small}`);
+        await tab(1);
+        const row = page.locator(`[data-retouch-id="${op.id}"] .pe-mask-row__name`);
+        await tab(2);
+        if (await row.getAttribute('aria-pressed') !== 'true') await row.click();
+        await tab(1);
+        const handle = await page.locator('.pe-retouch-source').boundingBox();
+        assert.ok(handle && handle.width >= 43 && handle.height >= 43, `source handle ${JSON.stringify(handle)}`);
+        assert.deepEqual(await page.evaluate(() => [window.scrollX, window.scrollY, document.scrollingElement.scrollTop]), [0, 0, 0], 'the page did not scroll');
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, 'no horizontal scroll');
+        result.touch = { gestures: 'ok' };
+      });
+    }
+
+
     if (!phone) {
       await step('a 90° turn keeps every repair on its target', async () => {
         await tab(2);

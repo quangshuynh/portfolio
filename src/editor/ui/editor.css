@@ -737,7 +737,10 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-mask-handle--rotate::after { border-radius: 2px; }
 .pe-mask-handle:focus-visible::after { outline: 2px solid var(--pe-focus); outline-offset: 3px; }
 @media (pointer: coarse) {
+  /* The brush panels' headers (Masks, Retouch) are tapped often while painting. */
+  .pe-masks .pe-section__toggle { min-height: 2.75rem; }
   .pe-mask-handle { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
+
   .pe-mask-row__name { min-height: 2.75rem; }
 }
 .pe-masks .pe-field--check input { width: 1rem; min-height: 1rem; height: 1rem; padding: 0; }

@@ -265,6 +265,8 @@ function EditorWorkspace({ host }) {
   // Retouch: the tool on the photo, its brush, the clone source (one photo's, never carried to
   // another), whether the next tap sets that source, the selected operation and the last message.
   const [retouchTool, setRetouchTool] = useState(null);
+  // While a retouch brush is on: one finger (or the mouse) pans instead of painting.
+  const [retouchPan, setRetouchPan] = useState(false);
   const [retouchBrush, setRetouchBrush] = useState(RETOUCH_DEFAULTS);
   const [retouchClone, setRetouchClone] = useState({ source: null, aligned: true, offset: null });
   const [retouchPicking, setRetouchPicking] = useState(false);
@@ -788,6 +790,7 @@ function EditorWorkspace({ host }) {
   const chooseRetouchTool = useCallback((value) => {
     if (transformMode) return;
     setRetouchTool(value);
+    setRetouchPan(false);
     setRetouchPicking(false);
     setRetouchMessage(null);
     setRetouchArea(null);
@@ -1745,7 +1748,7 @@ function EditorWorkspace({ host }) {
           } : null}
           onCancelFill={(ids) => applyRetouch(adjustments.retouch.filter((op) => !ids.includes(op.id)))}
           retouchTool={ready && !transformMode && (retouchTool || retouchSelected || retouchArea) ? {
-            tool: retouchTool,
+            tool: retouchPan ? null : retouchTool,
             brush: retouchBrush,
             clone: retouchClone,
             picking: retouchPicking,
@@ -1821,6 +1824,13 @@ function EditorWorkspace({ host }) {
           <button type="button" className="pe-text-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'fit', at: Date.now() })} title="Fit to screen (0)">Fit</button>
           <button type="button" className="pe-text-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'actual', at: Date.now() })} title="Actual pixels (1)">100%</button>
           <button type="button" className="pe-icon-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'in', at: Date.now() })} aria-label="Zoom in" title="Zoom in (+)">+</button>
+          {retouchTool && (
+            <button type="button" className="pe-text-button pe-zoom__pan" aria-pressed={retouchPan} onClick={() => setRetouchPan((on) => !on)}
+              title="Move the photo with one finger (or the mouse) instead of painting; two fingers always pan and zoom">
+              Pan
+            </button>
+          )}
+
           <button
             type="button"
             className="pe-text-button pe-zoom__crop"
