@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { invert3, project } from '../pipeline/geometry.mjs';
 import { createRetouchOperation } from '../model/retouch.mjs';
+import { maskMapKey } from '../pipeline/mask.mjs';
+
 
 // A new point is recorded once the pointer has moved this far (canvas px, or a share of the radius).
 const POINT_SPACING_PX = 1.5;
@@ -18,9 +20,11 @@ const POINT_SPACING_RADIUS = 0.15;
  *   copies from it with the offset fixed at the stroke's first point. Aligned keeps that offset
  *   for later strokes until a new source is set; otherwise each stroke starts at the source.
  * One pointer paints (a second touch cancels the stroke and the fingers pinch-zoom); pressure is
- * not used. The selected operation shows its target and source; dragging the source handle (or
- * the arrow keys on it) moves the source. The brush outline and source marker follow the pointer
- * outside React.
+ * not used. No stroke starts while another finger is down, so a finger landing again during a
+ * pinch never paints. On touch, Set source follows the finger with a marker and takes the point
+ * where it lifts. A stroke in progress is dropped when the tool or photo changes. The selected
+ * operation shows its target and source; dragging the source handle (or the arrow keys on it)
+ * moves the source. The brush outline and source marker follow the pointer outside React.
  * :param tool: 'heal' | 'clone' | 'remove' | null (handles only)
  * :param brush: { radius, hardness, opacity, spacing }
  * :param clone: { source: { x, y } | null, aligned, offset: { x, y } | null } (the clone sampling state)
@@ -32,6 +36,10 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
   const markerRef = useRef(null);
   const liveRef = useRef(null);
   const rectRef = useRef(null);
+  // Touch pointers down on the tool now (a new primary touch starts a new set).
+  const touchesRef = useRef(new Set());
+  const previewRef = useRef(onPreview);
+  previewRef.current = onPreview;
   const inverse = useMemo(() => invert3(map.matrix), [map]);
   const k = box.width / output.width;
   const short = Math.min(map.width, map.height);
@@ -55,7 +63,19 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
     }
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   };
-  useEffect(() => () => cancelAnimationFrame(frameRef.current), []);
+  // Drops a stroke, drag or source pick in progress (nothing is committed) and its preview.
+  const abandon = () => {
+    const drag = dragRef.current;
+    cancelAnimationFrame(frameRef.current);
+    dragRef.current = null;
+    liveRef.current?.setAttribute('visibility', 'hidden');
+    areaRef.current?.setAttribute('visibility', 'hidden');
+    if (markerRef.current && drag?.kind === 'pick') markerRef.current.hidden = true;
+    if (drag && drag.kind !== 'area') previewRef.current(null);
+  };
+  // Another tool or photo (or leaving the editor) mid-stroke: the stroke never lands on it.
+  const mapKey = maskMapKey(map);
+  useEffect(() => abandon, [tool, mapKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The offset a clone stroke starting at (u, v) uses.
   const cloneOffset = (u, v) => {
@@ -82,7 +102,14 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
     marker.style.transform = `translate(${s.x}px, ${s.y}px)`;
     marker.hidden = false;
   };
+  const showPick = (point) => {
+    const marker = markerRef.current;
+    if (!marker) return;
+    marker.style.transform = `translate(${point.x}px, ${point.y}px)`;
+    marker.hidden = false;
+  };
   const hideCursor = () => {
+
     if (cursorRef.current) cursorRef.current.hidden = true;
     if (markerRef.current) markerRef.current.hidden = true;
   };
@@ -97,6 +124,15 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
   const areaRef = useRef(null);
   const onPointerDown = (event) => {
     if (event.button !== 0) return;
+    if (event.pointerType === 'touch') {
+      if (event.isPrimary) touchesRef.current.clear();
+      touchesRef.current.add(event.pointerId);
+      if (touchesRef.current.size > 1) {
+        // A second finger: abandon the stroke; the fingers pinch-zoom (the Viewer) instead.
+        abandon();
+        return;
+      }
+    }
     if (areaFor) {
       // Remove: drag a rectangle, the area the fill may copy from.
       event.preventDefault();
@@ -109,15 +145,16 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
     if (!tool) return;
     if (event.pointerType !== 'touch') event.stopPropagation();
     event.preventDefault();
-    if (dragRef.current) {
-      // A second touch: abandon the stroke; the fingers pinch-zoom instead.
-      cancelAnimationFrame(frameRef.current);
-      dragRef.current = null;
-      onPreview(null);
-      return;
-    }
+    if (dragRef.current) { abandon(); return; }
     const point = local(event);
     const { u, v } = toSpace(point.x, point.y);
+    if (tool === 'clone' && picking && event.pointerType === 'touch') {
+      // The finger hides the spot: the marker follows it and the source is where it lifts.
+      try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* a synthetic pointer */ }
+      dragRef.current = { kind: 'pick', pointer: event.pointerId, point };
+      showPick(point);
+      return;
+    }
     if (tool === 'clone' && (event.altKey || picking)) {
       onSource({ x: u, y: v });
       return;
@@ -143,6 +180,11 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
     const drag = dragRef.current;
     if (!drag || drag.pointer !== event.pointerId) return;
     if (event.pointerType !== 'touch') event.stopPropagation();
+    if (drag.kind === 'pick') {
+      drag.point = point;
+      showPick(point);
+      return;
+    }
     if (drag.kind === 'area') {
       drag.end = point;
       const rect = areaRef.current;
@@ -186,13 +228,20 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
     }
   };
   const onPointerUp = (event) => {
+    if (event.pointerType === 'touch') touchesRef.current.delete(event.pointerId);
     const drag = dragRef.current;
     if (!drag || drag.pointer !== event.pointerId) return;
     if (event.pointerType !== 'touch') event.stopPropagation();
+    if (event.type === 'pointercancel') { abandon(); return; }
     dragRef.current = null;
     cancelAnimationFrame(frameRef.current);
     liveRef.current?.setAttribute('visibility', 'hidden');
-    if (event.type === 'pointercancel') { onPreview(null); return; }
+    if (drag.kind === 'pick') {
+      if (markerRef.current) markerRef.current.hidden = true;
+      const at = toSpace(drag.point.x, drag.point.y);
+      onSource({ x: at.u, y: at.v });
+      return;
+    }
     if (drag.kind === 'area') {
       areaRef.current?.setAttribute('visibility', 'hidden');
       // The rectangle's corners in the photo's space (its bounding box there when the photo is turned).

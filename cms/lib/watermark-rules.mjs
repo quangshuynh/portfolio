@@ -77,6 +77,22 @@ export function watermarkStatus(treatment) {
   return treatment.status === 'approved' && treatment.approved?.documentHash === treatment.documentHash ? 'approved' : 'needs-review';
 }
 
+/**
+ * Whether a merged-HDR treatment's three exposures are all at hand: each input of the saved
+ * merge (by content hash) among the photograph's available editing sources. The editor checks
+ * the bytes again (it hashes every file it loads) before it merges.
+ * :param document: the working edit document (object or text)
+ * :param sources: editing sources ({ name, sha256, available })
+ * :returns: null when the treatment is not an HDR merge, else { ready, missing: [file names] }
+ */
+export function hdrSourceStatus(document, sources) {
+  const hdr = firstPhoto(document)?.source.hdr;
+  if (!hdr) return null;
+  const present = new Set(sources.filter(({ available }) => available).map(({ sha256 }) => sha256));
+  const missing = hdr.inputs.filter(({ sha256 }) => !sha256 || !present.has(sha256)).map(({ name }) => name);
+  return { ready: missing.length === 0, missing };
+}
+
 /** Statuses automatic drafting works on: it adds, renders or re-renders the watermark. */
 export const AUTO_STATUSES = Object.freeze(['missing', 'draft', 'needs-regeneration']);
 
@@ -85,20 +101,23 @@ export const AUTO_STATUSES = Object.freeze(['missing', 'draft', 'needs-regenerat
  * A photograph that already has a watermark keeps its own (per-photo) settings, so a stale
  * draft is re-rendered as it was; a missing one gets the policy, at the calmer corner when
  * the placement check flags the policy's. Approved and awaiting-review photographs are left
- * alone; nothing approved is replaced here.
- * :param photos: portfolio overview entries ({ id, source, treatment: { watermarkStatus, watermark, hdr } })
+ * alone; nothing approved is replaced here. A merged HDR is drafted once all three of its
+ * exposures are available (the editor merges them again with the saved settings).
+ * :param photos: portfolio overview entries ({ id, source, treatment: { watermarkStatus, watermark, hdr, hdrSources } })
  * :param policy: the CMS watermark preference (settings)
  * :param placements: { id: { flags, suggestion } } from placementReport, where known
  * :param skip: ids not to touch now (open in the editor, failed in this session)
- * :returns: { ids, settings: { id: settings } }
+ * :returns: { ids, settings: { id: settings }, hdr: [ids of HDR merges, slower to draft] }
  */
 export function autoDraftPlan(photos, policy, placements = {}, skip = new Set()) {
   const ids = [];
   const settings = {};
+  const hdr = [];
   for (const photo of photos) {
     if (ids.includes(photo.id) || skip.has(photo.id)) continue;
     if (!AUTO_STATUSES.includes(photo.treatment.watermarkStatus)) continue;
-    if (!photo.source?.available || photo.source.limited || photo.treatment.hdr) continue;
+    if (!photo.source?.available || photo.source.limited) continue;
+    if (photo.treatment.hdr && !photo.treatment.hdrSources?.ready) continue;
     const own = watermarkActive(photo.treatment.watermark) ? photo.treatment.watermark : null;
     const placement = placements[photo.id];
     const position = !own && placement?.flags?.length && placement.suggestion ? placement.suggestion : undefined;
@@ -106,6 +125,8 @@ export function autoDraftPlan(photos, policy, placements = {}, skip = new Set())
     if (!target) continue;
     ids.push(photo.id);
     settings[photo.id] = target;
+    if (photo.treatment.hdr) hdr.push(photo.id);
   }
-  return { ids, settings };
+  return { ids, settings, hdr };
+
 }

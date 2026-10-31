@@ -12,6 +12,8 @@
 // Automatic drafts (WatermarkAutopilot.jsx) run the same queue with `mode: 'auto'` in an
 // off-screen frame of the CMS: there the watermark joins the photo's own edits (review covers
 // both), and the frame tells the CMS when the run ends instead of navigating back to it.
+// A merged HDR is merged again first, from its three exposures (matched by content hash) with
+// the saved roles and settings, so the saved edits and the watermark land on the same merge.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeWatermark, watermarksEqual } from '../../src/editor/watermark/watermark.mjs';
 import { ApiError, treatments, watermark as watermarkApi } from './api.js';
@@ -98,7 +100,7 @@ export function createCmsHost(photoId) {
   };
 }
 
-function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, render, cancelRender, openHdrMerge, setNotice, applySettings, queue }) {
+function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, render, cancelRender, openHdrMerge, restoreHdr, setNotice, applySettings, queue }) {
   const [info, setInfo] = useState(shared.info);
   const [busy, setBusy] = useState(null);
   const [progress, setProgress] = useState(null);
@@ -189,6 +191,7 @@ function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, 
   const [queueStage, setQueueStage] = useState(queue ? 'waiting' : null);
   const target = useMemo(() => (queue ? normalizeWatermark(queue.settings?.[photoId] ?? null) : null), [queue, photoId]);
   const leaving = useRef(false);
+  const merging = useRef(null);
   const finishQueued = useCallback((outcome, message = '') => {
     const latest = readWatermarkQueue() ?? queue;
     const next = { ...latest, index: latest.index + 1, results: [...(latest.results ?? []).filter(({ id }) => id !== photoId), { id: photoId, outcome, message }] };
@@ -210,13 +213,28 @@ function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, 
     if (status?.state !== 'ready' || !photo || !info) return;
     if (!target) { finishQueued('failed', 'No watermark settings were queued for this photograph.'); return; }
     if (info.sources?.[0]?.limited) { finishQueued('skipped', 'Only the 2200 px public image is available; attach the original first.'); return; }
-    if (isHdrTreatment(info) && !photo.hdr) { finishQueued('skipped', 'HDR treatment: open it, Merge HDR, then add the watermark.'); return; }
+    if (isHdrTreatment(info) && !photo.hdr) {
+      if (!restoreHdr) { finishQueued('skipped', 'HDR treatment: open it, Merge HDR, then add the watermark.'); return; }
+      setQueueStage('merging');
+      setProgress({ stage: 'decoding', fraction: 0 });
+      const job = restoreHdr((next) => setProgress(next));
+      merging.current = job;
+      job.promise.then(() => setQueueStage('waiting'), (failure) => {
+        if (failure.code !== 'cancelled') finishQueued('failed', `Merge HDR: ${failure.message}`);
+      }).finally(() => { merging.current = null; setProgress(null); });
+      return;
+    }
+    // The merge must be the saved one (same exposures and settings), or the saved edits would not apply.
+    if (isHdrTreatment(info) && !photo.restored) { finishQueued('failed', 'The merged HDR does not match the saved treatment; open it in QuangEdit and Merge HDR by hand.'); return; }
     const state = watermarkTreatmentState(info.treatment, target);
+
     if (state.unapprovedEdits && queue.mode !== 'auto') { finishQueued('skipped', 'Its treatment has edits that are not approved; approve or discard them first.'); return; }
     if (state.upToDate) { finishQueued('unchanged', 'Already staged with these watermark settings.'); return; }
     applySettings({ watermark: target });
     setQueueStage('applied');
-  }, [queueStage, status, photo, info, target, applySettings, finishQueued]);
+  }, [queueStage, status, photo, info, target, applySettings, finishQueued, restoreHdr]);
+  // Leaving the page (a cancelled automatic run unloads this frame) stops a merge in progress.
+  useEffect(() => () => merging.current?.cancel(), []);
   useEffect(() => {
     if (queueStage !== 'applied' || !photo || !watermarksEqual(photo.history.present.watermark ?? null, target)) return;
     setQueueStage('rendering');
@@ -267,7 +285,8 @@ function TreatmentPanel({ photoId, shared, publish, status, photo, documentFor, 
       </div>
       {queue && queueStage && (
         <p className="cms-host__note" role="status" data-watermark-queue={queueStage}>
-          Bulk watermarking: photograph {queue.index + 1} of {queue.ids.length}. {queueStage === 'rendering' ? 'Saving and rendering the draft…' : queueStage === 'done' ? 'Opening the next photograph…' : 'Loading…'}
+          Bulk watermarking: photograph {queue.index + 1} of {queue.ids.length}. {queueStage === 'rendering' ? 'Saving and rendering the draft…' : queueStage === 'merging' ? `Merging the HDR exposures${percent != null ? ` ${percent}%` : '…'}` : queueStage === 'done' ? 'Opening the next photograph…' : 'Loading…'}
+
           {' '}<button type="button" className="pe-text-button" onClick={stopQueue}>Stop after this photograph</button> (the rest can be resumed)
         </p>
       )}

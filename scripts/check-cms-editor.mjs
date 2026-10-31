@@ -13,9 +13,15 @@
 // lists the published photographs with previews, one (given an attached original) is staged
 // through the bulk queue (QuangEdit renders it from the original), compared and explicitly
 // approved; the approved render differs from the original only inside the mark's box, and it
-// is listed for the next publication.
+// is listed for the next publication. With the genuine files, a published photograph also gets
+// the merged HDR with retouching (overlapping Heal, Clone and Remove), adjustments, colour
+// grading, a mask, an adjustment layer, crop, rotation and perspective; automatic watermark
+// drafting merges the exposures again in its off-screen frame (cancelled once mid-merge, then
+// resumed), redrafts after a retouch change, and the approved render goes through a publication
+// dry run in a temporary clone, whose commit holds no camera file.
 // Usage: npm run check:cms:editor (CMS_EDITOR_RUNS=chromium,firefox to limit the runs)
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -23,6 +29,10 @@ import sharp from 'sharp';
 import { chromium, devices, firefox, webkit } from 'playwright';
 import { createEditDocument, serializeEditDocument } from '../src/editor/model/editDocument.mjs';
 import { neutralAdjustments } from '../src/editor/model/adjustments.mjs';
+import { createAdjustmentLayer } from '../src/editor/model/layers.mjs';
+import { createRetouchOperation } from '../src/editor/model/retouch.mjs';
+import { createGit } from '../cms/lib/git.mjs';
+import { preparePublication } from '../cms/lib/publish.mjs';
 import { WATERMARK_DEFAULTS, layoutWatermark, normalizeWatermark } from '../src/editor/watermark/watermark.mjs';
 import { startCmsServer } from '../cms/server.mjs';
 
@@ -45,8 +55,15 @@ async function poll(read, ok, label, timeout = 120_000) {
   const end = Date.now() + timeout;
   let value;
   while (Date.now() < end) {
-    value = await read();
-    if (ok(value)) return value;
+    try {
+      value = await read();
+    } catch (error) {
+      // The page reloads (attaching a source does): read again on the next page.
+      if (!/context was destroyed|navigation|Target closed/i.test(error.message)) throw error;
+      value = undefined;
+    }
+    if (value !== undefined && ok(value)) return value;
+
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error(`Timed out waiting for ${label} (last: ${JSON.stringify(value)?.slice(0, 200)})`);
@@ -79,6 +96,7 @@ const radialTreatment = (source) => serializeEditDocument(createEditDocument([{
 const cms = await startCmsServer({ port: 4321, workspace: path.join(work, 'workspace'), offline: true, log: () => {} });
 const origin = new URL(cms.url).origin;
 const results = [];
+let hdrDocument = null;
 let failed = false;
 
 async function api(page, method, url, body) {
@@ -406,9 +424,107 @@ try {
           assert.equal(json.renderFresh, true);
           assert.ok(json.treatment.document.photos[0].source.hdr, 'HDR document');
           assert.match(json.treatment.render.file, /-HDR-quangedit\.jpg$/);
+          hdrDocument = json.treatment.document;
           return { size: `${json.treatment.render.width}×${json.treatment.render.height}`, name: json.treatment.render.file };
         });
+        await step('genuine HDR workflow: retouch and adjust, automatic draft (cancel, resume, redraft), approve, publication dry run', async () => {
+          const workspace = (await api(page, 'GET', '/api/workspace')).json;
+          const id = workspace.catalog.photographs.filter(({ status }) => status === 'published')[RUNS.length + 1].id;
+          const photo = async () => (await api(page, 'GET', `/api/editor/photos/${id}`)).json;
+          const statusOf = async () => (await api(page, 'GET', '/api/watermark/portfolio')).json.photographs.find((entry) => entry.id === id)?.treatment;
+          const until = (status, timeout = 1_200_000) => poll(async () => (await statusOf())?.watermarkStatus, (value) => value === status, `${id} ${status}`, timeout);
+          // The three exposures, attached in QuangEdit to the CMS's private workspace (stored by content hash).
+          await page.goto(`${origin}/admin/photography/editor/?photo=${id}`);
+          await page.locator('.cms-host').waitFor();
+          await page.waitForSelector('.pe-photo[data-status=ready]', { state: 'attached', timeout: 60_000 });
+          await page.setInputFiles('.cms-host input[type=file]', RAW_FILES.slice(0, 3));
+          await poll(async () => (await photo()).sources.filter(({ kind, available }) => kind === 'attached' && available).length, (n) => n === 3, 'three exposures attached', 300_000);
+          let info = await photo();
+
+          // The saved merge (same exposures, roles and settings), with retouching and adjustments on top.
+          const document = JSON.parse(JSON.stringify(hdrDocument));
+          const adjustments = document.photos[0].adjustments;
+          Object.assign(adjustments, {
+            exposure: 0.25,
+            contrast: 10,
+            gradeShadowsSat: 25,
+            gradeHighlightsSat: 15,
+            retouch: [
+              createRetouchOperation('h1', 'heal', [[0.3, 0.4], [0.33, 0.41]], { radius: 0.015 }, { x: 0.06, y: 0 }),
+              createRetouchOperation('c1', 'clone', [[0.31, 0.405], [0.35, 0.42]], { radius: 0.01 }, { x: -0.05, y: 0.04 }),
+              createRetouchOperation('r1', 'remove', [[0.6, 0.6], [0.64, 0.62]], { radius: 0.02 }),
+              createRetouchOperation('r2', 'remove', [[0.62, 0.61]], { radius: 0.03 }),
+            ],
+            geometry: { ...adjustments.geometry, angle: -2, perspective: { vertical: 6, horizontal: -3 }, crop: { x: 0.05, y: 0.05, width: 0.9, height: 0.88 } },
+            local: JSON.parse(radialTreatment({ name: 'x', size: 1, sha256: 'a'.repeat(64), format: 'jpeg' })).photos[0].adjustments.local,
+            layers: [createAdjustmentLayer('cms-layer', { contrast: 12, saturation: -10 })],
+            watermark: null,
+          });
+          const saved = await api(page, 'PUT', `/api/editor/photos/${id}/treatment`, { document: JSON.stringify(document), revision: info.treatment.revision });
+          assert.equal(saved.status, 200, JSON.stringify(saved.json));
+          assert.deepEqual((await statusOf()).hdrSources, { ready: true, missing: [] });
+          assert.equal((await statusOf()).watermarkStatus, 'missing');
+          // Automatic drafting merges again in its frame; cancel it mid-merge.
+          await page.goto(`${origin}/admin/photography/#watermark`);
+          await page.evaluate(() => localStorage.setItem('cms-watermark-auto', 'on'));
+          await page.reload();
+          const frame = page.frameLocator('.cms-autopilot-frame');
+          await frame.locator('[data-watermark-queue=merging]').waitFor({ timeout: 600_000 });
+          assert.match(await page.locator('[data-watermark-autopilot]').textContent(), new RegExp(id));
+          await page.getByRole('button', { name: 'Cancel now' }).click();
+          await page.locator('.cms-autopilot-frame').waitFor({ state: 'detached', timeout: 10_000 });
+          info = await photo();
+          assert.equal(info.treatment.approved, null, 'cancel approved nothing');
+          assert.notEqual((await statusOf()).watermarkStatus, 'needs-review', 'cancelled before a render was staged');
+          // Resumed after a reload (as after a CMS restart): merged, watermarked and rendered.
+          let started = Date.now();
+          await page.reload();
+          await until('needs-review');
+          const draftMs = Date.now() - started;
+          info = await photo();
+          const draft = info.treatment.document.photos[0];
+          assert.deepEqual(draft.source.hdr.inputs, hdrDocument.photos[0].source.hdr.inputs, 'exposure identities, roles and order kept');
+          assert.deepEqual(draft.source.hdr.settings, hdrDocument.photos[0].source.hdr.settings, 'merge settings kept');
+          assert.equal(draft.source.sha256, hdrDocument.photos[0].source.sha256, 'same merge identity');
+          assert.equal(draft.adjustments.retouch.length, 4);
+          assert.equal(draft.adjustments.layers.length, 1);
+          assert.deepEqual(draft.adjustments.watermark, (await api(page, 'GET', '/api/watermark')).json.settings);
+          assert.equal(info.renderFresh, true);
+          assert.equal(info.treatment.approved, null);
+          assert.match(info.treatment.render.file, /-HDR-quangedit\.jpg$/);
+          assert.ok(info.treatment.render.width > 3000, `full resolution render: ${info.treatment.render.width}`);
+          // A retouch change makes the draft stale; it is drafted again with the same single watermark.
+          const changed = JSON.parse(JSON.stringify(info.treatment.document));
+          changed.photos[0].adjustments.retouch.push(createRetouchOperation('h2', 'heal', [[0.7, 0.3]], { radius: 0.02 }, { x: -0.06, y: 0.02 }));
+          assert.equal((await api(page, 'PUT', `/api/editor/photos/${id}/treatment`, { document: JSON.stringify(changed), revision: info.treatment.revision })).status, 200);
+          assert.equal((await statusOf()).watermarkStatus, 'needs-regeneration');
+          started = Date.now();
+          await page.reload();
+          await until('needs-review');
+          const redraftMs = Date.now() - started;
+          info = await photo();
+          assert.equal(info.treatment.document.photos[0].adjustments.retouch.length, 5);
+          assert.deepEqual(info.treatment.document.photos[0].adjustments.watermark, draft.adjustments.watermark, 'one watermark, unchanged settings');
+          await page.evaluate(() => localStorage.setItem('cms-watermark-auto', 'off'));
+          // Reopened by hand, the treatment asks for its merge again (nothing lost).
+          await page.goto(`${origin}/admin/photography/editor/?photo=${id}`);
+          await page.locator('.cms-host__note', { hasText: 'merged HDR' }).waitFor({ timeout: 300_000 });
+          // Approval is explicit; then a publication dry run in a temporary clone (never this checkout).
+          assert.equal((await api(page, 'POST', `/api/editor/photos/${id}/approve`, { revision: info.treatment.revision })).status, 200);
+          assert.equal((await statusOf()).watermarkStatus, 'approved');
+          assert.ok((await api(page, 'GET', '/api/workspace')).json.images.includes(id), 'listed for the next publication');
+          const clone = path.join(work, 'clone');
+          execFileSync('git', ['clone', '--quiet', '--shared', process.cwd(), clone]);
+          const git = createGit(clone);
+          const publication = await preparePublication({ git, workspaceDir: path.join(work, 'workspace'), offline: true, dryRun: true, allowUnwatermarked: true, baseBranch: 'origin/main' });
+          const files = (await git(['show', '--name-only', '--format=', publication.branch])).split('\n').filter(Boolean);
+          assert.ok(files.some((file) => file.includes(id)), `the approved image is in the commit: ${files.slice(0, 5)}`);
+          const camera = files.filter((file) => /\.(arw|nef|dng)$|(^|\/)sources\//i.test(file));
+          assert.deepEqual(camera, [], 'no camera original or private source in the publication');
+          return { draftMs, redraftMs, render: `${info.treatment.render.width}×${info.treatment.render.height}`, files: files.length };
+        });
       }
+
       assert.deepEqual(outside, [], `requests outside 127.0.0.1: ${outside.slice(0, 3).join(', ')}`);
       const relevant = errors.filter((text) => !/favicon|Failed to load resource: the server responded with a status of 404/.test(text));
       assert.deepEqual(relevant, [], `console errors: ${relevant.slice(0, 3).join(' | ')}`);

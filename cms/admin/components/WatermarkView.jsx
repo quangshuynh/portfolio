@@ -127,7 +127,11 @@ export default function WatermarkView({ onNotice, onChanged }) {
     if (!photo.source?.available) return 'No source file available';
     if (photo.treatment.unapprovedEdits) return 'Its treatment has unapproved edits: approve or discard them first';
     if (photo.source.limited) return 'Only the 2200 px public image: attach the original first';
-    if (photo.treatment.hdr) return 'HDR treatment: open it in QuangEdit (Merge HDR) and add the watermark there';
+    if (photo.treatment.hdr && !photo.treatment.hdrSources?.ready) {
+      const missing = photo.treatment.hdrSources?.missing ?? [];
+      return `HDR treatment: attach ${missing.length ? `the missing exposure${missing.length === 1 ? '' : 's'} (${missing.join(', ')})` : 'its three exposures'} in QuangEdit; drafts resume then`;
+    }
+
     return null;
   };
   const stageable = photos.filter((photo) => !blocked(photo));
@@ -203,9 +207,9 @@ export default function WatermarkView({ onNotice, onChanged }) {
         <div className="cms-banner" role="status" data-watermark-run>
           <p>
             {remaining > 0 ? `Bulk run ${run.stopped ? 'stopped' : 'interrupted'}: ${run.index} of ${run.ids.length} done, ${remaining} remaining.` : `Last bulk run: ${run.ids.length} photographs.`}
-            {' '}{['staged', 'unchanged', 'skipped', 'failed'].map((outcome) => `${run.results.filter((entry) => entry.outcome === outcome).length} ${outcome}`).join(', ')}.
+            {' '}{['staged', 'unchanged', 'skipped', 'failed', 'cancelled'].map((outcome) => `${run.results.filter((entry) => entry.outcome === outcome).length} ${outcome}`).join(', ')}.
           </p>
-          {run.results.filter(({ outcome }) => outcome === 'skipped' || outcome === 'failed').map(({ id, outcome, message }) => <span key={id} className="cms-watermark-result">{id} ({outcome}): {message}</span>)}
+          {run.results.filter(({ outcome }) => outcome === 'skipped' || outcome === 'failed' || outcome === 'cancelled').map(({ id, outcome, message }) => <span key={id} className="cms-watermark-result">{id} ({outcome}): {message}</span>)}
           <div className="cms-toolbar">
             {remaining > 0 && <button type="button" className="cms-button cms-button--primary" onClick={resume}>Resume ({remaining})</button>}
             <button type="button" className="cms-link" onClick={dismissRun}>{remaining > 0 ? 'Cancel the rest' : 'Dismiss'}</button>

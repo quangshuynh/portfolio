@@ -201,7 +201,8 @@ const LAYER_TARGETED = new Set(['previewAdjustment', 'setAdjustment', 'resetAdju
 /**
  * :param props.host: optional embedding host (the local photography CMS); the public route
  *   passes none. { title, backHref, backLabel, privacyNote, load(): Promise<{ files, document }>,
- *   Panel: component given { photo, documentFor, render, openHdrMerge, setNotice } }.
+ *   Panel: component given { photo, documentFor, render, openHdrMerge, restoreHdr, setNotice } }.
+
  *   With a host, the photo comes from host.load() and nothing is autosaved to this browser.
  */
 export default function EditorApp({ host = null }) {
@@ -264,6 +265,8 @@ function EditorWorkspace({ host }) {
   // Retouch: the tool on the photo, its brush, the clone source (one photo's, never carried to
   // another), whether the next tap sets that source, the selected operation and the last message.
   const [retouchTool, setRetouchTool] = useState(null);
+  // While a retouch brush is on: one finger (or the mouse) pans instead of painting.
+  const [retouchPan, setRetouchPan] = useState(false);
   const [retouchBrush, setRetouchBrush] = useState(RETOUCH_DEFAULTS);
   const [retouchClone, setRetouchClone] = useState({ source: null, aligned: true, offset: null });
   const [retouchPicking, setRetouchPicking] = useState(false);
@@ -787,6 +790,7 @@ function EditorWorkspace({ host }) {
   const chooseRetouchTool = useCallback((value) => {
     if (transformMode) return;
     setRetouchTool(value);
+    setRetouchPan(false);
     setRetouchPicking(false);
     setRetouchMessage(null);
     setRetouchArea(null);
@@ -1281,6 +1285,31 @@ function EditorWorkspace({ host }) {
     setHdrOpen(false);
     setNotice({ tone: 'info', text: `Merged ${name} (${crop.width}×${crop.height}${mode === 'fusion' ? ', exposure fusion' : ''}). The three originals are unchanged.` });
   }, []);
+  // A host's unattended merge of a saved HDR (the CMS's automatic watermark drafts): the three
+  // exposures already in the workspace, matched by content hash, with the saved roles and merge
+  // settings; the saved edits then restore onto the merged photo as after Merge HDR by hand.
+  const restoreSavedHdr = useCallback((onProgress = () => {}) => {
+    let cancelled = false;
+    let job = null;
+    const promise = (async () => {
+      const saved = stateRef.current.pendingEdits.find(({ source }) => source.hdr)?.source;
+      if (!saved) throw new Error('No saved HDR merge is waiting for its exposures.');
+      const ready = stateRef.current.photos.filter((item) => item.status === 'ready' && item.format !== 'hdr');
+      const inputs = [];
+      for (const entry of saved.hdr.inputs) {
+        const match = ready.find((item) => item.sha256 && item.sha256 === entry.sha256);
+        if (!match) throw new Error(`The exposure ${entry.name} is missing or its file changed since the merge was saved; attach the original again.`);
+        inputs.push({ ...(await describeWorkspacePhoto(match.id)), role: entry.role });
+      }
+      const mode = inputs[0].raw ? 'radiance' : 'fusion';
+      if (mode !== saved.hdr.mode) throw new Error(`The saved merge used ${saved.hdr.mode}; these files would merge as ${mode}.`);
+      if (cancelled) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
+      job = mergeBracket(inputs, saved.hdr.settings, onProgress);
+      const result = await job.promise;
+      await addMergedPhoto(result, inputs, saved.hdr.settings);
+    })();
+    return { promise, cancel: () => { cancelled = true; job?.cancel(); } };
+  }, [describeWorkspacePhoto, mergeBracket, addMergedPhoto]);
 
   // Parses a .cube off the main thread, adds it to this session's library and applies it
   // to the active photo. Photos waiting for this exact file (same hash) resolve too.
@@ -1609,6 +1638,7 @@ function EditorWorkspace({ host }) {
               render={renderForHost}
               cancelRender={cancelExport}
               openHdrMerge={() => setHdrOpen(true)}
+              restoreHdr={restoreSavedHdr}
               setNotice={setNotice}
               applySettings={(patch) => dispatch({ type: 'applySettings', patch })}
             />
@@ -1718,7 +1748,7 @@ function EditorWorkspace({ host }) {
           } : null}
           onCancelFill={(ids) => applyRetouch(adjustments.retouch.filter((op) => !ids.includes(op.id)))}
           retouchTool={ready && !transformMode && (retouchTool || retouchSelected || retouchArea) ? {
-            tool: retouchTool,
+            tool: retouchPan ? null : retouchTool,
             brush: retouchBrush,
             clone: retouchClone,
             picking: retouchPicking,
@@ -1794,6 +1824,13 @@ function EditorWorkspace({ host }) {
           <button type="button" className="pe-text-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'fit', at: Date.now() })} title="Fit to screen (0)">Fit</button>
           <button type="button" className="pe-text-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'actual', at: Date.now() })} title="Actual pixels (1)">100%</button>
           <button type="button" className="pe-icon-button" disabled={!ready} onClick={() => setZoomCommand({ type: 'in', at: Date.now() })} aria-label="Zoom in" title="Zoom in (+)">+</button>
+          {retouchTool && (
+            <button type="button" className="pe-text-button pe-zoom__pan" aria-pressed={retouchPan} onClick={() => setRetouchPan((on) => !on)}
+              title="Move the photo with one finger (or the mouse) instead of painting; two fingers always pan and zoom">
+              Pan
+            </button>
+          )}
+
           <button
             type="button"
             className="pe-text-button pe-zoom__crop"

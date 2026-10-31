@@ -933,7 +933,8 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
     if (!proxy || event.button !== 0 || event.target.closest('.pe-split')) return;
     // The mask tool keeps its own pointer capture (it paints with that finger).
     if ((maskTool?.tool || retouchTool?.tool) && event.target.closest('.pe-masktool')) toolPointersRef.current.add(event.pointerId);
-    else event.currentTarget.setPointerCapture(event.pointerId);
+    else try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* a pointer already gone (or synthetic) */ }
+
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     startGesture({ originX: offsetX, originY: offsetY, zoom });
   };
@@ -1092,7 +1093,9 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
         )}
         {retouchTool && proxy && proxy.id === photo?.id && !transform && !inspect && compare !== 'original' && (
           <RetouchTool
+            key={photo?.id}
             map={imageMaskMap(plan, { width: sourceWidth, height: sourceHeight }, native)}
+
             box={{ x: offsetX, y: offsetY, width: displayWidth, height: displayHeight }}
             output={{ width: sourceWidth, height: sourceHeight }}
             tool={retouchTool.tool}

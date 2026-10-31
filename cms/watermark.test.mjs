@@ -182,14 +182,18 @@ describe('bulk staging rules', () => {
       photo('unrendered', 'draft', { treatment: { watermark: own } }),
       photo('waiting', 'needs-review', { treatment: { watermark: own } }),
       photo('done', 'approved', { treatment: { watermark: policy } }),
-      photo('hdr', 'missing', { treatment: { hdr: true } }),
+      photo('hdr', 'missing', { treatment: { hdr: true, hdrSources: { ready: false, missing: ['DSC09642.ARW'] } } }),
+      photo('hdr-ready', 'needs-regeneration', { treatment: { hdr: true, hdrSources: { ready: true, missing: [] }, watermark: own } }),
       photo('public-only', 'missing', { photo: { source: { available: true, limited: true } } }),
       photo('no-source', 'missing', { photo: { source: null } }),
       photo('editing', 'missing'),
       photo('new', 'missing'),
     ];
     const plan = autoDraftPlan(photos, policy, { busy: { flags: ['busy'], suggestion: 'bottom-left' }, new: { flags: [] } }, new Set(['editing']));
-    expect(plan.ids).toEqual(['new', 'busy', 'stale', 'unrendered']);
+    // A merged HDR is drafted once its three exposures are all attached (the editor merges them again).
+    expect(plan.ids).toEqual(['new', 'busy', 'stale', 'unrendered', 'hdr-ready']);
+    expect(plan.hdr).toEqual(['hdr-ready']);
+
     expect(plan.settings.new).toMatchObject({ position: 'bottom-right', color: 'auto', size: 0.11, opacity: 0.65, outline: true, enabled: true });
     expect(plan.settings.busy.position).toBe('bottom-left');
     expect(plan.settings.stale).toMatchObject({ position: 'top-left', color: 'dark', size: 0.09 });

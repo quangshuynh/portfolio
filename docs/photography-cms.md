@@ -209,14 +209,20 @@ The **Watermark** view uses the editor's own renderer (no CMS renderer).
   or **Needs regeneration** (the treatment changed: edits, crop, geometry or
   watermark settings) gets a watermark draft from QuangEdit, one photograph at a
   time in an off-screen frame (`WatermarkAutopilot.jsx`, the queue below in
-  `auto` mode); progress and **Stop** sit at the bottom left, and a reload or
-  restart resumes. Missing photographs get the preference (11%, 65%, bottom
+  `auto` mode); progress, **Stop** (after this photograph) and **Cancel now**
+  (unloads the frame at once; drafting pauses until the CMS is reloaded) sit at
+  the bottom left, and a reload or restart resumes. Missing photographs get the preference (11%, 65%, bottom
   right, outline, automatic white or charcoal; the calmer corner when the
   placement check flags it); stale drafts keep their own settings. The mark joins
   the photo's own edits, and approval reviews both. It never approves, never
   replaces an approved version (that stays live until a newer draft is approved),
-  and skips photographs open in QuangEdit, HDR treatments and photographs with
-  only the public image. Statuses come from the treatment on disk
+  and skips photographs open in QuangEdit and photographs with only the public
+  image. **Merged HDR:** drafted once all three exposures are attached (matched by
+  SHA-256, `hdrSourceStatus`); the frame merges them again with the saved roles
+  and settings (`restoreHdr`, in workers), checks the saved edits restored onto
+  that merge, then adds the mark and renders at full size (15 min limit per HDR
+  photo, 5 min otherwise). A missing exposure is listed by name in the Watermark
+  view instead. Statuses come from the treatment on disk
   (`watermarkStatus`): Missing, Draft, Needs regeneration, **Needs review**,
   **Approved**.
 - **Apply HUYNH Watermark to Portfolio**, three separate steps:
@@ -236,7 +242,8 @@ The **Watermark** view uses the editor's own renderer (no CMS renderer).
   camera files (D3100 `_DSC0051`, `_DSC0027`, `_DSC0061`, 2026-04-04) are
   ungraded, so rendering from them would change the published colours.
 - **Not eligible / flagged:** no original (only the 2200 px public image), HDR
-  treatments (merge manually), treatments with **unapproved edits** (would
+  treatments missing an exposure, treatments with **unapproved edits** (would
+
   publish unreviewed changes). Already staged with the same settings: re-runs
   report "unchanged". The mark is one setting over the original, so re-staging
   replaces it (never stacks) and every render starts from the original (no

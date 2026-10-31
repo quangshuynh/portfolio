@@ -349,7 +349,16 @@ describe('attached editing sources', () => {
     const hdr = { mode: 'fusion', inputs, settings: { align: true, deghost: true, deghostStrength: 50 } };
     const document = serializeEditDocument(createEditDocument([{ name: 'normal-HDR', size: 1, sha256: 'e'.repeat(64), format: 'hdr', width: 1600, height: 1000, hdr, adjustments: neutralAdjustments() }], {}));
     expect((await save('gamma', document)).status).toBe(200);
-    const missing = serializeEditDocument(createEditDocument([{ name: 'normal-HDR', size: 1, sha256: 'e'.repeat(64), format: 'hdr', width: 1600, height: 1000,
+    // Automatic watermark drafts see whether all three exposures are here, without reading them.
+    const hdrEntry = async () => (await call('GET', '/api/watermark/portfolio')).json.photographs.find(({ id }) => id === 'gamma').treatment;
+    expect(await hdrEntry()).toMatchObject({ hdr: true, hdrSources: { ready: true, missing: [] } });
+    const over = path.join(fixture.workspace, 'sources', readdirSync(path.join(fixture.workspace, 'sources')).find((name) => name.startsWith(inputs[2].sha256)));
+    const kept = readFileSync(over);
+    rmSync(over);
+    expect(await hdrEntry()).toMatchObject({ hdr: true, hdrSources: { ready: false, missing: ['over.jpg'] } });
+    writeFileSync(over, kept);
+    const missing = serializeEditDocument(
+createEditDocument([{ name: 'normal-HDR', size: 1, sha256: 'e'.repeat(64), format: 'hdr', width: 1600, height: 1000,
       hdr: { ...hdr, inputs: inputs.map((input, i) => (i === 2 ? { ...input, sha256: 'd'.repeat(64) } : input)) }, adjustments: { ...neutralAdjustments(), exposure: 1 } }], {}));
     expect((await save('gamma', missing)).json.error.code).toBe('source-mismatch');
   });
