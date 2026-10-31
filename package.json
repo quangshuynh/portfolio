@@ -31,6 +31,8 @@
     "check:editor:detail": "node scripts/check-editor-detail.mjs",
     "check:editor:batch": "node scripts/check-editor-batch.mjs",
     "check:editor:raw-stability": "node scripts/check-editor-raw-stability.mjs",
+    "check:editor:raw-formats": "node --max-old-space-size=8192 scripts/check-editor-raw-formats.mjs",
+    "check:raw:compat": "node --max-old-space-size=8192 scripts/check-raw-compat.mjs",
     "check:editor:memory": "node scripts/check-editor-memory.mjs",
     "check:editor:geometry": "node scripts/check-editor-geometry.mjs",
     "check:editor:creative": "node scripts/check-editor-creative.mjs",
