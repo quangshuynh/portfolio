@@ -19,7 +19,7 @@ Interval 1 (2026-10-22).
 {
   "schemaVersion": 1,
   "captureTimeZone": "America/New_York",
-  "hero": "river-arch-bridge",
+  "hero": "shoreline-gold-dusk",
   "categories": ["Automotive", "Places", "Landscape", "Nature"],
   "photographs": [
     {
