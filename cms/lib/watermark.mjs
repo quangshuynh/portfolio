@@ -10,7 +10,7 @@ import {
 } from '../../src/editor/watermark/watermark.mjs';
 import { readGeneratedManifest } from '../../scripts/photography-catalog-files.mjs';
 import { editingSources, listTreatments, renderIsFresh } from './treatments.mjs';
-import { watermarkStatus, watermarkTreatmentState } from './watermark-rules.mjs';
+import { hdrSourceStatus, watermarkStatus, watermarkTreatmentState } from './watermark-rules.mjs';
 import { readJson, readWorkspace, writeAtomic } from './workspace.mjs';
 
 export class WatermarkError extends Error {
@@ -62,7 +62,10 @@ export async function portfolioOverview({ workspaceDir, libraryDir, derivativesD
   const photographs = [];
   for (const record of [...published, ...imported]) {
     const treatment = treatments[record.id] ?? { attached: [], document: null, status: 'none', approved: null };
-    const [source] = await editingSources({ workspaceDir, libraryDir, record, treatment, derivativesDir, hash: false });
+    const sources = await editingSources({ workspaceDir, libraryDir, record, treatment, derivativesDir, hash: false });
+    const [source] = sources;
+    // Attached sources are stored under their content hash, so their hashes are known unread.
+    const hdrSources = hdrSourceStatus(treatment.document, sources);
     const meta = generated.get(record.id);
     const state = watermarkTreatmentState(treatment);
     photographs.push({
@@ -78,7 +81,10 @@ export async function portfolioOverview({ workspaceDir, libraryDir, derivativesD
       treatment: {
         status: treatment.status,
         revision: treatment.revision ?? 0,
-        hdr: Boolean(treatment.document?.photos?.[0]?.source?.hdr),
+        hdr: Boolean(hdrSources),
+        // For a merged HDR: whether all three exposures are here, and which are missing.
+        hdrSources,
+
         renderFresh: renderIsFresh(treatment),
         watermark: state.watermark,
         watermarked: watermarkActive(state.watermark),
