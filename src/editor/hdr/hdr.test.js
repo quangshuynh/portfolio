@@ -125,6 +125,9 @@ describe('import and metadata', () => {
     expect(validateBracket([raw('1.ARW', { sha256: 'a'.repeat(64) }), raw('2.ARW', { sha256: 'a'.repeat(64), exposure: exposure(1 / 30) }), raw('3.ARW', { exposure: exposure(1 / 500) })]).errors.join(' ')).toMatch(/same file/);
     expect(validateBracket([raw('1.ARW'), raw('2.ARW', { exposure: exposure(1 / 30, { model: 'ILCE-6400' }) }), raw('3.ARW', { exposure: exposure(1 / 500) })]).errors.join(' ')).toMatch(/different cameras/);
     expect(validateBracket([raw('1.ARW'), raw('2.ARW', { width: 4024, height: 6024, exposure: exposure(1 / 30) }), raw('3.ARW', { exposure: exposure(1 / 500) })]).errors.join(' ')).toMatch(/different sizes/);
+    // No genuine CR3 (or other new-format) bracket has been merged: refused, not assumed.
+    const cr3 = (name, shutter) => raw(name, { format: 'cr3', exposure: exposure(shutter, { model: 'EOS R8' }) });
+    expect(validateBracket([cr3('1.CR3', 1 / 125), cr3('2.CR3', 1 / 30), cr3('3.CR3', 1 / 500)]).errors.join(' ')).toMatch(/not been validated with CR3 brackets/);
   });
 
   test('raster orientation and framing: rotated or differently cropped photos are refused, scaled ones allowed', () => {

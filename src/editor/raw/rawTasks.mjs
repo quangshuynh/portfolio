@@ -11,7 +11,7 @@ import { deriveParams } from '../pipeline/spec.mjs';
 import { exportGeometry, LIMITS, proxyDimensions } from '../io/files.mjs';
 import { finishRows, warpImage, warpSpec } from '../pipeline/warp.mjs';
 import { contentHash } from '../io/hash.mjs';
-import { RawDecodeError, decodeRaw, downsampleRaw } from './rawDecoder.mjs';
+import { RawDecodeError, cropToSize, decodeRaw, downsampleRaw, sameSize } from './rawDecoder.mjs';
 import { RAW_SNIFF_BYTES, RAW_SUPPORT, sniffRaw } from './rawFormat.mjs';
 import { applyRetouch } from '../pipeline/retouch.mjs';
 
@@ -82,10 +82,10 @@ export function createRawHandlers(loadModule) {
     async region({ file, raw, rect, geometry = null, retouch = [] }) {
       const { Module, bytes, format } = await openRaw(file, loadModule);
       const decoded = decodeRaw(Module, bytes, { format, halfSize: false });
-      if (decoded.info.width !== raw.width || decoded.info.height !== raw.height) {
+      if (!sameSize(decoded.info, raw)) {
         throw new RawDecodeError('corrupt', 'The file changed since it was imported. Import it again.');
       }
-      const image = downsampleRaw(decoded.image, raw.width, raw.height);
+      const image = downsampleRaw(cropToSize(decoded.image, raw), raw.width, raw.height);
       decoded.image = null;
       applyRetouch(image, retouch);
       const plan = geometryPlan(normalizeGeometry(geometry), { width: raw.width, height: raw.height });
@@ -114,10 +114,10 @@ export function createRawHandlers(loadModule) {
     async develop({ file, raw, width, height }) {
       const { Module, bytes, format } = await openRaw(file, loadModule);
       const decoded = decodeRaw(Module, bytes, { format, halfSize: !needsFullDecode(raw, { width, height }) });
-      if (decoded.info.width !== raw.width || decoded.info.height !== raw.height) {
+      if (!sameSize(decoded.info, raw)) {
         throw new RawDecodeError('corrupt', 'The file changed since it was imported. Import it again.');
       }
-      const image = downsampleRaw(decoded.image, width, height);
+      const image = downsampleRaw(decoded.image.width > raw.width / 1.5 ? cropToSize(decoded.image, raw) : decoded.image, width, height);
       decoded.image = null;
       if (image.width !== width || image.height !== height) {
         throw new RawDecodeError('corrupt', `LibRaw returned ${image.width}×${image.height} instead of ${width}×${height}.`);
@@ -138,11 +138,12 @@ export function createRawHandlers(loadModule) {
       progress({ stage: 'decoding', fraction: 0 });
       const { Module, bytes, format } = await openRaw(file, loadModule);
       const decoded = decodeRaw(Module, bytes, { format, halfSize: !needsFullDecode(raw, developSize) });
-      if (decoded.info.width !== raw.width || decoded.info.height !== raw.height) {
+      if (!sameSize(decoded.info, raw)) {
         throw new RawDecodeError('corrupt', 'The file changed since it was imported. Import it again.');
       }
-      const source = decoded.image.width === raw.width ? 'full' : 'half';
-      let image = downsampleRaw(decoded.image, developSize.width, developSize.height);
+      const full = decoded.image.width > raw.width / 1.5;
+      const source = full ? 'full' : 'half';
+      let image = downsampleRaw(full ? cropToSize(decoded.image, raw) : decoded.image, developSize.width, developSize.height);
       decoded.image = null;
       if (image.width !== developSize.width || image.height !== developSize.height) {
         throw new RawDecodeError('corrupt', `LibRaw returned ${image.width}×${image.height} instead of ${developSize.width}×${developSize.height}.`);

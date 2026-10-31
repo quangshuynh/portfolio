@@ -157,6 +157,9 @@ export function suggestRolesFromBrightness(brightness) {
   return roles;
 }
 
+/** RAW formats validated with genuine three-frame brackets; other RAW formats edit singly. */
+export const HDR_RAW_FORMATS = Object.freeze(['arw', 'nef', 'dng']);
+
 /** True when roles name each of under, normal and over once. */
 export const rolesComplete = (roles) => roles.length === BRACKET_SIZE && ROLES.every((role) => roles.filter((r) => r === role).length === 1);
 
@@ -188,6 +191,9 @@ export function validateBracket(inputs) {
 
   const [first] = inputs;
   if (mode === 'radiance') {
+    // RAW HDR merges are validated only with genuine brackets of these formats (docs/raw-compatibility.md).
+    const untested = [...new Set(inputs.map(({ format }) => format).filter((format) => format && !HDR_RAW_FORMATS.includes(format)))];
+    if (untested.length) errors.push(`RAW HDR merging has not been validated with ${untested.map((format) => format.toUpperCase()).join(', ')} brackets yet; it supports ${HDR_RAW_FORMATS.map((format) => format.toUpperCase()).join(', ')}. Merge the camera's JPEGs instead.`);
     const models = new Set(inputs.map(({ exposure }) => exposure?.model).filter(Boolean));
     if (models.size > 1) errors.push(`The RAW files come from different cameras (${[...models].join(', ')}).`);
     if (inputs.some(({ width, height }) => width !== first.width || height !== first.height)) {
