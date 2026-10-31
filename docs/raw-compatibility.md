@@ -103,6 +103,16 @@ crash on Windows (docs/photography-editor.md, Known issues) did not occur in thi
 intermittent, so this is not evidence that it is fixed. Firefox exports X-Trans RAF about 2.6×
 slower than Chromium.
 
+## CMS
+
+`check:cms:editor` with `CMS_RAW_FORMATS_DIR` (Chromium) attaches one file per validated format
+(DNG, CR2, CRW, CR3, RAF, NRW, NEF, ORF, RW2, SR2, PEF) to a photograph, identified by content
+(stored once by SHA-256, never under its name's extension), renders it for the portfolio at full
+size (5–31 s) and reopens the treatment with a fresh render. The SRF is refused with its reason
+(HTTP 415). An HE NEF passes identification and fails in QuangEdit with the HE message; nothing is
+rendered. Automatic HUYNH watermark drafts, approval and the publication dry run are
+format-independent and stay covered by the ARW and HDR steps of the same check.
+
 ## Not verified
 
 Physical iPhone or Android devices; Safari on macOS or iOS; Canon sRAW/mRAW, Fujifilm
