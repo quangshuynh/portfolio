@@ -880,10 +880,36 @@ with none.
   gain), a max-pooled edge channel (helped fences, hurt small brick), other weights (noise).
   Clean on skies, walls, brick, grass, gravel and pavement for small and medium objects, thin
   wires, and at the photo's edge; large objects on irregular texture no longer repeat patches.
-  **Limits:** thin straight structures (lane markings, rails, sleepers) that cross a large hole
-  are not continued (they vanish at the coarse levels); dense foliage comes out softer. It never
+  **Structure guidance** (`pipeline/structure.mjs`): where the hole is at most 320 px across
+  (else the pyramid level where it is), coherent colour edges in a ring around it (Di Zenzo
+  tensor, so a grey rail on green counts) vote in a Hough transform; each line gives the ends
+  that run into the hole, with a fitted direction and a colour profile across the edge. Two ends
+  pair only when their tangents point at each other as a straight line or a circular arc (at most
+  20° from the chord, ends at most ~5% of the gap off line) and their profiles match (or, across a
+  background change such as a pole over a kerb, correlate in shape with the line colour shared);
+  confidence ≥ 0.45, each end used once, at most 6 guides, at most one crossing (both ≥ 0.7). The
+  path (known part traced outward along the edge, bridging gaps up to 10 px; Hermite curve through
+  the hole) becomes a sixth patch channel: within 6 px of a guide (full-size pixels) its signed
+  distance, so a pixel near a structure must come from the same place across that structure, with
+  a fifth of the reuse penalty; other pixels ignore it. Three or more parallel guides among many
+  unexplained edges (brick joints, tile grout) count as texture: no guidance. No guide, no change:
+  the fill is then byte-identical to Interval 19.
+  **Measured** against Interval 19 (`bench:remove`, baseline 4357bd3, 3 seeds, same machine):
+  the 9 regression scenes are unchanged (byte-identical); 11 structure scenes: colour error
+  12.9 → 12.0, continuity 0.64 → 0.74, invented edges 0.32 → 0.18 (wires 0.16 → 1.0 continuity,
+  lane lines 11.6 → 7.3, curved kerb 9.1 → 5.2, pole over kerb 10.4 → 8.5); hard set 17.5 → 16.4
+  (rail sleepers 43.6 → 35.3). Worse: synthetic railing 6.1 → 6.7 (rail continued, posts ending
+  in the hole misaligned). 24 MP: 40 px 0.18 → 0.25 s, 120 px 0.91 → 1.02 s, 240 px 3.37 →
+  3.53 s; peak memory +10 → +17, +46 → +50, +170 → +155 MB (features now exist per level only
+  while it is filled). Detection is most of the added time (~60–150 ms cold, guides or not).
+
+  **Limits:** a structure seen on one side only, dashed markings broken by the mask, dense grids,
+  and a second line crossing a guided one below 0.7 confidence are left to the patch fill (not
+  continued); posts that end inside the hole may come back misaligned; along a guide, colour can
+  drift where lighting changes along the structure. Dense foliage comes out softer. It never
   reconstructs what was hidden behind an object and is not suited to removing people: choose a
   source area or use Clone there.
+
 - **Preview:** a retouched copy of the proxy. Appended operations are applied in place and only
   their box is uploaded to a second GPU texture (before/split still read the untouched one); a
   clone stroke in progress is drawn from one snapshot per stroke. Other changes rebuild the copy.
@@ -899,18 +925,29 @@ with none.
   export 0.66 s; genuine A7 III ARW 4024×6024 PNG 4.8 s, D3100 NEF 3084×4644 3.4 s, changed only
   inside the repairs. Headless SwiftShader redraws are ~0.75 s per move (software WebGL).
 
-**Manual iPhone Safari check** (emulation is not Safari; run on the phone, Vercel preview):
+- **Touch:** one finger paints; a second finger drops the stroke and pinch-zooms (two fingers
+  also pan). No stroke starts while another finger is down, so a finger landing again during a
+  pinch never paints. **Pan** (zoom bar, shown while a retouch brush is on) lets one finger move
+  the photo instead. Set source on touch follows the finger with a marker and takes the point
+  where it lifts. A stroke in progress is dropped (never committed) when the tool or photo
+  changes. Source handles and panel controls are 44 px on touch screens.
+
+**Manual iPhone 16e Safari check** (emulation is not Safari; run on the phone, Vercel preview):
 1. Open a 24 MP JPEG and a RAW; Adjust tab → Retouch → Remove. Paint one finger over a small
-   object at 100% and at 3× zoom: the red stroke tint follows the finger with no lag or page scroll.
-2. Start a stroke, put a second finger down: the stroke disappears and the photo pinch-zooms;
-   lift both: no repair was added. Pan with two fingers: no stroke.
-3. Paint a large removal (a third of the photo): "Removing… n%" appears; tap Cancel: the photo
-   is unchanged and the repair list has not grown. Paint again: it fills.
-4. Paint along the left and right screen edges: no Safari back/forward swipe, no page scroll.
-5. Select the removal → Choose source area → drag a rectangle; drag a clone source handle: both
-   follow the finger and the fill updates.
-6. Undo and Redo buttons step through repairs one by one; turn a repair off and on.
-7. Rotate 90° and crop, then export full size: repairs stay on their objects.
+   object at 100% and at 3× zoom: the stroke follows the finger with no lag or page scroll.
+2. Start a stroke, put a second finger down, pinch; lift one finger and put it down again
+   while the other stays: no repair is added and nothing is painted.
+3. Zoom in, tap **Pan**, drag one finger: the photo moves, nothing is painted; tap Pan again.
+4. Clone Stamp → Set source: touch, slide to the exact spot (the dashed ring follows), lift;
+   paint: the copy comes from where the finger lifted. Drag a repair's source handle.
+5. Paint a large removal: "Removing… n%" appears below the notch area; tap Cancel (easy to
+   hit): the photo is unchanged. Paint again: it fills.
+6. Paint along the screen edges and near the home indicator: no Safari back swipe, no page
+   scroll, controls clear of the notch and home indicator in portrait and landscape.
+7. Start a stroke and switch tools or photos mid-stroke: no repair appears.
+8. Size and Hardness sliders and the Retouch header are easy to hit; Undo/Redo step repairs.
+9. Rotate 90° and crop, then export full size: repairs stay on their objects.
+
 
 
 **Using them** (Masks panel, below Layers; Adjust tab on phones). **New local adjustment →
