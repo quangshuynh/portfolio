@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { createEditDocument, serializeEditDocument } from '../../src/editor/model/editDocument.mjs';
 import { neutralAdjustments } from '../../src/editor/model/adjustments.mjs';
-import { fakeGitHub, fixtureRepo, photograph } from '../test-helpers.mjs';
+import { fakeGitHub, fakeRaw, fixtureRepo, photograph } from '../test-helpers.mjs';
 import { addDraft, setStatus } from './catalog-ops.mjs';
 import { createGit } from './git.mjs';
 import { preparePublication, resolveBase } from './publish.mjs';
@@ -58,7 +58,7 @@ test('the canonical document is stable and drops what the editor would drop', ()
 });
 
 test('a treatment developed from a Nikon NEF publishes only its JPEG derivatives', async () => {
-  await treat('beta', { source: { name: '_DSC0051.NEF', bytes: Buffer.concat([Buffer.from([0x4d, 0x4d, 0, 0x2a]), Buffer.alloc(2048, 5)]) } });
+  await treat('beta', { source: { name: '_DSC0051.NEF', bytes: fakeRaw({ make: 'NIKON CORPORATION', model: 'NIKON D3100', bigEndian: true, size: 2048, fill: 5 }) } });
   const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });
   expect(state.summary.images).toEqual(['beta']);
   expect(changed(state.branch).filter((file) => !file.endsWith('.json')).sort()).toEqual(['src/assets/photography/generated/beta-gallery.jpg', 'src/assets/photography/generated/beta-viewer.jpg']);
@@ -66,7 +66,7 @@ test('a treatment developed from a Nikon NEF publishes only its JPEG derivatives
 });
 
 test('an approved render replaces a published photograph\'s images under the same names', async () => {
-  const treatment = await treat('alpha', { source: { name: 'DSC09640.ARW', bytes: Buffer.concat([Buffer.from([0x49, 0x49, 0x2a, 0]), Buffer.alloc(2048, 3)]) } });
+  const treatment = await treat('alpha', { source: { name: 'DSC09640.ARW', bytes: fakeRaw({ size: 2048, fill: 3 }) } });
   const state = await preparePublication({ allowUnwatermarked: true, git, workspaceDir: fixture.workspace, github: fakeGitHub(), dryRun: true });
   expect(state.summary.images).toEqual(['alpha']);
   expect(state.title).toMatch(/new images for 1/);

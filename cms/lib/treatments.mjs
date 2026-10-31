@@ -27,6 +27,7 @@ import { derivativeFilenames } from '../../scripts/photography-utils.mjs';
 import {
   EditDocumentError, MAX_DOCUMENT_BYTES, createEditDocument, parseEditDocument,
 } from '../../src/editor/model/editDocument.mjs';
+import { RAW_FORMATS, RAW_SNIFF_BYTES, RAW_SUPPORT, sniffRaw } from '../../src/editor/raw/rawFormat.mjs';
 import { sniffImageType } from './uploads.mjs';
 import { paths, readJson, writeAtomic } from './workspace.mjs';
 
@@ -39,8 +40,11 @@ export const MAX_RENDER_PIXELS = 120_000_000;
 export const MAX_ATTACHED = 3;
 const ID = /^[A-Za-z0-9_-]+$/;
 const SHA = /^[0-9a-f]{64}$/;
-const EXTENSIONS = { jpeg: '.jpg', png: '.png', webp: '.webp', arw: '.arw', nef: '.nef', dng: '.dng' };
-const RAW_EXTENSIONS = { '.arw': 'arw', '.nef': 'nef', '.dng': 'dng' };
+// RAW formats validated with genuine files (docs/raw-compatibility.md), identified by content.
+const EXTENSIONS = { jpeg: '.jpg', png: '.png', webp: '.webp', ...Object.fromEntries(Object.keys(RAW_FORMATS).map((key) => [key, `.${key}`])) };
+const RAW_EXTENSIONS = Object.fromEntries(Object.keys(RAW_FORMATS).map((key) => [`.${key}`, key]));
+// Camera RAW extensions the editor cannot develop: a library original with one is passed over.
+const OTHER_RAW_EXTENSIONS = /^\.(srf|srw|x3f|mrw|3fr|fff|iiq|rwl|dcr|kdc|erf|mef|mos|raw|rwz)$/i;
 
 export class TreatmentError extends Error {
   constructor(code, message, status = 422, details) {
@@ -176,8 +180,11 @@ export async function editingSources({ workspaceDir, libraryDir, record, treatme
       problem: available ? null : 'The uploaded original is missing from the workspace.' }];
   }
   const library = libraryFile(libraryDir, photographLibraryPaths[record.id]);
+  let unsupported = null;
   if (library) {
-    if (await exists(library)) {
+    if (await exists(library) && OTHER_RAW_EXTENSIONS.test(path.extname(library))) {
+      unsupported = `The camera-library original (${path.extname(library).slice(1).toUpperCase()}) is a RAW format QuangEdit cannot develop; attach a JPEG or a DNG conversion of it instead. RAW support covers ${RAW_SUPPORT}.`;
+    } else if (await exists(library)) {
       const info = await stat(library);
       return [{ kind: 'library', name: record.sourceFilename, format: formatFromName(record.sourceFilename), size: info.size, sha256: hash ? await fileHash(library) : null, file: library, available: true, problem: null }];
     }
@@ -188,8 +195,8 @@ export async function editingSources({ workspaceDir, libraryDir, record, treatme
     const file = path.join(directory, viewerFilename);
     if (await exists(file)) {
       return [{ kind: 'derivative', limited: true, name: viewerFilename, format: 'jpeg', size: (await stat(file)).size, sha256: hash ? await fileHash(file) : null, file, available: true,
-        problem: library ? 'The camera-library original was not found (moved or renamed); only the 2200 px public image is available.'
-          : 'Only the 2200 px public image is available. Attach the original (JPEG, ARW, NEF or DNG) to edit at full quality.' }];
+        problem: unsupported ?? (library ? 'The camera-library original was not found (moved or renamed); only the 2200 px public image is available.'
+          : 'Only the 2200 px public image is available. Attach the original (JPEG or a supported RAW file) to edit at full quality.') }];
     }
   }
   return [];
@@ -210,7 +217,8 @@ export async function receiveFile(request, directory, limit) {
     for await (const chunk of request) {
       size += chunk.length;
       if (size > limit) throw new TreatmentError('too-large', `Files are limited to ${Math.round(limit / 1024 / 1024)} MB.`, 413);
-      if (head.length < 16) head = Buffer.concat([head, chunk.subarray(0, 16 - head.length)]);
+      // Enough to identify a RAW file by its IFD0 (rawFormat.mjs).
+      if (head.length < RAW_SNIFF_BYTES) head = Buffer.concat([head, chunk.subarray(0, RAW_SNIFF_BYTES - head.length)]);
       hash.update(chunk);
       await handle.write(chunk);
     }
@@ -246,7 +254,7 @@ const safeName = (name, fallbackExt) => {
 };
 
 /**
- * Attaches an editing source (JPEG, PNG, WebP, Sony ARW, DNG) to a photograph: stored once
+ * Attaches an editing source (JPEG, PNG, WebP or a supported RAW file) to a photograph: stored once
  * by content in sources/, or referenced in originals/ when it is already an upload.
  */
 export async function attachSource(dir, id, { request, filename, revision }) {
@@ -254,10 +262,15 @@ export async function attachSource(dir, id, { request, filename, revision }) {
   const received = await receiveFile(request, p.sources, MAX_SOURCE_BYTES);
   try {
     let format = sniffImageType(received.head);
-    const tiff = received.head.length >= 4 && ((received.head[0] === 0x49 && received.head[1] === 0x49 && received.head[2] === 0x2a && received.head[3] === 0)
-      || (received.head[0] === 0x4d && received.head[1] === 0x4d && received.head[2] === 0 && received.head[3] === 0x2a));
-    if (!format && tiff) format = RAW_EXTENSIONS[path.extname(String(filename ?? '')).toLowerCase()] ?? null;
-    if (!format) throw new TreatmentError('unsupported', 'Attach a JPEG, PNG, WebP, Sony ARW, Nikon NEF or DNG file.', 415);
+    // RAW files by content, never by name; an unvalidated RAW format is refused with its name.
+    if (!format) {
+      try {
+        format = sniffRaw(new Uint8Array(received.head.buffer, received.head.byteOffset, received.head.length));
+      } catch (error) {
+        throw new TreatmentError('unsupported', error.message, 415);
+      }
+    }
+    if (!format) throw new TreatmentError('unsupported', `Attach a JPEG, PNG or WebP file, or a RAW file (${RAW_SUPPORT}).`, 415);
     const treatment = await readTreatment(dir, id);
     if (treatment.attached.some((entry) => entry.sha256 === received.sha256)) return treatment;
     if (treatment.attached.length >= MAX_ATTACHED) throw new TreatmentError('too-many', `A photograph has at most ${MAX_ATTACHED} editing sources (an HDR bracket).`, 409);

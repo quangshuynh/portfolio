@@ -118,3 +118,25 @@ export function fakeGitHub(overrides = {}) {
   };
   return client;
 }
+
+/**
+ * A RAW-looking file the CMS identifies by content: a TIFF header and an IFD0 with Make and
+ * Model (in either byte order), padded with `fill`. Not decodable; the CMS never decodes.
+ */
+export function fakeRaw({ make = 'SONY', model = 'ILCE-7M3', bigEndian = false, size = 4096, fill = 7 } = {}) {
+  const bytes = Buffer.alloc(Math.max(256, size), fill);
+  const little = !bigEndian;
+  bytes.write(little ? 'II' : 'MM', 0, 'latin1');
+  const u16 = (value, at) => (little ? bytes.writeUInt16LE(value, at) : bytes.writeUInt16BE(value, at));
+  const u32 = (value, at) => (little ? bytes.writeUInt32LE(value, at) : bytes.writeUInt32BE(value, at));
+  u16(42, 2);
+  u32(8, 4);
+  u16(2, 8);
+  [[0x010f, make, 64], [0x0110, model, 128]].forEach(([tag, text, at], i) => {
+    const entry = 10 + i * 12;
+    u16(tag, entry); u16(2, entry + 2); u32(text.length + 1, entry + 4); u32(at, entry + 8);
+    bytes.write(`${text}\0`, at, 'latin1');
+  });
+  u32(0, 34);
+  return bytes;
+}
