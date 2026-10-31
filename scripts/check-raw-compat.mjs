@@ -3,13 +3,15 @@
 // identification, LibRaw metadata (camera, sensor, CFA, bit depth, preview), half and full
 // decodes with timings and the wasm heap they needed, white balance re-applied against LibRaw's
 // own decode, colour sanity against the camera's embedded JPEG (brightness within reach of an
-// exposure change, neutral balance, no magenta highlights) and a full-resolution export through
-// the worker's export handler with exposure, tone, colour, Detail, white balance, a heal, crop
-// and straighten. The browser part (masks, watermark, layers, Remove, batch ZIP, save/reopen) is
+// exposure change, neutral balance, no magenta highlights), the three RAW rendering profiles
+// against that reference (lightness, clipping, saturation, neutral balance, render time; a
+// camera JPEG beside the RAW with the same name is used instead of the embedded preview) and a
+// full-resolution export through the worker's export handler with the Camera Natural profile,
+// exposure, tone, colour, Detail, white balance, a heal, crop and straighten. The browser part (masks, watermark, layers, Remove, batch ZIP, save/reopen) is
 // check:editor:raw-formats. Files never leave this machine; the report names only file names.
 // Usage: RAW_COMPAT_DIR=C:/path npm run check:raw:compat (RAW_COMPAT_OUT=report.json to save it)
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -69,9 +71,9 @@ function libraw(Module, bytes) {
 }
 
 /** Camera JPEG as RGB at a size, turned like our development when its own EXIF does not. */
-async function cameraPreview(preview, { width, height }, flip) {
-  if (!preview?.data || preview.format !== 'jpeg') return null;
-  let image = sharp(Buffer.from(preview.data)).rotate();
+async function cameraPreview(preview, { width, height }, flip, jpeg = null) {
+  if (!jpeg && (!preview?.data || preview.format !== 'jpeg')) return null;
+  let image = sharp(jpeg ?? Buffer.from(preview.data)).rotate();
   const meta = await sharp(await image.toBuffer()).metadata();
   const landscape = meta.width >= meta.height;
   if (landscape !== width >= height) image = sharp(await image.toBuffer()).rotate({ 5: 270, 6: 90, 3: 180 }[flip] ?? 90);
@@ -120,6 +122,61 @@ function colourSanity(small, info, camera) {
   return result;
 }
 
+/**
+ * Each RAW rendering profile with no edits, against the camera's rendering: median L* gap,
+ * highlight and shadow clipping, chroma relative to the camera's, neutral balance, render time.
+ */
+function profileComparison(small, info, camera) {
+  const count = small.width * small.height;
+  const linear = (data, stride, i, c) => SRGB_TO_LINEAR_8BIT[data[i * stride + c]];
+  const luminance = (data, stride, i) => 0.2126 * linear(data, stride, i, 0) + 0.7152 * linear(data, stride, i, 1) + 0.0722 * linear(data, stride, i, 2);
+  const chroma = (data, stride) => {
+    let sum = 0;
+    for (let i = 0; i < count; i += 1) sum += Math.max(data[i * stride], data[i * stride + 1], data[i * stride + 2]) - Math.min(data[i * stride], data[i * stride + 1], data[i * stride + 2]);
+    return sum / count;
+  };
+  const cameraL = camera ? median(Array.from({ length: count }, (_, i) => lstar(luminance(camera.data, 3, i)))) : null;
+  const cameraChroma = camera ? chroma(camera.data, 3) : null;
+  const neutral = camera ? Array.from({ length: count }, (_, i) => i).filter((i) => {
+    const [r, g, b] = [0, 1, 2].map((c) => camera.data[i * 3 + c]);
+    return Math.max(r, g, b) - Math.min(r, g, b) < 20 && g > 40 && g < 230;
+  }) : [];
+  return Object.fromEntries(['legacy', 'linear', 'camera-natural'].map((profile) => {
+    const start = performance.now();
+    const out = renderRawRgba8(small.data, deriveParams({ ...neutralAdjustments(), raw: { whiteBalance: 'as-shot', profile } }, { raw: info }));
+    const result = { ms: +(performance.now() - start).toFixed(1) };
+    const lightness = median(Array.from({ length: count }, (_, i) => lstar(luminance(out, 4, i))));
+    result.medianL = +lightness.toFixed(1);
+    // Clipped: white in every channel (texture lost). A saturated colour at the gamut edge has
+    // one channel at 255 with its hue kept by the range fit; counted apart as channelClipped.
+    let clipped = 0;
+    let channelClipped = 0;
+    let crushed = 0;
+    for (let i = 0; i < count; i += 1) {
+      if (Math.min(out[i * 4], out[i * 4 + 1], out[i * 4 + 2]) >= 254) clipped += 1;
+      if (Math.max(out[i * 4], out[i * 4 + 1], out[i * 4 + 2]) >= 254) channelClipped += 1;
+      if (Math.max(out[i * 4], out[i * 4 + 1], out[i * 4 + 2]) <= 2) crushed += 1;
+    }
+    result.clipped = +(clipped / count).toFixed(4);
+    result.channelClipped = +(channelClipped / count).toFixed(4);
+    result.crushed = +(crushed / count).toFixed(4);
+    if (camera) {
+      let cameraClipped = 0;
+      for (let i = 0; i < count; i += 1) if (Math.min(camera.data[i * 3], camera.data[i * 3 + 1], camera.data[i * 3 + 2]) >= 254) cameraClipped += 1;
+      result.cameraClipped = +(cameraClipped / count).toFixed(4);
+      result.gapL = +(lightness - cameraL).toFixed(1);
+      result.chromaRatio = +(chroma(out, 4) / cameraChroma).toFixed(2);
+      if (neutral.length > count * 0.01) {
+        const balance = (data, stride) => [0, 2].map((c) => neutral.reduce((sum, i) => sum + linear(data, stride, i, c), 0) / neutral.reduce((sum, i) => sum + linear(data, stride, i, 1), 0));
+        const [red, blue] = balance(out, 4);
+        const [cameraRed, cameraBlue] = balance(camera.data, 3);
+        result.neutralLog = +Math.max(Math.abs(Math.log(red / cameraRed)), Math.abs(Math.log(blue / cameraBlue))).toFixed(3);
+      }
+    }
+    return [profile, result];
+  }));
+}
+
 function whiteBalanceParity(Module, bytes, info, image) {
   const { gain, multipliers } = rawDevelopParams(info, { whiteBalance: 'custom', temperature: 3800, tint: -10 });
   const raw = new Module.LibRaw();
@@ -145,7 +202,7 @@ function whiteBalanceParity(Module, bytes, info, image) {
 // The representative edit: tone, colour, Detail, custom white balance, a heal, crop and straighten.
 const EDIT = normalizeAdjustments({
   exposure: 0.3, contrast: 15, highlights: -30, shadows: 25, vibrance: 15, saturation: 5, sharpening: 30, luminanceNoise: 20, grainAmount: 10,
-  rawTemperature: 5200, rawTint: 5, raw: { whiteBalance: 'custom' },
+  rawTemperature: 5200, rawTint: 5, raw: { whiteBalance: 'custom', profile: 'camera-natural' },
   geometry: { angle: 2, crop: { x: 0.05, y: 0.05, width: 0.9, height: 0.9 } },
   retouch: [{ id: 'heal-1', type: 'heal', enabled: true, points: [[0.4, 0.5]], radius: 0.02, offset: { x: 0.05, y: 0 } }],
 });
@@ -216,8 +273,12 @@ for (const name of names) {
     const camMul = Array.from(meta.color_data?.cam_mul ?? []);
     row.wbTolerance = Math.max(8, camMul[3] > 0 && camMul[1] > 0 ? Math.ceil(Math.abs(1 - camMul[3] / camMul[1]) * 65535) : 0);
     const small = downsampleRaw(half.image, Math.max(64, Math.round(half.image.width / 8)), Math.max(64, Math.round(half.image.height / 8)));
-    const camera = await cameraPreview(preview, small, half.info.flip);
+    const base = path.join(DIR, name.replace(/\.[^.]+$/, ''));
+    const jpegPath = ['.JPG', '.jpg', '.jpeg'].map((extension) => base + extension).find(existsSync);
+    const camera = await cameraPreview(preview, small, half.info.flip, jpegPath ? readFileSync(jpegPath) : null);
+    row.reference = camera ? (jpegPath ? 'camera JPEG' : 'embedded preview') : 'none';
     Object.assign(row, colourSanity(small, half.info, camera));
+    row.profiles = profileComparison(small, half.info, camera);
     half.image = null;
     start = performance.now();
     const full = decodeRaw(Module, bytes, { format: row.accepted });
@@ -243,7 +304,7 @@ for (const name of names) {
 }
 
 // Validated here means the Node pipeline passed; the browser check adds the editor flow.
-const COLOUR = { gap: 6, neutral: 0.15, tinted: 0.002 };
+const COLOUR = { gap: 6, neutral: 0.15, tinted: 0.002, clip: 0.005 };
 for (const row of report) {
   const failures = [];
   if (!row.accepted) { row.node = 'refused'; continue; } // eslint-disable-line no-continue
@@ -255,6 +316,12 @@ for (const row of report) {
   if (row.closestGap !== undefined && Math.abs(row.closestGap) > COLOUR.gap) failures.push(`lightness ${row.closestGap} L* from the camera JPEG at best`);
   if (Math.abs(row.neutralRedLog ?? 0) > COLOUR.neutral || Math.abs(row.neutralBlueLog ?? 0) > COLOUR.neutral) failures.push('neutral balance differs from the camera JPEG');
   if (row.tintedHighlights > COLOUR.tinted) failures.push(`tinted highlights ${row.tintedHighlights}`);
+  // Camera Natural: brighter than legacy, no clipping beyond what the sensor clipped (legacy shows
+  // exactly that), neutral balance unchanged.
+  const { legacy, 'camera-natural': natural } = row.profiles ?? {};
+  if (natural && natural.medianL < legacy.medianL) failures.push('Camera Natural is darker than legacy');
+  if (natural && natural.clipped > legacy.clipped + COLOUR.clip) failures.push(`Camera Natural clips ${natural.clipped} vs legacy ${legacy.clipped}`);
+  if (natural?.neutralLog > COLOUR.neutral) failures.push(`Camera Natural neutral balance differs by ${natural.neutralLog}`);
   if (row.export && (row.export.size !== row.export.expected || !row.export.complete || row.export.meanGreen < 8 || row.export.meanGreen > 250)) failures.push(`export ${JSON.stringify(row.export)}`);
   row.node = failures.length ? 'fail' : 'pass';
   if (failures.length) row.failures = failures;
@@ -264,6 +331,18 @@ if (process.env.RAW_COMPAT_OUT) writeFileSync(process.env.RAW_COMPAT_OUT, `${JSO
 console.table(report.map((row) => ({
   file: row.file, camera: row.camera, as: row.accepted ?? row.identified, cfa: row.cfa, bits: row.bits, image: row.fullSize ?? row.image,
   half: row.halfDecodeMs, full: row.fullDecodeMs, export: row.export?.ms, heap: row.wasmHeapMb, wb: row.wbParity?.p999, gap: row.closestGap, nR: row.neutralRedLog, nB: row.neutralBlueLog, node: row.node,
+})));
+console.table(report.filter(({ profiles }) => profiles).map(({ file, reference, profiles: p }) => ({
+  file,
+  ref: reference,
+  'legacy gap L*': p.legacy.gapL,
+  'linear gap L*': p.linear.gapL,
+  'natural gap L*': p['camera-natural'].gapL,
+  'white clip legacy/natural/camera %': `${(p.legacy.clipped * 100).toFixed(2)} / ${(p['camera-natural'].clipped * 100).toFixed(2)} / ${((p.legacy.cameraClipped ?? 0) * 100).toFixed(2)}`,
+  'channel at 255 legacy/natural %': `${(p.legacy.channelClipped * 100).toFixed(2)} / ${(p['camera-natural'].channelClipped * 100).toFixed(2)}`,
+  'crushed natural %': +(p['camera-natural'].crushed * 100).toFixed(2),
+  'chroma vs camera legacy/natural': `${p.legacy.chromaRatio} / ${p['camera-natural'].chromaRatio}`,
+  'neutral natural': p['camera-natural'].neutralLog,
 })));
 for (const row of report.filter(({ failures, refusal }) => failures || refusal)) console.log(`${row.file}: ${row.failures?.join('; ') ?? row.refusal}${row.decodeError ? ` (decoder: ${row.decodeError})` : ''}`);
 assert.ok(report.every(({ node }) => node !== 'fail'), 'RAW compatibility failures (see above)');

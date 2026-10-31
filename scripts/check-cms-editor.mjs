@@ -18,7 +18,10 @@
 // grading, a mask, an adjustment layer, crop, rotation and perspective; automatic watermark
 // drafting merges the exposures again in its off-screen frame (cancelled once mid-merge, then
 // resumed), redrafts after a retouch change, and the approved render goes through a publication
-// dry run in a temporary clone, whose commit holds no camera file.
+// dry run in a temporary clone, whose commit holds no camera file. RAW profiles: a new RAW attachment
+// starts with Camera Natural; an approved, watermarked RAW treatment saved before profiles reopens
+// with the legacy profile, and switching it to Camera Natural makes a new draft with one watermark
+// while the approved version and its render stay untouched.
 // Usage: npm run check:cms:editor (CMS_EDITOR_RUNS=chromium,firefox to limit the runs)
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -397,6 +400,7 @@ try {
         });
       }
 
+      let rawPhotoId = null;
       if (run.genuine && RAW_FILES.length >= 3) {
         await step('genuine ARW: attach, develop from sensor data, render full size', async () => {
           const bytes = await syntheticJpeg(seed += 1, 1200, 800);
@@ -415,7 +419,53 @@ try {
           await poll(() => page.locator('.cms-host__status').textContent(), (text) => /render up to date/.test(text), 'RAW render', 900_000);
           const { json } = await api(page, 'GET', `/api/editor/photos/${rawId}`);
           assert.equal(json.treatment.document.photos[0].source.format, 'arw');
+          assert.equal(json.treatment.document.photos[0].adjustments.raw?.profile, 'camera-natural', 'a new RAW attachment starts with Camera Natural');
+          rawPhotoId = rawId;
           return { size: `${json.treatment.render.width}×${json.treatment.render.height}`, name: json.treatment.render.file };
+        });
+        await step('RAW profile on an approved, watermarked treatment saved before profiles', async () => {
+          const rawId = rawPhotoId;
+          let info = (await api(page, 'GET', `/api/editor/photos/${rawId}`)).json;
+          // What an Interval 21 editor saved: no profile (legacy rendering), the watermark on.
+          const legacy = JSON.parse(JSON.stringify(info.treatment.document));
+          delete legacy.photos[0].adjustments.raw;
+          legacy.version = 13;
+          legacy.photos[0].adjustments.watermark = (await api(page, 'GET', '/api/watermark')).json.settings;
+          assert.equal((await api(page, 'PUT', `/api/editor/photos/${rawId}/treatment`, { document: JSON.stringify(legacy), revision: info.treatment.revision })).status, 200);
+          await page.reload();
+          await page.waitForSelector('.pe-photo[data-status=ready]', { state: 'attached', timeout: 300_000 });
+          const profile = page.getByRole('combobox', { name: 'Profile' });
+          await poll(() => profile.inputValue(), (value) => value === 'legacy', 'legacy profile restored');
+          await page.getByRole('button', { name: 'Render for portfolio' }).click();
+          await poll(() => page.locator('.cms-host__status').textContent(), (text) => /render up to date/.test(text), 'legacy render', 900_000);
+          info = (await api(page, 'GET', `/api/editor/photos/${rawId}`)).json;
+          assert.equal((await api(page, 'POST', `/api/editor/photos/${rawId}/approve`, { revision: info.treatment.revision })).status, 200);
+          info = (await api(page, 'GET', `/api/editor/photos/${rawId}`)).json;
+          const approved = info.treatment.approved;
+          // Reopened unchanged: still approved, same hash (no profile written for legacy).
+          await page.reload();
+          await page.waitForSelector('.pe-photo[data-status=ready]', { state: 'attached', timeout: 300_000 });
+          assert.equal((await api(page, 'GET', `/api/editor/photos/${rawId}`)).json.treatment.status, 'approved');
+          await profile.selectOption('camera-natural');
+          await page.getByRole('button', { name: 'Save treatment' }).click();
+          await poll(() => page.locator('.cms-host__status').textContent(), (text) => !/unsaved/.test(text), 'saved');
+          info = (await api(page, 'GET', `/api/editor/photos/${rawId}`)).json;
+          const adjustments = info.treatment.document.photos[0].adjustments;
+          assert.equal(info.treatment.status, 'draft');
+          assert.equal(adjustments.raw.profile, 'camera-natural');
+          assert.ok(adjustments.watermark?.enabled, 'the watermark setting is kept');
+          assert.equal(info.treatment.approved.documentHash, approved.documentHash, 'the approved version was not replaced');
+          assert.equal(info.treatment.approved.render.sha256, approved.render.sha256, 'the approved render was not replaced');
+          assert.equal(info.renderFresh, false);
+          await page.getByRole('button', { name: 'Render for portfolio' }).click();
+          await poll(() => page.locator('.cms-host__status').textContent(), (text) => /render up to date/.test(text), 'Camera Natural render', 900_000);
+          info = (await api(page, 'GET', `/api/editor/photos/${rawId}`)).json;
+          assert.notEqual(info.treatment.render.sha256, approved.render.sha256);
+          // Brighter than the legacy rendering of the same treatment, from the same original.
+          const mean = async (kind) => (await sharp(Buffer.from(await page.evaluate(async ([photo, which]) => [...new Uint8Array(await (await fetch(`/api/editor/photos/${photo}/images/${which}`)).arrayBuffer())], [rawId, kind]))).stats()).channels[1].mean;
+          const [legacyMean, naturalMean] = [await mean('approved-full'), await mean('current-full')];
+          assert.ok(naturalMean > legacyMean, `Camera Natural ${naturalMean} vs legacy ${legacyMean}`);
+          return { legacyMeanGreen: Math.round(legacyMean), naturalMeanGreen: Math.round(naturalMean) };
         });
         if (FORMAT_FILES.valid.length) {
           await step('other cameras: each validated RAW format attached by content, rendered at full size and reopened; an unsupported file refused', async () => {
