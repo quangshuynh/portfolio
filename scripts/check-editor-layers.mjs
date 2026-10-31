@@ -505,6 +505,19 @@ async function runOne(run, files) {
         const meta = await sharp(await download.path()).metadata();
         result.genuine = { jpegLayerPreviewMs: jpegLayerMs, rawLayerPreviewMs: rawLayerMs, exportMs: Date.now() - t, peakMb: stop(), size: `${meta.width}×${meta.height}` };
         assert.equal(download.suggestedFilename(), `${name.replace(/\.[^.]+$/, '')}-quangedit.jpg`);
+        // The RAW layer develops with its own profile: Camera Natural when added, Linear when chosen.
+        const saved = await savedWhen(name, (v) => v.layers?.length === 3, 'genuine layers');
+        assert.deepEqual(saved.layers.find((layer) => layer.source?.format === 'arw')?.rawProfile, { profile: 'camera-natural', profileVersion: 2 });
+        await page.locator('.pe-layer[data-type=image]').first().locator('.pe-layer__name').click();
+        const profileSelect = props().getByRole('combobox', { name: 'RAW profile' });
+        assert.equal(await profileSelect.inputValue(), 'camera-natural');
+        const naturalMean = (await sharp(await download.path()).stats()).channels[1].mean;
+        await profileSelect.selectOption('linear');
+        await savedWhen(name, (v) => v.layers?.find((layer) => layer.source?.format === 'arw')?.rawProfile?.profile === 'linear', 'RAW layer profile');
+        await layersReady(2);
+        const linearMean = (await sharp(await (await exportFile('jpeg')).path()).stats()).channels[1].mean;
+        assert.ok(naturalMean > linearMean + 0.5, `RAW layer: Camera Natural ${naturalMean} vs Linear ${linearMean}`);
+        Object.assign(result.genuine, { rawLayerNaturalMean: +naturalMean.toFixed(1), rawLayerLinearMean: +linearMean.toFixed(1) });
       });
     }
     if (run.hdr && RAW_FILES.length >= 3 && JPEG_FILES.length) {

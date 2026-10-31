@@ -19,6 +19,8 @@ import factory from 'libraw-wasm/dist/libraw.js';
 import { identifyRaw, sniffRaw, RAW_SNIFF_BYTES } from '../src/editor/raw/rawFormat.mjs';
 import { decodeRaw, downsampleRaw } from '../src/editor/raw/rawDecoder.mjs';
 import { rawDevelopParams } from '../src/editor/raw/rawColor.mjs';
+import { rawProfileParams } from '../src/editor/raw/rawProfiles.mjs';
+import { luminanceSamples, suggestExposure } from '../src/editor/raw/rawAutoExposure.mjs';
 import { createRawHandlers } from '../src/editor/raw/rawTasks.mjs';
 import { deriveParams } from '../src/editor/pipeline/spec.mjs';
 import { renderRawRgba8 } from '../src/editor/pipeline/cpuRenderer.mjs';
@@ -126,7 +128,7 @@ function colourSanity(small, info, camera) {
  * Each RAW rendering profile with no edits, against the camera's rendering: median L* gap,
  * highlight and shadow clipping, chroma relative to the camera's, neutral balance, render time.
  */
-function profileComparison(small, info, camera) {
+function profileComparison(small, info, camera, autoExposure = null) {
   const count = small.width * small.height;
   const linear = (data, stride, i, c) => SRGB_TO_LINEAR_8BIT[data[i * stride + c]];
   const luminance = (data, stride, i) => 0.2126 * linear(data, stride, i, 0) + 0.7152 * linear(data, stride, i, 1) + 0.0722 * linear(data, stride, i, 2);
@@ -141,9 +143,16 @@ function profileComparison(small, info, camera) {
     const [r, g, b] = [0, 1, 2].map((c) => camera.data[i * 3 + c]);
     return Math.max(r, g, b) - Math.min(r, g, b) < 20 && g > 40 && g < 230;
   }) : [];
-  return Object.fromEntries(['legacy', 'linear', 'camera-natural'].map((profile) => {
+  const variants = [
+    ['legacy', { profile: 'legacy' }],
+    ['linear', { profile: 'linear' }],
+    ['camera-natural', { profile: 'camera-natural', profileVersion: 1 }],
+    ['natural-v2', { profile: 'camera-natural', profileVersion: 2 }],
+  ];
+  if (autoExposure !== null) variants.push(['natural-v2-auto', { profile: 'camera-natural', profileVersion: 2, autoExposure }]);
+  return Object.fromEntries(variants.map(([name, raw]) => {
     const start = performance.now();
-    const out = renderRawRgba8(small.data, deriveParams({ ...neutralAdjustments(), raw: { whiteBalance: 'as-shot', profile } }, { raw: info }));
+    const out = renderRawRgba8(small.data, deriveParams({ ...neutralAdjustments(), raw: { whiteBalance: 'as-shot', ...raw } }, { raw: info }));
     const result = { ms: +(performance.now() - start).toFixed(1) };
     const lightness = median(Array.from({ length: count }, (_, i) => lstar(luminance(out, 4, i))));
     result.medianL = +lightness.toFixed(1);
@@ -173,7 +182,7 @@ function profileComparison(small, info, camera) {
         result.neutralLog = +Math.max(Math.abs(Math.log(red / cameraRed)), Math.abs(Math.log(blue / cameraBlue))).toFixed(3);
       }
     }
-    return [profile, result];
+    return [name, result];
   }));
 }
 
@@ -278,7 +287,11 @@ for (const name of names) {
     const camera = await cameraPreview(preview, small, half.info.flip, jpegPath ? readFileSync(jpegPath) : null);
     row.reference = camera ? (jpegPath ? 'camera JPEG' : 'embedded preview') : 'none';
     Object.assign(row, colourSanity(small, half.info, camera));
-    row.profiles = profileComparison(small, half.info, camera);
+    // Auto Exposure from the same samples the editor takes at import, for Camera Natural version 2.
+    const natural = rawProfileParams('camera-natural', half.info, 2);
+    const suggestion = suggestExposure(luminanceSamples(half.image, rawDevelopParams(half.info, { whiteBalance: 'as-shot' })), { baseEv: natural.exposureEv, curve: natural.curve, raw: half.info });
+    row.autoExposure = suggestion.ev === null ? { ev: null, reason: suggestion.reason } : { ev: suggestion.ev, limitedBy: suggestion.limitedBy };
+    row.profiles = profileComparison(small, half.info, camera, suggestion.ev);
     half.image = null;
     start = performance.now();
     const full = decodeRaw(Module, bytes, { format: row.accepted });
@@ -318,7 +331,7 @@ for (const row of report) {
   if (row.tintedHighlights > COLOUR.tinted) failures.push(`tinted highlights ${row.tintedHighlights}`);
   // Camera Natural: brighter than legacy, no clipping beyond what the sensor clipped (legacy shows
   // exactly that), neutral balance unchanged.
-  const { legacy, 'camera-natural': natural } = row.profiles ?? {};
+  const { legacy, 'natural-v2': natural } = row.profiles ?? {};
   if (natural && natural.medianL < legacy.medianL) failures.push('Camera Natural is darker than legacy');
   if (natural && natural.clipped > legacy.clipped + COLOUR.clip) failures.push(`Camera Natural clips ${natural.clipped} vs legacy ${legacy.clipped}`);
   if (natural?.neutralLog > COLOUR.neutral) failures.push(`Camera Natural neutral balance differs by ${natural.neutralLog}`);
@@ -332,17 +345,19 @@ console.table(report.map((row) => ({
   file: row.file, camera: row.camera, as: row.accepted ?? row.identified, cfa: row.cfa, bits: row.bits, image: row.fullSize ?? row.image,
   half: row.halfDecodeMs, full: row.fullDecodeMs, export: row.export?.ms, heap: row.wasmHeapMb, wb: row.wbParity?.p999, gap: row.closestGap, nR: row.neutralRedLog, nB: row.neutralBlueLog, node: row.node,
 })));
-console.table(report.filter(({ profiles }) => profiles).map(({ file, reference, profiles: p }) => ({
+console.table(report.filter(({ profiles }) => profiles).map(({ file, reference, profiles: p, autoExposure }) => ({
   file,
   ref: reference,
   'legacy gap L*': p.legacy.gapL,
   'linear gap L*': p.linear.gapL,
-  'natural gap L*': p['camera-natural'].gapL,
-  'white clip legacy/natural/camera %': `${(p.legacy.clipped * 100).toFixed(2)} / ${(p['camera-natural'].clipped * 100).toFixed(2)} / ${((p.legacy.cameraClipped ?? 0) * 100).toFixed(2)}`,
-  'channel at 255 legacy/natural %': `${(p.legacy.channelClipped * 100).toFixed(2)} / ${(p['camera-natural'].channelClipped * 100).toFixed(2)}`,
-  'crushed natural %': +(p['camera-natural'].crushed * 100).toFixed(2),
-  'chroma vs camera legacy/natural': `${p.legacy.chromaRatio} / ${p['camera-natural'].chromaRatio}`,
-  'neutral natural': p['camera-natural'].neutralLog,
+  'natural v1 gap L*': p['camera-natural'].gapL,
+  'natural v2 gap L*': p['natural-v2'].gapL,
+  'auto EV': autoExposure.ev ?? '–',
+  'v2 + auto gap L*': p['natural-v2-auto']?.gapL ?? '–',
+  'white clip legacy/v2/camera %': `${(p.legacy.clipped * 100).toFixed(2)} / ${(p['natural-v2'].clipped * 100).toFixed(2)} / ${((p.legacy.cameraClipped ?? 0) * 100).toFixed(2)}`,
+  'crushed v2 %': +(p['natural-v2'].crushed * 100).toFixed(2),
+  'chroma vs camera v2': p['natural-v2'].chromaRatio,
+  'neutral v2': p['natural-v2'].neutralLog,
 })));
 for (const row of report.filter(({ failures, refusal }) => failures || refusal)) console.log(`${row.file}: ${row.failures?.join('; ') ?? row.refusal}${row.decodeError ? ` (decoder: ${row.decodeError})` : ''}`);
 assert.ok(report.every(({ node }) => node !== 'fail'), 'RAW compatibility failures (see above)');
