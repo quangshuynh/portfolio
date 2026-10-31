@@ -8,6 +8,8 @@
 // heal and a full-size export of a 24 MP JPEG. RETOUCH_RAW_DIR (a folder with Sony .ARW and/or
 // Nikon .NEF files) adds, in Chromium, a genuine RAW healed, cloned and with a removal, exported at full size:
 // the export differs from the unretouched one only inside the repairs.
+// RETOUCH_HDR_DIR (three .ARW/.DNG frames of one bracket, e.g. A7 III DSC09640–09642) adds, in
+// Chromium and Firefox, a merged HDR retouched on its merged source (see checkHdr).
 // Remove: an object painted over is filled in the background (progress shown) and disappears from
 // the preview; on desktop a source area is then chosen; exports match the Node reference.
 // Usage: npm run check:editor:retouch (EDITOR_ENGINES=chromium to limit; CHECK_GPU=1: Chromium on the real GPU)
@@ -32,11 +34,13 @@ const URL_EDITOR = `http://localhost:${PORT}/photography/editor/`;
 const ONLY = process.env.EDITOR_ENGINES?.split(',');
 const RAW_DIR = process.env.RETOUCH_RAW_DIR ?? '';
 const RAW_FILES = RAW_DIR && existsSync(RAW_DIR) ? ['arw', 'nef'].map((ext) => readdirSync(RAW_DIR).filter((name) => name.toLowerCase().endsWith(`.${ext}`)).sort()[0]).filter(Boolean).map((name) => path.join(RAW_DIR, name)) : [];
+const HDR_DIR = process.env.RETOUCH_HDR_DIR ?? '';
+const HDR_FILES = HDR_DIR && existsSync(HDR_DIR) ? readdirSync(HDR_DIR).filter((name) => /\.(arw|dng)$/i.test(name)).sort().slice(0, 3).map((name) => path.join(HDR_DIR, name)) : [];
 const AUTOSAVE_KEY = 'photo-editor:edits:v1';
 
 const RUNS = [
-  { id: 'chromium', name: 'Chromium, desktop', type: chromium, large: true, raw: true },
-  { id: 'firefox', name: 'Firefox, desktop', type: firefox, large: true },
+  { id: 'chromium', name: 'Chromium, desktop', type: chromium, large: true, raw: true, hdr: true },
+  { id: 'firefox', name: 'Firefox, desktop', type: firefox, large: true, hdr: true },
   { id: 'webkit', name: 'WebKit, desktop', type: webkit, large: true },
   { id: 'iphone', name: 'WebKit, iPhone 13 emulation', type: webkit, device: 'iPhone 13' },
   { id: 'pixel', name: 'Chromium, Pixel 7 emulation', type: chromium, device: 'Pixel 7' },
@@ -180,6 +184,7 @@ async function runOne(run, files) {
     const i = (Math.round(v * (frame.height - 1)) * frame.width + Math.round(u * (frame.width - 1))) * 4;
     return frame.data[i + 1];
   }, at);
+  const drawnFrame = () => page.evaluate(() => { const f = window.__photoEditorPreview?.read(); return f && { width: f.width, height: f.height, data: Array.from(f.data) }; });
   const setExportPng = async () => {
     await tab(3);
     await page.check('input[name=pe-format][value=png]');
@@ -496,6 +501,7 @@ async function runOne(run, files) {
         });
       }
     }
+    if (run.hdr && HDR_FILES.length === 3) await checkHdr({ page, result, step, tab, choose, pointer, photoPoint, twoFrames, savedWhen, exportFile, drawnFrame });
     assert.deepEqual(problems, [], problems.join('\n'));
     result.ok = true;
     delete result.step;
@@ -516,6 +522,184 @@ async function runOne(run, files) {
   return result;
 }
 
+const busy = (page) => page.locator('[data-retouch-busy]').count();
+const photosSaved = (page) => page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null')?.photos ?? [], AUTOSAVE_KEY);
+// Changed pixels (green, more than 2 code values) between two same-size RGBA images, and their box.
+function changes(a, b, step = 2) {
+  let count = 0; let total = 0; let x0 = Infinity; let y0 = Infinity; let x1 = -1; let y1 = -1;
+  for (let y = 0; y < a.height; y += step) for (let x = 0; x < a.width; x += step) {
+    total += 1;
+    const i = (y * a.width + x) * 4;
+    if (Math.abs(a.data[i + 1] - b.data[i + 1]) <= 2) continue; // eslint-disable-line no-continue
+    count += 1; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+  }
+  return { fraction: count / total, box: count ? { x0, y0, x1, y1 } : null };
+}
+
+/**
+ * RETOUCH_HDR_DIR: a genuine three-exposure bracket merged in the editor, then healed, cloned
+ * and with overlapping removals on the merged source; a long removal cancelled and the fill
+ * worker used again; grading, sharpening, a radial local adjustment, crop, straighten,
+ * perspective and the watermark applied through a saved v13 document; full-size exports with and
+ * without the repairs (they differ only where the repairs are); preview against export.
+ */
+async function checkHdr({ page, result, step, tab, choose, pointer, photoPoint, twoFrames, savedWhen, exportFile, drawnFrame }) {
+  result.hdr = {};
+  const known = (await photosSaved(page)).map((p) => p.source.name);
+  let name = null;
+  const saved = (test, label, timeout = 60_000) => savedWhen(name, test, label, timeout);
+  const stroke = async (from, to, moves = 4) => {
+    const a = await photoPoint(from); const b = await photoPoint(to);
+    await pointer('pointerdown', a);
+    for (let k = 1; k <= moves; k += 1) { await pointer('pointermove', { x: a.x + ((b.x - a.x) * k) / moves, y: a.y + ((b.y - a.y) * k) / moves }); await twoFrames(); }
+    await pointer('pointerup', b);
+  };
+  await step('genuine HDR bracket: merge, then heal, clone and an overlapping removal on the merged source', async () => {
+    await tab(1);
+    await page.click('.pe-library__actions button:has-text("Merge HDR")');
+    await page.waitForSelector('.pe-dialog[role=dialog]');
+    await page.setInputFiles('.pe-dialog input[type=file][multiple]', HDR_FILES);
+    await poll(() => page.$$eval('.pe-bracket__item', (items) => items.map((li) => li.dataset.status)), (s) => s.length === 3 && s.every((v) => v !== 'reading'), 'bracket inputs', 120_000);
+    let started = Date.now();
+    await page.click('.pe-dialog__foot button:has-text("Merge")');
+    await page.waitForSelector('.pe-dialog', { state: 'detached', timeout: 300_000 });
+    await poll(() => page.evaluate(() => !document.querySelector('.pe-stage-message') && !document.querySelector('.pe-canvas-host').hidden), Boolean, 'HDR preview', 180_000);
+    result.hdr.mergeMs = Date.now() - started;
+    await twoFrames();
+    await choose('Spot Heal', 'j');
+    const at = await photoPoint({ u: 0.45, v: 0.5 });
+    started = Date.now();
+    await pointer('pointerdown', at);
+    await pointer('pointerup', at);
+    const photo = await poll(async () => (await photosSaved(page)).find((p) => !known.includes(p.source.name) && p.adjustments.retouch?.length === 1) ?? null, Boolean, 'HDR heal saved', 60_000);
+    name = photo.source.name;
+    result.hdr.photo = name;
+    result.hdr.healMs = Date.now() - started;
+    await choose('Clone Stamp', 's');
+    const source = await photoPoint({ u: 0.7, v: 0.3 });
+    await pointer('pointerdown', source, { altKey: true });
+    await pointer('pointerup', source, { altKey: true });
+    await stroke({ u: 0.6, v: 0.6 }, { u: 0.64, v: 0.61 });
+    await saved((a) => a.retouch?.length === 2, 'HDR clone saved');
+    await choose('Remove', 'r');
+    started = Date.now();
+    // Over the heal: each repair reads the result of the ones before it.
+    await stroke({ u: 0.43, v: 0.49 }, { u: 0.48, v: 0.51 });
+    await saved((a) => a.retouch?.length === 3 && a.retouch[2].type === 'remove', 'HDR removal saved');
+    await poll(() => busy(page), (n) => n === 0, 'HDR fill finished', 120_000);
+    result.hdr.removeMs = Date.now() - started;
+  });
+
+  await step('HDR: a long removal is cancelled (nothing kept), then the fill worker removes again', async () => {
+    await stroke({ u: 0.08, v: 0.2 }, { u: 0.92, v: 0.24 }, 12);
+    await saved((a) => a.retouch?.length === 4, 'long removal saved');
+    const cancel = page.locator('.pe-retouch-progress button', { hasText: 'Cancel' });
+    let cancelled = false;
+    try { await cancel.click({ timeout: 5_000 }); cancelled = true; } catch { /* the fill finished first */ }
+    result.hdr.cancelled = cancelled;
+    if (cancelled) await saved((a) => a.retouch?.length === 3, 'cancelled removal dropped');
+    else { await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z'); await saved((a) => a.retouch?.length === 3, 'long removal undone'); }
+    // The remaining repairs are rebuilt from the loaded photo (their removal fills again).
+    await poll(() => busy(page), (n) => n === 0, 'rebuild after cancel', 120_000);
+    const started = Date.now();
+    await stroke({ u: 0.3, v: 0.75 }, { u: 0.33, v: 0.75 });
+    await saved((a) => a.retouch?.length === 4, 'removal after cancel saved');
+    await poll(() => busy(page), (n) => n === 0, 'fill after cancel', 120_000);
+    result.hdr.removeAfterCancelMs = Date.now() - started;
+  });
+
+  let ops;
+  await step('HDR: a v13 document adds grading, sharpening, a radial local adjustment and the watermark; exports differ only at the repairs', async () => {
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await tab(3);
+    const [edits] = await Promise.all([page.waitForEvent('download'), page.locator('button:visible', { hasText: 'Save edits' }).first().click()]);
+    const document = JSON.parse(readFileSync(await edits.path(), 'utf8'));
+    assert.equal(document.version, DOCUMENT_VERSION);
+    const entry = document.photos.find((p) => p.adjustments?.retouch?.length === 4);
+    assert.ok(entry, 'the HDR photo and its repairs are in the saved document');
+    ops = entry.adjustments.retouch;
+    Object.assign(entry.adjustments, {
+      exposure: 0.3, contrast: 15, gradeShadowsSat: 30, gradeHighlightsSat: 20, sharpening: 40,
+      local: [{ id: 'hdr-radial', name: 'Radial', enabled: true, amount: 1, mask: { base: 'none', components: [{ id: 'hdr-radial-c', type: 'radial', x: 0.5, y: 0.45, rx: 0.3, ry: 0.25, feather: 0.6 }] }, settings: { exposure: 0.4 } }],
+    });
+    const file = path.join(work, `hdr-doc-${Date.now()}.json`);
+    writeFileSync(file, JSON.stringify(document));
+    await page.setInputFiles('input[type=file][accept="application/json,.json"]:not([aria-label])', file);
+    await saved((a) => a.exposure === 0.3 && a.local?.length === 1 && a.retouch?.length === 4, 'document applied');
+    await poll(() => busy(page), (n) => n === 0, 'fills after the document', 120_000);
+    await tab(3);
+    await page.check('input[name=pe-format][value=png]');
+    const mark = page.getByRole('checkbox', { name: /Include watermark/ }).first();
+    result.hdr.watermark = (await mark.count()) > 0;
+    if (result.hdr.watermark) await mark.check();
+    let started = Date.now();
+    const on = await decode((await exportFile()).file);
+    result.hdr.exportMs = Date.now() - started;
+    result.hdr.size = `${on.width}×${on.height}`;
+    assert.ok(on.width > 5900 && on.height > 3900, `full-size HDR export ${result.hdr.size}`);
+    // Preview against export: the drawn frame and the export scaled to it agree, repairs included.
+    const frame = await drawnFrame();
+    if (frame) {
+      const scaled = await decode(await sharp(Buffer.from(on.data), { raw: { width: on.width, height: on.height, channels: 4 } }).resize(frame.width, frame.height, { fit: 'fill' }).png().toBuffer());
+      const boxes = ops.map((op) => retouchBounds(op, frame.width, frame.height));
+      let inSum = 0; let inN = 0; let outSum = 0; let outN = 0;
+      for (let y = 0; y < frame.height; y += 2) for (let x = 0; x < frame.width; x += 2) {
+        const i = (y * frame.width + x) * 4; const d = Math.abs(frame.data[i + 1] - scaled.data[i + 1]);
+        if (boxes.some((b) => x >= b.x0 && x < b.x1 && y >= b.y0 && y < b.y1)) { inSum += d; inN += 1; } else { outSum += d; outN += 1; }
+      }
+      result.hdr.previewVsExport = { insideRepairs: +(inSum / inN).toFixed(2), elsewhere: +(outSum / outN).toFixed(2) };
+      assert.ok(inSum / inN < outSum / outN + 4, `preview and export disagree at the repairs: ${JSON.stringify(result.hdr.previewVsExport)}`);
+    }
+    await tab(2);
+    const panel = page.locator('#pe-retouch-title .pe-section__toggle');
+    if (await panel.getAttribute('aria-expanded') !== 'true') await panel.click();
+    for (const op of ops) await page.locator(`[data-retouch-id="${op.id}"] .pe-layer__toggle`).click();
+    await saved((a) => a.retouch.every(({ enabled }) => !enabled), 'HDR repairs off');
+    started = Date.now();
+    const off = await decode((await exportFile()).file);
+    const regions = ops.map((op) => retouchRegion({ ...op, offset: { x: 0, y: 0 } }, off.width, off.height));
+    let inside = 0; let outside = 0;
+    // Sharpening spreads a change a few pixels: allow 6 px around each repair's region.
+    for (let y = 0; y < off.height; y += 2) for (let x = 0; x < off.width; x += 2) {
+      const i = (y * off.width + x) * 4;
+      if (Math.abs(on.data[i + 1] - off.data[i + 1]) <= 1) continue; // eslint-disable-line no-continue
+      if (regions.some((r) => x >= r.x - 6 && x < r.x + r.width + 6 && y >= r.y - 6 && y < r.y + r.height + 6)) inside += 1; else outside += 1;
+    }
+    result.hdr.changed = { inside, outside };
+    assert.ok(inside > 50 && outside === 0, `HDR export changed inside the repairs ${inside}, outside ${outside}`);
+    for (const op of ops) await page.locator(`[data-retouch-id="${op.id}"] .pe-layer__toggle`).click();
+    await saved((a) => a.retouch.every(({ enabled }) => enabled), 'HDR repairs on');
+    await poll(() => busy(page), (n) => n === 0, 'fills back on', 120_000);
+  });
+
+  await step('HDR: crop, straighten and perspective keep the repairs local', async () => {
+    await tab(3);
+    const [edits] = await Promise.all([page.waitForEvent('download'), page.locator('button:visible', { hasText: 'Save edits' }).first().click()]);
+    const document = JSON.parse(readFileSync(await edits.path(), 'utf8'));
+    const entry = document.photos.find((p) => p.adjustments?.retouch?.length === 4);
+    entry.adjustments.geometry = { quarterTurns: 1, angle: 3, perspective: { vertical: 15, horizontal: 0 }, crop: { x: 0.05, y: 0.05, width: 0.9, height: 0.9 } };
+    const file = path.join(work, `hdr-geometry-${Date.now()}.json`);
+    writeFileSync(file, JSON.stringify(document));
+    await page.setInputFiles('input[type=file][accept="application/json,.json"]:not([aria-label])', file);
+    await saved((a) => a.geometry?.quarterTurns === 1 && a.geometry?.angle === 3, 'geometry applied');
+    await poll(() => busy(page), (n) => n === 0, 'fills after geometry', 120_000);
+    const on = await decode((await exportFile()).file);
+    await tab(2);
+    for (const op of ops) await page.locator(`[data-retouch-id="${op.id}"] .pe-layer__toggle`).click();
+    await saved((a) => a.retouch.every(({ enabled }) => !enabled), 'repairs off (geometry)');
+    const off = await decode((await exportFile()).file);
+    assert.deepEqual([on.width, on.height], [off.width, off.height]);
+    assert.ok(on.height > on.width, 'a quarter turn makes the export portrait');
+    const diff = changes(on, off);
+    result.hdr.geometry = { size: `${on.width}×${on.height}`, changedFraction: +diff.fraction.toFixed(4) };
+    // The four repairs cover well under a tenth of the photo; everything else is identical.
+    assert.ok(diff.fraction > 0.0005 && diff.fraction < 0.08, `changed fraction after geometry ${diff.fraction}`);
+    for (const op of ops) await page.locator(`[data-retouch-id="${op.id}"] .pe-layer__toggle`).click();
+    await saved((a) => a.retouch.every(({ enabled }) => enabled), 'repairs on (geometry)');
+  });
+}
+
 async function main() {
   const files = await makeFixtures();
   await build({ root, logLevel: 'silent', configFile: path.join(root, 'vite.config.mjs') });
@@ -530,6 +714,7 @@ async function main() {
   } finally {
     server.httpServer.close();
   }
+  if (HDR_FILES.length !== 3) console.log('Genuine HDR not checked: set RETOUCH_HDR_DIR to a folder with one three-frame RAW bracket.');
   if (!RAW_FILES.length) console.log('Genuine RAW not checked: set RETOUCH_RAW_DIR to a folder with a Sony .ARW and/or a Nikon .NEF file.');
   if (results.some(({ ok }) => !ok)) { console.log(`Screenshots in ${work}`); process.exitCode = 1; } else rmSync(work, { recursive: true, force: true });
 }
