@@ -117,7 +117,7 @@
 /* Photography keeps its quieter outlined .com and section path. */
 .photography-nav .brand-tld { border-color: var(--accent); background: transparent; color: var(--accent); box-shadow: none; transform: none; }
 .photography-nav .brand-lockup:hover .brand-tld { box-shadow: none; transform: none; }
-.photography-brand-section { margin-left: .15rem; color: var(--text-tertiary); font-family: var(--font-mono); font-size: .72em; letter-spacing: 0; }
+.photography-brand-section { margin-left: .15rem; color: var(--text-tertiary); font-family: var(--font-mono); font-size: max(.72em, .8125rem); letter-spacing: 0; }
 .photography-brand-camera { color: var(--accent); font-size: .9rem; }
 
 /* ---------- links + tools ---------- */

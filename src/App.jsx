@@ -71,7 +71,7 @@ function App() {
   }
 
   if (isPhotography) {
-    return <RouteErrorBoundary name="Photography"><Suspense fallback={null}><PhotographyPage selectedPhotograph={selectedPhotograph} invalidPhotoId={Boolean(photoId && !selectedPhotograph)} /><RevealAnimations /></Suspense></RouteErrorBoundary>;
+    return <RouteErrorBoundary name="Photography"><Suspense fallback={null}><PhotographyPage selectedPhotograph={selectedPhotograph} invalidPhotoId={Boolean(photoId && !selectedPhotograph)} search={location.search} /><RevealAnimations /></Suspense></RouteErrorBoundary>;
   }
 
   return (

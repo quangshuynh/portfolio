@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FaArrowLeft } from 'react-icons/fa';
 import {
   PHOTOGRAPHY_CATEGORIES,
   PHOTOGRAPHY_HERO_SLUG,
@@ -10,39 +9,9 @@ import {
   sortPhotographs,
 } from '../../data/photographs';
 import { appHref, navigate, photographyHref } from '../../util/navigation';
-import PhotographyLightbox from '../photography/photographyLightbox';
+import PhotographyLightbox, { formatCameraName } from '../photography/photographyLightbox';
 import SiteNav from '../sections/siteNav';
 import Footer from '../sections/footer';
-
-// Two columns only once each column stays roughly 160px wide; narrower phones get
-// a single column rather than thin portrait strips.
-export const PHOTOGRAPHY_TWO_COLUMN_MIN_WIDTH = 340;
-
-export function getPhotographyColumnCount(contentWidth = window.innerWidth) {
-  if (contentWidth > 820) return 3;
-  return contentWidth >= PHOTOGRAPHY_TWO_COLUMN_MIN_WIDTH ? 2 : 1;
-}
-
-const CAPTION_LINE_HEIGHT = 20;
-const CAPTION_BASE_HEIGHT = 30;
-
-export function distributePhotographs(orderedPhotographs, columnCount) {
-  const columns = Array.from({ length: columnCount }, () => ({ photographs: [], estimatedHeight: 0 }));
-
-  orderedPhotographs.forEach((photograph) => {
-    const shortestColumn = columns.reduce((shortest, column) => (
-      column.estimatedHeight < shortest.estimatedHeight ? column : shortest
-    ));
-    const aspectRatio = photograph.galleryWidth && photograph.galleryHeight
-      ? photograph.galleryHeight / photograph.galleryWidth
-      : 1;
-    const estimatedCaptionLines = Math.max(1, Math.ceil((photograph.caption?.length ?? 0) / 32));
-    shortestColumn.photographs.push(photograph);
-    shortestColumn.estimatedHeight += aspectRatio * 1000 + CAPTION_BASE_HEIGHT + estimatedCaptionLines * CAPTION_LINE_HEIGHT;
-  });
-
-  return columns.map(({ photographs: columnPhotographs }) => columnPhotographs);
-}
 
 export function formatExposure({ focalLength, aperture, shutterSpeed, iso }) {
   const parts = [];
@@ -54,20 +23,32 @@ export function formatExposure({ focalLength, aperture, shutterSpeed, iso }) {
 }
 
 const padNumber = (value) => String(value).padStart(2, '0');
+const aspectOf = (photograph) => (photograph.galleryWidth && photograph.galleryHeight ? photograph.galleryWidth / photograph.galleryHeight : 1.5);
 
 function srcSet(photograph) {
   return `${photograph.gallerySrc} ${photograph.galleryWidth}w, ${photograph.viewerSrc} ${photograph.viewerWidth}w`;
 }
 
-// Featured rows: a full-width opener, then alternating pairs and single wide frames so
-// landscape and portrait work trade places down the page.
+// ---------- collections in the URL ----------
+// `?collection=automotive` filters the archive; the hash stays the photo viewer's.
+export const collectionParam = (category) => category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+export function categoryFromSearch(search = '') {
+  const value = new URLSearchParams(search).get('collection');
+  return PHOTOGRAPHY_CATEGORIES.find((category) => collectionParam(category) === value) ?? 'All';
+}
+const searchFor = (category) => (category === 'All' ? '' : `?collection=${collectionParam(category)}`);
+
+// ---------- featured rows ----------
+// A full-width opener, then pairs and single frames in turn. Pairs share one height (each frame
+// takes width in proportion to its aspect ratio), so landscape and portrait sit side by side
+// uncropped and aligned. Slot sizes give clean Featured counts of 1, 3, 4, 6, 7 and 9.
 const FEATURED_ROWS = [
-  { layout: 'lead', size: 1, sizes: '(max-width: 760px) 100vw, min(1360px, 94vw)' },
-  { layout: 'pair-portrait-first', size: 2, sizes: '(max-width: 760px) 92vw, 50vw' },
-  { layout: 'single-offset', size: 1, sizes: '(max-width: 760px) 100vw, 80vw' },
-  { layout: 'pair-landscape-first', size: 2, sizes: '(max-width: 760px) 92vw, 55vw' },
-  { layout: 'single-wide', size: 1, sizes: '(max-width: 760px) 100vw, min(1360px, 94vw)' },
-  { layout: 'pair-portrait-first pair--low', size: 2, sizes: '(max-width: 760px) 92vw, 55vw' },
+  { layout: 'lead', size: 1, sizes: '(max-width: 760px) 100vw, min(1520px, 94vw)' },
+  { layout: 'pair', size: 2, sizes: '(max-width: 760px) 100vw, 60vw' },
+  { layout: 'single', size: 1, sizes: '(max-width: 760px) 100vw, min(1520px, 94vw)' },
+  { layout: 'pair', size: 2, sizes: '(max-width: 760px) 100vw, 60vw' },
+  { layout: 'single', size: 1, sizes: '(max-width: 760px) 100vw, min(1520px, 94vw)' },
+  { layout: 'pair', size: 2, sizes: '(max-width: 760px) 100vw, 60vw' },
 ];
 
 export function groupFeaturedRows(items) {
@@ -81,10 +62,62 @@ export function groupFeaturedRows(items) {
   return rows;
 }
 
-function FeaturedFigure({ photograph, sizes, onOpen, priority }) {
+// ---------- archive: justified rows ----------
+// Rows fill the width at one height per row, so every frame keeps its full proportions and
+// edges line up. Each break is chosen so the row height lands closest to the target, and no
+// frame is narrower than `minWidth`; the last row keeps the target height instead of stretching.
+export function justifyRows(items, { width, target, gap, minWidth = 0 }) {
+  const rows = [];
+  let row = [];
+  let aspectSum = 0;
+  const heightOf = (sum, count) => (width - gap * (count - 1)) / sum;
+  const fits = (candidate, sum) => candidate.every((item) => aspectOf(item) * heightOf(sum, candidate.length) >= minWidth);
+  for (const item of items) {
+    const nextSum = aspectSum + aspectOf(item);
+    const next = [...row, item];
+    if (row.length && (!fits(next, nextSum) || Math.abs(heightOf(nextSum, next.length) - target) > Math.abs(heightOf(aspectSum, row.length) - target))) {
+      rows.push({ items: row, complete: true, height: heightOf(aspectSum, row.length) });
+      row = [item];
+      aspectSum = aspectOf(item);
+    } else {
+      row = next;
+      aspectSum = nextSum;
+    }
+  }
+  if (row.length) {
+    // The last row is not stretched, but still tall enough for the narrowest frame's minimum width.
+    const fill = heightOf(aspectSum, row.length);
+    const needed = minWidth / Math.min(...row.map(aspectOf));
+    rows.push({ items: row, complete: fill <= target, height: Math.min(fill, Math.max(target, needed)) });
+  }
+  return rows;
+}
+
+// Target row heights by archive width: generous on wide screens, two-up on phones, where no
+// frame is narrower than 160 px (164 leaves room for sub-pixel rounding).
+export function archiveLayout(width) {
+  if (width >= 1200) return { width, target: 330, gap: 20, minWidth: 0 };
+  if (width >= 760) return { width, target: 260, gap: 16, minWidth: 0 };
+  return { width, target: 210, gap: 12, minWidth: 164 };
+}
+
+const initialArchiveWidth = () => Math.max(280, Math.min(1520, (typeof window === 'undefined' ? 1440 : window.innerWidth)) - 2 * 20);
+
+// ---------- figures ----------
+function FrameCaption({ number, photograph }) {
   return (
-    <figure data-featured-slug={photograph.slug} className={`featured-frame featured-frame--${photograph.shape ?? 'landscape'}`}>
-      <a href={photographyHref(photograph.slug)} onClick={(event) => onOpen(event, 'featured')} aria-label={`View photograph: ${photograph.caption}`}>
+    <figcaption>
+      {number && <span className="photo-number mono" aria-hidden="true">{number}</span>}
+      <span className="photo-title">{photograph.caption}</span>
+      <span className="photo-meta">{photograph.category}</span>
+    </figcaption>
+  );
+}
+
+function FeaturedFigure({ photograph, sizes, onOpen, href, priority }) {
+  return (
+    <figure data-featured-slug={photograph.slug} className={`featured-frame featured-frame--${photograph.shape ?? 'landscape'}`} style={{ '--aspect': aspectOf(photograph) }}>
+      <a href={href} onClick={(event) => onOpen(event, 'featured')} aria-label={`View photograph: ${photograph.caption}`}>
         <img
           src={priority ? photograph.viewerSrc : photograph.gallerySrc}
           srcSet={srcSet(photograph)}
@@ -93,68 +126,30 @@ function FeaturedFigure({ photograph, sizes, onOpen, priority }) {
           height={photograph.viewerHeight}
           alt={photograph.alt}
           loading={priority ? 'eager' : 'lazy'}
-          fetchPriority={priority ? 'high' : undefined}
           decoding="async"
         />
       </a>
-      <figcaption>
-        <span className="mono" aria-hidden="true">{padNumber(photograph.featured)}</span>
-        {photograph.caption}
-      </figcaption>
+      <FrameCaption number={padNumber(photograph.featured)} photograph={photograph} />
     </figure>
   );
 }
 
-// Viewfinder corners frame the opening photograph and close in on hover, like focusing.
-function HeroFigure({ photograph, onOpen }) {
-  const exposure = formatExposure(photograph);
+function PhotographFigure({ photograph, onOpen, href }) {
   return (
-    <figure className="photography-hero" data-hero-slug={photograph.slug}>
-      <a href={photographyHref(photograph.slug)} onClick={(event) => onOpen(event, 'featured')} aria-label={`View photograph: ${photograph.caption}`}>
-        <span className="photography-hero__frame">
-          <img
-            src={photograph.viewerSrc}
-            srcSet={srcSet(photograph)}
-            sizes="(max-width: 899px) 100vw, 60vw"
-            alt={photograph.alt}
-            loading="eager"
-            fetchPriority="high"
-            decoding="async"
-          />
-          {exposure && <span className="photography-hero__exposure mono" aria-hidden="true">{exposure}</span>}
-        </span>
-        <span className="photography-hero__corners" aria-hidden="true"><i /><i /><i /><i /></span>
-      </a>
-      <figcaption>
-        <span className="mono" aria-hidden="true">No. {padNumber(photograph.curatedOrder)}</span>
-        <span className="photography-hero__caption">{photograph.caption}</span>
-        <span className="photography-hero__cue mono" aria-hidden="true">View ↗</span>
-      </figcaption>
-    </figure>
-  );
-}
-
-function PhotographFigure({ photograph, onOpen }) {
-  const exposure = formatExposure(photograph);
-  return (
-    <figure data-photo-slug={photograph.slug} className={`photo-frame photo-frame--${photograph.shape ?? 'landscape'}`}>
-      <a href={photographyHref(photograph.slug)} onClick={(event) => onOpen(event, 'collection')} aria-label={`Open photograph: ${photograph.caption}`}>
+    <figure data-photo-slug={photograph.slug} className={`photo-frame photo-frame--${photograph.shape ?? 'landscape'}`} style={{ '--aspect': aspectOf(photograph) }}>
+      <a href={href} onClick={(event) => onOpen(event, 'collection')} aria-label={`Open photograph: ${photograph.caption}`}>
         <img
           src={photograph.gallerySrc}
           srcSet={srcSet(photograph)}
-          sizes="(max-width: 340px) 92vw, (max-width: 820px) 46vw, 30vw"
+          sizes="(max-width: 760px) 50vw, 34vw"
           width={photograph.galleryWidth}
           height={photograph.galleryHeight}
           alt={photograph.alt}
           loading="lazy"
           decoding="async"
         />
-        {exposure && <span className="photo-frame__exposure mono" aria-hidden="true">{exposure}</span>}
       </a>
-      <figcaption>
-        <span className="mono" aria-hidden="true">{padNumber(photograph.curatedOrder)}</span>
-        {photograph.caption}
-      </figcaption>
+      <figcaption><span className="photo-title">{photograph.caption}</span></figcaption>
     </figure>
   );
 }
@@ -171,26 +166,29 @@ export const photographyCollections = PHOTOGRAPHY_CATEGORIES.map((category) => {
   const cover = members.find(({ featured }) => !featured) ?? members[0];
   return { category, count: members.length, cover };
 }).filter(({ count }) => count > 0);
-// The opening frame is the catalog's `hero`; Featured and the archive keep their own order.
-// HeroFigure's srcSet/sizes are mirrored by the build's preload (scripts/seo-plugin.mjs).
+// The opening frame is the catalog's `hero`. The hero <img> srcSet/sizes are mirrored by the
+// build's preload (scripts/seo-plugin.mjs) so the browser reuses that response.
 const heroPhotograph = findPhotograph(PHOTOGRAPHY_HERO_SLUG) ?? featuredPhotographs[0];
 const cameraCount = new Set(photographs.map(({ camera }) => camera).filter(Boolean)).size;
+export const HERO_SIZES = '100vw';
 
-function SectionLabel({ index, id, title, headingRef, children }) {
+function SectionHeader({ eyebrow, id, title, headingRef, children }) {
   return (
-    <div className="photography-section-label">
-      <span className="photography-section-index mono" aria-hidden="true">{index}</span>
-      <h2 id={id} ref={headingRef} tabIndex={headingRef ? '-1' : undefined}>{title}</h2>
-      {children}
+    <div className="photography-section-header">
+      <div>
+        <p className="photography-eyebrow">{eyebrow}</p>
+        <h2 id={id} ref={headingRef} tabIndex={headingRef ? '-1' : undefined}>{title}</h2>
+      </div>
+      {children && <div className="photography-section-header__aside">{children}</div>}
     </div>
   );
 }
 
-export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = false }) {
+export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = false, search = '' }) {
+  const category = categoryFromSearch(search);
   const [sort, setSort] = useState('default');
-  const [category, setCategory] = useState('All');
   const [viewerContext, setViewerContext] = useState('collection');
-  const [columnCount, setColumnCount] = useState(() => getPhotographyColumnCount());
+  const [archiveWidth, setArchiveWidth] = useState(initialArchiveWidth);
   const galleryRef = useRef(null);
   const featuredRef = useRef(null);
   const collectionsRef = useRef(null);
@@ -200,11 +198,13 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
     () => sortPhotographs(filterPhotographs(photographs, category), sort),
     [category, sort],
   );
-  const photographColumns = useMemo(
-    () => sort === 'default' ? distributePhotographs(collectionPhotographs, columnCount) : [],
-    [collectionPhotographs, columnCount, sort],
-  );
+  const archiveRows = useMemo(() => justifyRows(collectionPhotographs, archiveLayout(archiveWidth)), [collectionPhotographs, archiveWidth]);
   const featuredRows = useMemo(() => groupFeaturedRows(featuredPhotographs), []);
+  const { gap: rowGap } = archiveLayout(archiveWidth);
+
+  // Photo links keep the active collection, so closing the viewer returns to the same view.
+  const query = searchFor(category);
+  const hrefFor = useCallback((photograph) => `${photographyHref()}${query}${photograph ? `#${encodeURIComponent(photograph.slug)}` : ''}`, [query]);
 
   // The viewer steps through whichever sequence the photograph was opened from; a direct
   // link (or a photo hidden by the current filter) falls back to the full collection.
@@ -215,8 +215,8 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
     return sortPhotographs(photographs);
   }, [collectionPhotographs, selectedPhotograph, viewerContext]);
 
-  const navigateToPhotograph = useCallback((photograph) => navigate(photographyHref(photograph.slug)), []);
-  const closePhotograph = useCallback(() => navigate(photographyHref()), []);
+  const navigateToPhotograph = useCallback((photograph) => navigate(hrefFor(photograph)), [hrefFor]);
+  const closePhotograph = useCallback(() => navigate(hrefFor(null)), [hrefFor]);
   const openPhotograph = useCallback((event, context) => {
     event.preventDefault();
     viewerTrigger.current = event.currentTarget;
@@ -225,18 +225,18 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
   }, []);
 
   useEffect(() => {
-    // This component mounts on route entry, but remains mounted for sort and photo-hash state.
+    // This component mounts on route entry, but remains mounted for sort, collection and photo-hash state.
     if (window.scrollY) window.scrollTo(0, 0);
   }, []);
 
   useEffect(() => {
-    const updateColumns = () => setColumnCount(getPhotographyColumnCount(galleryRef.current?.clientWidth || window.innerWidth));
-    updateColumns();
+    const update = () => setArchiveWidth(Math.round(galleryRef.current?.clientWidth || initialArchiveWidth()));
+    update();
     if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', updateColumns);
-      return () => window.removeEventListener('resize', updateColumns);
+      window.addEventListener('resize', update);
+      return () => window.removeEventListener('resize', update);
     }
-    const observer = new ResizeObserver(updateColumns);
+    const observer = new ResizeObserver(update);
     if (galleryRef.current) observer.observe(galleryRef.current);
     return () => observer.disconnect();
   }, []);
@@ -270,41 +270,54 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
     target.focus({ preventScroll: true });
   }, []);
 
+  // A collection is a history entry (shareable, Back returns to the previous one), never a reload.
+  const chooseCollection = useCallback((name) => {
+    if (name !== category) navigate(`${photographyHref()}${searchFor(name)}`);
+  }, [category]);
   const showCollection = useCallback((name) => {
-    setCategory(name);
+    chooseCollection(name);
     jumpTo(collectionRef);
-  }, [jumpTo]);
+  }, [chooseCollection, jumpTo]);
 
   return (
     <div className="app-shell photography-page">
       <a className="skip-link" href={photographyHref()} onClick={(event) => { event.preventDefault(); document.getElementById('main-content')?.focus(); }}>Skip to photographs</a>
       <SiteNav variant="photography" current="photography" />
       <main id="main-content" tabIndex="-1">
-        <header className="photography-intro section-inner">
-          <a className="photography-modal-back-link" href={appHref('/about')} onClick={backToAbout}>
-            <FaArrowLeft aria-hidden="true" /> Back to photography modal
-          </a>
-          <div className="photography-intro__grid">
-            <div className="photography-intro__text">
-              {/* Stacked into two lines on wide screens; announced as one word. */}
-              <h1>
-                <span className="visually-hidden">Photography</span>
-                <span className="photography-intro__title" aria-hidden="true"><span>Photo</span><span>graphy</span></span>
-              </h1>
-              <p className="photography-intro__tagline">Cars, places, and whatever catches my eye.</p>
-              <p className="photography-intro__facts mono">
-                <span>{photographs.length} photographs</span> · <span>{photographyCollections.length} collections</span> · <span>{cameraCount} cameras</span>
-              </p>
-              <p className="photography-intro__tool">
-                <a href={appHref('/photography/editor')} onClick={openEditor}>Edit a photo<span aria-hidden="true"> ↗</span></a>
-              </p>
-              <nav className="photography-index" aria-label="Photography sections">
-                <button type="button" onClick={() => jumpTo(featuredRef)}><span className="mono" aria-hidden="true">01</span> Featured</button>
-                <button type="button" onClick={() => jumpTo(collectionsRef)}><span className="mono" aria-hidden="true">02</span> Collections</button>
-                <button type="button" onClick={() => jumpTo(collectionRef)}><span className="mono" aria-hidden="true">03</span> All {photographs.length} photographs</button>
-              </nav>
+        <header className="photography-hero" aria-labelledby="photography-title">
+          {heroPhotograph && (
+            <figure className="photography-hero__media" data-hero-slug={heroPhotograph.slug}>
+              <a href={hrefFor(heroPhotograph)} onClick={(event) => openPhotograph(event, 'featured')} aria-label={`View photograph: ${heroPhotograph.caption}`}>
+                <img
+                  src={heroPhotograph.viewerSrc}
+                  srcSet={srcSet(heroPhotograph)}
+                  sizes={HERO_SIZES}
+                  width={heroPhotograph.viewerWidth}
+                  height={heroPhotograph.viewerHeight}
+                  alt={heroPhotograph.alt}
+                  loading="eager"
+                  fetchPriority="high"
+                  decoding="async"
+                />
+              </a>
+              <figcaption className="photography-hero__credit">
+                {heroPhotograph.caption}{heroPhotograph.camera ? ` · ${formatCameraName(heroPhotograph.camera)}` : ''}
+              </figcaption>
+            </figure>
+          )}
+          <div className="photography-hero__content">
+            <p className="photography-eyebrow">Portfolio of Quang Huynh</p>
+            <h1 id="photography-title" className="photography-wordmark">
+              <span>Huynh</span> <span>Photography</span>
+            </h1>
+            <p className="photography-hero__lede">Cars, places, landscapes and nature, photographed in and around Rochester, New York.</p>
+            <div className="photography-hero__actions">
+              <button type="button" className="photography-button photography-button--primary" onClick={() => jumpTo(featuredRef)}>View featured work</button>
+              <button type="button" className="photography-button" onClick={() => jumpTo(collectionRef)}>All {photographs.length} photographs</button>
             </div>
-            {heroPhotograph && <HeroFigure photograph={heroPhotograph} onOpen={openPhotograph} />}
+            <p className="photography-hero__facts">
+              <span>{photographs.length} photographs</span><span>{photographyCollections.length} collections</span><span>{cameraCount} cameras</span>
+            </p>
           </div>
         </header>
 
@@ -312,14 +325,14 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
 
         <section className="photography-featured" aria-labelledby="photography-featured-title">
           <div className="section-inner">
-            <SectionLabel index="01" id="photography-featured-title" title="Featured" headingRef={featuredRef}>
-              <span className="photography-section-meta mono">{padNumber(featuredPhotographs.length)} selected</span>
-            </SectionLabel>
+            <SectionHeader eyebrow="Selected work" id="photography-featured-title" title="Featured" headingRef={featuredRef}>
+              <p>{featuredPhotographs.length} photographs, chosen and sequenced.</p>
+            </SectionHeader>
             <div className="featured-sequence">
               {featuredRows.map((row, rowIndex) => (
-                <div className={`featured-row ${row.layout.split(' ').map((name) => `featured-row--${name}`).join(' ')}`} key={rowIndex}>
+                <div className={`featured-row featured-row--${row.layout}`} key={rowIndex}>
                   {row.photographs.map((photograph) => (
-                    <FeaturedFigure photograph={photograph} sizes={row.sizes} onOpen={openPhotograph} key={photograph.id} />
+                    <FeaturedFigure photograph={photograph} sizes={row.sizes} onOpen={openPhotograph} href={hrefFor(photograph)} key={photograph.id} />
                   ))}
                 </div>
               ))}
@@ -329,17 +342,15 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
 
         <section className="photography-collections" aria-labelledby="photography-collections-title">
           <div className="section-inner">
-            <SectionLabel index="02" id="photography-collections-title" title="Collections" headingRef={collectionsRef}>
-              <span className="photography-section-meta mono">{padNumber(photographyCollections.length)} collections</span>
-            </SectionLabel>
+            <SectionHeader eyebrow="Browse by subject" id="photography-collections-title" title="Collections" headingRef={collectionsRef} />
             <ul className="photography-collections__list">
               {photographyCollections.map(({ category: name, count, cover }) => (
                 <li key={name}>
-                  <button type="button" className="collection-card" onClick={() => showCollection(name)} aria-label={`${name}, ${count} photographs. Show in all photographs`}>
+                  <button type="button" className="collection-card" aria-current={category === name ? 'true' : undefined} onClick={() => showCollection(name)} aria-label={`${name}, ${count} photographs. Show in all photographs`}>
                     <span className="collection-card__media">
                       <img
                         src={cover.gallerySrc}
-                        sizes="(max-width: 760px) 46vw, 24vw"
+                        sizes="(max-width: 760px) 50vw, 25vw"
                         srcSet={srcSet(cover)}
                         width={cover.galleryWidth}
                         height={cover.galleryHeight}
@@ -350,7 +361,7 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
                     </span>
                     <span className="collection-card__label">
                       <span className="collection-card__name">{name}</span>
-                      <span className="mono">{padNumber(count)}</span>
+                      <span className="collection-card__count">{count} photographs</span>
                     </span>
                   </button>
                 </li>
@@ -361,19 +372,19 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
 
         <section className="photography-collection" aria-labelledby="photography-collection-title">
           <div className="section-inner">
-            <SectionLabel index="03" id="photography-collection-title" title="All photographs" headingRef={collectionRef}>
-              <span className="photography-section-meta mono">{category === 'All' ? `${padNumber(photographs.length)} photographs` : `${padNumber(collectionPhotographs.length)} of ${padNumber(photographs.length)}`}</span>
-            </SectionLabel>
+            <SectionHeader eyebrow="Archive" id="photography-collection-title" title="All photographs" headingRef={collectionRef}>
+              <p aria-hidden="true">{category === 'All' ? `Every published photograph, ${photographs.length} in all.` : `${collectionPhotographs.length} of ${photographs.length}: ${category}.`}</p>
+            </SectionHeader>
             <div className="photography-collection__controls">
               <div className="photography-filters" role="group" aria-label="Filter photographs by category">
                 {filters.map(([name, count]) => (
-                  <button type="button" key={name} aria-pressed={category === name} onClick={() => setCategory(name)}>
-                    {name} <span className="mono" aria-hidden="true">{count}</span>
+                  <button type="button" key={name} aria-pressed={category === name} onClick={() => chooseCollection(name)}>
+                    {name} <span className="photography-filters__count" aria-hidden="true">{count}</span>
                     <span className="visually-hidden">, {count} photographs</span>
                   </button>
                 ))}
               </div>
-              <label>Order
+              <label className="photography-order">Order
                 <select value={sort} onChange={(event) => setSort(event.target.value)}>
                   <option value="default">Curated</option>
                   <option value="newest">Newest</option>
@@ -385,20 +396,31 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
               {category === 'All' ? `Showing all ${collectionPhotographs.length} photographs` : `Showing ${collectionPhotographs.length} ${category} photographs`}
             </p>
 
-            <div ref={galleryRef} className={`photography-page-grid photography-page-grid--${sort === 'default' ? 'masonry' : 'chronological'}`} id="photography-gallery" aria-label="Photography collection" style={{ '--photography-columns': columnCount }}>
-              {sort === 'default'
-                ? photographColumns.map((column, columnIndex) => (
-                  // Explicit columns trade row-major keyboard order for compact curated packing.
-                  <div className="photography-masonry-column" key={columnIndex}>
-                    {column.map((photograph) => <PhotographFigure photograph={photograph} onOpen={openPhotograph} key={photograph.id} />)}
-                  </div>
-                ))
-                : collectionPhotographs.map((photograph) => <PhotographFigure photograph={photograph} onOpen={openPhotograph} key={photograph.id} />)}
+            <div ref={galleryRef} className="photography-page-grid" id="photography-gallery" aria-label="Photography collection" style={{ '--row-gap': `${rowGap}px` }}>
+              {archiveRows.map((row) => (
+                <div className={`photography-row${row.complete ? '' : ' photography-row--last'}`} style={{ '--row-target': `${Math.round(row.height)}px` }} key={row.items[0].id}>
+                  {row.items.map((photograph) => <PhotographFigure photograph={photograph} onOpen={openPhotograph} href={hrefFor(photograph)} key={photograph.id} />)}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="photography-editor-note" aria-labelledby="photography-editor-title">
+          <div className="section-inner photography-editor-note__inner">
+            <div>
+              <p className="photography-eyebrow">QuangEdit</p>
+              <h2 id="photography-editor-title">Edit your own photographs, free</h2>
+            </div>
+            <p className="photography-editor-note__text">A free photo editor that runs entirely in your browser: RAW development, tone and colour, retouching and export. Your files never leave your device.</p>
+            <div className="photography-editor-note__links">
+              <a className="photography-button" href={appHref('/photography/editor')} onClick={openEditor}>Open QuangEdit</a>
+              <a className="photography-text-link photography-modal-back-link" href={appHref('/about')} onClick={backToAbout}>Back to About</a>
             </div>
           </div>
         </section>
       </main>
-      <Footer />
+      <Footer variant="photography" />
       {selectedPhotograph && <PhotographyLightbox photograph={selectedPhotograph} collection={viewerCollection} onNavigate={navigateToPhotograph} onClose={closePhotograph} returnFocusRef={viewerTrigger} />}
     </div>
   );

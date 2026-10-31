@@ -111,13 +111,13 @@ export default function seoPlugin() {
           .map((fileName) => ({ rel: 'modulepreload', crossorigin: '', href: `${base}${fileName}` }));
         if (route.id !== 'photography') return { jsonLd: buildJsonLd(route), preloads };
         // The hero is the page's LCP element; start it before the lazy page chunk runs.
-        // srcset/sizes mirror HeroFigure in photographyPage.jsx so the browser reuses the response.
+        // srcset/sizes mirror the hero <img> (HERO_SIZES) in photographyPage.jsx so the browser reuses the response.
         preloads.unshift({
           rel: 'preload',
           as: 'image',
           href: `${base}${hero.viewerFile}`,
           imagesrcset: `${base}${hero.galleryFile} ${hero.galleryWidth}w, ${base}${hero.viewerFile} ${hero.viewerWidth}w`,
-          imagesizes: '(max-width: 899px) 100vw, 60vw',
+          imagesizes: '100vw',
           fetchpriority: 'high',
         });
         return {

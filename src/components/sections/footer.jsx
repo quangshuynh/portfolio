@@ -3,13 +3,36 @@ import { FaEnvelope, FaFilePdf, FaGithub, FaLinkedin } from 'react-icons/fa';
 import { Ridgeline, TopoField } from '../ui/terrain';
 import { aboutHref, photographyPageHref } from './siteNav';
 
+const emailHref = 'mailto:quang@quanghuynh.com?subject=Let%27s%20Connect!&body=Hi%20Quang%2C%0A%0AI%20came%20across%20your%20portfolio%20and%20wanted%20to%20reach%20out.%20I%27d%20love%20to%20connect%20and%20chat%20about...';
+
+// Photography closes with a short note about the photographs, not the software contact pitch.
+function PhotographyContact() {
+  return (
+    <section className="contact-section contact-section--photography" id="contact" aria-labelledby="contact-title">
+      <div className="section-inner contact-inner">
+        <p className="eyebrow">Contact</p>
+        <h2 id="contact-title">Questions about a photograph?</h2>
+        <p className="contact-lede">Email me about any of these photographs, or just to say hello.</p>
+        <div className="contact-links">
+          <a className="button" href="mailto:quang@quanghuynh.com?subject=Your%20photography" target="_blank" rel="noreferrer">
+            <FaEnvelope aria-hidden="true" /> Email me
+          </a>
+          <a className="button button-secondary" href={aboutHref}>About Quang</a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /**
  * renders contact links and site attribution
+ * :param variant: 'photography' for the photography page's own closing section
  * :returns: contact section and footer markup
  */
-function Footer() {
+function Footer({ variant = 'default' }) {
   return (
     <>
+      {variant === 'photography' ? <PhotographyContact /> : (
       <section className="contact-section" id="contact" aria-labelledby="contact-title">
         <TopoField variant="quiet" className="contact-topo" />
         <div className="section-inner contact-inner">
@@ -22,7 +45,7 @@ function Footer() {
           </p>
 
           <div className="contact-links" data-reveal>
-            <a className="button" href="mailto:quang@quanghuynh.com?subject=Let%27s%20Connect!&body=Hi%20Quang%2C%0A%0AI%20came%20across%20your%20portfolio%20and%20wanted%20to%20reach%20out.%20I%27d%20love%20to%20connect%20and%20chat%20about..." target="_blank" rel="noreferrer">
+            <a className="button" href={emailHref} target="_blank" rel="noreferrer">
               <FaEnvelope aria-hidden="true" /> Email me
             </a>
             <a className="button button-secondary" href="https://github.com/quangshuynh" target="_blank" rel="noreferrer">
@@ -38,6 +61,7 @@ function Footer() {
         </div>
         <Ridgeline className="contact-ridge" />
       </section>
+      )}
       <footer className="site-footer">
         <div className="footer-inner section-inner">
           <p>© {new Date().getFullYear()} Quang Huynh</p>

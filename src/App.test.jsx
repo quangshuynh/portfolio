@@ -290,7 +290,8 @@ describe('routing', () => {
       await screen.findByRole(
         'heading',
         {
-          name: 'Photography',
+          level: 1,
+          name: 'Huynh Photography',
         },
       ),
     ).toBeInTheDocument();
