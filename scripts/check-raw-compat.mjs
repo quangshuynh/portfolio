@@ -20,7 +20,7 @@ import { identifyRaw, sniffRaw, RAW_SNIFF_BYTES } from '../src/editor/raw/rawFor
 import { decodeRaw, downsampleRaw } from '../src/editor/raw/rawDecoder.mjs';
 import { rawDevelopParams } from '../src/editor/raw/rawColor.mjs';
 import { rawProfileParams } from '../src/editor/raw/rawProfiles.mjs';
-import { luminanceSamples, suggestExposure } from '../src/editor/raw/rawAutoExposure.mjs';
+import { AUTO_EXPOSURE, luminanceSamples, previewLightness, suggestExposure } from '../src/editor/raw/rawAutoExposure.mjs';
 import { createRawHandlers } from '../src/editor/raw/rawTasks.mjs';
 import { deriveParams } from '../src/editor/pipeline/spec.mjs';
 import { renderRawRgba8 } from '../src/editor/pipeline/cpuRenderer.mjs';
@@ -287,10 +287,16 @@ for (const name of names) {
     const camera = await cameraPreview(preview, small, half.info.flip, jpegPath ? readFileSync(jpegPath) : null);
     row.reference = camera ? (jpegPath ? 'camera JPEG' : 'embedded preview') : 'none';
     Object.assign(row, colourSanity(small, half.info, camera));
-    // Auto Exposure from the same samples the editor takes at import, for Camera Natural version 2.
+    // Auto Exposure from the same samples the editor takes at import (the embedded preview's
+    // lightness decoded here with sharp, in the editor by the browser), for Camera Natural version 2.
     const natural = rawProfileParams('camera-natural', half.info, 2);
-    const suggestion = suggestExposure(luminanceSamples(half.image, rawDevelopParams(half.info, { whiteBalance: 'as-shot' })), { baseEv: natural.exposureEv, curve: natural.curve, raw: half.info });
-    row.autoExposure = suggestion.ev === null ? { ev: null, reason: suggestion.reason } : { ev: suggestion.ev, limitedBy: suggestion.limitedBy };
+    const samples = luminanceSamples(half.image, rawDevelopParams(half.info, { whiteBalance: 'as-shot' }));
+    if (preview?.format === 'jpeg') {
+      const small = await sharp(Buffer.from(preview.data)).resize(AUTO_EXPOSURE.sampleEdge, AUTO_EXPOSURE.sampleEdge, { fit: 'inside' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      samples.previewLightness = previewLightness({ width: small.info.width, height: small.info.height, data: small.data }, Math.max(meta.thumb_width, meta.thumb_height));
+    }
+    const suggestion = suggestExposure(samples, { baseEv: natural.exposureEv, curve: natural.curve, raw: half.info });
+    row.autoExposure = suggestion.ev === null ? { ev: null, source: suggestion.source, reason: suggestion.reason } : { ev: suggestion.ev, source: suggestion.source, limitedBy: suggestion.limitedBy };
     row.profiles = profileComparison(small, half.info, camera, suggestion.ev);
     half.image = null;
     start = performance.now();
