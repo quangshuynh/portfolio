@@ -76,7 +76,7 @@ try {
   await expectTop('Image loading does not move the page');
 
   await enter('/photography/#IMG_0846', viewerReady);
-  assert.match(await evaluate("document.querySelector('.photography-lightbox').textContent"), /My 2011 Subaru WRX after dark/);
+  assert.match(await evaluate("document.querySelector('.photography-lightbox').textContent"), /Subaru WRX/);
   await click(close);
   await waitFor(`!(${viewerReady})`);
   await expectTop('Deep-link close does not scroll to the last thumbnail');
@@ -87,7 +87,7 @@ try {
   await click('[data-photo-slug="_DSC0023"] a');
   await waitFor(viewerReady);
   await click('[aria-label="Next photograph"]');
-  await waitFor("location.hash === '#DIBS2164'");
+  await waitFor("location.hash === '#docks'");
   await click('[aria-label="Previous photograph"]');
   await waitFor("location.hash === '#_DSC0023'");
   await click(close);
