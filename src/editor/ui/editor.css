@@ -717,6 +717,11 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-retouch-source:focus-visible::after { outline: 2px solid #fff; outline-offset: 2px; }
 .pe-retouch-picked { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; pointer-events: none; background: linear-gradient(#fff, #fff) center / 2px 100% no-repeat, linear-gradient(#fff, #fff) center / 100% 2px no-repeat; filter: drop-shadow(0 0 1px #000); }
 .pe-retouch-marker .pe-masktool__ring { border-style: dashed; border-color: #0a84ff; }
+.pe-retouchtool[data-tool='remove'] { cursor: none; }
+.pe-retouchtool[data-tool='area'] { cursor: crosshair; }
+.pe-masktool__shapes .pe-retouch-sourcearea { fill: rgba(10, 132, 255, .12); stroke: #0a84ff; stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.pe-retouch-progress { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 3; display: flex; gap: .75rem; align-items: center; padding: .4rem .8rem; border-radius: 999px; background: rgba(0, 0, 0, .72); color: #fff; font-size: .85rem; pointer-events: auto; }
+.pe-retouch-progress[data-retouch-busy='error'] { background: rgba(160, 30, 30, .85); }
 /* The hotspot: + paints, − erases (Alt swaps while held). */
 .pe-masktool__cursor::before, .pe-masktool__cursor::after { content: ''; position: absolute; left: -4px; top: -.5px; width: 8px; height: 1px; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .55); }
 .pe-masktool__cursor::after { left: -.5px; top: -4px; width: 1px; height: 8px; }

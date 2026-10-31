@@ -825,7 +825,7 @@ the RAW queue (one decoder at a time), so a RAW layer appears after its half-siz
 Repeated project switching with layers was not measured separately; the raster cache is bounded
 (8 rasters, 384 MB) and cleared when the workspace empties. No physical iPhone was tested.
 
-## Retouch (Spot Heal and Clone Stamp)
+## Retouch (Remove, Spot Heal and Clone Stamp)
 
 `model/retouch.mjs` (data), `pipeline/retouch.mjs` (rendering), `ui/RetouchTool.jsx` (on the
 photo), `ui/RetouchPanel.jsx`. Edit document v12 adds `adjustments.retouch`; v11 and older read
@@ -851,6 +851,25 @@ with none.
   (`findHealSource`: 120 nearby offsets scored on surrounding luminance and texture, clear of
   the stroke and the photo's edges) and saved, so exports never search again; drag the source
   handle to choose another. Not content-aware fill: large or structured areas need Clone.
+- **Remove (R, edit document v13):** a `remove` operation (offset unused; optional `source`, a
+  normalised rectangle) fills the brushed area content-aware (`pipeline/inpaint.mjs`): a
+  coarse-to-fine pyramid (coarsest level ~24 px across the hole), at each level PatchMatch
+  (7×7 patches compared on colour and luminance gradient, propagation and random search) and
+  weighted voting, sharper at the finest level, which then takes each pixel from its best patch.
+  It copies from the photo within one hole-extent around the stroke (never from a guard band of 15% of
+  the brush radius next to it, which is often the object's own fringe),
+  or only from the chosen source area. The inner brush is replaced outright; only the outer half
+  of the falloff feathers: paint a little past the object, or uncovered parts can be copied back in.
+  Deterministic (seed from the operation id); same code in preview and
+  export. Fills run in a worker (`inpaintClient.mjs`) with progress and Cancel in the page,
+  synchronously inside export workers. Measured: 24 MP fill 0.12 s (40 px radius), 0.52 s
+  (120 px), 2.0 s (240 px), +50 MB at most; preview fill ~0.2 s, about 0.7 s from stroke end to
+  the filled preview (Chromium, real GPU).
+  **Quality:** clean on skies, walls and regular patterns (brick), grass and pavement for small
+  and medium objects, thin wires, and at the photo's edge. Large areas of complex texture (dense
+  foliage, an object beside strong structure) come out softer or as repeated patches; choose a
+  source area or use Clone there. It does not reconstruct objects behind the removed one, and is
+  not reliable for large objects or people.
 - **Preview:** a retouched copy of the proxy. Appended operations are applied in place and only
   their box is uploaded to a second GPU texture (before/split still read the untouched one); a
   clone stroke in progress is drawn from one snapshot per stroke. Other changes rebuild the copy.

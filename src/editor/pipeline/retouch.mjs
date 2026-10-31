@@ -11,13 +11,23 @@
 // frequencies from the target: no circular patch, halo or seam. Because every size is derived
 // from the operation's normalised geometry, a preview and an export of the same photo give the
 // same result up to resampling. Pixels whose source falls outside the photo are left untouched.
-// Alpha is never changed. Environment-free (page, worker, Node).
+// Remove fills the brushed area by content-aware inpainting (pipeline/inpaint.mjs) from the
+// photo around it, or from a chosen source area. Alpha is never changed. Environment-free.
+
+import { inpaint, seedOf } from './inpaint.mjs';
 
 // Coarse grid of the heal field: cells across the longer side of the stroke's box.
 const HEAL_GRID = 48;
 const HEAL_ITERATIONS = 400;
 // The heal box extends this far (in radii) beyond the brush, so a ring of target pixels surrounds it.
 const HEAL_MARGIN = 0.35;
+// Remove: the photo this far around the brushed area (in its own extent, at least REMOVE_MIN_MARGIN
+// pixels) is where the fill copies from, unless a source area is chosen.
+const REMOVE_MARGIN = 1;
+const REMOVE_MIN_MARGIN = 24;
+// Pixels this close to the brushed area (a share of the brush radius, at least 2 px) are never
+// copied: they are often the object's own fringe, which would grow the object back.
+const REMOVE_GUARD = 0.15;
 
 // `image.region` ({ x, y, width, height }) says `data` holds only that part of the photo (a canvas
 // read); coordinates stay those of the whole photo.
@@ -54,7 +64,7 @@ export function stampCentres(op, width, height) {
 /** The pixel box an operation changes in a width × height image (clipped), or null. */
 export function retouchBounds(op, width, height) {
   const { centres, radius } = stampCentres(op, width, height);
-  const reach = radius * (op.type === 'heal' ? 1 + HEAL_MARGIN : 1) + 1;
+  const reach = radius * (op.type === 'heal' ? 1 + HEAL_MARGIN : 1) + (op.type === 'remove' ? 2 : 1);
   let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
   for (const [x, y] of centres) {
     x0 = Math.min(x0, x - reach); y0 = Math.min(y0, y - reach);
@@ -210,6 +220,10 @@ function healField(image, channels, box, mask, snap, ox, oy) {
  */
 export function applyRetouchOperation(image, op) {
   if (!op?.enabled) return null;
+  if (op.type === 'remove') {
+    const job = removeJob(image, op);
+    return job ? job.apply(inpaint(job.payload)) : null;
+  }
   const { width, height } = image;
   const channels = channelsOf(image);
   const full = retouchBounds(op, width, height);
@@ -248,6 +262,10 @@ export function applyRetouchOperation(image, op) {
  * and its source box (with a pixel for sampling), clipped. { x, y, width, height } or null.
  */
 export function retouchRegion(op, width, height) {
+  if (op.type === 'remove') {
+    const context = removeContext(op, width, height);
+    return context && { x: context.x0, y: context.y0, width: context.x1 - context.x0, height: context.y1 - context.y0 };
+  }
   const box = retouchBounds(op, width, height);
   if (!box) return null;
   const ox = op.offset.x * width;
@@ -271,6 +289,124 @@ export function applyRetouchToContext(context, width, height, operations) {
     const pixels = context.getImageData(region.x, region.y, region.width, region.height, { colorSpace: 'srgb' });
     if (applyRetouchOperation({ width, height, data: pixels.data, region }, op)) context.putImageData(pixels, region.x, region.y);
   }
+}
+
+/**
+ * The pixels a Remove operation reads: the brushed box grown by REMOVE_MARGIN of its extent, plus
+ * its source area when one is chosen ({ x, y, width, height } normalised), clipped.
+ */
+export function removeContext(op, width, height) {
+  const box = retouchBounds(op, width, height);
+  if (!box) return null;
+  const margin = Math.max(REMOVE_MIN_MARGIN, REMOVE_MARGIN * Math.max(box.x1 - box.x0, box.y1 - box.y0));
+  let context = { x0: box.x0 - margin, y0: box.y0 - margin, x1: box.x1 + margin, y1: box.y1 + margin };
+  if (op.source) context = union(context, { x0: op.source.x * width, y0: op.source.y * height, x1: (op.source.x + op.source.width) * width, y1: (op.source.y + op.source.height) * height });
+  const clipped = { x0: Math.max(0, Math.floor(context.x0)), y0: Math.max(0, Math.floor(context.y0)), x1: Math.min(width, Math.ceil(context.x1)), y1: Math.min(height, Math.ceil(context.y1)) };
+  return clipped.x1 > clipped.x0 && clipped.y1 > clipped.y0 ? clipped : null;
+}
+
+/**
+ * Prepares a Remove operation on `image` (whole, or a region read covering removeContext):
+ * `payload` is what inpaint() needs (normalised colour, the hole, where it may copy from, the
+ * seed) as plain typed arrays a worker can take; `apply(filled)` blends the fill into the image
+ * through the brush's feathered coverage and returns the changed box. Null when nothing to do.
+ */
+export function removeJob(image, op) {
+  const { width, height } = image;
+  const r = regionOf(image);
+  const channels = channelsOf(image);
+  const full = removeContext(op, width, height);
+  const box = retouchBounds(op, width, height);
+  if (!full || !box) return null;
+  const ctx = { x0: Math.max(full.x0, r.x), y0: Math.max(full.y0, r.y), x1: Math.min(full.x1, r.x + r.width), y1: Math.min(full.y1, r.y + r.height) };
+  const cw = ctx.x1 - ctx.x0;
+  const ch = ctx.y1 - ctx.y0;
+  if (cw <= 0 || ch <= 0) return null;
+  const top = maxOf(image.data);
+  // Float (HDR) data is compared on a compressed scale, so highlights do not dominate the match.
+  const encode = top === Infinity ? (v) => v / (1 + v) : (v) => v / top;
+  const decode = top === Infinity ? (v) => v / Math.max(1e-6, 1 - v) : (v) => v * top;
+  const mask = brushMask(op, width, height, box);
+  const bw = box.x1 - box.x0;
+  const color = new Float32Array(cw * ch * 3);
+  const hole = new Uint8Array(cw * ch);
+  const coverage = new Float32Array(cw * ch);
+  for (let y = ctx.y0; y < ctx.y1; y += 1) {
+    for (let x = ctx.x0; x < ctx.x1; x += 1) {
+      const o = (y - ctx.y0) * cw + (x - ctx.x0);
+      const i = indexOf(r, x, y, channels);
+      color[o * 3] = encode(image.data[i]); color[o * 3 + 1] = encode(image.data[i + 1]); color[o * 3 + 2] = encode(image.data[i + 2]);
+      if (x >= box.x0 && x < box.x1 && y >= box.y0 && y < box.y1) {
+        const m = mask[(y - box.y0) * bw + (x - box.x0)];
+        // The inner part of the brush is replaced outright (no trace of the object is blended
+        // back); only the outer half of the falloff feathers the fill into the photo.
+        if (m > 0.02) { hole[o] = 1; coverage[o] = Math.min(1, 2 * m); }
+      }
+    }
+  }
+  // Allowed: not in or right next to the hole, and inside the chosen source area if there is one.
+  const allowed = new Uint8Array(cw * ch).fill(1);
+  const guard = Math.max(2, Math.round(REMOVE_GUARD * op.radius * Math.min(width, height)));
+  for (let y = 0; y < ch; y += 1) {
+    for (let x = 0; x < cw; x += 1) {
+      if (!hole[y * cw + x]) continue; // eslint-disable-line no-continue
+      for (let dy = -guard; dy <= guard; dy += 1) {
+        for (let dx = -guard; dx <= guard; dx += 1) {
+          const nx = x + dx; const ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < cw && ny < ch) allowed[ny * cw + nx] = 0;
+        }
+      }
+    }
+  }
+  if (op.source) {
+    const sx0 = op.source.x * width; const sy0 = op.source.y * height;
+    const sx1 = sx0 + op.source.width * width; const sy1 = sy0 + op.source.height * height;
+    for (let y = 0; y < ch; y += 1) {
+      for (let x = 0; x < cw; x += 1) {
+        const px = ctx.x0 + x + 0.5; const py = ctx.y0 + y + 0.5;
+        if (px < sx0 || px >= sx1 || py < sy0 || py >= sy1) allowed[y * cw + x] = 0;
+      }
+    }
+  }
+  const payload = { width: cw, height: ch, color, hole, allowed, seed: seedOf(op.id) };
+  const apply = (filled) => {
+    let dirty = null;
+    for (let y = 0; y < ch; y += 1) {
+      for (let x = 0; x < cw; x += 1) {
+        const o = y * cw + x;
+        // `coverage` is non-zero exactly on the hole (the payload's arrays may have gone to a worker).
+        const m = coverage[o] * op.opacity;
+        if (m <= 0) continue; // eslint-disable-line no-continue
+        const px = ctx.x0 + x; const py = ctx.y0 + y;
+        const i = indexOf(r, px, py, channels);
+        for (let k = 0; k < 3; k += 1) {
+          const target = image.data[i + k];
+          const value = target + (decode(filled[o * 3 + k]) - target) * m;
+          image.data[i + k] = top === Infinity ? Math.max(0, value) : Math.min(top, Math.max(0, Math.round(value)));
+        }
+        dirty = union(dirty, { x0: px, y0: py, x1: px + 1, y1: py + 1 });
+      }
+    }
+    return dirty;
+  };
+  return { payload, apply, box };
+}
+
+/**
+ * As applyRetouch, with Remove fills handed to `runRemove(payload)` (a promise of the filled
+ * colour, e.g. from a worker) so a page never blocks on a large fill. :returns: the changed box
+ */
+export async function applyRetouchAsync(image, operations, { runRemove, signal = null, onOperation = () => {} } = {}) {
+  let dirty = null;
+  for (const [index, op] of (operations ?? []).entries()) {
+    if (signal?.cancelled) return dirty;
+    if (op.enabled && op.type === 'remove') {
+      const job = removeJob(image, op);
+      if (job) dirty = union(dirty, job.apply(await runRemove(job.payload)));
+    } else dirty = union(dirty, applyRetouchOperation(image, op));
+    onOperation(index + 1);
+  }
+  return dirty;
 }
 
 /** Renders every enabled operation in order, in place. :returns: the changed pixel box, or null */

@@ -10,7 +10,8 @@ import { finishRows, warpSpec } from '../pipeline/warp.mjs';
 import { FORMATS } from '../io/imageHeader.mjs';
 import { recordDiagnostic } from '../io/diagnostics.mjs';
 import { renderDetailParallel, renderPixelsParallel, warpParallel } from '../io/detailPool.mjs';
-import { applyRetouch } from '../pipeline/retouch.mjs';
+import { applyRetouchAsync } from '../pipeline/retouch.mjs';
+import { createInpaintRunner } from '../pipeline/inpaintClient.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
 
 const PRIORITY = { decode: 0, region: 0, export: 1, develop: 1, inspect: 2 };
@@ -132,8 +133,15 @@ export async function exportRaw(queue, { file, raw, adjustments, lut, settings, 
     onProgress({ stage: 'decoding', fraction: 0 });
     let image = await develop.promise;
     const developed = image.width === raw.width ? 'full' : 'half';
-    // Retouch (stage 0) on the developed sensor data, before geometry and every adjustment.
-    applyRetouch(image, adjustments.retouch);
+    // Retouch (stage 0) on the developed sensor data, before geometry and every adjustment; Remove
+    // fills run in their own worker.
+    const remover = createInpaintRunner();
+    try {
+      await applyRetouchAsync(image, adjustments.retouch, { runRemove: (payload) => remover.run(payload), signal });
+    } finally {
+      remover.dispose();
+    }
+    if (signal.cancelled) throw new WorkerCancelled();
     const spec = geometry.identity ? null : warpSpec(geometry.plan, size, image);
     if (spec) {
       // The development (LibRaw's worker has ended) is warped on the band workers.

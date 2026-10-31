@@ -16,7 +16,8 @@ import { assertCanvasWorks, createCanvas, encodeCanvas } from './decode.mjs';
 import { exportGeometry } from './files.mjs';
 import { FORMATS } from './imageHeader.mjs';
 import { finishRows, hasAlpha, sourceRows, warpSpec } from '../pipeline/warp.mjs';
-import { applyRetouch } from '../pipeline/retouch.mjs';
+import { applyRetouchAsync } from '../pipeline/retouch.mjs';
+import { createInpaintRunner } from '../pipeline/inpaintClient.mjs';
 
 export const DETAIL_POOL_BAND_ROWS = 256;
 const MAX_DETAIL_WORKERS = 4;
@@ -194,8 +195,15 @@ export async function exportImageInBands(decoder, { file, header, adjustments, l
   // With geometry the decoded original is warped on the band workers too.
   const spec = geometry.identity ? null : warpSpec(geometry.plan, size, geometry.decode);
   let image = await decoder.call('decode', { file, header, ...geometry.decode });
-  // Retouch (stage 0) on the decoded original, before geometry and every adjustment.
-  applyRetouch(image, adjustments.retouch);
+  // Retouch (stage 0) on the decoded original, before geometry and every adjustment; Remove
+  // fills run in their own worker so the page stays responsive.
+  const remover = createInpaintRunner();
+  try {
+    await applyRetouchAsync(image, adjustments.retouch, { runRemove: (payload) => remover.run(payload), signal });
+  } finally {
+    remover.dispose();
+  }
+  if (signal.cancelled) throw new WorkerCancelled();
   if (spec) image = await warpParallel(image, spec, { workers, signal, spawn, onProgress: (fraction) => onProgress({ stage: 'decoding', fraction }) });
   const decodedAt = performance.now();
   const render = deriveParams(adjustments, { lut }).spatialActive ? renderDetailParallel : renderPixelsParallel;

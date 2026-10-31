@@ -7,7 +7,7 @@
 // rendered from the source pixels of whatever size is being rendered (pipeline/retouch.mjs).
 // Retouch belongs to one photograph: presets, recipes, copy/paste and sync never carry it.
 
-export const RETOUCH_TYPES = Object.freeze(['clone', 'heal']);
+export const RETOUCH_TYPES = Object.freeze(['clone', 'heal', 'remove']);
 
 export const RETOUCH_LIMITS = Object.freeze({
   operations: 200,
@@ -62,8 +62,18 @@ export function normalizeRetouchOperation(input, index = 0, budget = { points: R
     hardness: round(clamp(input.hardness, RETOUCH_LIMITS.hardness, RETOUCH_DEFAULTS.hardness), 4),
     opacity: round(clamp(input.opacity, RETOUCH_LIMITS.opacity, RETOUCH_DEFAULTS.opacity), 4),
     spacing: round(clamp(input.spacing, RETOUCH_LIMITS.spacing, RETOUCH_DEFAULTS.spacing), 4),
-    offset: { x: round(clamp(offset.x, [-RETOUCH_LIMITS.offset, RETOUCH_LIMITS.offset], 0)), y: round(clamp(offset.y, [-RETOUCH_LIMITS.offset, RETOUCH_LIMITS.offset], 0)) },
+    offset: input.type === 'remove' ? { x: 0, y: 0 } : { x: round(clamp(offset.x, [-RETOUCH_LIMITS.offset, RETOUCH_LIMITS.offset], 0)), y: round(clamp(offset.y, [-RETOUCH_LIMITS.offset, RETOUCH_LIMITS.offset], 0)) },
+    // Remove: an optional source area (normalised rectangle) the fill may copy from.
+    ...(input.type === 'remove' ? { source: normalizeArea(input.source) } : {}),
   };
+}
+
+/** A normalised source rectangle inside the photo, at least 1% across, or null. */
+function normalizeArea(input) {
+  if (!isObject(input) || ![input.x, input.y, input.width, input.height].every(finite)) return null;
+  const x = clamp(input.x, [0, 1], 0); const y = clamp(input.y, [0, 1], 0);
+  const width = Math.min(1 - x, clamp(input.width, [0, 1], 0)); const height = Math.min(1 - y, clamp(input.height, [0, 1], 0));
+  return width >= 0.01 && height >= 0.01 ? { x: round(x), y: round(y), width: round(width), height: round(height) } : null;
 }
 
 /** The operations list from untrusted input: valid entries only, unique ids, within the limits. */
@@ -83,7 +93,7 @@ export function normalizeRetouch(input) {
   return out;
 }
 
-const operationKey = (op) => JSON.stringify([op.id, op.type, op.enabled, op.points, op.radius, op.hardness, op.opacity, op.spacing, op.offset.x, op.offset.y]);
+const operationKey = (op) => JSON.stringify([op.id, op.type, op.enabled, op.points, op.radius, op.hardness, op.opacity, op.spacing, op.offset.x, op.offset.y, op.source ?? null]);
 export const retouchEqual = (a, b) => a.length === b.length && a.every((op, i) => operationKey(op) === operationKey(b[i]));
 export const activeRetouch = (operations) => (operations ?? []).filter(({ enabled }) => enabled);
 
@@ -93,4 +103,4 @@ export const createRetouchOperation = (id, type, points, settings, offset) => no
 export const updateRetouchOperation = (operations, id, patch) => operations.map((op, index) => (op.id === id ? normalizeRetouchOperation({ ...op, ...patch, id }, index) ?? op : op));
 export const removeRetouchOperation = (operations, id) => operations.filter((op) => op.id !== id);
 
-export const RETOUCH_LABELS = Object.freeze({ clone: 'Clone', heal: 'Heal' });
+export const RETOUCH_LABELS = Object.freeze({ clone: 'Clone', heal: 'Heal', remove: 'Remove' });
