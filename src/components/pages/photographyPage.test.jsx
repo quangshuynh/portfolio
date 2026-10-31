@@ -20,6 +20,8 @@ import {
   photographyHref,
 } from '../../util/navigation';
 
+import { archiveLayout, categoryFromSearch, justifyRows } from './photographyPage';
+
 import {
   PhotographyDetails,
   formatCameraName,
@@ -66,7 +68,7 @@ test('renders the photography page and curated photographs', async () => {
   render(<App />);
 
   expect(
-    await screen.findByRole('heading', { name: 'Photography' }),
+    await screen.findByRole('heading', { level: 1, name: 'Huynh Photography' }),
   ).toBeInTheDocument();
 
   const renderedItems = [
@@ -96,7 +98,7 @@ test('accepts the photography pathname without a trailing slash', async () => {
   render(<App />);
 
   expect(
-    await screen.findByRole('heading', { name: 'Photography' }),
+    await screen.findByRole('heading', { level: 1, name: 'Huynh Photography' }),
   ).toBeInTheDocument();
 
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -376,7 +378,7 @@ test('sorts photographs chronologically without mutating input', () => {
 test('changing the gallery order renders photographs in chronological order', async () => {
   render(<App />);
 
-  await screen.findByRole('heading', { name: 'Photography' });
+  await screen.findByRole('heading', { level: 1, name: 'Huynh Photography' });
 
   fireEvent.change(
     screen.getByLabelText('Order'),
@@ -643,7 +645,7 @@ test('collections index lists each category with its real count and opens it in 
 test('the opening photograph is an existing photograph and opens in the existing viewer', async () => {
   render(<App />);
 
-  await screen.findByRole('heading', { level: 1, name: 'Photography' });
+  await screen.findByRole('heading', { level: 1, name: 'Huynh Photography' });
 
   const hero = document.querySelector('[data-hero-slug]');
   const photograph = photographs.find(({ slug }) => slug === hero.dataset.heroSlug);
@@ -666,10 +668,11 @@ test('a discreet link opens the photo editor in-app, without a page load', async
   vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,');
   const { unmount } = render(<App />);
 
-  const link = await screen.findByRole('link', { name: 'Edit a photo' });
+  const link = await screen.findByRole('link', { name: 'Open QuangEdit' });
   expect(link).toHaveAttribute('href', '/photography/editor');
-  // Secondary to the photographs: a text link in the intro, not a banner or button.
-  expect(link.closest('header.photography-intro')).not.toBeNull();
+  // Secondary to the photographs: a quiet section after the archive, not part of the hero.
+  expect(link.closest('section.photography-editor-note')).not.toBeNull();
+  expect(link.closest('header')).toBeNull();
 
   fireEvent.click(link);
   expect(getAppPathname(window.location.pathname)).toBe('/photography/editor');
@@ -683,7 +686,64 @@ test('a discreet link opens the photo editor in-app, without a page load', async
 
 test('modified clicks on the editor link are left to the browser', async () => {
   render(<App />);
-  const link = await screen.findByRole('link', { name: 'Edit a photo' });
+  const link = await screen.findByRole('link', { name: 'Open QuangEdit' });
   fireEvent.click(link, { ctrlKey: true });
   expect(getAppPathname(window.location.pathname)).toBe('/photography');
+});
+
+
+test('a collection is a shareable URL: direct links open it, filters push history, Back and Forward restore it', async () => {
+  window.history.replaceState({}, '', '/photography/?collection=automotive');
+  render(<App />);
+
+  const filters = await screen.findByRole('group', { name: 'Filter photographs by category' });
+  const automotive = photographs.filter(({ category }) => category === 'Automotive');
+  expect(within(filters).getByRole('button', { name: /^Automotive/ })).toHaveAttribute('aria-pressed', 'true');
+  expect(document.querySelectorAll('[data-photo-slug]')).toHaveLength(automotive.length);
+  expect(screen.getByRole('button', { name: /^Automotive, \d+ photographs/ })).toHaveAttribute('aria-current', 'true');
+
+  fireEvent.click(within(filters).getByRole('button', { name: /^Nature/ }));
+  expect(window.location.search).toBe('?collection=nature');
+  const nature = photographs.filter(({ category }) => category === 'Nature');
+  expect(document.querySelectorAll('[data-photo-slug]')).toHaveLength(nature.length);
+
+  // Opening and closing a photograph keeps the collection.
+  fireEvent.click(screen.getByRole('link', { name: `Open photograph: ${sortPhotographs(nature)[0].caption}` }));
+  expect(window.location.search).toBe('?collection=nature');
+  fireEvent.click(screen.getByRole('button', { name: 'Close photograph' }));
+  expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe('/photography/?collection=nature');
+
+  act(() => {
+    window.history.back();
+  });
+  await waitFor(() => expect(window.location.hash).toBe(`#${sortPhotographs(nature)[0].slug}`));
+  act(() => {
+    window.history.go(-2);
+  });
+  await waitFor(() => expect(window.location.search).toBe('?collection=automotive'));
+  await waitFor(() => expect(within(filters).getByRole('button', { name: /^Automotive/ })).toHaveAttribute('aria-pressed', 'true'));
+
+  fireEvent.click(within(filters).getByRole('button', { name: /^All/ }));
+  expect(window.location.search).toBe('');
+  expect(document.querySelectorAll('[data-photo-slug]')).toHaveLength(photographs.length);
+  expect(categoryFromSearch('?collection=unknown')).toBe('All');
+});
+
+test('the archive is laid out in justified rows: every photograph once, in order, uncropped, rows filling the width', () => {
+  const ordered = sortPhotographs(photographs);
+  [1440, 1024, 768, 390, 320].forEach((viewport) => {
+    const layout = archiveLayout(viewport - 40);
+    const rows = justifyRows(ordered, layout);
+    expect(rows.flatMap(({ items }) => items.map(({ slug }) => slug))).toEqual(ordered.map(({ slug }) => slug));
+    rows.forEach(({ items, complete, height: shown }) => {
+      const aspect = items.reduce((sum, { galleryWidth, galleryHeight }) => sum + galleryWidth / galleryHeight, 0);
+      const height = (layout.width - layout.gap * (items.length - 1)) / aspect;
+      if (complete) expect(height).toBeGreaterThan(layout.target * .45);
+      // A lone frame fills the width (a portrait on a phone stands alone rather than shrink below 160 px).
+      if (complete && items.length > 1) expect(height).toBeLessThan(layout.target * 1.9);
+      // Phones: no frame narrower than 160 px.
+      items.forEach(({ galleryWidth, galleryHeight }) => expect((galleryWidth / galleryHeight) * shown).toBeGreaterThanOrEqual(layout.minWidth - 1e-6));
+      if (complete) expect(shown).toBeCloseTo(height, 6);
+    });
+  });
 });

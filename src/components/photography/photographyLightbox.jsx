@@ -540,7 +540,10 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
         <h2 className="visually-hidden">Photography viewer</h2>
         <p className="visually-hidden" aria-live="polite" aria-atomic="true">{announcement}</p>
         <div className="photography-lightbox-toolbar">
-          <span aria-hidden="true">{index + 1} / {collection.length}</span>
+          <span className="photography-lightbox-position" aria-hidden="true">
+            <span className="photography-lightbox-count">{index + 1} / {collection.length}</span>
+            <span className="photography-lightbox-title">{photograph.caption}</span>
+          </span>
           <div>
             <div className="photography-lightbox-zoom-controls" aria-label="Image zoom controls">
               <button type="button" onClick={() => zoom(-.25)} disabled={scale <= 1} aria-label="Zoom out"><FaMinus aria-hidden="true" /></button>
