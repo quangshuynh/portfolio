@@ -25,7 +25,8 @@ export function rasterBucket(layer, canvas, maxEdge = 4096) {
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
 
-const settingsKey = (layer) => JSON.stringify(compactLayerSettings(layer.settings));
+// A RAW layer's rendering profile changes its pixels as much as its settings do.
+const settingsKey = (layer) => JSON.stringify([compactLayerSettings(layer.settings), layer.rawProfile ?? null]);
 
 /**
  * :param load: async (layer, size) => { width, height, data } RGBA8

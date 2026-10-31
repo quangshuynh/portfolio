@@ -1,4 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { RAW_FORMATS } from '../raw/rawFormat.mjs';
+import { RAW_PROFILE_CHOICES, profileChoiceOf } from '../raw/rawProfiles.mjs';
 import {
   BLEND_MODES, LAYER_LIMITS, canAddLayer, cleanName, duplicateLayer, layerLabel, moveLayer, removeLayer, resetImageTransform,
   TEXT_RESET, updateLayer,
@@ -275,6 +277,21 @@ export default function LayersPanel({ layers, activeId, disabled, canvas, source
               onApply={(value) => patch(active.id, { opacity: value }, `layer:${active.id}:opacity`)}
               onCommit={onCommit}
             />
+            {active.type === 'image' && Object.hasOwn(RAW_FORMATS, active.source.format) && (
+              <label className="pe-field">
+                <span>RAW profile</span>
+                <select
+                  value={profileChoiceOf(active.rawProfile?.profile ?? 'legacy', active.rawProfile?.profileVersion).value}
+                  disabled={disabled || locked}
+                  onChange={(event) => {
+                    const next = RAW_PROFILE_CHOICES.find((entry) => entry.value === event.target.value);
+                    patch(active.id, { rawProfile: next.profile === 'legacy' ? null : { profile: next.profile, profileVersion: next.version } });
+                  }}
+                >
+                  {RAW_PROFILE_CHOICES.filter((entry) => !entry.superseded || entry === profileChoiceOf(active.rawProfile?.profile ?? 'legacy', active.rawProfile?.profileVersion)).map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+            )}
             {active.type === 'image' && (
               <div className="pe-layers__transform" role="group" aria-label="Transform">
                 <NumberField label="X" unit="% of width" value={active.x * 100} min={-100} max={200} step={0.5} disabled={disabled || locked} onApply={(v) => patch(active.id, { x: v / 100 }, `layer:${active.id}:x`)} />

@@ -5,7 +5,7 @@ import {
   LAYER_LIMITS, canAddLayer, compactLayers, createAdjustmentLayer, createImageLayer, duplicateLayer, insertLayer, layerAdjustments,
   layerSettingKeys, moveLayer, normalizeLayer, normalizeLayers, removeLayer, updateLayer, visibleLayers,
 } from './layers.mjs';
-import { compactAdjustments, normalizeAdjustments } from './adjustments.mjs';
+import { compactAdjustments, normalizeAdjustments, normalizeRawSettings } from './adjustments.mjs';
 import { DOCUMENT_VERSION, createEditDocument, parseEditDocument, serializeEditDocument } from './editDocument.mjs';
 import { editorReducer, initialEditorState } from './editorState.mjs';
 import { planSync, DEFAULT_SYNC_GROUPS } from './sync.mjs';
@@ -31,7 +31,7 @@ describe('migration of earlier documents', () => {
       expect(retouch).toEqual([]);
       // Everything else (base photo settings, RAW, HDR tone, geometry, creative, filter, LUT) is unchanged;
       // RAW settings read with the legacy profile (document version 14).
-      expect(rest).toEqual({ ...expected, raw: { ...expected.raw, profile: 'legacy' } });
+      expect(rest).toEqual({ ...expected, raw: normalizeRawSettings(expected.raw) });
       // Text objects become text layers: same ids, order (z-order), content and appearance.
       expect(layers.map(({ id }) => id)).toEqual(overlays.map(({ id }) => id));
       layers.forEach((layer, j) => {
@@ -44,7 +44,7 @@ describe('migration of earlier documents', () => {
     const document = parseEditDocument(fixture('edits-v8.json'));
     expect(document.photos.map(({ source: s }) => s.name)).toEqual(['IMG_0001.jpg', 'DSC09015.ARW', 'DSC09641-HDR', 'plain.png']);
     expect(document.photos[2].source.hdr.inputs.map(({ role }) => role)).toEqual(['under', 'normal', 'over']);
-    expect(document.photos[1].adjustments.raw).toEqual({ whiteBalance: 'custom', profile: 'legacy' });
+    expect(document.photos[1].adjustments.raw).toEqual({ whiteBalance: 'custom', profile: 'legacy', profileVersion: 1, autoExposure: null });
     expect(document.photos[0].adjustments.layers[0].text).toBe('Café Été\nLine two');
   });
 

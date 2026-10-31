@@ -19,7 +19,7 @@ import { CURVE_CHANNELS, curvesEqual, curvesNeutral, isNeutralCurve, neutralCurv
 import { MAX_LUT_SIZE, MIN_LUT_SIZE } from '../pipeline/lut.mjs';
 import { compactGeometry, geometryEqual, geometryNeutral, neutralGeometry, normalizeGeometry } from '../pipeline/geometry.mjs';
 import { DAYLIGHT_KELVIN, RAW_KELVIN, RAW_TINT, WHITE_BALANCE_MODES } from '../raw/rawColor.mjs';
-import { LEGACY_RAW_PROFILE, RAW_PROFILE_IDS } from '../raw/rawProfiles.mjs';
+import { LEGACY_RAW_PROFILE, RAW_PROFILE_IDS, profileVersionOf } from '../raw/rawProfiles.mjs';
 import { compactLayers, layersEqual, normalizeLayers, textLayers } from './layers.mjs';
 import { MASK_LIMITS, compactLocals, localsEqual, normalizeLocalAdjustments } from './masks.mjs';
 import { normalizeWatermark, watermarksEqual } from '../watermark/watermark.mjs';
@@ -207,23 +207,53 @@ export function normalizeFilterRef(input) {
 const filterRefsEqual = (a, b) => (a === null || b === null ? a === b : a.id === b.id && a.strength === b.strength);
 
 // Settings without a profile (every edit saved before document version 14) keep the legacy
-// rendering; new RAW imports start with Camera Natural (editorState.mjs).
-export const RAW_DEFAULTS = Object.freeze({ whiteBalance: 'as-shot', profile: LEGACY_RAW_PROFILE });
+// rendering; new RAW imports start with Camera Natural version 2 (editorState.mjs). Camera Natural
+// without a version (Interval 22, document version 14) is version 1.
+export const RAW_DEFAULTS = Object.freeze({ whiteBalance: 'as-shot', profile: LEGACY_RAW_PROFILE, profileVersion: 1, autoExposure: null });
+
+/** Accepted Auto Exposure corrections are kept within ±3 EV in 0.05 EV steps. */
+export const AUTO_EXPOSURE_LIMIT = 3;
+const normalizeAutoExposure = (value) => {
+  const number = Number(value);
+  if (value === null || value === undefined || !Number.isFinite(number)) return null;
+  const rounded = Math.round(Math.min(AUTO_EXPOSURE_LIMIT, Math.max(-AUTO_EXPOSURE_LIMIT, number)) * 20) / 20;
+  return rounded === 0 ? null : rounded;
+};
 
 /**
  * RAW development settings beyond the numeric controls: the white balance mode (as
- * shot, daylight, or custom from rawTemperature and rawTint) and the rendering profile
- * (raw/rawProfiles.mjs).
+ * shot, daylight, or custom from rawTemperature and rawTint), the rendering profile and its
+ * version (raw/rawProfiles.mjs), and an accepted Auto Exposure correction in EV
+ * (raw/rawAutoExposure.mjs; null when none), which adds to the Exposure slider without changing it.
  */
 export function normalizeRawSettings(input) {
   const source = input !== null && typeof input === 'object' ? input : {};
+  const profile = RAW_PROFILE_IDS.includes(source.profile) ? source.profile : LEGACY_RAW_PROFILE;
   return {
     whiteBalance: WHITE_BALANCE_MODES.includes(source.whiteBalance) ? source.whiteBalance : 'as-shot',
-    profile: RAW_PROFILE_IDS.includes(source.profile) ? source.profile : LEGACY_RAW_PROFILE,
+    profile,
+    profileVersion: profileVersionOf(profile, source.profileVersion),
+    autoExposure: normalizeAutoExposure(source.autoExposure),
   };
 }
 
-const rawEqual = (a, b) => a.whiteBalance === b.whiteBalance && (a.profile ?? LEGACY_RAW_PROFILE) === (b.profile ?? LEGACY_RAW_PROFILE);
+const rawEqual = (a, b) => {
+  const [x, y] = [normalizeRawSettings(a), normalizeRawSettings(b)];
+  return x.whiteBalance === y.whiteBalance && x.profile === y.profile && x.profileVersion === y.profileVersion && x.autoExposure === y.autoExposure;
+};
+
+/**
+ * Saved form of RAW settings: only what differs from a document before profiles, so edits saved
+ * by earlier versions keep their exact form (and CMS treatment hashes): no legacy profile, no
+ * version 1, no Auto Exposure unless accepted.
+ */
+function compactRaw(raw) {
+  const out = { whiteBalance: raw.whiteBalance };
+  if (raw.profile !== LEGACY_RAW_PROFILE) out.profile = raw.profile;
+  if (raw.profileVersion !== 1) out.profileVersion = raw.profileVersion;
+  if (raw.autoExposure !== null) out.autoExposure = raw.autoExposure;
+  return out;
+}
 
 /**
  * Neutral settings that keep the photo's RAW rendering profile: what Reset gives and what
@@ -231,7 +261,8 @@ const rawEqual = (a, b) => a.whiteBalance === b.whiteBalance && (a.profile ?? LE
  */
 export function developmentBase(current = null) {
   const neutral = neutralAdjustments();
-  neutral.raw.profile = normalizeRawSettings(current?.raw).profile;
+  const { profile, profileVersion } = normalizeRawSettings(current?.raw);
+  neutral.raw = { ...neutral.raw, profile, profileVersion };
   return neutral;
 }
 
@@ -293,7 +324,10 @@ export const groupKeys = (group) => ADJUSTMENTS.filter((spec) => spec.group === 
 export function groupIsNeutral(adjustments, group) {
   if (group === 'curves') return curvesNeutral(adjustments.curves);
   if (group === 'lut') return !adjustments.lut;
-  if (group === 'raw') return normalizeRawSettings(adjustments.raw).whiteBalance === RAW_DEFAULTS.whiteBalance && numericNeutral(adjustments, groupKeys('raw'));
+  if (group === 'raw') {
+    const raw = normalizeRawSettings(adjustments.raw);
+    return raw.whiteBalance === RAW_DEFAULTS.whiteBalance && raw.autoExposure === null && numericNeutral(adjustments, groupKeys('raw'));
+  }
   if (group === 'geometry') return geometryNeutral(adjustments.geometry ?? NEUTRAL_GEOMETRY);
   if (group === 'text') return !textLayers(adjustments.layers ?? []).length;
   if (group === 'layers') return !adjustments.layers?.length;
@@ -344,8 +378,7 @@ export function compactAdjustments(adjustments) {
   });
   if (!curvesNeutral(a.curves)) out.curves = Object.fromEntries(CURVE_CHANNELS.filter((c) => !isNeutralCurve(a.curves[c])).map((c) => [c, a.curves[c].map((point) => [...point])]));
   if (a.lut) out.lut = a.lut;
-  // A legacy profile is never written, so documents saved before profiles keep their exact form.
-  if (!rawEqual(a.raw, RAW_DEFAULTS)) out.raw = a.raw.profile === LEGACY_RAW_PROFILE ? { whiteBalance: a.raw.whiteBalance } : a.raw;
+  if (!rawEqual(a.raw, RAW_DEFAULTS)) out.raw = compactRaw(a.raw);
   const geometry = compactGeometry(a.geometry);
   if (geometry) out.geometry = geometry;
   if (a.layers.length) out.layers = compactLayers(a.layers);

@@ -5,7 +5,7 @@ import {
   MASK_LIMITS, addComponent, appendStroke, createBrush, createLinear, createLocalAdjustment, createMask, createRadial, duplicateComponent,
   gradientLocals, linearCentre, linearFromCentre, maskActive, maskPoints, normalizeLocalAdjustments, normalizeMask, removeComponent, updateComponent, visibleLocals,
 } from './masks.mjs';
-import { compactAdjustments, groupIsNeutral, isNeutral, neutralGroup, normalizeAdjustments } from './adjustments.mjs';
+import { compactAdjustments, groupIsNeutral, isNeutral, neutralGroup, normalizeAdjustments, normalizeRawSettings } from './adjustments.mjs';
 import { DOCUMENT_VERSION, createEditDocument, parseEditDocument, serializeEditDocument } from './editDocument.mjs';
 import { createAdjustmentLayer, duplicateLayer, normalizeLayer, updateLayer } from './layers.mjs';
 import { createPreset, presetPatch } from './presets.mjs';
@@ -125,7 +125,7 @@ describe('settings, documents and history', () => {
       expect(local).toEqual([]);
       expect(watermark).toBeNull();
       expect(retouch).toEqual([]);
-      expect(rest).toEqual({ ...before[i], raw: { ...before[i].raw, profile: 'legacy' } });
+      expect(rest).toEqual({ ...before[i], raw: normalizeRawSettings(before[i].raw) });
       photo.adjustments.layers.forEach((layer) => expect(layer).not.toHaveProperty('mask'));
     });
   });

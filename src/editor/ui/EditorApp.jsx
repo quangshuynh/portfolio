@@ -30,7 +30,7 @@ import { loadTextFonts } from '../text/fonts.mjs';
 import { rasterizeTextLayer } from '../text/textRender.mjs';
 import { WATERMARK_DEFAULTS, normalizeWatermark, watermarkActive } from '../watermark/watermark.mjs';
 import { applyWatermark, loadWatermarkFonts } from '../watermark/watermarkRender.mjs';
-import { createImageLayer, createAdjustmentLayer, insertLayer, layerAdjustments, layerLabel, settingsNeutral, updateLayer, visibleLayers } from '../model/layers.mjs';
+import { createImageLayer, createAdjustmentLayer, insertLayer, layerAdjustments, layerDevelopment, layerLabel, settingsNeutral, updateLayer, visibleLayers } from '../model/layers.mjs';
 import { rasterSize } from '../pipeline/layerTransform.mjs';
 import { composeLayers } from '../io/composeLayers.mjs';
 import { visibleLocals } from '../model/masks.mjs';
@@ -421,7 +421,7 @@ function EditorWorkspace({ host }) {
         } else {
           inspected = await worker('import').call('inspect', { file: resource.file, thumbnailEdge: THUMBNAIL_EDGE });
         }
-        const { header, sha256, thumbnail, raw = null } = inspected;
+        const { header, sha256, thumbnail, raw = null, exposureSamples = null } = inspected;
         if (!resources.current.has(entry.id)) continue;
         const duplicate = sha256 && [...resources.current.entries()].find(([id, other]) => id !== entry.id && other.sha256 === sha256);
         if (duplicate) {
@@ -434,7 +434,7 @@ function EditorWorkspace({ host }) {
         dispatch({
           type: 'importSucceeded',
           id: entry.id,
-          info: { format: header.format, width: header.displayWidth, height: header.displayHeight, orientation: header.orientation, sha256, raw },
+          info: { format: header.format, width: header.displayWidth, height: header.displayHeight, orientation: header.orientation, sha256, raw, exposureSamples },
         });
       } catch (error) {
         // Cancelled: the photo was removed while it was being read.
@@ -690,7 +690,7 @@ function EditorWorkspace({ host }) {
       ? await raws().run('decode', { file: source.file, maxEdge: Math.max(size.width, size.height) }).promise
       : await worker('layers').call('decode', { file: source.file, header: source.header, width: size.width, height: size.height });
     if (!source.raw && settingsNeutral(layer.settings)) return image;
-    return worker('layers').call('render', { key: newId(), source: image, adjustments: layerAdjustments(layer.settings), lut: lutOfLayer(layer), raw: source.raw ?? null });
+    return worker('layers').call('render', { key: newId(), source: image, adjustments: layerDevelopment(layer), lut: lutOfLayer(layer), raw: source.raw ?? null });
   }, [sourceFor, raws, worker]); // eslint-disable-line react-hooks/exhaustive-deps
   const loadLayerRasterRef = useRef(loadLayerRaster);
   loadLayerRasterRef.current = loadLayerRaster;
@@ -721,7 +721,7 @@ function EditorWorkspace({ host }) {
       }
       if (signal.cancelled) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
       if (!source.raw && settingsNeutral(layer.settings)) return image;
-      return await client.call('render', { key: 'layer', source: image, adjustments: layerAdjustments(layer.settings), lut: lutOfLayer(layer), raw: source.raw ?? null }, { transfer: [image.data.buffer] });
+      return await client.call('render', { key: 'layer', source: image, adjustments: layerDevelopment(layer), lut: lutOfLayer(layer), raw: source.raw ?? null }, { transfer: [image.data.buffer] });
     } finally {
       client.terminate();
     }
@@ -902,9 +902,14 @@ function EditorWorkspace({ host }) {
       const source = layer.type === 'image' ? sourceFor(layer.source.sha256) : null;
       if (!source?.thumbnail) return null;
       if (source.thumbnail.kind !== 'raw') return source.thumbnail;
-      // A RAW thumbnail is half-size sensor data: developed once, neutral and as shot.
-      source.layerThumbnail ??= { width: source.thumbnail.width, height: source.thumbnail.height, data: renderRawRgba8(source.thumbnail.data, deriveParams(neutralAdjustments(), { raw: source.raw })) };
-      return source.layerThumbnail;
+      // A RAW thumbnail is half-size sensor data: developed once per profile, neutral and as shot.
+      const profile = JSON.stringify(layer.rawProfile ?? null);
+      source.layerThumbnails ??= new Map();
+      if (!source.layerThumbnails.has(profile)) {
+        const neutral = layer.rawProfile ? { ...neutralAdjustments(), raw: { ...neutralAdjustments().raw, ...layer.rawProfile } } : neutralAdjustments();
+        source.layerThumbnails.set(profile, { width: source.thumbnail.width, height: source.thumbnail.height, data: renderRawRgba8(source.thumbnail.data, deriveParams(neutral, { raw: source.raw })) });
+      }
+      return source.layerThumbnails.get(profile);
     },
     workspace: state.photos.filter((item) => item.status === 'ready' && item.format !== 'hdr' && item.sha256).map(({ id, name }) => ({ id, name })),
     onAddPhoto,
@@ -1935,6 +1940,7 @@ function EditorWorkspace({ host }) {
             presets={{ userPresets, onChange: changePresets, onPreview: targetLayer ? () => {} : setPresetPreview, onDownload: downloadBlob, newId }}
             recipes={{ recipes, onChange: changeRecipes, onOpen: (mode, recipe = null) => setRecipeDialog({ mode, recipe }), onDownload: downloadBlob, newId }}
             raw={ready ? photo.raw ?? null : null}
+            exposureSamples={ready ? photo.exposureSamples ?? null : null}
             hdr={ready ? photo.hdr ?? null : null}
             geometry={ready ? { native: { width: photo.width, height: photo.height }, mode: transformMode, onMode: openTransform, onChange: changeGeometry, onCommit: commitGeometry, onStraightening: setStraightening } : null}
             text={{ selectedId: activeLayer, onSelect: setActiveLayer, editing: layerToolOn, onTool: (on) => { if (!transformMode) setLayerToolOn(on); }, focusRequest: textFocus }}

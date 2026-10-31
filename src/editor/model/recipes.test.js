@@ -307,7 +307,7 @@ describe('batches, history and compatibility', () => {
     expect(plan.errors).toEqual([]);
     expect(plan.changedCount).toBe(3);
     // b is a RAW photo: imported with the Camera Natural profile.
-    expect(present(state, 'b')).toEqual(normalizeAdjustments({ raw: { profile: 'camera-natural' } }));
+    expect(present(state, 'b')).toEqual(normalizeAdjustments({ raw: { profile: 'camera-natural', profileVersion: 2 } }));
     const next = editorReducer(state, { type: 'applyBatch', label: 'recipe', changes: plan.items.map(({ id, after }) => ({ id, after })) });
     expect(present(next, 'a').geometry).toEqual(SOURCE_SPECIFIC.geometry);
     expect(present(next, 'a').contrast).toBe(8);
