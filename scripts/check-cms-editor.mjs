@@ -489,6 +489,15 @@ try {
           assert.equal(info.treatment.document.photos[0].adjustments.exposure ?? 0, 0, 'the Exposure slider is untouched');
           assert.ok(info.treatment.document.photos[0].adjustments.watermark?.enabled, 'one watermark setting, kept');
           assert.equal(info.treatment.approved.render.sha256, approved.render.sha256, 'the approved render was not replaced');
+          // The draft renders again with Auto Exposure (and is not left for the automatic queue).
+          await page.reload();
+          await page.waitForSelector('.pe-photo[data-status=ready]', { state: 'attached', timeout: 300_000 });
+          await page.getByRole('button', { name: 'Render for portfolio' }).click();
+          await poll(() => page.locator('.cms-host__status').textContent(), (text) => /render up to date/.test(text), 'Auto Exposure render', 900_000);
+          info = (await api(page, 'GET', `/api/editor/photos/${rawId}`)).json;
+          assert.equal(info.renderFresh, true);
+          assert.equal(info.treatment.document.photos[0].adjustments.raw.autoExposure, autoExposure);
+          assert.equal(info.treatment.approved.render.sha256, approved.render.sha256, 'the approved render was not replaced');
           return { legacyMeanGreen: Math.round(legacyMean), naturalMeanGreen: Math.round(naturalMean), autoExposureNote: note.trim(), autoExposure };
         });
         if (FORMAT_FILES.valid.length) {
