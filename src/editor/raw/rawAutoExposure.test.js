@@ -3,7 +3,7 @@
 // backlit, bright automotive, high ISO, clipped), its limits, determinism and the sampler.
 
 import { describe, expect, test } from 'vitest';
-import { AUTO_EXPOSURE, exposureValue100, luminanceSamples, suggestExposure, targetKey } from './rawAutoExposure.mjs';
+import { AUTO_EXPOSURE, exposureValue100, luminanceSamples, previewLightness, suggestExposure, targetKey } from './rawAutoExposure.mjs';
 import { NATURAL_CURVE, naturalTone, rawProfileParams } from './rawProfiles.mjs';
 import { rawDevelopParams } from './rawColor.mjs';
 
@@ -118,6 +118,50 @@ describe('Auto Exposure suggestions', () => {
     expect(suggestExposure(copy, options(14))).toEqual(first);
     expect(exposureValue100({ shutter: 1 / 125, aperture: 8, iso: 100 })).toBeCloseTo(Math.log2(64 * 125), 9);
     expect(exposureValue100({ shutter: 1 / 125, aperture: 8 })).toBeNull();
+  });
+});
+
+describe('Auto Exposure matched to the camera preview', () => {
+  const withPreview = (samples, lightness) => ({ ...samples, previewLightness: lightness });
+  const lightnessAt = (samples, stops) => {
+    const gain = 2 ** (natural.exposureEv + stops);
+    const values = Array.from(samples.y, (v) => naturalTone(v * gain, natural.curve, Math.max(2 ** natural.exposureEv, gain)))
+      .map((y) => (y > 216 / 24389 ? 116 * Math.cbrt(y) - 16 : (24389 / 27) * y)).sort((a, b) => a - b);
+    return values[values.length >> 1];
+  };
+
+  test("suggests the exposure at which the median lightness meets the camera's rendering", () => {
+    const samples = scene(textured(keyAtTarget));
+    const camera = Math.round(lightnessAt(samples, 0.8) * 2) / 2;
+    const result = suggestExposure(withPreview(samples, camera), options(12));
+    expect(result).toMatchObject({ source: 'camera', previewLightness: camera });
+    expect(result.ev).toBeGreaterThanOrEqual(0.7);
+    expect(result.ev).toBeLessThanOrEqual(0.9);
+    // Darker camera rendering: darker suggestion, whatever the scene statistics say.
+    expect(suggestExposure(withPreview(samples, Math.round(lightnessAt(samples, -0.6) * 2) / 2), options(12)).ev).toBeCloseTo(-0.6, 1);
+  });
+
+  test("keeps the camera's intent: a night or high-key rendering is matched, not normalised", () => {
+    const night = scene((x, y) => (Math.hypot(x - 0.5, y - 0.3) < 0.03 ? 1.2 : keyAtTarget / 30));
+    // The camera showed it as dark as we do: nothing to suggest.
+    expect(suggestExposure(withPreview(night, Math.round(lightnessAt(night, 0) * 2) / 2), options(3)).ev).toBeNull();
+    const highKey = scene(textured(keyAtTarget * 5));
+    expect(suggestExposure(withPreview(highKey, Math.round(lightnessAt(highKey, 0) * 2) / 2), options(14))).toMatchObject({ ev: null, source: 'camera' });
+  });
+
+  test('differences under the threshold are not offered; brightening keeps the highlight guard', () => {
+    const samples = scene(textured(keyAtTarget));
+    expect(suggestExposure(withPreview(samples, Math.round(lightnessAt(samples, 0.15) * 2) / 2), options(12)).ev).toBeNull();
+    const backlit = scene((x, y) => (Math.hypot(x - 0.5, y - 0.55) < 0.45 ? keyAtTarget / 30 : 0.35));
+    const linear = suggestExposure(withPreview(backlit, 90), { baseEv: 0, curve: null, raw: metered(13) });
+    expect(linear.limitedBy).toBe('highlights');
+  });
+
+  test('preview lightness: median L* rounded to 0.5; small previews are not trusted', () => {
+    const grey = { width: 4, height: 2, data: new Uint8ClampedArray(32).fill(119) };
+    expect(previewLightness(grey, 1616)).toBe(50);
+    expect(previewLightness(grey, 160)).toBeNull();
+    expect(previewLightness(null, 1616)).toBeNull();
   });
 });
 

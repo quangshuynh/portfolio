@@ -132,11 +132,13 @@ export function cropToSize(image, { width, height }) {
  * Decodes a RAW file.
  * :param Module: the loaded libraw-wasm Emscripten module
  * :param bytes: Uint8Array of the whole file
- * :param options: { halfSize } half size takes each 2×2 sensor block as one pixel
- *   (genuine sensor data at half resolution, about 5x faster); else full AHD demosaic
- * :returns: { info, image: { kind: 'raw', width, height, data: Uint16Array RGB } }
+ * :param options: { halfSize, preview } half size takes each 2×2 sensor block as one pixel
+ *   (genuine sensor data at half resolution, about 5x faster); else full AHD demosaic.
+ *   `preview` also returns the camera's embedded JPEG preview (only its brightness is used,
+ *   by Auto Exposure), or null when there is none
+ * :returns: { info, image: { kind: 'raw', width, height, data: Uint16Array RGB }, preview }
  */
-export function decodeRaw(Module, bytes, { format, halfSize = false } = {}) {
+export function decodeRaw(Module, bytes, { format, halfSize = false, preview: wantPreview = false } = {}) {
   const raw = new Module.LibRaw();
   Module.lastMessage = '';
   try {
@@ -149,6 +151,13 @@ export function decodeRaw(Module, bytes, { format, halfSize = false } = {}) {
     }
     const info = summarizeMetadata(meta, format);
     checkDecodable(meta, info);
+    let preview = null;
+    if (wantPreview) {
+      try {
+        const thumb = raw.thumbnailData();
+        if (thumb?.format === 'jpeg' && thumb.data?.length) preview = { bytes: Uint8Array.from(thumb.data), width: meta.thumb_width, height: meta.thumb_height };
+      } catch { /* no preview: Auto Exposure falls back to the photo's own luminance */ }
+    }
     let image;
     try {
       image = raw.imageData();
@@ -160,7 +169,7 @@ export function decodeRaw(Module, bytes, { format, halfSize = false } = {}) {
     }
     // 1.6.0 returns a copy; a view into the (shared) wasm heap could not be transferred.
     const data = image.data.buffer instanceof ArrayBuffer ? image.data : image.data.slice();
-    return { info, image: { kind: 'raw', width: image.width, height: image.height, data } };
+    return { info, image: { kind: 'raw', width: image.width, height: image.height, data }, preview };
   } finally {
     raw.delete();
   }

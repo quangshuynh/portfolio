@@ -101,6 +101,11 @@ describe('RAW panel', () => {
     expect(present().raw.autoExposure).toBeNull();
   });
 
+  test('Auto Exposure says when it matches the camera preview', () => {
+    setup({ ...RAW }, { ...samples(0.18 / 2 ** (1.35 + 0.25)), previewLightness: 58 });
+    expect(screen.getByTestId('raw-auto-exposure').textContent).toMatch(/^Auto Exposure suggests \+\d\.\d\d EV to match the camera's own rendering of this photo\.$/);
+  });
+
   test('Auto Exposure offers nothing for a normal frame or a night scene, and says why', () => {
     const { unmount } = setup(RAW, samples(0.18 / 2 ** (1.35 + 0.25)));
     expect(screen.getByTestId('raw-auto-exposure')).toHaveTextContent('no suggestion. The exposure is within the normal range.');

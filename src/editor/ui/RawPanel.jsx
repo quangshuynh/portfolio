@@ -62,7 +62,9 @@ function AutoExposure({ raw, samples, adjustments, disabled, dispatch }) {
   return (
     <div className="pe-raw__auto" role="group" aria-label="Auto Exposure">
       <p className="pe-note" data-testid="raw-auto-exposure">
-        Auto Exposure suggests <strong>{ev(suggestion.ev)}</strong>{suggestion.limitedBy ? ` (limited by ${suggestion.limitedBy})` : ''}.
+        Auto Exposure suggests <strong>{ev(suggestion.ev)}</strong>
+        {suggestion.source === 'camera' ? " to match the camera's own rendering of this photo" : " from the photo's brightness"}
+        {suggestion.limitedBy ? ` (limited by ${suggestion.limitedBy})` : ''}.
       </p>
       <div className="pe-raw__auto-actions">
         <button type="button" className="pe-text-button" aria-pressed={previewing} disabled={disabled} onClick={togglePreview}>Preview</button>
