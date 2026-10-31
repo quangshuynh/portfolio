@@ -74,6 +74,59 @@ const pictures = {
     if (line) return [0.9 + n * 0.3, 0.88 + n * 0.3, 0.8 + n * 0.3];
     return [0.3 + n, 0.31 + n, 0.33 + n];
   },
+  // Structure scenes: lines that cross the removed object, in perspective where it matters.
+  lanes: (x, y, w, h) => {
+    const n = 0.05 * noise(x, y, 11) + 0.03 * noise(x / 4, y / 4, 12);
+    const vx = w * 0.5; const vy = -h * 0.9; const t = (y - vy) / (h - vy);
+    const off = (bx) => Math.abs(x - (vx + (bx - vx) * t)) * (h - vy) / Math.hypot(h - vy, bx - vx);
+    const half = 1.2 + 2.8 * t;
+    if (off(w * 0.08) < half) return [0.92 + n * 0.3, 0.9 + n * 0.3, 0.85 + n * 0.3];
+    if (off(w * 0.62) < half && Math.floor(6 / t) % 2 === 0) return [0.9 + n * 0.3, 0.75 + n * 0.3, 0.2 + n * 0.3];
+    return [0.3 + n, 0.31 + n, 0.33 + n];
+  },
+  railing: (x, y, w, h) => {
+    const n = 0.03 * noise(x, y, 13);
+    const top = h * 0.3 + 0.12 * (x - w / 2); const bottom = h * 0.62 + 0.05 * (x - w / 2);
+    const rail = Math.abs(y - top) < 2.5 || Math.abs(y - bottom) < 2.5;
+    const post = (x + 3) % 22 < 4 && y > top && y < bottom;
+    if (rail || post) return [0.35 + n, 0.38 + n, 0.45 + n];
+    const g = 0.3 + 0.2 * (y / h) + 0.08 * noise(x / 2, y / 2, 14);
+    return [g * 0.45 + n, g + n, g * 0.4 + n];
+  },
+  building: (x, y, w, h) => {
+    const n = 0.025 * noise(x, y, 15);
+    const roof = h * 0.42 + 0.35 * (x - w / 2);
+    if (y < roof) { const v = 0.55 + 0.3 * (y / h); return [v * 0.68 + n * 0.3, v * 0.82 + n * 0.3, v + n * 0.3]; }
+    const course = (y - roof) % 14 < 1.5;
+    const shade = x > w * 0.72 + 0.04 * y ? 0.72 : 1;
+    const v = course ? 0.8 : 1;
+    return [(0.78 + n) * v * shade, (0.7 + n) * v * shade, (0.56 + n) * v * shade];
+  },
+  wires: (x, y, w, h) => {
+    const v = 0.5 + 0.35 * (y / h); const n = 0.01 * noise(x, y, 16);
+    const d = (y - h / 2 - 0.53 * (x - w / 2)) / Math.hypot(1, 0.53);
+    for (const c of [-18, 0, 18]) if (Math.abs(d - c) < 0.9) return [0.15, 0.15, 0.17];
+    return [v * 0.7 + n, v * 0.85 + n, v + n];
+  },
+  crossing: (x, y, w, h) => {
+    const n = 0.04 * noise(x, y, 17) + 0.02 * noise(x / 3, y / 3, 18);
+    if (Math.abs(x - (w * 0.5 + 0.1 * (y - h / 2))) < 4) return [0.22 + n * 0.3, 0.24 + n * 0.3, 0.26 + n * 0.3];
+    if (y > h * 0.55 + 0.06 * (x - w / 2)) return [0.6 + n, 0.58 + n, 0.54 + n];
+    return [0.34 + n, 0.35 + n, 0.37 + n];
+  },
+  curve: (x, y, w, h) => {
+    const edge = h * 0.45 + 0.0018 * (x - w / 2) ** 2;
+    if (y > edge) { const n = 0.04 * noise(x, y, 19) + 0.02 * noise(x / 4, y / 4, 20); return [0.55 + n, 0.54 + n, 0.52 + n]; }
+    const n = 0.06 * Math.sin(x * 1.31 + Math.sin(y * 0.7) * 3) + 0.05 * Math.cos(y * 2.17 + x * 0.3);
+    return [0.25 + n, 0.5 + n, 0.2 + n];
+  },
+  tiles: (x, y) => {
+    const a = 0.14; const u = x * Math.cos(a) + y * Math.sin(a); const v = -x * Math.sin(a) + y * Math.cos(a);
+    const n = 0.03 * noise(x, y, 21);
+    if (((u % 24) + 24) % 24 < 2 || ((v % 24) + 24) % 24 < 2) return [0.4 + n, 0.4 + n, 0.38 + n];
+    const t = 0.08 * (hash(Math.floor(u / 24), Math.floor(v / 24), 22) - 0.5);
+    return [0.8 + t + n, 0.78 + t + n, 0.74 + t + n];
+  },
 };
 
 // Real photographs: a crop of a published derivative, scaled down by `scale`.
@@ -107,6 +160,19 @@ const SCENES = [
   { name: 'photo-boardwalk-large', group: 'hard', photo: photo('DSC09893', 280, 1050, 640, 480, 2), object: disk(160, 130, 32), points: [[160, 130]], radius: 38 },
   { name: 'photo-foliage-large', group: 'hard', photo: photo('DSC09673', 800, 400, 640, 480, 2), object: any(disk(160, 120, 30), capsule(160, 120, 210, 90, 24)), points: [[160, 120], [185, 105], [210, 90]], radius: 36 },
   { name: 'photo-rails-large', group: 'hard', photo: photo('DSC09912', 300, 1200, 640, 480, 2), object: disk(160, 120, 32), points: [[160, 120]], radius: 38 },
+  // Structure: large objects across lines whose continuation the truth shows.
+  { name: 'lane-markings', group: 'structure', picture: 'lanes', size: [320, 240], object: capsule(70, 125, 180, 120, 24), points: [[70, 125], [125, 122], [180, 120]], radius: 30 },
+  { name: 'railing', group: 'structure', picture: 'railing', size: [320, 240], object: any(disk(160, 118, 30), capsule(160, 118, 195, 135, 20)), points: [[160, 118], [178, 127], [195, 135]], radius: 36 },
+  { name: 'building-edge', group: 'structure', picture: 'building', size: [320, 240], object: disk(150, 100, 32), points: [[150, 100]], radius: 38 },
+  { name: 'angled-wires', group: 'structure', picture: 'wires', size: [320, 240], object: disk(160, 120, 28), points: [[160, 120]], radius: 34 },
+  { name: 'crossing', group: 'structure', picture: 'crossing', size: [320, 240], object: disk(160, 128, 30), points: [[160, 128]], radius: 36 },
+  { name: 'curved-edge', group: 'structure', picture: 'curve', size: [320, 240], object: disk(200, 120, 30), points: [[200, 120]], radius: 36 },
+  { name: 'tiles-large', group: 'structure', picture: 'tiles', size: [320, 240], object: disk(160, 120, 34), points: [[160, 120]], radius: 40 },
+  { name: 'irregular-large', group: 'structure', picture: 'lanes', size: [320, 240], object: any(capsule(170, 60, 200, 120, 18), capsule(200, 120, 210, 165, 18), capsule(150, 145, 240, 105, 14)), points: [[170, 60], [185, 90], [200, 120], [205, 142], [210, 165], [180, 155], [150, 145], [195, 125], [240, 105]], radius: 25 },
+  { name: 'photo-path-edge', group: 'structure', photo: photo('DSC09678', 700, 880, 640, 480, 2), object: disk(130, 72, 30), points: [[130, 72]], radius: 36 },
+
+  { name: 'photo-railing', group: 'structure', photo: photo('DSC09967', 1500, 620, 640, 480, 2), object: disk(160, 120, 30), points: [[160, 120]], radius: 36 },
+  { name: 'photo-arches', group: 'structure', photo: photo('DSC09907', 1180, 560, 640, 480, 2), object: disk(160, 120, 32), points: [[160, 120]], radius: 38 },
 ];
 
 async function cleanImage(scene) {
@@ -206,7 +272,28 @@ function measure(result, clean, object, region) {
     if (tm > 4) { structNum += Math.min(tm, Math.max(0, (rx * tx + ry * ty) / tm)); structDen += tm; }
     if (object(x, y)) { leak += Math.max(0, objectness(result.data, i) - objectness(clean.data, i)); leakN += 1; }
   }
+  // Continuity: share of the truth's edges inside the object that the fill reproduces (an edge
+  // of the same orientation within 1 px). False edges: share of the fill's edges there that the
+  // truth does not have (invented lines).
+  const EDGE = 10;
+  const hasEdge = (img, x, y, [tx, ty]) => {
+    const tm = Math.hypot(tx, ty);
+    for (let dy = -1; dy <= 1; dy += 1) for (let dx = -1; dx <= 1; dx += 1) {
+      const [gx, gy] = grad(img, x + dx, y + dy); const m = Math.hypot(gx, gy);
+      if (m > EDGE * 0.6 && Math.abs(gx * tx + gy * ty) / (m * tm) > 0.85) return true;
+    }
+    return false;
+  };
+  let truthEdges = 0; let kept = 0; let fillEdges = 0; let invented = 0;
+  for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
+    if (!object(x, y)) continue; // eslint-disable-line no-continue
+    const t = grad(clean, x, y); const r = grad(result, x, y);
+    if (Math.hypot(...t) > EDGE) { truthEdges += 1; if (hasEdge(result, x, y, t)) kept += 1; }
+    if (Math.hypot(...r) > EDGE) { fillEdges += 1; if (!hasEdge(clean, x, y, r)) invented += 1; }
+  }
   return {
+    continuity: truthEdges ? +(kept / truthEdges).toFixed(3) : null,
+    falseEdges: fillEdges ? +(invented / fillEdges).toFixed(3) : 0,
     colorError: +(mae / n).toFixed(2),
     colorConsistency: +(low / n).toFixed(2),
     structure: structDen ? +(structNum / structDen).toFixed(3) : null,
@@ -268,13 +355,13 @@ async function quality(baseline, candidate, out) {
       await sidebyside(path.join(out, `${scene.name}.png`), [dirty, ...outputs, clean], box);
     }
     const b = row.baseline; const c = row.candidate;
-    console.log(`${scene.name.padEnd(22)} ${scene.group.padEnd(10)} err ${b.colorError}→${c.colorError}  low ${b.colorConsistency}→${c.colorConsistency}  struct ${b.structure}→${c.structure}  sharp ${b.sharpness}→${c.sharpness}  seam ${b.seam}→${c.seam}  rep ${b.repetition}→${c.repetition}  leak ${b.leak}→${c.leak}  ms ${b.ms}→${c.ms}`);
+    console.log(`${scene.name.padEnd(22)} ${scene.group.padEnd(10)} err ${b.colorError}→${c.colorError}  low ${b.colorConsistency}→${c.colorConsistency}  cont ${b.continuity}→${c.continuity}  false ${b.falseEdges}→${c.falseEdges}  struct ${b.structure}→${c.structure}  sharp ${b.sharpness}→${c.sharpness}  seam ${b.seam}→${c.seam}  rep ${b.repetition}→${c.repetition}  leak ${b.leak}→${c.leak}  ms ${b.ms}→${c.ms}`);
   }
-  for (const group of ['regression', 'hard']) {
+  for (const group of ['regression', 'hard', 'structure']) {
     const members = rows.filter((r) => r.group === group);
     if (!members.length) continue; // eslint-disable-line no-continue
     const mean = (label, key) => +(members.reduce((sum, r) => sum + (r[label][key] ?? 0), 0) / members.length).toFixed(3);
-    const keys = ['colorError', 'colorConsistency', 'structure', 'sharpness', 'seam', 'repetition', 'leak', 'ms'];
+    const keys = ['colorError', 'colorConsistency', 'continuity', 'falseEdges', 'structure', 'sharpness', 'seam', 'repetition', 'leak', 'ms'];
     console.log(`mean ${group}: ${keys.map((k) => `${k} ${mean('baseline', k)}→${mean('candidate', k)}`).join('  ')}`);
   }
   return rows;
@@ -315,7 +402,7 @@ async function child([ref, raw, radius]) {
 
 if (args[0] === '--child') await child(args.slice(1));
 else {
-  const ref = option('--baseline', '298dcf0');
+  const ref = option('--baseline', '4357bd3');
   const out = option('--out') ?? mkdtempSync(path.join(os.tmpdir(), 'bench-remove-report-'));
   mkdirSync(out, { recursive: true });
   const [baseline, candidate] = [await loadAlgorithm(ref), await loadAlgorithm(null)];
