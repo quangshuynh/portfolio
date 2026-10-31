@@ -191,7 +191,7 @@ async function runOne(run, files, reference) {
       assert.equal(download.suggestedFilename(), 'synthetic-quangedit.png');
       const pixels = await sharp(await download.path()).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
       assert.deepEqual([pixels.info.width, pixels.info.height], [400, 600]);
-      const expected = renderRawRgba8(reference.image.data, deriveParams(normalizeAdjustments({ exposure: 0.5, raw: { whiteBalance: 'custom', profile: 'camera-natural' }, rawTemperature: 4000, rawTint: reference.asShotTint }), { raw: reference.info }));
+      const expected = renderRawRgba8(reference.image.data, deriveParams(normalizeAdjustments({ exposure: 0.5, raw: { whiteBalance: 'custom', profile: 'camera-natural', profileVersion: 2 }, rawTemperature: 4000, rawTint: reference.asShotTint }), { raw: reference.info }));
       result.pngMaxDifference = maxDifference(expected, pixels.data);
       assert.ok(result.pngMaxDifference <= 1, `PNG differs from the reference by ${result.pngMaxDifference}`);
       if (await page.isEnabled('input[name=pe-format][value=jpeg]')) {
