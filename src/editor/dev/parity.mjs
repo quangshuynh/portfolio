@@ -77,6 +77,7 @@ const RAW_EDITS = [
   ['RAW Camera Natural +1.5 combined', { ...COMBINED, exposure: 1.5, curves: CURVES, raw: { whiteBalance: 'daylight', profile: 'camera-natural' } }],
   ['RAW Camera Natural -2', { exposure: -2, raw: { profile: 'camera-natural' } }],
   ['RAW Linear', { raw: { profile: 'linear' } }],
+  ['RAW Camera Natural v2 + Auto Exposure', { contrast: 20, raw: { profile: 'camera-natural', profileVersion: 2, autoExposure: 0.6 } }],
 ];
 
 // Merged RAW HDR: float camera RGB up to 4x the sensor white (a -2 EV darkest frame).

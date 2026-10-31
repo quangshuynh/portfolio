@@ -106,12 +106,15 @@ export function deriveParams(adjustments, { lut = null, raw = null } = {}) {
   const whiteBalanceActive = a.temperature !== 0 || a.tint !== 0;
   const developed = raw ? rawDevelopParams(raw, { ...a.raw, temperature: a.rawTemperature, tint: a.rawTint }) : null;
   // Merged HDR photos have their own tone stage and keep the legacy rendering.
-  const profile = developed ? rawProfileParams(developed.white > 1 ? LEGACY_RAW_PROFILE : a.raw.profile, raw) : null;
+  const hdrSource = Boolean(developed && developed.white > 1);
+  const profile = developed ? rawProfileParams(hdrSource ? LEGACY_RAW_PROFILE : a.raw.profile, raw, a.raw.profileVersion) : null;
+  // An accepted Auto Exposure correction acts like Exposure (before the profile's tone).
+  const autoExposure = developed && !hdrSource ? (a.raw.autoExposure ?? 0) : 0;
   const params = {
     whiteBalanceActive,
     whiteBalance: whiteBalanceMatrix(a.temperature, a.tint),
-    // The profile's baseline adds to the gain; the Exposure slider keeps its own value.
-    exposureGain: 2 ** (a.exposure + (profile?.exposureEv ?? 0)),
+    // The profile's baseline and Auto Exposure add to the gain; the Exposure slider keeps its own value.
+    exposureGain: 2 ** (a.exposure + autoExposure + (profile?.exposureEv ?? 0)),
     toneActive,
     tone,
     vibrance: a.vibrance / 100,

@@ -14,6 +14,8 @@ import { contentHash } from '../io/hash.mjs';
 import { RawDecodeError, cropToSize, decodeRaw, downsampleRaw, sameSize } from './rawDecoder.mjs';
 import { RAW_SNIFF_BYTES, RAW_SUPPORT, sniffRaw } from './rawFormat.mjs';
 import { applyRetouch } from '../pipeline/retouch.mjs';
+import { rawDevelopParams } from './rawColor.mjs';
+import { luminanceSamples } from './rawAutoExposure.mjs';
 
 export const RAW_BAND_ROWS = 256;
 
@@ -63,7 +65,10 @@ export const needsFullDecode = (info, { width, height }) => width > Math.floor(i
 /** :param loadModule: () => Promise of the libraw-wasm Emscripten module */
 export function createRawHandlers(loadModule) {
   return {
-    /** Validates, hashes and develops a thumbnail from half-size sensor data. */
+    /**
+     * Validates, hashes and develops a thumbnail from half-size sensor data, with the luminance
+     * samples Auto Exposure reads (from the same decode, so it costs no second one).
+     */
     async inspect({ file, thumbnailEdge }, progress) {
       const { Module, bytes, format } = await openRaw(file, loadModule);
       const sha256 = await contentHash(bytes);
@@ -71,8 +76,12 @@ export function createRawHandlers(loadModule) {
       const { info, image } = decodeRaw(Module, bytes, { format, halfSize: true });
       const size = proxyDimensions(image, thumbnailEdge);
       const thumbnail = downsampleRaw(image, size.width, size.height);
+      const exposureSamples = luminanceSamples(image, rawDevelopParams(info, { whiteBalance: 'as-shot' }));
       const header = { format, width: info.width, height: info.height, displayWidth: info.width, displayHeight: info.height, orientation: 1 };
-      return { result: { header, sha256, raw: info, thumbnail }, transfer: [thumbnail.data.buffer] };
+      return {
+        result: { header, sha256, raw: info, thumbnail, exposureSamples },
+        transfer: [thumbnail.data.buffer, exposureSamples.y.buffer, exposureSamples.clipped.buffer],
+      };
     },
 
     /**

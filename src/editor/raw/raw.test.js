@@ -286,7 +286,9 @@ describe('RAW worker tasks', () => {
     expect(result.header).toMatchObject({ format: 'dng', displayWidth: 64, displayHeight: 48 });
     expect(result.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(result.thumbnail).toMatchObject({ kind: 'raw', width: 16, height: 12 });
-    expect(transfer).toEqual([result.thumbnail.data.buffer]);
+    // The Auto Exposure samples come from the same decode and are transferred too.
+    expect(transfer).toEqual([result.thumbnail.data.buffer, result.exposureSamples.y.buffer, result.exposureSamples.clipped.buffer]);
+    expect(result.exposureSamples.y.length).toBe(result.exposureSamples.width * result.exposureSamples.height);
     expect(progress).toHaveBeenCalledWith({ stage: 'decoding' });
     await expect(handlers.inspect({ file: dngFile(new TextEncoder().encode('not a raw')), thumbnailEdge: 16 }, vi.fn())).rejects.toMatchObject({ code: 'unsupported' });
     await expect(handlers.inspect({ file: dngFile(new Uint8Array()), thumbnailEdge: 16 }, vi.fn())).rejects.toMatchObject({ code: 'corrupt' });
