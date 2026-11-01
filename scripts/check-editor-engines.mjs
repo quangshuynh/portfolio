@@ -137,16 +137,18 @@ async function runOne(run, files) {
       assert.ok(thumb.left < 10 && thumb.right > 240, JSON.stringify(thumb));
     });
     await step('adjust', async () => {
-      if (run.device) await page.click('.pe-tabs button:nth-child(2)');
+      if (run.device) { await page.click('.pe-tabs button:nth-child(2)'); await page.getByRole('navigation', { name: 'Editing tools', exact: true }).getByRole('button', { name: 'Light', exact: true }).click(); }
       const field = page.locator('input[aria-label="Exposure value"]');
       await field.fill('0.5');
       await field.press('Enter');
       await poll(() => field.inputValue(), (value) => value === '+0.50 EV', 'exposure shows +0.50 EV');
     });
     await step('compare', async () => {
+      if (run.device) await page.getByRole('button', { name: 'More editor options' }).click();
       await page.click('.pe-compare button:nth-child(3)');
       assert.equal(await page.locator('.pe-split__handle').count(), 1);
       await page.click('.pe-compare button:nth-child(1)');
+      if (run.device) await page.getByRole('button', { name: 'More editor options' }).click();
     });
     await step('export at full resolution', async () => {
       if (run.device) await page.click('.pe-tabs button:nth-child(3)');
@@ -174,12 +176,14 @@ async function runOne(run, files) {
       await page.click('.pe-photo--list button.pe-photo__select[aria-label^="chart.png"]');
       await poll(() => page.locator('.pe-stage-message').count(), (count) => count === 0, 'chart preview');
       if (run.device) await page.click('.pe-tabs button:nth-child(2)');
+      if (run.device) await page.getByLabel('Editing tool', { exact: true }).selectOption('color');
       const field = page.locator('input[aria-label="Saturation value"]');
       await field.fill('30');
       await field.press('Enter');
       await poll(() => field.inputValue(), (value) => value === '+30', 'saturation shows +30');
       // A .cube LUT through the UI: parsed in the worker (or main thread), applied at 60%.
-      await page.click('.pe-section[data-section-id=lut] .pe-section__toggle');
+      if (run.device) await page.getByLabel('Editing tool', { exact: true }).selectOption('lut');
+      else await page.click('.pe-section[data-section-id=lut] .pe-section__toggle');
       await page.setInputFiles('input[aria-label="Import a .cube LUT"]', files.lut);
       await poll(() => page.locator('.pe-lut select').inputValue(), (value) => value.length === 64, 'LUT imported');
       const intensity = page.locator('input[aria-label="Intensity value"]');

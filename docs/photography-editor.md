@@ -17,6 +17,18 @@ the original proposal is in
 `/photography` links to it with a small "Edit a photo" text link (in-app
 navigation).
 
+## Mobile workspace
+
+At 860 px and below, the canvas, contextual tool tray and Photos / Adjust / Export
+navigation occupy separate grid rows. Choose a tool in Adjust; Close tools returns
+to the picker and stops active brush/source-selection modes. Photos contains the
+library and batch actions; the top-bar overflow contains comparison, fullscreen
+and edit-document actions. The empty workspace shows import and a separate saved
+settings notice. Chrome remains neutral dark in either site theme for colour judgement.
+The viewport uses `dvh` and safe-area insets; fit zoom follows canvas resizing.
+`npm run check:editor:mobile` checks the real UI in three engines; emulation does not
+verify physical Safari browser chrome or the software keyboard.
+
 ## Layout of the code
 
 | Path | Role |

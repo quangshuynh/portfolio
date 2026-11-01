@@ -66,7 +66,7 @@ export function NumberField({ label, value, min, max, step, unit, disabled, onAp
  *   workspace: [{ id, name }] photos that can be added as layers, onAddPhoto(id), onImport(),
  *   onReconnect(layer), busy }
  */
-export default function LayersPanel({ layers, activeId, disabled, canvas, sources, onSelect, onApply, onPreview, onCommit, onAddText, onAddAdjustment, onEditSettings, tool, onTool, freeResize, onFreeResize }) {
+export default function LayersPanel({ compact = false, onClose, layers, activeId, disabled, canvas, sources, onSelect, onApply, onPreview, onCommit, onAddText, onAddAdjustment, onEditSettings, tool, onTool, freeResize, onFreeResize }) {
   const [open, setOpen] = useState(true);
   const [confirming, setConfirming] = useState(null);
   const [renaming, setRenaming] = useState(null);
@@ -119,10 +119,10 @@ export default function LayersPanel({ layers, activeId, disabled, canvas, source
   const short = canvas ? Math.min(canvas.width, canvas.height) : 1;
 
   return (
-    <section className="pe-panel pe-layers" aria-labelledby="pe-layers-title" data-open={open || undefined}>
+    <section className="pe-panel pe-layers" aria-labelledby="pe-layers-title" data-open={open || compact || undefined}>
       <div className="pe-panel__head">
         <h2 id="pe-layers-title">
-          <button type="button" className="pe-section__toggle" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen((value) => !value)}>
+          <button type="button" className="pe-section__toggle" aria-expanded={open || compact} aria-controls={bodyId} onClick={() => compact ? onClose?.() : setOpen((value) => !value)}>
             <svg className="pe-section__chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
             <span>Layers</span> <span className="pe-count mono">{layers.length}</span>
           </button>
@@ -131,7 +131,7 @@ export default function LayersPanel({ layers, activeId, disabled, canvas, source
           {tool ? 'Done' : 'Move'}
         </button>
       </div>
-      <div id={bodyId} hidden={!open}>
+      <div id={bodyId} hidden={!open && !compact}>
         <div className="pe-layers__add" role="group" aria-label="Add layer">
           <button type="button" className="pe-button" disabled={disabled || sources.busy || !canAddLayer(layers, 'image')} onClick={sources.onImport}>Image file…</button>
           <label className="pe-layers__photo">

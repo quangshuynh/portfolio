@@ -23,7 +23,7 @@ const newComponent = (type, id) => (type === 'brush' ? createBrush(id) : type ==
  * :param target: { kind: 'local', local } | { kind: 'layer', layer } | null, the mask being edited
  * :param space: { width, height } of the target mask's space in pixels (gradient fields)
  */
-export default function MaskPanel({
+export default function MaskPanel({ compact = false, onClose,
   disabled, locals, layer, target, space, selectedId, onSelect, onSelectLocal, onSelectLayerMask, tool, onTool, brush, onBrush, overlay, onOverlay,
   onApplyLocals, onApplyMask, onPreviewMask, onCommit, newId, onEditSettings,
 }) {
@@ -60,10 +60,10 @@ export default function MaskPanel({
   const setLinear = (patch, key) => patchComponent(linearFromCentre({ ...linear, ...patch }, space), key);
 
   return (
-    <section className="pe-panel pe-masks" aria-labelledby="pe-masks-title" data-open={open || undefined}>
+    <section className="pe-panel pe-masks" aria-labelledby="pe-masks-title" data-open={open || compact || undefined}>
       <div className="pe-panel__head">
         <h2 id="pe-masks-title">
-          <button type="button" className="pe-section__toggle" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen((value) => !value)}>
+          <button type="button" className="pe-section__toggle" aria-expanded={open || compact} aria-controls={bodyId} onClick={() => compact ? onClose?.() : setOpen((value) => !value)}>
             <svg className="pe-section__chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
             <span>Masks</span> <span className="pe-count mono">{locals.length}</span>
           </button>
@@ -74,7 +74,7 @@ export default function MaskPanel({
           </button>
         )}
       </div>
-      <div id={bodyId} hidden={!open}>
+      <div id={bodyId} hidden={!open && !compact}>
         <div className="pe-masks__add" role="group" aria-label="New local adjustment">
           <span className="pe-masks__label">New local adjustment</span>
           {TOOLS.map(([type, label]) => (
