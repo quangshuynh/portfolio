@@ -303,9 +303,9 @@ async function main() {
 
     await check('the photography page links to the editor without a full page load', async () => {
       await navigate(`${origin}/photography/`);
-      await waitFor('document.querySelector(".photography-intro__tool a")', 'gallery rendered');
+      await waitFor('document.querySelector("a[href$=editor]")', 'gallery rendered');
       await evaluate('window.__sameDocument = true');
-      await click('.photography-intro__tool a');
+      await click('a[href$=editor]');
       await waitFor('document.querySelector(".pe[data-engine]")', 'editor mounted in-app');
       assert.equal(await evaluate('window.__sameDocument'), true, 'the page reloaded');
       assert.equal(await evaluate('location.pathname'), '/photography/editor');
@@ -569,6 +569,7 @@ async function main() {
       assert.ok(await evaluate('!!document.querySelector(".pe-library .pe-button--primary")?.offsetParent'));
       await shot('editor-mobile-photos.png');
       await click('.pe-tabs button:nth-child(2)');
+      await click('.pe-mobile-tools__list button');
       const thumb = await evaluate('Math.round(document.querySelector(".pe-section[data-section-id=light] .pe-range").getBoundingClientRect().height)');
       assert.ok(thumb >= 36, `slider ${thumb}px`);
       await viewport(1440, 900);

@@ -224,8 +224,10 @@ describe('editor workspace', () => {
     // The panel tabs only display below 860 px; jsdom lays out at desktop width.
     const tabs = within(document.querySelector('nav.pe-tabs'));
     expect(tabs.getByRole('button', { name: 'Adjust', hidden: true })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(tabs.getByRole('button', { name: 'Export', hidden: true }));
-    expect(tabs.getByRole('button', { name: 'Export', hidden: true })).toHaveAttribute('aria-pressed', 'true');
+    expect(tabs.getByRole('button', { name: 'Export', hidden: true })).toBeDisabled();
+    expect(tabs.getByRole('button', { name: 'Adjust', hidden: true })).toBeDisabled();
+    fireEvent.click(tabs.getByRole('button', { name: 'Photos', hidden: true }));
+    expect(tabs.getByRole('button', { name: 'Photos', hidden: true })).toHaveAttribute('aria-pressed', 'true');
   });
 });
 
@@ -281,5 +283,23 @@ describe('fullscreen workspace', () => {
     await act(async () => { fireEvent.click(exit); });
     expect(root).not.toHaveAttribute('data-fullscreen');
     expect(screen.getByRole('button', { name: 'Enter fullscreen' })).toHaveFocus();
+  });
+});
+
+
+describe('mobile contextual adjustments', () => {
+  test('only the chosen tool is mounted, including formerly lazy tools, without changing desktop sections', () => {
+    const props = { adjustments: neutralAdjustments(), disabled: false, dispatch: vi.fn(), onMobileSectionChange: vi.fn() };
+    const { rerender } = render(<AdjustPanel {...props} mobileSection="light" />);
+    expect(screen.getByRole('slider', { name: 'Exposure' })).toBeEnabled();
+    expect(screen.queryByRole('slider', { name: 'Temperature' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Light', exact: true }));
+    expect(props.onMobileSectionChange).toHaveBeenCalledWith(null);
+    rerender(<AdjustPanel {...props} mobileSection="color" />);
+    expect(screen.queryByRole('slider', { name: 'Exposure' })).toBeNull();
+    expect(screen.getByRole('slider', { name: 'Temperature' })).toBeEnabled();
+    rerender(<AdjustPanel {...props} />);
+    expect(screen.getByRole('slider', { name: 'Exposure' })).toBeEnabled();
+    expect(screen.getByRole('slider', { name: 'Temperature' })).toBeEnabled();
   });
 });

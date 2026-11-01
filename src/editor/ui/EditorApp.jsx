@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { activePhoto, editorReducer, initialEditorState, selectedPhotos } from '../model/editorState.mjs';
 import { canRedo, canUndo } from '../model/history.mjs';
 import { createEditDocument, parseEditDocument, readEditDocumentFile, serializeEditDocument } from '../model/editDocument.mjs';
@@ -300,6 +300,33 @@ function EditorWorkspace({ host }) {
   const [notice, setNotice] = useState(null);
   const [dragDepth, setDragDepth] = useState(0);
   const [mobilePanel, setMobilePanel] = useState('adjust');
+  const [mobileTool, setMobileTool] = useState(null);
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const [narrow, setNarrow] = useState(() => window.matchMedia?.('(max-width: 860px)').matches ?? false);
+  const mobileScroll = useRef(new Map());
+  const mobileScrollKey = `${mobilePanel}:${mobileTool || ''}`;
+  useLayoutEffect(() => {
+    const inspector = rootRef.current?.querySelector('.pe-inspector');
+    if (inspector && narrow) inspector.scrollTop = mobileScroll.current.get(mobileScrollKey) || 0;
+  }, [mobileScrollKey, narrow]);
+
+  useEffect(() => {
+    const query = window.matchMedia?.('(max-width: 860px)');
+    if (!query) return;
+    const change = () => setNarrow(query.matches);
+    query.addEventListener('change', change);
+    return () => query.removeEventListener('change', change);
+  }, []);
+  const stopMobileTools = () => {
+    if (transformMode) cancelTransform();
+    setMaskTool(null); setRetouchTool(null); setRetouchPicking(false);
+    setRetouchArea(null); setLayerToolOn(false);
+  };
+  const selectMobileTool = (tool) => {
+    stopMobileTools(); setMobileTool(tool); setMobileMenu(false);
+    if (!tool) requestAnimationFrame(() => rootRef.current?.querySelector(`[data-mobile-choice="${mobileTool}"]`)?.focus());
+  };
+
   const [zoomCommand, setZoomCommand] = useState(null);
   const [engine, setEngine] = useState(null);
   const [restoredCount, setRestoredCount] = useState(0);
@@ -319,6 +346,10 @@ function EditorWorkspace({ host }) {
   const renderState = useRef({ client: null, key: null, luts: new Set() });
 
   const photo = activePhoto(state);
+  useEffect(() => {
+    setMobileTool((tool) => (tool === 'raw' && !photo?.raw || tool === 'hdr' && !photo?.hdr) ? null : tool);
+  }, [photo?.raw, photo?.hdr]);
+
   const adjustments = photo?.history.present ?? neutralAdjustments();
   const ready = photo?.status === 'ready';
   const lutFor = useCallback((settings) => (settings?.lut ? luts.get(settings.lut.sha256) ?? null : null), [luts]);
@@ -1601,8 +1632,16 @@ function EditorWorkspace({ host }) {
     );
   });
 
+  const mobileTools = [
+    ['light', 'Light'], ['color', 'Color'], ['detail', 'Detail'], ['geometry', 'Crop'],
+    ['masks', 'Masks'], ['retouch', 'Retouch'], ['layers', 'Layers'], ['watermark', 'Watermark'],
+    ['hsl', 'HSL'], ['curves', 'Tone Curve'], ['creative', 'Creative'], ['text', 'Text'],
+    ['lut', 'LUT'], ['presets', 'Presets'], ['recipes', 'Recipes'],
+    ...(photo?.raw ? [['raw', 'RAW']] : []), ...(photo?.hdr ? [['hdr', 'HDR']] : []),
+  ].filter(([id]) => !targetLocal && !targetLayer || ['layers', 'masks', 'retouch', 'light', 'color', 'hsl', ...(targetLocal ? ['detail'] : ['curves', 'lut', 'creative', 'presets'])].includes(id));
+
   return (
-    <div ref={rootRef} className="pe" data-fullscreen={fullscreen.mode ?? undefined} data-engine={engine?.kind} data-mobile-panel={mobilePanel} data-dragging={dragDepth > 0 || undefined} {...dragHandlers}>
+    <div ref={rootRef} className="pe" data-fullscreen={fullscreen.mode ?? undefined} data-engine={engine?.kind} data-mobile-panel={mobilePanel} data-mobile-tool={mobileTool || undefined} data-ready={ready || undefined} data-empty={!state.photos.length || undefined} data-menu={mobileMenu || undefined} data-dragging={dragDepth > 0 || undefined} {...dragHandlers}>
       <a className="skip-link" href="#pe-workspace">Skip to workspace</a>
       <header className="pe-bar">
         <a className="pe-back" href={host ? host.backHref : appHref('/photography/')}>
@@ -1618,6 +1657,8 @@ function EditorWorkspace({ host }) {
           <button type="button" className="pe-icon-button" onClick={() => dispatch({ type: 'redo' })} disabled={!history || !canRedo(history)} aria-label="Redo" title="Redo (Ctrl+Shift+Z)" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3.5l3 3-3 3M13 6.5H6.5a4 4 0 0 0 0 8H9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
+          <button type="button" className="pe-icon-button pe-mobile-only" aria-label="More editor options" aria-expanded={mobileMenu} aria-controls="pe-more-options" onClick={() => { if (!mobileMenu) stopMobileTools(); setMobileMenu((value) => !value); }}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h1m3.5 0h1M12 8h1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg></button>
+          <div id="pe-more-options" className="pe-more-options" onKeyDown={(event) => { if (event.key === 'Escape') { setMobileMenu(false); rootRef.current?.querySelector('[aria-controls="pe-more-options"]')?.focus(); } }}>
           <div className="pe-compare" role="group" aria-label="Compare">
             {[['edited', 'Edited'], ['original', 'Original'], ['split', 'Split']].map(([value, label]) => (
               <button key={value} type="button" aria-pressed={compare === value} disabled={!ready} onClick={() => setCompare(value)}>{label}</button>
@@ -1629,6 +1670,8 @@ function EditorWorkspace({ host }) {
               : <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />}</svg>
           </button>
           {sessionButtons('pe-session')}
+          {narrow && <button type="button" className="pe-text-button" disabled={!ready || (!targetLocal && Boolean(targetLayer?.locked)) || isNeutral(panelAdjustments)} onClick={() => { panelDispatch({ type: 'resetAll' }); setMobileMenu(false); }}>Reset current adjustments</button>}
+          </div>
           <input ref={editsInputRef} type="file" accept="application/json,.json" hidden onChange={(event) => { openEdits(event.target.files[0]); event.target.value = ''; }} />
         </div>
       </header>
@@ -1734,7 +1777,7 @@ function EditorWorkspace({ host }) {
             onPreview: (layers) => dispatch({ type: 'previewSettings', patch: { layers } }),
             onCommit: () => dispatch({ type: 'commitAdjustment' }),
             onApply: (layers, coalesceKey = null) => dispatch({ type: 'applySettings', patch: { layers }, coalesceKey }),
-            onEdit: (id) => { setActiveLayer(id); setMobilePanel('adjust'); setTextFocus((count) => count + 1); },
+            onEdit: (id) => { setActiveLayer(id); setMobilePanel('adjust'); setMobileTool('text'); setTextFocus((count) => count + 1); },
           } : null}
           maskTool={maskTarget && !transformMode ? {
             owner: maskTarget.kind === 'local' ? { kind: 'local', id: maskTarget.local.id } : { kind: 'layer', layer: maskTarget.layer },
@@ -1781,8 +1824,10 @@ function EditorWorkspace({ host }) {
         {!state.photos.length && (
           <div className="pe-empty">
             <p className="pe-empty__title">Edit photographs in your browser</p>
-            <p>Drop JPEG, PNG, WebP or RAW ({RAW_EXTENSION_LIST}) files here, or</p>
+            <p>JPEG, PNG, WebP and supported camera RAW files.</p>
             <button type="button" className="pe-button pe-button--primary pe-button--large" onClick={openPicker}>Choose photos</button>
+            {narrow && <button type="button" className="pe-text-button" onClick={() => setHdrOpen(true)}>Merge HDR</button>}
+            <details className="pe-empty__formats"><summary>Supported RAW formats</summary><p>{RAW_EXTENSION_LIST}</p></details>
             <p className="pe-note">Your photographs are decoded, edited and exported on this device. They are never uploaded, and no account is needed.</p>
           </div>
         )}
@@ -1869,9 +1914,17 @@ function EditorWorkspace({ host }) {
         </div>
       </main>
 
-      <aside className="pe-inspector" aria-label="Adjustments and export">
+      {ready && <div className="pe-mobile-tools">
+        {mobileTool ? <div className="pe-mobile-tools__head">
+          <label><span className="visually-hidden">Editing tool</span><select aria-label="Editing tool" value={mobileTool} onChange={(event) => selectMobileTool(event.target.value)}>{mobileTools.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+          <button type="button" className="pe-text-button" onClick={() => selectMobileTool(null)}>Close tools</button>
+        </div> : <nav aria-label="Editing tools" className="pe-mobile-tools__list">{mobileTools.map(([id, label]) => <button type="button" className="pe-text-button" key={id} data-mobile-choice={id} onClick={() => selectMobileTool(id)}>{label}</button>)}</nav>}
+      </div>}
+      <aside className="pe-inspector" onScroll={(event) => { if (narrow) mobileScroll.current.set(mobileScrollKey, event.currentTarget.scrollTop); }} aria-label="Adjustments and export">
         <div className="pe-inspector__section" data-section="adjust">
           <LayersPanel
+            compact={narrow && mobileTool === 'layers'}
+            onClose={() => selectMobileTool(null)}
             layers={adjustments.layers}
             activeId={activeLayer}
             disabled={!ready}
@@ -1883,7 +1936,7 @@ function EditorWorkspace({ host }) {
             onCommit={() => dispatch({ type: 'commitAdjustment' })}
             onAddText={addTextLayer}
             onAddAdjustment={addAdjustmentLayer}
-            onEditSettings={() => setMobilePanel('adjust')}
+            onEditSettings={() => { setMobilePanel('adjust'); setMobileTool('light'); }}
             tool={layerToolOn}
             onTool={(on) => { if (!transformMode) setLayerToolOn(on); }}
             freeResize={freeResize}
@@ -1891,6 +1944,8 @@ function EditorWorkspace({ host }) {
           />
           <input ref={layerInputRef} type="file" accept={ACCEPT} hidden data-layer-input onChange={(event) => { onLayerFile(event.target.files[0]); event.target.value = ''; }} />
           <RetouchPanel
+            compact={narrow && mobileTool === 'retouch'}
+            onClose={() => selectMobileTool(null)}
             disabled={!ready}
             operations={ready ? adjustments.retouch : []}
             tool={retouchTool}
@@ -1909,6 +1964,8 @@ function EditorWorkspace({ host }) {
             onAreaFor={(id) => { setRetouchArea(id); if (id) { setRetouchTool(null); setRetouchSelected(id); } }}
           />
           <MaskPanel
+            compact={narrow && mobileTool === 'masks'}
+            onClose={() => selectMobileTool(null)}
             disabled={!ready}
             locals={ready ? adjustments.local : []}
             layer={maskLayer}
@@ -1929,9 +1986,11 @@ function EditorWorkspace({ host }) {
             onPreviewMask={previewMask}
             onCommit={() => dispatch({ type: 'commitAdjustment' })}
             newId={newLayerId}
-            onEditSettings={() => setMobilePanel('adjust')}
+            onEditSettings={() => { setMobilePanel('adjust'); setMobileTool('light'); }}
           />
           <AdjustPanel
+            mobileSection={narrow ? mobileTool : undefined}
+            onMobileSectionChange={selectMobileTool}
             adjustments={panelAdjustments}
             layer={targetLocal ? { label: targetLocal.name || 'Local adjustment', local: true } : targetLayer ? { label: layerLabel(targetLayer), adjustment: targetLayer.type === 'adjustment' } : null}
             disabled={!ready || (!targetLocal && Boolean(targetLayer?.locked))}
@@ -2001,7 +2060,7 @@ function EditorWorkspace({ host }) {
 
       <nav className="pe-tabs" aria-label="Editor panels">
         {[['library', 'Photos'], ['adjust', 'Adjust'], ['export', 'Export']].map(([value, label]) => (
-          <button key={value} type="button" aria-pressed={mobilePanel === value} onClick={() => setMobilePanel(value)}>{label}</button>
+          <button key={value} type="button" aria-pressed={mobilePanel === value} disabled={!ready && value !== 'library'} onClick={() => { stopMobileTools(); setMobilePanel(value); setMobileMenu(false); }}>{label}</button>
         ))}
       </nav>
 

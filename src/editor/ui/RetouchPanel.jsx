@@ -12,23 +12,23 @@ const MAX_RADIUS = RETOUCH_LIMITS.radius[1];
  * :param operations: adjustments.retouch of the photo
  * :param clone: { source, aligned, offset }
  */
-export default function RetouchPanel({ disabled, operations, tool, onTool, brush, onBrush, clone, onClone, picking, onPicking, selectedId, onSelect, onApply, message, areaFor = null, onAreaFor = () => {} }) {
+export default function RetouchPanel({ compact = false, onClose, disabled, operations, tool, onTool, brush, onBrush, clone, onClone, picking, onPicking, selectedId, onSelect, onApply, message, areaFor = null, onAreaFor = () => {} }) {
   const [open, setOpen] = useState(false);
   const bodyId = useId();
   const selected = operations.find(({ id }) => id === selectedId) ?? null;
   const set = (patch) => onBrush({ ...brush, ...patch });
   return (
-    <section className="pe-panel pe-masks pe-retouch" aria-labelledby="pe-retouch-title" data-open={open || undefined}>
+    <section className="pe-panel pe-masks pe-retouch" aria-labelledby="pe-retouch-title" data-open={open || compact || undefined}>
       <div className="pe-panel__head">
         <h2 id="pe-retouch-title">
-          <button type="button" className="pe-section__toggle" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen((value) => !value)}>
+          <button type="button" className="pe-section__toggle" aria-expanded={open || compact} aria-controls={bodyId} onClick={() => compact ? onClose?.() : setOpen((value) => !value)}>
             <svg className="pe-section__chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
             <span>Retouch</span> <span className="pe-count mono">{operations.length}</span>
           </button>
         </h2>
         {tool && <button type="button" className="pe-text-button" onClick={() => onTool(null)} title="Stop retouching (Esc)">Done</button>}
       </div>
-      <div id={bodyId} hidden={!open && !tool}>
+      <div id={bodyId} hidden={!open && !tool && !compact}>
         <div className="pe-masks__tools" role="group" aria-label="Retouch tool">
           {TOOLS.map(([id, label, key]) => (
             <button key={id} type="button" className="pe-button" aria-pressed={tool === id} disabled={disabled || (!tool && operations.length >= RETOUCH_LIMITS.operations)} onClick={() => onTool(tool === id ? null : id)} title={`${label} (${key})`}>{label}</button>

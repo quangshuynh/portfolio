@@ -59,7 +59,7 @@ function Section({ id, title, open, onToggle, edited, onReset, resetDisabled, ch
  *   Tone Curve, LUT, the colour parts of Creative and Presets are shown; with `local: true` (a
  *   local adjustment) only Light, Color, HSL and Detail
  */
-export default function AdjustPanel({ adjustments, disabled, dispatch, lut, presets, recipes = null, raw = null, exposureSamples = null, hdr = null, geometry = null, text = null, thumbnails = null, layer = null, watermark = null }) {
+export default function AdjustPanel({ mobileSection, onMobileSectionChange, adjustments, disabled, dispatch, lut, presets, recipes = null, raw = null, exposureSamples = null, hdr = null, geometry = null, text = null, thumbnails = null, layer = null, watermark = null }) {
   const [open, setOpen] = useState(readOpenSections);
   // Editing a text's wording from the photo opens the Text section.
   useEffect(() => { if (text?.focusRequest) setOpen((current) => ({ ...current, text: true })); }, [text?.focusRequest]);
@@ -70,19 +70,21 @@ export default function AdjustPanel({ adjustments, disabled, dispatch, lut, pres
   });
   // `lazy` sections (many controls) render their body only while open.
   const section = (id, title, children, { reset = true, edited, lazy = false } = {}) => {
+    if (mobileSection !== undefined && mobileSection !== id) return null;
+    const expanded = mobileSection === id || Boolean(open[id]);
     const neutral = groupIsNeutral(adjustments, id);
     return (
       <Section
         key={id}
         id={id}
         title={title}
-        open={Boolean(open[id])}
-        onToggle={() => toggle(id)}
+        open={expanded}
+        onToggle={() => mobileSection !== undefined ? onMobileSectionChange?.(null) : toggle(id)}
         edited={edited ?? !neutral}
         onReset={reset ? () => dispatch({ type: 'resetGroup', group: id }) : null}
         resetDisabled={disabled || neutral}
       >
-        {lazy && !open[id] ? null : children}
+        {lazy && !expanded ? null : children}
       </Section>
     );
   };
