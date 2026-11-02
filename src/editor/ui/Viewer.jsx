@@ -913,6 +913,22 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
   // Touches on the mask tool reach here too: one of them paints (no pan), two pinch.
   const pointersRef = useRef(new Map());
   const toolPointersRef = useRef(new Set());
+  useEffect(() => {
+    const interrupt = () => {
+      pointersRef.current.clear();
+      toolPointersRef.current.clear();
+      dragRef.current = null;
+    };
+    const hidden = () => { if (document.hidden) interrupt(); };
+    window.addEventListener('blur', interrupt);
+    document.addEventListener('visibilitychange', hidden);
+    interrupt();
+    return () => {
+      interrupt();
+      window.removeEventListener('blur', interrupt);
+      document.removeEventListener('visibilitychange', hidden);
+    };
+  }, [photo?.id, maskTool?.tool, retouchTool?.tool]);
   const stagePoint = (x, y) => {
     const rect = stageRef.current.getBoundingClientRect();
     return { x: x - rect.left, y: y - rect.top };
@@ -932,6 +948,11 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
   };
   const onPointerDown = (event) => {
     if (!proxy || event.button !== 0 || event.target.closest('.pe-split')) return;
+    if (event.pointerType === 'touch' && event.isPrimary) {
+      pointersRef.current.clear();
+      toolPointersRef.current.clear();
+      dragRef.current = null;
+    }
     // The mask tool keeps its own pointer capture (it paints with that finger).
     if ((maskTool?.tool || retouchTool?.tool) && event.target.closest('.pe-masktool')) toolPointersRef.current.add(event.pointerId);
     else try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* a pointer already gone (or synthetic) */ }
@@ -1078,6 +1099,7 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
         />
         {maskTool?.editable && proxy && proxy.id === photo?.id && !transform && !inspect && compare !== 'original' && (
           <MaskTool
+            key={`${photo?.id}:${maskTool.owner.id ?? maskTool.owner.layer?.id}`}
             mask={maskTool.mask}
             map={ownerMaskMap(maskTool.owner, { width: sourceWidth, height: sourceHeight }, plan, native)}
             box={{ x: offsetX, y: offsetY, width: displayWidth, height: displayHeight }}

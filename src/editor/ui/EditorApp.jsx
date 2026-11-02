@@ -51,6 +51,7 @@ import PhotoThumb from './PhotoThumb';
 import RecipeDialog from './RecipeDialog';
 import Viewer from './Viewer';
 import useFullscreen from '../../components/utilities/useFullscreen';
+import useEditorViewport from './useEditorViewport';
 import './editor.css';
 
 export const AUTOSAVE_KEY = 'photo-editor:edits:v1';
@@ -294,6 +295,7 @@ function EditorWorkspace({ host }) {
   const editsInputRef = useRef(null);
   // Fullscreen (or, where the API is missing, a focus mode): the photo and its controls only.
   const rootRef = useRef(null);
+  useEditorViewport(rootRef);
   const fullscreen = useFullscreen(rootRef);
   const [compare, setCompare] = useState('edited');
   const [split, setSplit] = useState(0.5);

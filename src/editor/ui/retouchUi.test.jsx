@@ -54,6 +54,18 @@ describe('retouch tool on the photo, by touch', () => {
     expect(onCommit).not.toHaveBeenCalled();
   });
 
+  test('losing focus drops a stroke and clears interrupted touch pointers', () => {
+    const { layer, onCommit, onPreview } = renderTool();
+    touch(layer, 'pointerDown', 1, 100, 100, true);
+    fireEvent.blur(window);
+    touch(layer, 'pointerUp', 1, 100, 100);
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(onPreview).toHaveBeenLastCalledWith(null);
+    touch(layer, 'pointerDown', 2, 100, 100, true);
+    touch(layer, 'pointerUp', 2, 100, 100);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+  });
+
   test('Set source by touch follows the finger and takes the point where it lifts; Alt-click still sets it at once', () => {
     const { layer, onSource, rerender } = renderTool({ tool: 'clone', picking: true });
     touch(layer, 'pointerDown', 1, 60, 80, true);

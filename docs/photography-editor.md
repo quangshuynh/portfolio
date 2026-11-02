@@ -25,9 +25,29 @@ to the picker and stops active brush/source-selection modes. Photos contains the
 library and batch actions; the top-bar overflow contains comparison, fullscreen
 and edit-document actions. The empty workspace shows import and a separate saved
 settings notice. Chrome remains neutral dark in either site theme for colour judgement.
-The viewport uses `dvh` and safe-area insets; fit zoom follows canvas resizing.
-`npm run check:editor:mobile` checks the real UI in three engines; emulation does not
-verify physical Safari browser chrome or the software keyboard.
+The viewport follows `visualViewport` height/offset (with `dvh` fallback), safe-area
+insets, fullscreen changes and page restoration. Browser page zoom remains available.
+Keyboard entry scrolls only the focused field's tray and temporarily hides zoom controls;
+closing it restores the workspace without changing edits. Short landscape screens put
+the tray beside the canvas. Mask and retouch strokes cancel on interruption; an extra
+finger during a pinch cannot start a mask stroke.
+`npm run check:editor:mobile` checks three engines at 320–1280 px, landscape, and a
+mocked visual-viewport keyboard contract. Captures and timings stay in a temporary
+directory (`EDITOR_MOBILE_OUTPUT` overrides it). These are not physical Safari tests.
+The keyboard contract covers adjustment values, layer names, text, presets, watermark
+values and export suffixes. Three export/tool-switch cycles report Chromium post-GC
+JavaScript heap; GPU buffers and native decoder allocations are not included.
+
+**iPhone 16e acceptance:** after building, run `npm run preview -- --host 0.0.0.0`
+and open `http://<PC-LAN-IP>:4173/photography/editor/` on the same Wi-Fi, or use an
+owner-approved deployment. This serves the public build, not the local CMS.
+Import a JPEG and RAW; adjust, crop, mask, retouch, watermark, undo/redo and export.
+Open/close the keyboard in text, rename, numeric, preset and export fields; rotate,
+toggle fullscreen, collapse browser chrome, background Safari and return. Check that
+controls stay reachable, values survive, pinch never paints, and the downloaded file opens.
+Record failures as: iOS version / URL + commit / photo format + dimensions / tool /
+steps / expected vs actual / portrait or landscape / keyboard + browser toolbar state.
+Attach a screen recording and saved edit JSON if shareable; do not attach private originals.
 
 ## Layout of the code
 

@@ -227,6 +227,34 @@ describe('mask tool on the photo', () => {
     expect(onCommit).not.toHaveBeenCalled();
   });
 
+  test('a finger returning during a pinch cannot start a mask stroke', () => {
+    const { layer, onCommit } = renderTool({ tool: 'brush' });
+    const touch = (type, pointerId) => pointer(layer, type, 100, 100, { pointerType: 'touch', pointerId });
+    touch('pointerDown', 1);
+    touch('pointerDown', 2);
+    touch('pointerUp', 2);
+    touch('pointerDown', 3);
+    touch('pointerUp', 3);
+    touch('pointerUp', 1);
+    expect(onCommit).not.toHaveBeenCalled();
+    touch('pointerDown', 4);
+    touch('pointerUp', 4);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+  });
+
+  test('switching tools or losing focus abandons an unfinished mask', () => {
+    const { layer, onCommit, onPreview, rerender } = renderTool({ tool: 'brush' });
+    pointer(layer, 'pointerDown', 100, 100);
+    rerender({ tool: 'linear' });
+    pointer(layer, 'pointerUp', 200, 200);
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(onPreview).toHaveBeenLastCalledWith(createMask('image'));
+    pointer(layer, 'pointerDown', 100, 100);
+    fireEvent.blur(window);
+    pointer(layer, 'pointerUp', 200, 200);
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
   test('dragging out a linear gradient sets its start and end; a click alone adds nothing', () => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { callback(); return 1; });
     const { layer, onCommit } = renderTool({ tool: 'linear' });

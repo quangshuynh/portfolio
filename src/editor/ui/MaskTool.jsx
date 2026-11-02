@@ -28,6 +28,9 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
   const frameRef = useRef(0);
   const cursorRef = useRef(null);
   const rectRef = useRef(null);
+  const touchesRef = useRef(new Set());
+  const previewRef = useRef(onPreview);
+  previewRef.current = onPreview;
   const inverse = useMemo(() => invert3(map.matrix), [map]);
   const k = box.width / output.width;
   const short = Math.min(map.width, map.height);
@@ -65,7 +68,23 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
   };
   const hideCursor = () => { if (cursorRef.current) cursorRef.current.hidden = true; };
 
-  useEffect(() => () => cancelAnimationFrame(frameRef.current), []);
+  const abandon = () => {
+    cancelAnimationFrame(frameRef.current);
+    const drag = dragRef.current;
+    dragRef.current = null;
+    if (drag) previewRef.current(drag.origin);
+  };
+  useEffect(() => abandon, [tool]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const interrupt = () => { abandon(); touchesRef.current.clear(); };
+    const hidden = () => { if (document.hidden) interrupt(); };
+    window.addEventListener('blur', interrupt);
+    document.addEventListener('visibilitychange', hidden);
+    return () => {
+      window.removeEventListener('blur', interrupt);
+      document.removeEventListener('visibilitychange', hidden);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const preview = (next) => {
     dragRef.current.latest = next;
     cancelAnimationFrame(frameRef.current);
@@ -123,6 +142,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
 
   const startHandle = (event, component, handle) => {
     if (event.button !== 0) return;
+    if (event.pointerType === 'touch' && touchesRef.current.size > 1) return;
     event.stopPropagation();
     event.preventDefault();
     try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* a synthetic pointer */ }
@@ -158,8 +178,15 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     preview(updateComponent(mask, c.id, patch));
   };
 
+  const trackTouch = (event) => {
+    if (event.pointerType === 'touch') {
+      if (event.isPrimary) touchesRef.current.clear();
+      touchesRef.current.add(event.pointerId);
+      if (touchesRef.current.size > 1) abandon();
+    }
+  };
   const onPointerDown = (event) => {
-    if (event.button !== 0 || !tool) return;
+    if (event.button !== 0 || !tool || (event.pointerType === 'touch' && touchesRef.current.size > 1)) return;
     // Touches also reach the viewer, which pinch-zooms with two fingers (one finger paints here).
     if (event.pointerType !== 'touch') event.stopPropagation();
     event.preventDefault();
@@ -195,6 +222,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     }
   };
   const onPointerUp = (event) => {
+    touchesRef.current.delete(event.pointerId);
     const drag = dragRef.current;
     if (!drag || drag.pointer !== event.pointerId) return;
     if (event.pointerType !== 'touch') event.stopPropagation();
@@ -317,6 +345,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     <div
       className="pe-masktool"
       data-tool={tool ?? 'handles'}
+      onPointerDownCapture={trackTouch}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
