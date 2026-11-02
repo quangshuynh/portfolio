@@ -76,6 +76,16 @@ export default function RetouchTool({ map, box, output, tool, brush, operations,
   // Another tool or photo (or leaving the editor) mid-stroke: the stroke never lands on it.
   const mapKey = maskMapKey(map);
   useEffect(() => abandon, [tool, mapKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const interrupt = () => { abandon(); touchesRef.current.clear(); };
+    const hidden = () => { if (document.hidden) interrupt(); };
+    window.addEventListener('blur', interrupt);
+    document.addEventListener('visibilitychange', hidden);
+    return () => {
+      window.removeEventListener('blur', interrupt);
+      document.removeEventListener('visibilitychange', hidden);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The offset a clone stroke starting at (u, v) uses.
   const cloneOffset = (u, v) => {

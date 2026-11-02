@@ -1,3 +1,4 @@
+import { openEditorTool } from './editor-mobile-controls.mjs';
 // QuangEdit in the local CMS, end to end in real browsers (Playwright builds of Chromium,
 // Firefox and WebKit; iPhone 13 and Pixel 7 emulation; a forced CPU preview). Starts the CMS
 // with Vite against this checkout (offline, a temporary workspace; no branch, push or GitHub
@@ -186,6 +187,7 @@ try {
         return { restoredBadge: restored, engine: await page.$eval('.pe', (el) => el.dataset.engine) };
       });
       await step('paste a recipe, review and merge it (mask and rotation kept)', async () => {
+        await openEditorTool(page, 'recipes');
         const toggle = page.locator('.pe-section[data-section-id=recipes] .pe-section__toggle');
         if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
         await page.getByRole('button', { name: 'Paste settings…' }).click();
@@ -239,6 +241,7 @@ try {
         await page.waitForSelector('.pe-photo[data-status=ready]', { state: 'attached', timeout: 60_000 });
         // Each run takes its own published photograph, so runs never see another's treatment.
         // Edit it: one recipe application is enough to differ from the live image.
+        await openEditorTool(page, 'recipes');
         const toggle = page.locator('.pe-section[data-section-id=recipes] .pe-section__toggle');
         if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
         await page.getByRole('button', { name: 'Paste settings…' }).click();

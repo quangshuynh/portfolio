@@ -1,3 +1,4 @@
+import { openEditorTool } from './editor-mobile-controls.mjs';
 // Masks check of /photography/editor: GPU/CPU parity of masked passes (dev server,
 // src/editor/dev/layerParity.html), then on a production build in Chromium, Firefox and WebKit
 // (Playwright builds; WebKit is not Safari on iOS), iPhone 13 and Pixel 7 emulation and a forced
@@ -260,13 +261,18 @@ async function runOne(run, files) {
     const { data, info } = await sharp(await download.path()).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     return { data, width: info.width, height: info.height };
   };
+  let lastMaskTool = 'Brush';
   const setValue = async (label, value) => {
     await tab(2);
+    await openEditorTool(page, ['Saturation', 'Temperature'].includes(label) ? 'color' : label === 'Clarity' ? 'detail' : 'light');
     const field = page.getByRole('textbox', { name: `${label} value` });
     await field.fill(value);
     await field.press('Enter');
+    if (run.device) { await openEditorTool(page, 'masks'); await page.locator('.pe-masks__tools button', { hasText: new RegExp(`^${lastMaskTool}$`) }).click(); }
   };
   const newLocal = async (type) => {
+    lastMaskTool = type;
+    await openEditorTool(page, 'masks');
     await tab(2);
     await page.locator('.pe-masks__add[aria-label="New local adjustment"] button', { hasText: new RegExp(`^${type}$`) }).click();
     await page.locator('.pe-masktool').waitFor();
@@ -278,6 +284,7 @@ async function runOne(run, files) {
     return savedWhen(name, (v) => JSON.stringify(v.local ?? []) === JSON.stringify(normalizeAdjustments(document.photos[0].adjustments).local), 'document applied');
   };
   const openDetail = async () => {
+    await openEditorTool(page, 'detail');
     const toggle = page.locator('.pe-panel--adjust .pe-section__toggle', { hasText: /^Detail/ });
     if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
   };
@@ -399,7 +406,7 @@ async function runOne(run, files) {
       assert.ok(diff.ok, `reopened export differs: ${JSON.stringify(diff)}`);
     });
     await step('geometry, a masked multiply adjustment layer and a masked image layer: export equals the reference', async () => {
-      await tab(2);
+      await tab(2); await openEditorTool(page, 'layers');
       await page.setInputFiles('[data-layer-input]', files.overFile);
       await page.locator('.pe-layer[data-type=image]').waitFor();
       const current = await savedWhen('masks-base.png', (v) => v.layers?.length === 1, 'image layer');
@@ -420,7 +427,7 @@ async function runOne(run, files) {
       assert.ok(diff.ok, `export differs from the reference: ${JSON.stringify(diff)}`);
     });
     await step('overlay and greyscale mask view; Masks panel keyboard: M toggles the tool, O the overlay', async () => {
-      await tab(2);
+      await tab(2); await openEditorTool(page, 'masks');
       await page.locator('.pe-mask-row__name').first().click();
       await poll(() => page.evaluate(() => !document.querySelector('.pe-mask-overlay').hidden), Boolean, 'overlay shown');
       await page.locator('.pe-masks select').filter({ hasText: 'Mask in greyscale' }).selectOption('mask');

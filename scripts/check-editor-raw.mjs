@@ -1,3 +1,4 @@
+import { openEditorTool, editorOptions } from './editor-mobile-controls.mjs';
 // RAW check of /photography/editor on a production build, in Chromium, Firefox and
 // WebKit (Playwright builds; WebKit is not Safari on iOS) plus phone emulation and a
 // forced CPU preview. Each run: GPU/CPU parity of the RAW shader (dev server), import of
@@ -147,7 +148,7 @@ async function runOne(run, files, reference) {
       await poll(() => page.evaluate(() => !document.querySelector('.pe-stage-message') && !document.querySelector('.pe-canvas-host').hidden), Boolean, 'RAW preview', 60_000);
     });
     await step('RAW panel, white balance and undo', async () => {
-      await tab(2);
+      await tab(2); await openEditorTool(page, 'raw');
       const panel = page.locator('.pe-section[data-section-id=raw]');
       assert.match(await panel.textContent(), /Synthetic Test DNG.*1\/125 s · f\/5\.6/);
       // A new import starts with Camera Natural; switching re-renders the cached proxy (time to the next frames).
@@ -176,13 +177,16 @@ async function runOne(run, files, reference) {
       assert.notEqual(await temperature.inputValue(), '4000 K');
       await page.click('button[aria-label=Redo]');
       await poll(() => temperature.inputValue(), (value) => value === '4000 K', 'redo');
+      await openEditorTool(page, 'light');
       const exposure = page.locator('input[aria-label="Exposure value"]');
       await exposure.fill('0.5');
       await exposure.press('Enter');
       await poll(() => exposure.inputValue(), (value) => value === '+0.50 EV', 'exposure');
+      await editorOptions(page, true);
       await page.click('.pe-compare button:nth-child(3)');
       assert.equal(await page.locator('.pe-split__handle').count(), 1);
       await page.click('.pe-compare button:nth-child(1)');
+      await editorOptions(page, false);
     });
     await step('RAW export equals the Node reference, named -quangedit', async () => {
       await tab(3);
@@ -225,7 +229,7 @@ async function runOne(run, files, reference) {
         genuine.previewMs = Date.now() - started;
         genuine.afterPreviewMb = memoryMb(profile);
         // Auto Exposure read the camera's embedded preview in the RAW worker (browser JPEG decoder).
-        await tab(2);
+        await tab(2); await openEditorTool(page, 'raw');
         genuine.autoExposure = (await page.getByTestId('raw-auto-exposure').textContent()).trim();
         assert.match(genuine.autoExposure, /camera's own rendering|matches the camera/, `Auto Exposure did not use the camera preview: ${genuine.autoExposure}`);
         await tab(3);
@@ -260,10 +264,10 @@ async function runOne(run, files, reference) {
         await page.click('.pe-photo--list:last-child button.pe-photo__select');
         await poll(() => page.evaluate(() => [document.querySelector('.pe-canvas')?.width, document.querySelector('.pe-canvas')?.height, Boolean(document.querySelector('.pe-stage-message'))]), ([w, h, busy]) => w === 1542 && h === 2322 && !busy, 'NEF preview', 120_000);
         nef.previewMs = Date.now() - started;
-        await tab(2);
+        await tab(2); await openEditorTool(page, 'raw');
         nef.autoExposure = (await page.getByTestId('raw-auto-exposure').textContent()).trim();
         assert.match(nef.autoExposure, /camera's own rendering|matches the camera/, `Auto Exposure did not use the camera preview: ${nef.autoExposure}`);
-        await tab(2);
+        await tab(2); await openEditorTool(page, 'raw');
         const exposure = page.getByRole('textbox', { name: 'Exposure value' });
         await exposure.scrollIntoViewIfNeeded();
         await exposure.fill('0.5');

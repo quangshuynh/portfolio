@@ -1,3 +1,4 @@
+import { openEditorTool } from './editor-mobile-controls.mjs';
 // Retouch check of /photography/editor on a production build in Chromium, Firefox and WebKit
 // (Playwright builds; WebKit is not Safari on iOS), iPhone 13 and Pixel 7 emulation (touch) and
 // a forced CPU preview. Each run: Spot Heal by click or tap on a dark blemish (the preview
@@ -157,12 +158,11 @@ async function runOne(run, files) {
   const pointer = (type, at, extra = {}) => tool().dispatchEvent(type, { button: 0, pointerId: 7, clientX: at.x, clientY: at.y, pointerType, buttons: type === 'pointerup' ? 0 : 1, ...extra });
   const choose = async (label, key) => {
     if (phone) {
-      await tab(2);
+      await openEditorTool(page, 'retouch');
       const toggle = page.locator('#pe-retouch-title .pe-section__toggle');
-      if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+      if (await toggle.count() && await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
       await page.locator('.pe-retouch .pe-masks__tools button', { hasText: label }).click();
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, 'horizontal scroll with the Retouch panel open');
-      await tab(1);
     } else {
       await page.locator('body').click({ position: { x: 2, y: 2 } }).catch(() => {});
       await page.keyboard.press(key);
@@ -229,9 +229,8 @@ async function runOne(run, files) {
       const source = { u: SCRATCH[0].u, v: SCRATCH[0].v - 0.06 };
       const sourceAt = await photoPoint(source);
       if (phone) {
-        await tab(2);
+        await openEditorTool(page, 'retouch');
         await page.locator('.pe-retouch button', { hasText: 'Set source' }).click();
-        await tab(1);
         await pointer('pointerdown', sourceAt);
         await pointer('pointerup', sourceAt);
       } else {
@@ -288,7 +287,7 @@ async function runOne(run, files) {
     if (!phone) {
       await step('a source area for the removal', async () => {
         await page.keyboard.press('Escape');
-        await tab(2);
+        await openEditorTool(page, 'retouch');
         const panel = page.locator('#pe-retouch-title .pe-section__toggle');
         if (await panel.getAttribute('aria-expanded') !== 'true') await panel.click();
         const id = (await saved('retouch.png')).retouch[2].id;
@@ -333,7 +332,6 @@ async function runOne(run, files) {
         const count = async () => (await saved('retouch.png')).retouch.length;
         // Each gesture's first finger is the primary pointer, as on a phone.
         const touch = (type, id, at, primary = false) => tool().dispatchEvent(type, { button: 0, pointerId: id, isPrimary: primary, clientX: at.x, clientY: at.y, pointerType: 'touch', buttons: type === 'pointerup' ? 0 : 1 });
-        await tab(1);
         await page.getByRole('button', { name: 'Fit' }).click();
         await choose('Spot Heal', 'j');
         const before = await count();
@@ -386,9 +384,8 @@ async function runOne(run, files) {
         await page.getByRole('button', { name: 'Fit' }).click();
         // Set source on touch: the marker follows the finger; the source is where it lifts.
         await choose('Clone Stamp', 's');
-        await tab(2);
+        await openEditorTool(page, 'retouch');
         await page.locator('.pe-retouch button', { hasText: 'Set source' }).click();
-        await tab(1);
         const p1 = await photoPoint({ u: 0.7, v: 0.2 });
         const target = { u: 0.75, v: 0.25 };
         const p2 = await photoPoint(target);
@@ -397,9 +394,8 @@ async function runOne(run, files) {
         assert.equal(await page.locator('.pe-retouch-marker').evaluate((marker) => !marker.hidden && marker.style.transform.includes('translate')), true, 'source marker under the finger');
 
         await touch('pointerup', 17, p2);
-        await tab(2);
+        await openEditorTool(page, 'retouch');
         await page.locator('[data-clone-source=set]').waitFor();
-        await tab(1);
         const start = { u: 0.15, v: 0.15 };
         const s = await photoPoint(start);
         await touch('pointerdown', 18, s, true);
@@ -409,14 +405,12 @@ async function runOne(run, files) {
         const op = value.retouch.at(-1);
         assert.ok(Math.abs(op.offset.x - (target.u - op.points[0][0])) < 0.006 && Math.abs(op.offset.y - (target.v - op.points[0][1])) < 0.006, `source where the finger lifted: ${JSON.stringify(op.offset)}`);
         // Touch targets and scrolling.
-        await tab(2);
+        await openEditorTool(page, 'retouch');
         const small = await page.$$eval('.pe-retouch button, .pe-retouch input[type=range]', (items) => items.filter((el) => el.offsetParent && el.getBoundingClientRect().height < 43 && el.type !== 'range').map((el) => el.textContent.trim() || el.getAttribute('aria-label')));
         assert.deepEqual(small, [], `retouch controls under 44 px: ${small}`);
-        await tab(1);
         const row = page.locator(`[data-retouch-id="${op.id}"] .pe-mask-row__name`);
-        await tab(2);
+        await openEditorTool(page, 'retouch');
         if (await row.getAttribute('aria-pressed') !== 'true') await row.click();
-        await tab(1);
         const handle = await page.locator('.pe-retouch-source').boundingBox();
         assert.ok(handle && handle.width >= 43 && handle.height >= 43, `source handle ${JSON.stringify(handle)}`);
         assert.deepEqual(await page.evaluate(() => [window.scrollX, window.scrollY, document.scrollingElement.scrollTop]), [0, 0, 0], 'the page did not scroll');
@@ -428,10 +422,10 @@ async function runOne(run, files) {
 
     if (!phone) {
       await step('a 90° turn keeps every repair on its target', async () => {
-        await tab(2);
+        await openEditorTool(page, 'retouch');
         const toggle = page.locator('.pe-section[data-section-id=geometry] .pe-section__toggle');
         await toggle.scrollIntoViewIfNeeded();
-        if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+        if (await toggle.count() && await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
         await page.getByRole('button', { name: 'Rotate 90° clockwise' }).click();
         const value = await savedWhen('retouch.png', (a) => a.geometry?.quarterTurns === 1 || a.geometry?.rotate === 90 || a.geometry?.turns === 1 || JSON.stringify(a.geometry ?? {}) !== '{}', 'turn saved');
         const exported = await exportFile();
@@ -531,7 +525,7 @@ async function runOne(run, files) {
           const exportMs = Date.now() - started;
           const retouched = await decode(withRetouch.file);
           // The same photo without retouch: turn both operations off.
-          await tab(2);
+          await openEditorTool(page, 'retouch');
           const panel = page.locator('#pe-retouch-title .pe-section__toggle');
           if (await panel.getAttribute('aria-expanded') !== 'true') await panel.click();
           for (const op of value.retouch) await page.locator(`[data-retouch-id="${op.id}"] .pe-layer__toggle`).click();
@@ -556,14 +550,13 @@ async function runOne(run, files) {
           const names = RAW_FILES.map((file) => path.basename(file));
           for (const name of names) {
             await select(name);
-            await tab(2);
+            await openEditorTool(page, 'retouch');
             const panel = page.locator('#pe-retouch-title .pe-section__toggle');
             if (await panel.getAttribute('aria-expanded') !== 'true') await panel.click();
             for (const op of plains[name].ops) await page.locator(`[data-retouch-id="${op.id}"] .pe-layer__toggle`).click();
             await savedWhen(name, (a) => a.retouch.every(({ enabled }) => enabled), 'repairs on');
           }
-          await tab(1);
-          const items = page.locator('.pe-photo--list');
+            const items = page.locator('.pe-photo--list');
           const index = async (name) => (await items.evaluateAll((list, wanted) => list.findIndex((li) => li.querySelector('.pe-photo__select')?.getAttribute('aria-label')?.startsWith(wanted)), name));
           await select(names[0]);
           await items.nth(await index(names[1])).locator('.pe-photo__check').check();
@@ -749,7 +742,7 @@ async function checkHdr({ page, result, step, tab, choose, pointer, photoPoint, 
       result.hdr.previewVsExport = { insideRepairs: +(inSum / inN).toFixed(2), elsewhere: +(outSum / outN).toFixed(2) };
       assert.ok(inSum / inN < outSum / outN + 4, `preview and export disagree at the repairs: ${JSON.stringify(result.hdr.previewVsExport)}`);
     }
-    await tab(2);
+    await openEditorTool(page, 'retouch');
     const panel = page.locator('#pe-retouch-title .pe-section__toggle');
     if (await panel.getAttribute('aria-expanded') !== 'true') await panel.click();
     for (const op of ops) await page.locator(`[data-retouch-id="${op.id}"] .pe-layer__toggle`).click();
@@ -783,7 +776,7 @@ async function checkHdr({ page, result, step, tab, choose, pointer, photoPoint, 
     await saved((a) => a.geometry?.quarterTurns === 1 && a.geometry?.angle === 3, 'geometry applied');
     await poll(() => busy(page), (n) => n === 0, 'fills after geometry', 120_000);
     const on = await decode((await exportFile()).file);
-    await tab(2);
+    await openEditorTool(page, 'retouch');
     for (const op of ops) await page.locator(`[data-retouch-id="${op.id}"] .pe-layer__toggle`).click();
     await saved((a) => a.retouch.every(({ enabled }) => !enabled), 'repairs off (geometry)');
     const off = await decode((await exportFile()).file);

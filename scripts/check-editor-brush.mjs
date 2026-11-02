@@ -1,3 +1,4 @@
+import { openEditorTool } from './editor-mobile-controls.mjs';
 // Brush responsiveness check of /photography/editor on a production build: a 24 MP photo (and,
 // with BRUSH_FIXTURE_DIR, a genuine camera JPEG) gets a brush local adjustment with exposure, then
 // a stroke is painted from inside the page, one pointer move per animation frame, as a mouse or a
@@ -195,9 +196,10 @@ async function runOne(run, file) {
     await page.click('.pe-photo--list button.pe-photo__select');
     await poll(() => page.evaluate(() => !document.querySelector('.pe-stage-message') && !document.querySelector('.pe-canvas-host').hidden), Boolean, 'preview', 300_000);
     step('brush');
-    await tab(2);
+    await tab(2); await openEditorTool(page, 'masks');
     await page.locator('.pe-masks__add[aria-label="New local adjustment"] button', { hasText: /^Brush$/ }).click();
     await page.locator('.pe-masktool').waitFor();
+    await openEditorTool(page, LOCAL.section ? 'detail' : 'light');
     if (LOCAL.section) {
       const toggle = page.locator('.pe-panel--adjust .pe-section__toggle', { hasText: LOCAL.section });
       if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
@@ -205,6 +207,7 @@ async function runOne(run, file) {
     const field = page.getByRole('textbox', { name: `${LOCAL.label} value` });
     await field.fill(LOCAL.value);
     await field.press('Enter');
+    if (run.device) { await openEditorTool(page, 'masks'); await page.locator('.pe-masks__tools button', { hasText: /^Brush$/ }).click(); }
     await page.waitForTimeout(Number(process.env.BRUSH_PAUSE_MS ?? 500));
     // Local Detail: the stroke starts once the frame with the setting is final.
     if (LOCAL.section) await poll(() => page.evaluate(() => document.querySelector('[data-detail-preview]')?.dataset.detailPreview ?? null), (q) => q === null || q === 'final', 'Detail preview', 120_000);

@@ -1,3 +1,4 @@
+import { openEditorTool, editorOptions } from './editor-mobile-controls.mjs';
 // HDR check of /photography/editor on a production build in Chromium, Firefox and
 // WebKit (Playwright builds; WebKit is not Safari on iOS), phone emulation and a forced
 // CPU preview. Each run: GPU/CPU parity of the HDR shader path (dev server); Merge HDR
@@ -173,7 +174,7 @@ function referenceExport(Module, files, adjustments) {
 
 async function openDialog(page, tab) {
   await tab(1);
-  await page.click('.pe-library__actions button:has-text("Merge HDR")');
+  await page.locator('button:visible').filter({ hasText: /^Merge HDR$/ }).first().click();
   await page.waitForSelector('.pe-dialog[role=dialog]');
 }
 
@@ -239,7 +240,7 @@ async function runOne(run, files, reference, genuine) {
       const row = await poll(() => page.$$eval('.pe-photo--list', (items) => items.map((li) => li.textContent)), (r) => r.some((t) => /bracket-0-HDR/.test(t)), 'merged photo');
       assert.match(row.find((t) => /bracket-0-HDR/.test(t)), new RegExp(`bracket-0-HDR${reference.width}×${reference.height} · HDR merge`));
       await poll(() => page.evaluate(() => !document.querySelector('.pe-stage-message') && !document.querySelector('.pe-canvas-host').hidden), Boolean, 'HDR preview', 60_000);
-      await tab(2);
+      await tab(2); await openEditorTool(page, 'hdr');
       const panel = await page.textContent('.pe-section[data-section-id=hdr]');
       assert.match(panel, /RAW HDR merge/);
       assert.match(panel, /Overexposed: aligned/);
@@ -256,13 +257,16 @@ async function runOne(run, files, reference, genuine) {
       await poll(() => compression.inputValue(), (v) => v === '80', 'redo');
       await page.click('.pe-hdr__looks button:has-text("Natural")');
       await poll(() => compression.inputValue(), (v) => v === '50', 'Natural look');
+      await openEditorTool(page, 'light');
       const exposure = page.locator('input[aria-label="Exposure value"]');
       await exposure.fill('0.5');
       await exposure.press('Enter');
       await poll(() => exposure.inputValue(), (v) => v === '+0.50 EV', 'exposure');
+      await editorOptions(page, true);
       await page.click('.pe-compare button:nth-child(3)');
       assert.equal(await page.locator('.pe-split__handle').count(), 1);
       await page.click('.pe-compare button:nth-child(1)');
+      await editorOptions(page, false);
     });
     await step('PNG export from the sources equals the Node reference, named -HDR-quangedit', async () => {
       await tab(3);
@@ -298,7 +302,7 @@ async function runOne(run, files, reference, genuine) {
       assert.match(await page.textContent('.pe-dialog'), /suggested from brightness/);
       await page.click('.pe-dialog__foot button:has-text("Merge")');
       await page.waitForSelector('.pe-dialog', { state: 'detached', timeout: 120_000 });
-      await tab(2);
+      await tab(2); await openEditorTool(page, 'hdr');
       assert.match(await page.textContent('.pe-section[data-section-id=hdr]'), /Exposure fusion of processed images/);
       await tab(3);
       if (await page.isEnabled('input[name=pe-format][value=jpeg]')) {
@@ -346,7 +350,7 @@ async function runOne(run, files, reference, genuine) {
           merges.push({ ms: Date.now() - started, mergedMs, stages, peakMb: stop(), afterMb: memoryMb(profile) });
         }
         measures.previewMerges = merges;
-        await tab(2);
+        await tab(2); await openEditorTool(page, 'hdr');
         measures.panel = (await page.textContent('.pe-section[data-section-id=hdr] .pe-raw__meta')).replace(/\s+/g, ' ').slice(0, 300);
         await tab(3);
         const format = await page.isEnabled('input[name=pe-format][value=jpeg]') ? 'jpeg' : 'png';
@@ -388,7 +392,7 @@ async function runOne(run, files, reference, genuine) {
         measures.mergeMs = Date.now() - started;
         measures.stages = await page.evaluate(() => Object.fromEntries(['decode', 'analyse', 'merge'].map((stage) => [stage, Math.round(performance.getEntriesByName(`pe-hdr-${stage}`).at(-1)?.duration ?? -1)])));
         measures.mergePeakMb = stopMerge();
-        await tab(2);
+        await tab(2); await openEditorTool(page, 'hdr');
         measures.panel = (await page.textContent('.pe-section[data-section-id=hdr] .pe-raw__meta')).replace(/\s+/g, ' ').slice(0, 400);
         await tab(3);
         const format = await page.isEnabled('input[name=pe-format][value=jpeg]') ? 'jpeg' : 'png';
