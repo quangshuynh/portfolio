@@ -113,7 +113,9 @@ describe('diagnostics', () => {
   test('the report holds capabilities and events, never photo data', () => {
     const report = JSON.parse(diagnosticReport({ previewEngine: 'cpu' }, browser()));
     expect(report).toMatchObject({ page: '/photography/editor', previewEngine: 'cpu', capabilities: { workers: true } });
-    expect(Object.keys(report)).toEqual(['page', 'userAgent', 'capabilities', 'previewEngine', 'events']);
+    expect(Object.keys(report)).toEqual(['page', 'build', 'userAgent', 'capabilities', 'previewEngine', 'events']);
+    // The commit the build was made from (vite.config.mjs), which tells a phone tester what is open.
+    expect(report.build).toMatch(/^([0-9a-f]{7,}(\+changes)?|unknown)$/);
   });
 });
 
