@@ -213,7 +213,9 @@ async function parity() {
         const adjust = masked.filter(({ name }) => /^adjust /.test(name));
         const rasterMax = Math.max(...raster.map(({ max }) => max));
         const adjustMax = Math.max(...adjust.map(({ max }) => max));
-        results.push({ browser: `${type.name()} ${browser.version()}`, ok: rasterMax <= PASS_PARITY_MAX && adjustMax <= AMPLIFIED_PARITY_MAX, cases: masked.map(({ name, max, mean }) => `${name}: max ${max}, mean ${mean.toFixed(3)}`), rasterPassMax: rasterMax, adjustmentPassMax: adjustMax });
+        // The frame cache (a brush stroke under one base key) must equal uncached renders exactly.
+        const cachedMax = Math.max(r.brush.max, ...masked.map(({ cached }) => cached));
+        results.push({ browser: `${type.name()} ${browser.version()}`, ok: rasterMax <= PASS_PARITY_MAX && adjustMax <= AMPLIFIED_PARITY_MAX && cachedMax === 0 && r.brush.hits > 0, cachedMax, brushCache: r.brush, cases: masked.map(({ name, max, mean }) => `${name}: max ${max}, mean ${mean.toFixed(3)}`), rasterPassMax: rasterMax, adjustmentPassMax: adjustMax });
       } finally {
         await browser.close();
       }

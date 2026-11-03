@@ -848,7 +848,9 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
             setDetailQuality((shown) => (JSON.stringify(shown) === JSON.stringify(quality) ? shown : quality));
             if (complete) performance.mark?.('pe-local-detail');
           } else {
-            engine.renderer.render(params, { split: splitFraction, before, layers: layers?.gpu });
+            // The photo's own frame depends on these (the renderer adds its source, retouch and geometry state).
+            const baseKey = layers?.gpu?.length ? `${photo.id}|${JSON.stringify({ ...values, layers: null, local: null })}|${params.lutActive ? lut.sha256 : ''}|${glowVersion}` : null;
+            engine.renderer.render(params, { split: splitFraction, before, layers: layers?.gpu, baseKey });
           }
         }
       } else {

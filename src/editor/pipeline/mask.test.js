@@ -388,3 +388,53 @@ test('an export cancelled during a local Detail pass stops between bands', async
   await expect(compositeImage(image, passes, { bandRows: 8, onBand: () => { bands += 1; }, cancelled: () => bands >= 2 })).rejects.toMatchObject({ code: 'cancelled' });
   expect(bands).toBe(2);
 });
+
+test('GPU mask textures follow a painted stroke by uploading only the changed box', async () => {
+  const { GlRenderer } = await import('./glRenderer.mjs');
+  // A recording WebGL2 stand-in: each texture holds R8 texels; uploads honour UNPACK_ROW_LENGTH
+  // and the skip parameters as WebGL2 does.
+  const gl = {
+    TEXTURE_2D: 1, RED: 2, R8: 3, UNSIGNED_BYTE: 4, NEAREST: 5, CLAMP_TO_EDGE: 6, TEXTURE_MIN_FILTER: 7, TEXTURE_MAG_FILTER: 8, TEXTURE_WRAP_S: 9, TEXTURE_WRAP_T: 10,
+    UNPACK_ALIGNMENT: 11, UNPACK_PREMULTIPLY_ALPHA_WEBGL: 12, UNPACK_FLIP_Y_WEBGL: 13, UNPACK_ROW_LENGTH: 14, UNPACK_SKIP_PIXELS: 15, UNPACK_SKIP_ROWS: 16,
+    store: {}, bound: null, created: 0, deleted: 0, fullTexels: 0, subTexels: 0,
+    createTexture() { this.created += 1; return { texels: null }; },
+    deleteTexture() { this.deleted += 1; },
+    bindTexture(target, texture) { this.bound = texture; },
+    pixelStorei(name, value) { this.store[name] = value; },
+    texParameteri() {},
+    texImage2D(target, level, format, width, height, border, f, t, data) { this.bound.width = width; this.bound.texels = Uint8Array.from(data); this.fullTexels += width * height; },
+    texSubImage2D(target, level, x, y, w, h, f, t, data) {
+      const row = this.store[this.UNPACK_ROW_LENGTH] || w;
+      const sx = this.store[this.UNPACK_SKIP_PIXELS] || 0;
+      const sy = this.store[this.UNPACK_SKIP_ROWS] || 0;
+      for (let j = 0; j < h; j += 1) for (let i = 0; i < w; i += 1) this.bound.texels[(y + j) * this.bound.width + x + i] = data[(sy + j) * row + sx + i];
+      this.subTexels += w * h;
+    },
+  };
+  const renderer = Object.assign(Object.create(GlRenderer.prototype), { gl, maskTextures: new Map(), maskUploads: { full: 0, partial: 0 } });
+  const size = { width: 120, height: 90 };
+  const map = canvasMaskMap(size);
+  const cache = new Map();
+  const brush = { mode: 'add', radius: 0.05, hardness: 0.6, opacity: 1, points: [] };
+  let version = 0;
+  const frame = (strokes) => {
+    const m = mask([createBrush('b', { strokes })]);
+    const raster = rasterizeMask(m, map, size, cache);
+    const key = `k${(version += 1)}`;
+    const texture = renderer.maskTexture({ key, raster });
+    // As a render does: masks not used this frame are released.
+    for (const [held, entry] of renderer.maskTextures) if (held !== key) { gl.deleteTexture(entry.texture); renderer.maskTextures.delete(held); }
+    expect(texture.texels).toEqual(Uint8Array.from(raster.data));
+  };
+  const points = Array.from({ length: 20 }, (_, k) => [0.1 + k * 0.04, 0.5 + 0.2 * Math.sin(k / 3)]);
+  for (let i = 1; i <= points.length; i += 1) frame([{ ...brush, points: points.slice(0, i) }]);
+  expect(renderer.maskUploads).toEqual({ full: 1, partial: 19 });
+  expect(gl.created).toBe(1);
+  // Far fewer texels than 20 whole-texture uploads.
+  expect(gl.subTexels).toBeLessThan(size.width * size.height * 4);
+  // A second stroke continues in the same texture; an undo (a change the cache cannot follow) uploads it all.
+  const first = { ...brush, points };
+  frame([first, { ...brush, mode: 'erase', points: [[0.5, 0.2], [0.55, 0.8]] }]);
+  frame([first]);
+  expect(renderer.maskUploads.full).toBe(2);
+});

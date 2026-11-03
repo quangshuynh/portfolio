@@ -42,6 +42,8 @@ const UNIT = { source: 0, curves: 1, lut: 2, raw: 3, hdr: 4, glow: 5, diffuse: 6
 const COMPOSITE_UNIFORMS = ['uBackdrop', 'uLayer', 'uAdjust', 'uMatrix', 'uOutputSize', 'uScale', 'uOpaque', 'uOpacity', 'uMode', 'uMask', 'uMasked'];
 
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+// Frames kept between composites (the photo's own frame and one adjustment pass's output).
+const FRAME_CACHE = 2;
 
 /** An RGB16UI texture; integer textures are only read with texelFetch, so NEAREST. */
 function rawTexture(gl, width, height, data) {
@@ -134,6 +136,23 @@ function r8Texture(gl, width, height, data) {
   return texture;
 }
 
+/** Uploads the box { x0, y0, x1, y1 } of a full-size R8 raster into its texture. */
+function uploadR8Box(gl, texture, { width, data }, { x0, y0, x1, y1 }) {
+  if (x1 <= x0 || y1 <= y0) return;
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.pixelStorei(gl.UNPACK_ROW_LENGTH, width);
+  gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, x0);
+  gl.pixelStorei(gl.UNPACK_SKIP_ROWS, y0);
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, x0, y0, x1 - x0, y1 - y0, gl.RED, gl.UNSIGNED_BYTE, bytes);
+  gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0);
+  gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, 0);
+  gl.pixelStorei(gl.UNPACK_SKIP_ROWS, 0);
+}
+
 /**
  * Tries to create a WebGL2 context suitable for the editor.
  * :returns: { gl, reason } where gl is null and reason says why when it is unsuitable.
@@ -219,6 +238,8 @@ export class GlRenderer {
     this.layerTextures = new Map();
     // Mask coverage (R8) of masked passes, by the pass's mask key.
     this.maskTextures = new Map();
+    // Mask texture uploads since creation: whole textures and dirty boxes (browser checks read it).
+    this.maskUploads = { full: 0, partial: 0 };
   }
 
   /**
@@ -345,6 +366,7 @@ export class GlRenderer {
    */
   setRetouched(image, dirty = null) {
     const { gl } = this;
+    this.retouchVersion = (this.retouchVersion ?? 0) + 1;
     if (!image || !this.texture) {
       if (this.retouched) gl.deleteTexture(this.retouched);
       this.retouched = null;
@@ -394,17 +416,18 @@ export class GlRenderer {
    *   { width, height, data } (the Detail preview) drawn instead of the pipeline, scaled
    *   to the canvas when it is smaller
    */
-  render(params, { split = 0, before = null, rendered = null, layers = null, renderedDirty = null } = {}) {
+  render(params, { split = 0, before = null, rendered = null, layers = null, renderedDirty = null, baseKey = null } = {}) {
     const { gl } = this;
     if (!this.texture) return;
-    this.last = [params, { split, before, rendered, layers }];
+    this.last = [params, { split, before, rendered, layers, baseKey }];
     const width = this.outWidth;
     const height = this.outHeight;
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
     if (layers?.length) {
-      this.composite(params, rendered, layers);
+      this.composite(params, rendered, layers, baseKey);
     } else {
+      this.releaseFrames();
       gl.viewport(0, 0, width, height);
       if (rendered) this.draw({ ...params, neutral: true }, this.uploadRendered(rendered, renderedDirty));
       else this.draw(params);
@@ -423,32 +446,57 @@ export class GlRenderer {
   /**
    * Draws the photo into a framebuffer, applies each layer pass (composite.mjs raster passes
    * with a `key`, adjustment passes with derived `params`) and copies the result to the canvas.
+   * With a `baseKey` (the caller's key for everything the photo's own frame depends on), the
+   * photo's frame and the first adjustment pass's output are kept between frames (at most
+   * FRAME_CACHE targets): while a brush paints a local adjustment only its mask changes, so each
+   * move then costs the mask composite and the copy instead of two full pipeline draws.
    */
-  composite(params, rendered, layers) {
+  composite(params, rendered, layers, baseKey = null) {
     const { gl } = this;
     const width = this.outWidth;
     const height = this.outHeight;
     const c = this.ensureCompositor();
     const targets = this.ensureTargets(width, height, layers.some(({ kind }) => kind === 'adjust') ? 3 : 2);
     gl.viewport(0, 0, width, height);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, targets[0].framebuffer);
-    gl.useProgram(this.program);
-    if (rendered) this.draw({ ...params, neutral: true }, this.uploadRendered(rendered));
-    else this.draw(params);
-    let [current, next] = targets;
+    // Keys of cacheable frames; null once a frame depends on something not keyed.
+    let key = baseKey && !rendered ? `${this.stateKey()}|${baseKey}` : null;
+    const pinned = new Set();
+    let current;
+    if (key) {
+      current = this.cachedFrame(key, pinned, () => this.draw(params));
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, targets[0].framebuffer);
+      gl.useProgram(this.program);
+      if (rendered) this.draw({ ...params, neutral: true }, this.uploadRendered(rendered));
+      else this.draw(params);
+      current = targets[0];
+    }
+    // The ping-pong targets: never the one being read.
+    const writable = () => (current === targets[0] ? targets[1] : targets[0]);
     const used = new Set();
     const usedMasks = new Set();
     for (const pass of layers) {
       let layerTexture;
       if (pass.kind === 'adjust') {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, targets[2].framebuffer);
-        gl.useProgram(this.program);
-        this.draw(pass.params, current.texture, true);
-        layerTexture = targets[2].texture;
+        const adjustKey = key && pass.adjustments ? `${key}>${JSON.stringify(pass.adjustments)}|${pass.lut?.sha256 ?? ''}` : null;
+        const input = current;
+        const drawPass = () => this.draw(pass.params, input.texture, true);
+        if (adjustKey) {
+          layerTexture = this.cachedFrame(adjustKey, pinned, drawPass)?.texture;
+        }
+        if (!layerTexture) {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, targets[2].framebuffer);
+          gl.useProgram(this.program);
+          drawPass();
+          layerTexture = targets[2].texture;
+        }
       } else {
         layerTexture = this.layerTexture(pass);
         used.add(pass.key);
       }
+      // A composite depends on the mask, which changes while painting: not cached.
+      key = null;
+      const next = writable();
       gl.bindFramebuffer(gl.FRAMEBUFFER, next.framebuffer);
       gl.useProgram(c.program);
       const u = c.uniforms;
@@ -471,7 +519,7 @@ export class GlRenderer {
       gl.uniform1i(u.uMasked, pass.mask ? 1 : 0);
       if (pass.mask) usedMasks.add(pass.mask.key);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      [current, next] = [next, current];
+      current = next;
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.useProgram(c.copy);
@@ -489,15 +537,97 @@ export class GlRenderer {
     }
   }
 
-  /** The R8 coverage texture of a pass's mask ({ key, raster }), uploaded once per raster. */
+  /**
+   * The R8 coverage texture of a pass's mask ({ key, raster }), uploaded once per raster. While the
+   * brush paints, every new point is a new mask (a new key) whose raster says which box changed
+   * since an earlier version (mask.mjs `change`): when this renderer holds that version, only the
+   * box is uploaded into the same texture. Allocating and uploading a whole full-size texture on
+   * every pointer move was the brush's GPU stall (Interval 22.8).
+   */
   maskTexture({ key, raster }) {
     const cached = this.maskTextures.get(key);
     if (cached?.raster === raster) return cached.texture;
     const { gl } = this;
+    const change = raster.change;
+    if (!cached && change && change.from !== null) {
+      for (const [heldKey, held] of this.maskTextures) {
+        const was = held.raster;
+        if (was.width !== raster.width || was.height !== raster.height || was.change?.key !== change.key || was.change.version !== change.from) continue; // eslint-disable-line no-continue
+        if (change.dirty) uploadR8Box(gl, held.texture, raster, change.dirty);
+        this.maskTextures.delete(heldKey);
+        this.maskTextures.set(key, { texture: held.texture, raster });
+        this.maskUploads.partial += 1;
+        return held.texture;
+      }
+    }
     if (cached) gl.deleteTexture(cached.texture);
     const texture = r8Texture(gl, raster.width, raster.height, raster.data);
     this.maskTextures.set(key, { texture, raster });
+    this.maskUploads.full += 1;
     return texture;
+  }
+
+  /**
+   * Identity of the renderer state a frame depends on besides the caller's key: source, retouch,
+   * geometry, creative (glow) inputs and the output size. A new object means a new frame.
+   */
+  stateKey() {
+    const ids = (this.objectIds ??= new WeakMap());
+    const id = (object) => {
+      if (!object || typeof object !== 'object') return 0;
+      if (!ids.has(object)) ids.set(object, (this.nextObjectId = (this.nextObjectId ?? 0) + 1));
+      return ids.get(object);
+    };
+    const { nativeWidth = 0, nativeHeight = 0, glow = null } = this.creative ?? {};
+    return `${id(this.uploaded)}.${id(this.texture)}.${this.retouchVersion ?? 0}.${id(this.geometry)}.${nativeWidth}x${nativeHeight}.${id(glow?.data)}.${id(glow?.diffuse)}.${this.outWidth}x${this.outHeight}`;
+  }
+
+  /**
+   * A kept frame for `key`, drawn by `draw` into a free target when missing. `pinned` holds the
+   * frames this composite still reads, which are never reused for another key. Null when every
+   * target is pinned (the caller draws uncached).
+   */
+  cachedFrame(key, pinned, draw) {
+    const { gl } = this;
+    this.frames ??= new Map();
+    const hit = this.frames.get(key);
+    if (hit) {
+      this.frames.delete(key);
+      this.frames.set(key, hit);
+      pinned.add(hit);
+      this.frameHits = (this.frameHits ?? 0) + 1;
+      return hit;
+    }
+    let target = null;
+    if (this.frames.size < FRAME_CACHE) {
+      gl.activeTexture(gl.TEXTURE0 + UNIT.layer);
+      const texture = rgbaTexture(gl, this.outWidth, this.outHeight);
+      const framebuffer = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+      target = { texture, framebuffer, width: this.outWidth, height: this.outHeight };
+    } else {
+      const [oldKey, oldest] = [...this.frames].find(([, frame]) => !pinned.has(frame)) ?? [];
+      if (!oldest) return null;
+      this.frames.delete(oldKey);
+      target = oldest;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+    gl.viewport(0, 0, this.outWidth, this.outHeight);
+    gl.useProgram(this.program);
+    draw();
+    this.frames.set(key, target);
+    pinned.add(target);
+    this.frameMisses = (this.frameMisses ?? 0) + 1;
+    return target;
+  }
+
+  /** Frees the kept frames (no layers shown, a new size, a lost or disposed context). */
+  releaseFrames() {
+    if (!this.frames?.size) return;
+    const { gl } = this;
+    this.frames.forEach(({ texture, framebuffer }) => { gl.deleteFramebuffer(framebuffer); gl.deleteTexture(texture); });
+    this.frames.clear();
   }
 
   /** A 1 × 1 texture bound to the mask unit by unmasked passes. */
@@ -558,6 +688,7 @@ export class GlRenderer {
 
   releaseTargets() {
     const { gl } = this;
+    this.releaseFrames();
     this.targets.forEach(({ texture, framebuffer }) => { gl.deleteFramebuffer(framebuffer); gl.deleteTexture(texture); });
     this.targets = [];
   }
@@ -780,6 +911,7 @@ export class GlRenderer {
   }
 
   releaseSource() {
+    this.releaseFrames();
     this.uploaded = null;
     if (this.retouched) this.gl.deleteTexture(this.retouched);
     this.retouched = null;
