@@ -10,7 +10,7 @@ import { openEditorTool } from './editor-mobile-controls.mjs';
 // Regression gate (BRUSH_STRICT=1, desktop Chromium only): the median main-thread time per move
 // stays under BRUSH_MAX_MAIN_MS (default 40 ms), generous enough for headless software WebGL.
 // Usage: npm run check:editor:brush (BRUSH_RUNS=chromium,cpu,iphone,pixel; CHECK_GPU=1: real GPU;
-// BRUSH_SKIP_BUILD=1 reuses dist/; BRUSH_MOVES=120; BRUSH_PROFILE=1 prints the CPU profile;
+// BRUSH_SKIP_BUILD=1 reuses dist/; BRUSH_GL_TRACE=1 times each draw; BRUSH_CHROME_TRACE=f.json; BRUSH_MOVES=120; BRUSH_PROFILE=1 prints the CPU profile;
 // BRUSH_LOCAL=clarity paints a local Clarity adjustment instead of exposure, and reports the time
 // from release until the final Detail frame, then paints a second stroke; BRUSH_PAUSE_MS=500 is
 // the pause between setting the value and painting)
@@ -46,6 +46,50 @@ const INIT = {
     const original = HTMLCanvasElement.prototype.getContext;
     HTMLCanvasElement.prototype.getContext = function getContext(type, ...rest) { return type === 'webgl2' ? null : original.call(this, type, ...rest); };
   },
+};
+// BRUSH_GL_TRACE=1: every WebGL draw is followed by a 1×1 readPixels and timed, grouped by target
+// (canvas or framebuffer), viewport and program, to show which passes cost GPU time. gl.finish()
+// is not enough: headless Chromium with SwiftShader returns from it before the work runs. It
+// serialises the GPU, so its frame times are not comparable with untraced runs.
+const GL_TRACE = () => {
+  const proto = globalThis.WebGL2RenderingContext?.prototype;
+  if (!proto) return;
+  window.__glTrace = [];
+  const pixel = new Uint8Array(4);
+  const sync = (gl) => {
+    // A float framebuffer (HDR, glow) cannot be read as RGBA8; those draws are timed unsynced.
+    try { gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel); } catch { /* ignore */ }
+    gl.getError();
+  };
+  const programs = new WeakMap();
+  let nextProgram = 0;
+  // BRUSH_GL_TRACE=all: every other call is timed the same way, grouped by name.
+  if (window.__glTraceAll) {
+    for (const name of Object.getOwnPropertyNames(proto)) {
+      const fn = Object.getOwnPropertyDescriptor(proto, name).value;
+      if (typeof fn !== 'function' || /^(get|is|finish|flush|drawArrays|readPixels|constructor)/.test(name)) continue; // eslint-disable-line no-continue
+      proto[name] = function timed(...args) {
+        const t0 = performance.now();
+        const result = fn.apply(this, args);
+        sync(this);
+        window.__glTrace.push({ at: t0, ms: performance.now() - t0, pass: name });
+        return result;
+      };
+    }
+  }
+  const original = proto.drawArrays;
+  proto.drawArrays = function traced(...args) {
+    const program = this.getParameter(this.CURRENT_PROGRAM);
+    if (program && !programs.has(program)) programs.set(program, (nextProgram += 1));
+    const [, , w, h] = this.getParameter(this.VIEWPORT);
+    const target = this.getParameter(this.FRAMEBUFFER_BINDING) ? 'fbo' : 'canvas';
+    const scissor = this.isEnabled(this.SCISSOR_TEST);
+    const t0 = performance.now();
+    const result = original.apply(this, args);
+    sync(this);
+    window.__glTrace.push({ at: t0, ms: performance.now() - t0, pass: `${target} ${w}×${h} p${programs.get(program) ?? 0}${scissor ? ' scissor' : ''}` });
+    return result;
+  };
 };
 // Records when the preview draws, so a move's latency is "input → next draw call".
 const DRAW_PROBE = () => {
@@ -191,6 +235,8 @@ async function runOne(run, file) {
   const context = await browser.newContext(run.device ? devices[run.device] : { viewport: { width: 1440, height: 900 } });
   if (run.init) await context.addInitScript(INIT[run.init]);
   await context.addInitScript(DRAW_PROBE);
+  if (process.env.BRUSH_GL_TRACE === 'all') await context.addInitScript(() => { window.__glTraceAll = true; });
+  if (process.env.BRUSH_GL_TRACE) await context.addInitScript(GL_TRACE);
   const page = await context.newPage();
   const problems = [];
   page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`));
@@ -249,6 +295,7 @@ async function runOne(run, file) {
       const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
       await frame();
       window.__brushFrames.length = 0;
+      if (window.__glTrace) window.__glTrace.length = 0;
       const gpuBefore = { ...(window.__brushGpu ?? {}) };
       const inputs = [];
       const handler = [];
@@ -323,10 +370,19 @@ async function runOne(run, file) {
       const firstFrames = frameTimes.slice(0, 4);
       const firstPoint = { handler: downHandler, toDraw: firstDraw === undefined ? null : firstDraw - down, toComposite: firstComposite === undefined ? null : firstComposite - down, maxFrameOfFirstFour: Math.max(...firstFrames) };
       const detailShown = quality.some(Boolean) ? { final: quality.filter((q) => q === 'final').length, draft: quality.filter((q) => q === 'draft').length, rendering: quality.filter((q) => q === 'rendering').length } : null;
-      return { handler, frameTimes, latency, commitMs, settleMs, detailShown, firstPoint, longFrames, span: inputs.at(-1) - inputs[0], overlayDiff, gpuTraffic };
+      const glTrace = window.__glTrace ? Object.values(window.__glTrace.filter((d) => d.at >= down && d.at <= strokeEnd).reduce((all, { pass, ms }) => {
+        const entry = (all[pass] ??= { pass, draws: 0, ms: 0 });
+        entry.draws += 1; entry.ms += ms;
+        return all;
+      }, {})).map((e) => ({ ...e, ms: Math.round(e.ms) })).sort((a, b) => b.ms - a.ms) : null;
+      return { handler, frameTimes, latency, commitMs, settleMs, detailShown, firstPoint, longFrames, span: inputs.at(-1) - inputs[0], overlayDiff, gpuTraffic, glTrace };
     }, { moves: MOVES, pointerType: run.device ? 'touch' : 'mouse', offset });
     // With BRUSH_LOCAL a second stroke follows (painting over a local Detail that already shows).
+    // BRUSH_CHROME_TRACE=file.json (Chromium): a performance trace of the first stroke, all processes.
+    const chromeTrace = process.env.BRUSH_CHROME_TRACE && run.type === chromium ? process.env.BRUSH_CHROME_TRACE : null;
+    if (chromeTrace) await browser.startTracing(page, { path: chromeTrace, categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'gpu', 'cc', 'viz', 'toplevel', 'blink', 'disabled-by-default-gpu.service'] });
     const measured = await paintStroke(0);
+    if (chromeTrace) await browser.stopTracing();
     const second = LOCAL.section ? await (async () => { await page.waitForTimeout(300); await startProfile(); return paintStroke(-0.2); })() : null;
     if (cdp) {
       const { profile } = await cdp.send('Profiler.stop');
@@ -344,6 +400,7 @@ async function runOne(run, file) {
     result.longFrames = measured.longFrames.length ? { count: measured.longFrames.length, durationMs: stats(measured.longFrames.map((f) => f.duration)), renderMs: stats(measured.longFrames.map((f) => f.render)), busyShare: Math.round((100 * busy) / measured.span) } : 'none (or not Chromium)';
     result.commitMs = Math.round(measured.commitMs);
     const g = measured.gpuTraffic;
+    if (measured.glTrace) result.glTrace = measured.glTrace;
     if (g) result.gpuPerStroke = { texturesCreated: g.creates, texturesDeleted: g.deletes, fullUploads: g.fullUploads, fullUploadMb: Math.round(g.fullBytes / 1e5) / 10, subUploads: g.subUploads, subUploadMb: Math.round(g.subBytes / 1e5) / 10, readbacks: g.readbacks };
     if (measured.settleMs !== null) Object.assign(result, { detailFinalAfterReleaseMs: Math.round(measured.settleMs), detailDuringStroke: measured.detailShown });
     if (second) {
