@@ -45,8 +45,12 @@ Import a JPEG and RAW; adjust, crop, mask, retouch, watermark, undo/redo and exp
 Open/close the keyboard in text, rename, numeric, preset and export fields; rotate,
 toggle fullscreen, collapse browser chrome, background Safari and return. Check that
 controls stay reachable, values survive, pinch never paints, and the downloaded file opens.
-Record failures as: iOS version / URL + commit / photo format + dimensions / tool /
-steps / expected vs actual / portrait or landscape / keyboard + browser toolbar state.
+Also: cancel a RAW import and retry it, watch its stage and seconds, pinch, pan and
+rotate while a mask or retouch tool is on, export at full resolution and download it,
+export three times in a row, and note any memory warning or page reload.
+Record failures as: iOS + Safari version / URL + commit / photo format + dimensions + file
+size / tool / steps / expected vs actual / portrait or landscape / keyboard + browser toolbar
+state / whether Safari reloaded the page.
 Attach a screen recording and saved edit JSON if shareable; do not attach private originals.
 
 ## Layout of the code
@@ -302,7 +306,8 @@ header is checked and before the whole file is read (see [Known issues](#known-i
 If it cannot start (too little memory for its heap, or a compile failure) the import says
 so and JPEG, PNG and WebP keep working. Imports decode half size only; nothing is decoded at full size before
 an export. Removing a photo cancels its import. A worker that dies mid-job is
-reported as out of memory. The full decode cannot be tiled with this wrapper
+reported as out of memory; one that stops responding is stopped by the watchdog
+([Mobile reliability](#mobile-reliability)). The full decode cannot be tiled with this wrapper
 (LibRaw holds the whole image); the stages after it are banded and seam-free
 because they are per-pixel.
 
@@ -1755,6 +1760,45 @@ Playwright's WebKit is not Safari on iOS; physical iPhones and desktop Safari
 are **not verified**. Playwright's Windows WebKit PNG encoder changes some
 values by 1 on its own, so that check allows the encoder error it measures.
 Safari cannot encode WebP (the option is disabled when the browser cannot).
+
+## Mobile reliability
+
+**RAW watchdog** (Interval 22.8, `raw/rawTrace.mjs`, `rawClient.mjs`). The RAW worker reports
+`ready`, a 1 s heartbeat and checkpoints (`reading`, `module-loading`, `hashing`, `opening`,
+`decoding`, `processing`, `rendering`, `transferring`) with elapsed ms and wasm heap size. The
+queue stops a worker that never starts (30 s), goes silent in an asynchronous stage (20 s), or
+overruns a synchronous LibRaw stage's budget (max(120 s, 1.5 s/MP half-size, 4 s/MP full)).
+Only visible time counts, so a backgrounded tab is never cut short. A stopped job fails with
+code `stalled`, frees the single decoder slot and keeps the file. Previously a silent stall left
+the row "importing" forever and blocked every later RAW job; the 22.7 hang itself was not
+reproduced. The last 12 jobs' checkpoints (no names or pixels) are in `window.__peRawTrace`.
+
+**UI.** Importing rows show the stage and elapsed seconds, with Cancel. Rows that failed as
+cancelled, stalled, out of memory, worker failure or decoder error offer Retry; a preview that
+fails to load offers Try again.
+
+**Brush GPU traffic.** While painting, a new mask whose raster records the changed box since the
+version the renderer holds is uploaded with `texSubImage2D` into the same texture instead of a new
+full-size texture. With a `baseKey` from the viewer (photo, settings without layers or local
+masks, LUT, glow), `composite()` keeps the photo's frame and the first adjustment pass's output
+(`FRAME_CACHE = 2`, keyed also by the renderer's source, retouch, geometry, creative and output
+state), so a brush move skips those two full pipeline draws. The frames are freed when no layers
+are shown or the source or size changes. `check:editor:layers` and `check:editor:masks` require
+cached renders to equal uncached ones exactly (a miss, a hit, a growing brush mask, a retouch
+change under one key). The brush check reports `gpuPerStroke`. Pixel 7 emulation, 30 moves,
+SwiftShader on Windows: frame interval p50 3.7 → 3.5 s, release → final 3.6 → 0.45 s, two more
+full-size textures (the kept frames); frames stay dominated by software GL, so measure on a phone.
+
+`npm run check:editor:raw-reliability` covers a decoder that never starts (hidden, then visible),
+Cancel and Retry, a preview whose decoder goes silent, five import/remove cycles and sustained
+memory, and genuine files with `RAW_RELIABILITY_DIR`. Emulation and Playwright WebKit are not
+Safari on iOS; use the iPhone 16e acceptance list in [Mobile workspace](#mobile-workspace).
+Windows, Playwright WebKit (iPhone 13) and Firefox: every step passes; the never-starting
+decoder is stopped 29–30 s after the page is shown (nothing fails during 40 s hidden); on `main`
+the same row stays "Waiting for the RAW decoder" indefinitely. Genuine CR2, CR3, RAF, NRW, NEF,
+ORF, RW2 and DNG import in 0.9–3.1 s (WebKit) and 2.4–11 s (Firefox). Whole-browser memory over
+three import/export/remove cycles stays flat in Firefox (1.6 GB) and rises in WebKit (1.35 →
+1.62 GB; includes the GPU process, no RAW worker left alive).
 
 ## Known issues
 
