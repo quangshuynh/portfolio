@@ -406,6 +406,9 @@ async function runOne(run, file) {
     if (second) {
       result.secondStroke = { inputToDrawMs: stats(second.latency), frameIntervalMs: stats(second.frameTimes), detailDuringStroke: second.detailShown, commitMs: Math.round(second.commitMs), detailFinalAfterReleaseMs: second.settleMs === null ? null : Math.round(second.settleMs) };
     }
+    // Frames drawn ahead of the first stroke while idle (Interval 22.10), and how long that took.
+    const warmed = await page.evaluate(() => performance.getEntriesByName('pe-stroke-warm').map(({ detail }) => detail));
+    result.strokeWarm = warmed.length ? { runs: warmed.length, drawn: warmed.reduce((sum, { drawn }) => sum + drawn, 0), ms: stats(warmed.filter(({ drawn }) => drawn).map(({ ms }) => Math.round(ms * 10) / 10)) } : 'none';
     step('overlay');
     // The overlay drawn box by box while painting equals a full redraw of the same mask (alpha
     // exactly; premultiplied colour within the canvas's rounding of one level).
