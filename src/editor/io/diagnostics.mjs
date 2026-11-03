@@ -66,6 +66,8 @@ export function browserCapabilities(win = globalThis) {
 export function diagnosticReport(extra = {}, win = globalThis) {
   return JSON.stringify({
     page: win.location?.pathname,
+    // eslint-disable-next-line no-undef
+    build: typeof __EDITOR_BUILD__ === 'string' ? __EDITOR_BUILD__ : null,
     userAgent: win.navigator?.userAgent,
     capabilities: browserCapabilities(win),
     ...extra,

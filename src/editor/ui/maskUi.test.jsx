@@ -293,3 +293,20 @@ describe('mask tool on the photo', () => {
     window.requestAnimationFrame.mockRestore();
   });
 });
+
+describe('first-stroke warm-up pass', () => {
+  test('only a local not shown until painted, without strokes and without Detail is warmed', async () => {
+    const { strokePass } = await import('./Viewer');
+    const { createBrush, createLocalAdjustment } = await import('../model/masks.mjs');
+    const native = { width: 400, height: 300 };
+    const empty = createLocalAdjustment('L', { settings: { exposure: 1.5 } });
+    expect(strokePass(empty, native)).toMatchObject({ kind: 'adjust', id: 'L', adjustments: expect.objectContaining({ exposure: 1.5 }) });
+    const painted = { ...empty, mask: { ...empty.mask, components: [createBrush('b', { strokes: [{ mode: 'add', radius: 0.05, hardness: 0.5, opacity: 1, points: [[0.5, 0.5]] }] })] } };
+    expect(strokePass(painted, native)).toBeNull();
+    expect(strokePass(createLocalAdjustment('D', { settings: { clarity: 40 } }), native)).toBeNull();
+    expect(strokePass(createLocalAdjustment('N', { settings: {} }), native)).toBeNull();
+    expect(strokePass({ ...empty, enabled: false }, native)).toBeNull();
+    expect(strokePass({ ...empty, mask: { ...empty.mask, enabled: false } }, native)).toBeNull();
+    expect(strokePass(undefined, native)).toBeNull();
+  });
+});

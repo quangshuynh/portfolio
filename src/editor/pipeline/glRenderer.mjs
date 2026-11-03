@@ -419,7 +419,7 @@ export class GlRenderer {
    *   { width, height, data } (the Detail preview) drawn instead of the pipeline, scaled
    *   to the canvas when it is smaller
    */
-  render(params, { split = 0, before = null, rendered = null, layers = null, renderedDirty = null, baseKey = null } = {}) {
+  render(params, { split = 0, before = null, rendered = null, layers = null, renderedDirty = null, baseKey = null, keepFrames = false } = {}) {
     const { gl } = this;
     if (!this.texture) return;
     this.last = [params, { split, before, rendered, layers, baseKey }];
@@ -430,7 +430,12 @@ export class GlRenderer {
     if (layers?.length) {
       this.composite(params, rendered, layers, baseKey);
     } else {
-      this.releaseFrames();
+      // `keepFrames`: frames warmed for a stroke about to start (warmFrames) stay. Targets a
+      // warm-up made for a stroke that never came are freed with them.
+      if (!keepFrames) {
+        if (this.warmedTargets) this.releaseTargets();
+        else this.releaseFrames();
+      }
       gl.viewport(0, 0, width, height);
       if (rendered) this.draw({ ...params, neutral: true }, this.uploadRendered(rendered, renderedDirty));
       else this.draw(params);
@@ -459,6 +464,7 @@ export class GlRenderer {
     const width = this.outWidth;
     const height = this.outHeight;
     const c = this.ensureCompositor();
+    this.warmedTargets = false;
     const targets = this.ensureTargets(width, height, layers.some(({ kind }) => kind === 'adjust') ? 3 : 2);
     gl.viewport(0, 0, width, height);
     // Keys of cacheable frames; null once a frame depends on something not keyed.
@@ -643,6 +649,38 @@ export class GlRenderer {
     return target;
   }
 
+  /**
+   * Draws ahead of a stroke the kept frames its first point reads: the photo's frame and, when
+   * `pass` (the first layer pass) is an adjustment, its output, under the keys composite() uses
+   * for the same `params` and `baseKey`. Until then nothing is composited, so the first point
+   * would allocate the targets and draw both through the whole pipeline (Interval 22.10). Frames
+   * already kept are hits; a key that no longer matches is never read and is the first evicted.
+   * :returns: the number of frames drawn (0 when all were kept or nothing can be drawn)
+   */
+  warmFrames(params, baseKey, pass = null) {
+    const { gl } = this;
+    if (!this.texture || this.lost || !baseKey) return 0;
+    const misses = this.frameMisses ?? 0;
+    this.ensureCompositor();
+    const made = this.targets[0]?.width !== this.outWidth || this.targets[0]?.height !== this.outHeight;
+    this.ensureTargets(this.outWidth, this.outHeight, pass?.kind === 'adjust' ? 3 : 2);
+    if (made) this.warmedTargets = true;
+    gl.bindVertexArray(this.vao);
+    const key = `${this.stateKey()}|${baseKey}`;
+    const pinned = new Set();
+    const base = this.cachedFrame(key, pinned, () => this.draw(params));
+    if (base && pass?.kind === 'adjust' && pass.adjustments) {
+      this.cachedFrame(`${key}>${JSON.stringify(pass.adjustments)}|${pass.lut?.sha256 ?? ''}`, pinned, () => this.draw(pass.params, base.texture, true));
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.activeTexture(gl.TEXTURE0);
+    const drawn = (this.frameMisses ?? 0) - misses;
+    // Queued commands run at the next flush: without one they wait for the stroke's first frame.
+    if (drawn) gl.flush();
+    this.framesWarmed = (this.framesWarmed ?? 0) + drawn;
+    return drawn;
+  }
+
   /** Frees the kept frames (no layers shown, a new size, a lost or disposed context). */
   releaseFrames() {
     if (!this.frames?.size) return;
@@ -710,6 +748,7 @@ export class GlRenderer {
   releaseTargets() {
     const { gl } = this;
     this.partialComposite = null;
+    this.warmedTargets = false;
     this.releaseFrames();
     this.targets.forEach(({ texture, framebuffer }) => { gl.deleteFramebuffer(framebuffer); gl.deleteTexture(texture); });
     this.targets = [];
