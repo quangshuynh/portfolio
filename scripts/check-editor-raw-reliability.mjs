@@ -12,7 +12,8 @@
 // Usage: npm run check:editor:raw-reliability (RAW_RELIABILITY_RUNS=chromium,iphone-chromium,
 // pixel,iphone-webkit,firefox; RAW_RELIABILITY_STEPS=never,cancel,preview,five,sustained,genuine
 // runs only the steps naming one of those words; RAW_RELIABILITY_SKIP_BUILD=1 reuses dist/;
-// RAW_RELIABILITY_OUT writes the JSON results to a file). The sustained step reports, per cycle,
+// RAW_RELIABILITY_OUT writes the JSON results to a file; RAW_RELIABILITY_CYCLES=8 lengthens the
+// sustained step). The sustained step reports, per cycle,
 // measured post-GC JS heap (Chromium), browser memory by process type (Linux, Windows), the RAW
 // worker's wasm heap from its checkpoints, and estimated GPU texture memory (WebGL allocations).
 import assert from 'node:assert/strict';
@@ -33,6 +34,7 @@ const ONLY = process.env.RAW_RELIABILITY_RUNS?.split(',');
 // Steps whose names start with one of these words (e.g. never,cancel,preview,five,sustained,genuine).
 const ONLY_STEPS = process.env.RAW_RELIABILITY_STEPS?.split(',');
 const GENUINE_DIR = process.env.RAW_RELIABILITY_DIR ?? '';
+const CYCLES = Math.max(3, Number(process.env.RAW_RELIABILITY_CYCLES ?? 3));
 const GENUINE = GENUINE_DIR && existsSync(GENUINE_DIR)
   ? readdirSync(GENUINE_DIR).filter((name) => /\.(arw|nef|nrw|cr2|cr3|raf|rw2|orf|dng|pef)$/i.test(name)).sort().map((name) => path.join(GENUINE_DIR, name))
   : [];
@@ -231,7 +233,7 @@ async function runOne(run, fixtures) {
     });
 
     if (fixtures.genuine.length) {
-      await step('sustained session: import, develop, full-size export, remove (3 cycles × 2 RAW)', async () => {
+      await step(`sustained session: import, develop, full-size export, remove (${CYCLES} cycles × 2 RAW)`, async () => {
         const cdp = run.type === chromium ? await context.newCDPSession(page) : null;
         const jsHeapMb = async () => {
           if (!cdp) return null;
@@ -243,7 +245,7 @@ async function runOne(run, fixtures) {
         const samples = [await sample('empty')];
         const files = fixtures.genuine.slice(0, 2);
         const exports = [];
-        for (let cycle = 1; cycle <= 3; cycle += 1) {
+        for (let cycle = 1; cycle <= CYCLES; cycle += 1) {
           for (const file of files) {
             const name = path.basename(file);
             await importFile(file);
@@ -268,7 +270,7 @@ async function runOne(run, fixtures) {
           samples.push(await sample(`after cycle ${cycle}`));
         }
         const heap = samples.filter((x) => /after cycle/.test(x.label)).map((x) => x.jsHeapMb);
-        if (heap[0] !== null) assert.ok(heap[2] - heap[0] < 20, `JS heap grew ${heap[2] - heap[0]} MB from cycle 1 to 3`);
+        if (heap[0] !== null) assert.ok(heap.at(-1) - heap[0] < 20, `JS heap grew ${heap.at(-1) - heap[0]} MB from cycle 1 to ${CYCLES}`);
         if (cdp) await cdp.detach();
         return { samples, exports };
       });

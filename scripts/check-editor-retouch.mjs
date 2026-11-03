@@ -224,6 +224,28 @@ async function runOne(run, files) {
       result.heal = { clickToPreviewMs: Date.now() - started, applyMs: stats(await marks('pe-retouch-applied')), before: Math.round(before), after: Math.round(after) };
     });
 
+    if (await page.$eval('.pe', (e) => e.dataset.engine) === 'webgl2') {
+      await step('WebGL context lost and restored: the preview comes back with the heal (Interval 22.9)', async () => {
+        const before = await drawnFrame();
+        const lost = await page.evaluate(() => {
+          const ext = document.querySelector('.pe-canvas').getContext('webgl2').getExtension('WEBGL_lose_context');
+          window.__peLoseContext = ext;
+          ext?.loseContext();
+          return Boolean(ext);
+        });
+        assert.ok(lost, 'WEBGL_lose_context is unavailable');
+        await page.locator('.pe-stage-message', { hasText: 'graphics context was lost' }).waitFor({ timeout: 10_000 });
+        await page.evaluate(() => window.__peLoseContext.restoreContext());
+        await poll(() => page.evaluate(() => !document.querySelector('.pe-stage-message')), Boolean, 'restored preview', 15_000);
+        const after = await poll(drawnFrame, (f) => f && f.data.some((v, i) => i % 4 !== 3 && v > 0), 'restored frame', 15_000);
+        let max = 0;
+        for (let i = 0; i < before.data.length; i += 1) max = Math.max(max, Math.abs(before.data[i] - after.data[i]));
+        result.contextRestore = { size: `${after.width}×${after.height}`, max };
+        assert.equal(`${after.width}×${after.height}`, `${before.width}×${before.height}`);
+        assert.equal(max, 0, 'the restored preview differs (retouch lost?)');
+      });
+    }
+
     await step('Clone Stamp: source by Alt-click or Set source, a painted stroke with one offset', async () => {
       await choose('Clone Stamp', 's');
       const source = { u: SCRATCH[0].u, v: SCRATCH[0].v - 0.06 };
