@@ -170,6 +170,17 @@ describe('editor state', () => {
     expect(state.photos[0]).toMatchObject({ status: 'error', error: 'Damaged' });
   });
 
+  test('a cancelled or stalled import can be retried; the retry starts importing again', () => {
+    let state = editorReducer(initialEditorState(), { type: 'photosAdded', photos: [file('a')] });
+    state = editorReducer(state, { type: 'importProgress', id: 'a', progress: 'decoding' });
+    state = editorReducer(state, { type: 'importFailed', id: 'a', error: 'Import cancelled.', code: 'cancelled' });
+    expect(state.photos[0]).toMatchObject({ status: 'error', errorCode: 'cancelled' });
+    state = editorReducer(state, { type: 'importRetry', id: 'a' });
+    expect(state.photos[0]).toMatchObject({ status: 'importing', progress: null, error: null, errorCode: null });
+    // A retry of a photo that is not in error changes nothing.
+    expect(editorReducer(state, { type: 'importRetry', id: 'a' })).toBe(state);
+  });
+
   test('a loaded document applies to matching photos and waits for the rest', () => {
     let state = twoPhotos();
     const document = parseEditDocument(serializeEditDocument(createEditDocument([

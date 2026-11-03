@@ -219,6 +219,9 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-photo[data-status='error'] .pe-photo__detail { color: var(--pe-danger); font-family: var(--font-body); font-size: .75rem; }
 .pe-photo__badge { color: var(--pe-accent); font-size: .6875rem; }
 .pe-photo__remove { position: absolute; right: .2rem; top: 50%; transform: translateY(-50%); width: 1.75rem; min-height: 1.75rem; }
+/* Cancel (a RAW import in progress) and Retry (a cancelled or stalled import), left of Remove. */
+.pe-photo__retry { flex: none; min-height: 1.75rem; margin-right: 2rem; font-size: .75rem; }
+.pe-photo__elapsed { color: var(--pe-text-3); }
 
 .pe-filmstrip { grid-area: strip; display: flex; align-items: center; gap: .5rem; min-width: 0; padding: 0 .5rem; border-top: 1px solid var(--pe-line); background: var(--pe-bg); }
 .pe-filmstrip__list { display: flex; gap: .35rem; flex: 1; min-width: 0; overflow-x: auto; padding: .4rem .1rem; scrollbar-width: thin; }
@@ -671,6 +674,7 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
   .pe-range::-moz-range-thumb { width: 20px; height: 20px; }
   .pe-adjust__value { min-height: 2.25rem; }
   .pe-adjust__reset, .pe-photo__remove { width: 2.5rem; min-height: 2.5rem; }
+  .pe-photo__retry { min-height: 2.75rem; margin-right: 2.75rem; }
 }
 
 @media (max-width: 420px) {
