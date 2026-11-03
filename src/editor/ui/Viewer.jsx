@@ -693,6 +693,13 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
       && retouchOps.length > state.ops.length && retouchEqual(state.ops, retouchOps.slice(0, state.ops.length));
     const work = appended ? retouchOps.slice(state.ops.length) : retouchOps;
     const job = (retouchJobRef.current += 1);
+    // No retouch shown and none to show: every other edit (each brush move) lands here. Leaving
+    // the renderer and retouchVersion alone keeps the GPU's kept frames (Interval 22.9).
+    if (!active && !restored && state.original === original && state.image === original) {
+      state.ops = retouchOps;
+      setRetouchBusy(null);
+      return;
+    }
     if (active && work.some((op) => op.enabled && op.type === 'remove')) {
       // A fill: work on a copy in the background; a newer change abandons this one.
       removerRef.current?.cancel();

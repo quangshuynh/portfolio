@@ -438,3 +438,19 @@ test('GPU mask textures follow a painted stroke by uploading only the changed bo
   frame([first]);
   expect(renderer.maskUploads.full).toBe(2);
 });
+
+test('clearing a retouch that is not there keeps the cached frames (brush moves)', async () => {
+  const { GlRenderer } = await import('./glRenderer.mjs');
+  const deleted = [];
+  const renderer = Object.assign(Object.create(GlRenderer.prototype), { gl: { deleteTexture: (t) => deleted.push(t) }, texture: {}, retouched: null, creative: {}, width: 4, height: 3 });
+  const before = renderer.stateKey();
+  // Every brush move re-runs the viewer's retouch sync with no operations.
+  renderer.setRetouched(null);
+  renderer.setRetouched(null);
+  expect(renderer.stateKey()).toBe(before);
+  // Removing a retouch that exists is a new frame.
+  renderer.retouched = { id: 'retouched' };
+  renderer.setRetouched(null);
+  expect(deleted).toEqual([{ id: 'retouched' }]);
+  expect(renderer.stateKey()).not.toBe(before);
+});

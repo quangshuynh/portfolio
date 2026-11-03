@@ -366,6 +366,9 @@ export class GlRenderer {
    */
   setRetouched(image, dirty = null) {
     const { gl } = this;
+    // Clearing what is not there changes no frame; the viewer does it on every brush move, and
+    // a new version would discard the kept frames each time (Interval 22.9).
+    if (!image && !this.retouched) return;
     this.retouchVersion = (this.retouchVersion ?? 0) + 1;
     if (!image || !this.texture) {
       if (this.retouched) gl.deleteTexture(this.retouched);
