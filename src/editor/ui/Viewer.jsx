@@ -1166,6 +1166,8 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
             onPreview={maskTool.onPreview}
             onCommit={maskTool.onCommit}
             onRemove={maskTool.onRemove}
+            onPick={maskTool.onPick ?? null}
+            points={maskTool.points ?? null}
           />
         )}
         {retouchTool && proxy && proxy.id === photo?.id && !transform && !inspect && compare !== 'original' && (
