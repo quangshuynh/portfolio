@@ -10,9 +10,9 @@ import { openEditorTool } from './editor-mobile-controls.mjs';
 // leaves nothing and the next one works; Select again gives the same data; the saved edit file
 // holds the selections and reopens them; no request leaves the preview server.
 // Usage: npm run check:editor:selection (SELECTION_RUNS=chromium,firefox,webkit,iphone,pixel,cpu;
-// SELECTION_SKIP_BUILD=1 reuses dist/)
+// SELECTION_SKIP_BUILD=1 reuses dist/; SELECTION_RAW_DIR adds genuine RAW files, see checkRaws)
 import assert from 'node:assert/strict';
-import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -241,6 +241,47 @@ async function check(run, file) {
   return result;
 }
 
+// SELECTION_RAW_DIR: genuine RAW files (one of each format named below), each imported alone in
+// Chromium, then Select Sky and Select Subject on its development: what was found, how sure, how long.
+const RAW_FORMATS = /\.(arw|nef|cr2|cr3|raf|dng)$/i;
+async function checkRaws(dir) {
+  const files = readdirSync(dir).filter((name) => RAW_FORMATS.test(name)).sort();
+  // One file of each format.
+  const byFormat = new Map();
+  files.forEach((name) => { const ext = name.split('.').pop().toLowerCase(); if (!byFormat.has(ext)) byFormat.set(ext, name); });
+  const picked = [...byFormat.values()];
+  const rows = [];
+  for (const name of picked) {
+    const context = await chromium.launchPersistentContext(mkdtempSync(path.join(work, 'raw-')), { viewport: { width: 1440, height: 900 } }); // eslint-disable-line no-await-in-loop
+    const page = context.pages()[0] ?? await context.newPage(); // eslint-disable-line no-await-in-loop
+    const row = { file: name };
+    try {
+      await page.goto(URL_EDITOR);
+      await page.setInputFiles('input[type=file][multiple]', [path.join(dir, name)]);
+      await poll(() => page.$$eval('.pe-photo--list', (items) => items.map((li) => li.dataset.status)), (s) => s[0] === 'ready' || s[0] === 'error', 'RAW import', 300_000);
+      if ((await page.$$eval('.pe-photo--list', (items) => items[0].dataset.status)) === 'error') { row.import = 'refused'; rows.push(row); continue; } // eslint-disable-line no-continue
+      await page.click('.pe-photo--list button.pe-photo__select');
+      await poll(() => page.evaluate(() => !document.querySelector('.pe-stage-message') && !document.querySelector('.pe-canvas-host').hidden), Boolean, 'preview', 300_000);
+      for (const [kind, label] of [['sky', 'Sky'], ['subject', 'Subject']]) {
+        const t0 = Date.now();
+        await page.locator('.pe-masks__add[aria-label="New local adjustment from a selection"] button', { hasText: new RegExp(`^${label}$`) }).click();
+        await poll(() => page.evaluate(() => { const s = document.querySelector('.pe-masks__select-status'); return !s || s.dataset.state !== 'busy'; }), Boolean, label, 300_000);
+        const values = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null')?.photos[0]?.adjustments ?? null, AUTOSAVE_KEY);
+        const found = values?.local?.flatMap((l) => l.mask.components).find((c) => c.kind === kind);
+        const message = await page.evaluate(() => document.querySelector('.pe-masks__select-status')?.textContent ?? null);
+        row[kind] = found ? { confidence: found.confidence, grid: `${found.width}×${found.height}`, ms: Date.now() - t0 } : { found: false, message, ms: Date.now() - t0 };
+      }
+    } catch (error) {
+      row.error = error.message;
+    } finally {
+      await context.close(); // eslint-disable-line no-await-in-loop
+    }
+    rows.push(row);
+    console.log(`raw  ${JSON.stringify(row)}`);
+  }
+  return rows;
+}
+
 async function main() {
   if (!process.env.SELECTION_SKIP_BUILD) await build({ root, logLevel: 'silent', configFile: path.join(root, 'vite.config.mjs') });
   const server = await preview({ root, logLevel: 'silent', configFile: path.join(root, 'vite.config.mjs'), preview: { port: PORT, strictPort: true } });
@@ -252,6 +293,10 @@ async function main() {
       const result = await check(run, file); // eslint-disable-line no-await-in-loop
       if (!result.ok) failed += 1;
       console.log(`${result.ok ? 'ok  ' : 'FAIL'} ${JSON.stringify(result)}`);
+    }
+    if (process.env.SELECTION_RAW_DIR) {
+      const rows = await checkRaws(process.env.SELECTION_RAW_DIR);
+      if (rows.some((row) => row.error)) failed += 1;
     }
   } finally {
     await server.close();
