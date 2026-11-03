@@ -394,6 +394,8 @@ describe('RAW job queue', () => {
       setInterval: (fn, ms) => { next += 1; intervals.set(next, { fn, ms }); return next; },
       clearInterval: (id) => intervals.delete(id),
       advance(seconds) { for (let i = 0; i < seconds; i += 1) { time += 1000; [...intervals.values()].forEach(({ fn }) => fn()); } },
+      // A suspended tab: the clock moves, no timer runs.
+      skip(seconds) { time += seconds * 1000; },
       get active() { return intervals.size; },
     };
     return timers;
@@ -536,6 +538,26 @@ describe('RAW job queue', () => {
       started[0].ready();
       started[0].finish({ back: true });
       await expect(job.promise).resolves.toEqual({ back: true });
+    });
+
+    test('a decode backgrounded mid-stage keeps its budget; only visible seconds count (Interval 22.9)', async () => {
+      let shown = true;
+      const { queue, started, timers } = setup({ visible: () => shown });
+      const job = queue.run('inspect', {});
+      started[0].ready();
+      // 24 MP half size: the 120 s floor. 100 s visible, 20 min in the background, 15 s visible again.
+      started[0].progress({ checkpoint: 'decoding', megapixels: 24, full: false });
+      timers.advance(100);
+      shown = false;
+      timers.advance(1200);
+      // Then suspended (iOS freezes a background tab's timers) and shown again: the first tick
+      // after resuming counts at most maxTickSeconds, not the 30 minutes the clock moved.
+      timers.skip(1800);
+      shown = true;
+      timers.advance(15);
+      expect(started[0].terminated).toBe(false);
+      timers.advance(5);
+      await expect(job.promise).rejects.toMatchObject({ code: 'stalled', stage: 'decoding' });
     });
 
     test('checkpoints are not passed to the job\'s progress handler', async () => {

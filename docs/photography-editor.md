@@ -48,6 +48,11 @@ controls stay reachable, values survive, pinch never paints, and the downloaded 
 Also: cancel a RAW import and retry it, watch its stage and seconds, pinch, pan and
 rotate while a mask or retouch tool is on, export at full resolution and download it,
 export three times in a row, and note any memory warning or page reload.
+Interval 22.9 additions: in Layers select, rename (Rename button), hide, lock, reorder (grip and
+Move up/down) and delete by touch, in portrait and landscape; adding Text opens the Text tool with
+the keyboard; brush a mask for 10 s and compare its smoothness with 22.8; Spot Heal, Clone Stamp and
+Remove, then lift a second finger mid-stroke (nothing extra is painted); Auto Exposure on a Canon
+EOS R CR3 should suggest about +0.7 EV (camera match; Playwright WebKit cannot show it).
 Record failures as: iOS + Safari version / URL + commit / photo format + dimensions + file
 size / tool / steps / expected vs actual / portrait or landscape / keyboard + browser toolbar
 state / whether Safari reloaded the page.
@@ -1787,7 +1792,31 @@ are shown or the source or size changes. `check:editor:layers` and `check:editor
 cached renders to equal uncached ones exactly (a miss, a hit, a growing brush mask, a retouch
 change under one key). The brush check reports `gpuPerStroke`. Pixel 7 emulation, 30 moves,
 SwiftShader on Windows: frame interval p50 3.7 → 3.5 s, release → final 3.6 → 0.45 s, two more
-full-size textures (the kept frames); frames stay dominated by software GL, so measure on a phone.
+full-size textures (the kept frames).
+
+**Brush frames (Interval 22.9).** The 22.8 cache never hit while painting: each move gave the viewer
+a new (empty) `retouch` array, its retouch sync called `setRetouched(null)` and the new retouch
+version changed the renderer's state key, so the full pipeline ran twice per move (about 1.6 s per
+draw at 3072×2048 in SwiftShader). Clearing an absent retouch is now a no-op. Then, with one masked
+adjustment over kept frames, only the mask's changed box is composited into the target that still
+holds the last frame (`partialComposite`; a raster's `change.from` must equal the version that
+target was drawn with, else a full draw); the GPU parity page paints with a paint cache, incl. an
+unchanged frame, erase and undo, and every frame must equal an uncached render (a wrong box fails
+it). Same machine, build mode and 24 MP fixture, 30 moves, frame interval p50 / p95 / max:
+
+| Run | 22.8 | 22.9 |
+| --- | --- | --- |
+| Chromium, Pixel 7 emulation (SwiftShader) | 3583 / 4317 / 4700 ms | 67 / 83 / 3550 ms |
+| Chromium, desktop (SwiftShader) | 6700 / 7650 / 7883 ms | 133 / 167 / 6933 ms |
+| WebKit, iPhone 13 emulation (hardware GPU) | 65 / 80 / 183 ms | 65 / 82 / 182 ms |
+
+Input → draw stays 10–18 ms; release → final 440 → 331 ms (Pixel 7). The max is the stroke's first
+frame, which renders the cold photo and adjustment frames once; on a phone GPU that is one pipeline
+draw, in SwiftShader seconds. Diagnosis: a Chromium trace showed the compositor's `ReadPixels` of
+the WebGL canvas waiting on the GPU process, and `BRUSH_GL_TRACE` (a 1×1 `readPixels` after each
+draw; `gl.finish()` returns before the work under headless SwiftShader) attributed it per pass. GPU
+memory is unchanged: three layer targets, two kept frames and the mask texture (bounded, freed when
+no layers show or the source or size changes).
 
 `npm run check:editor:raw-reliability` covers a decoder that never starts (hidden, then visible),
 Cancel and Retry, a preview whose decoder goes silent, five import/remove cycles and sustained
@@ -1799,6 +1828,34 @@ the same row stays "Waiting for the RAW decoder" indefinitely. Genuine CR2, CR3,
 ORF, RW2 and DNG import in 0.9–3.1 s (WebKit) and 2.4–11 s (Firefox). Whole-browser memory over
 three import/export/remove cycles stays flat in Firefox (1.6 GB) and rises in WebKit (1.35 →
 1.62 GB; includes the GPU process, no RAW worker left alive).
+
+**Interval 22.9.**
+
+- *Phone Layers.* The 22.8 Layers check timeouts (iPhone 13 and Pixel 7, also on `main`) were the
+  check opening Adjust without a tool since the 22.6 tray; it now navigates as a phone user does.
+  Real defects fixed: rename was double-click/F2 only (now a Rename action), adding Text from the
+  Layers tray left its field in the closed Text tool (it opens the Text tool; text layers get Edit
+  text), and the phone Adjust panel hid which layer or mask it edits. The check taps select,
+  rename, hide, lock, Move up/down, duplicate and delete, and repeats in landscape.
+- *RAW.* The importing row's seconds count from the stage shown, not from queueing. The watchdog
+  is unchanged; a unit test pins that a decode backgrounded and then suspended mid-stage keeps its
+  visible-time budget. `check:editor:raw-reliability` passes in all five runs; 18 of 21 genuine files
+  (CR2, CR3, RAF, NEF, NRW, ORF, RW2, PEF, DNG) import in 0.7–3.8 s (WebKit, Chromium) and 1.3–11 s
+  (Firefox); the three High Efficiency NEFs are refused with the HE message.
+- *Memory.* Chromium post-GC JS heap stays within 0.3 MB over cycles and live WebGL textures return
+  to 0 after each photo. The WebKit rise is not a leak: live textures are 0 within 1.5 s of removal
+  (the 22.8 step sampled at once), and over eight identical cycles (`RAW_RELIABILITY_CYCLES=8`, two
+  genuine RAWs, full-size export) the whole-browser total moves between 0.94 and 1.50 GB with no
+  trend (1.19, 0.94, 1.23, 1.28, 1.50, 1.32, 1.36, 1.39 GB). It is allocator
+  and decoder memory the process keeps for reuse.
+- *Context loss.* Already correct (`lost` reads `gl.isContextLost()`; restoring re-runs the
+  retouch sync); `check:editor:retouch` now loses and restores the context and requires the same
+  preview (exact in Chromium, Firefox, WebKit, iPhone 13 and Pixel 7 emulation).
+- *Sustained session* (`check:editor:sustained`, synthetic 24 MP JPEG plus genuine CR3, NEF, RAF,
+  DNG): passes in Chromium, iPhone 13 (WebKit) and Pixel 7 emulation; preview vs export mean
+  difference 1.0–4.0 codes, reopened exports identical, no busy indicator left. Auto Exposure
+  differs in Playwright's Windows WebKit, which has no `OffscreenCanvas` in workers, so the
+  camera match falls back to the scene key (no suggestion); Safari on iOS has it since 16.4.
 
 ## Known issues
 

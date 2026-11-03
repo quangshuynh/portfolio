@@ -366,6 +366,9 @@ export class GlRenderer {
    */
   setRetouched(image, dirty = null) {
     const { gl } = this;
+    // Clearing what is not there changes no frame; the viewer does it on every brush move, and
+    // a new version would discard the kept frames each time (Interval 22.9).
+    if (!image && !this.retouched) return;
     this.retouchVersion = (this.retouchVersion ?? 0) + 1;
     if (!image || !this.texture) {
       if (this.retouched) gl.deleteTexture(this.retouched);
@@ -494,10 +497,27 @@ export class GlRenderer {
         layerTexture = this.layerTexture(pass);
         used.add(pass.key);
       }
+      const next = writable();
+      // Painting one local adjustment over kept frames: the target still holds the last frame,
+      // which differs only where the mask changed since then, so only that box is composited
+      // (each pixel reads its own texels: the result equals a full draw). Interval 22.9.
+      const change = pass.mask?.raster.change;
+      const inputs = layers.length === 1 && pass.kind === 'adjust' && key && change && pass.mask.raster.width === width && pass.mask.raster.height === height
+        ? `${key}>${JSON.stringify(pass.adjustments)}|${pass.lut?.sha256 ?? ''}|${pass.opacity}|${pass.mode}` : null;
+      const held = this.partialComposite;
+      const follows = inputs && held?.target === next && held.inputs === inputs && held.key === change.key && change.from !== null && change.from === held.version;
+      this.partialComposite = inputs ? { target: next, inputs, key: change.key, version: change.version } : null;
       // A composite depends on the mask, which changes while painting: not cached.
       key = null;
-      const next = writable();
+      // Nothing changed since the held frame: it is the result.
+      const unchanged = follows && !change.dirty;
       gl.bindFramebuffer(gl.FRAMEBUFFER, next.framebuffer);
+      if (follows && !unchanged) {
+        const { x0, y0, x1, y1 } = change.dirty;
+        gl.enable(gl.SCISSOR_TEST);
+        gl.scissor(x0, height - y1, x1 - x0, y1 - y0);
+        this.compositeBoxes = (this.compositeBoxes ?? 0) + 1;
+      }
       gl.useProgram(c.program);
       const u = c.uniforms;
       gl.activeTexture(gl.TEXTURE0 + UNIT.backdrop);
@@ -518,7 +538,8 @@ export class GlRenderer {
       gl.uniform1i(u.uMask, UNIT.mask);
       gl.uniform1i(u.uMasked, pass.mask ? 1 : 0);
       if (pass.mask) usedMasks.add(pass.mask.key);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      if (!unchanged) gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      if (follows) gl.disable(gl.SCISSOR_TEST);
       current = next;
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -688,6 +709,7 @@ export class GlRenderer {
 
   releaseTargets() {
     const { gl } = this;
+    this.partialComposite = null;
     this.releaseFrames();
     this.targets.forEach(({ texture, framebuffer }) => { gl.deleteFramebuffer(framebuffer); gl.deleteTexture(texture); });
     this.targets = [];
