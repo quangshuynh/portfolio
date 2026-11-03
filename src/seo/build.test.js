@@ -250,7 +250,16 @@ describe('Vercel routing', () => {
 
   test('caches only content-hashed assets as immutable', () => {
     const immutable = (config.headers ?? []).filter(({ headers }) => headers.some(({ key, value }) => key === 'Cache-Control' && /immutable/.test(value)));
-    expect(immutable.map(({ source }) => source)).toEqual(['/assets/(.*)']);
+    expect(immutable.map(({ source }) => source)).toEqual(['/assets/(.*)', '/photography/editor-models/(.*)']);
+    // Selection models are named after their content: the hash in the name is its SHA-256's start.
+    const dir = resolve(root, 'public/photography/editor-models');
+    const files = readdirSync(dir);
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) {
+      const named = /-([0-9a-f]{8})\.onnx$/.exec(file)?.[1];
+      expect(named, file).toBeTruthy();
+      expect(createHash('sha256').update(readFileSync(join(dir, file))).digest('hex').slice(0, 8)).toBe(named);
+    }
   });
 
   test('serves every route and redirects its non-canonical twin', () => {

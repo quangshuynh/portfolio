@@ -111,3 +111,30 @@ and are loaded only by the editor's RAW worker. Nothing below was modified.
    Copyright 2023 The Schibsted-Grotesk Project Authors
    (https://github.com/schibsted/schibsted-grotesk). SIL Open Font License 1.1:
    https://openfontlicense.org/open-font-license-official-text/
+
+Intelligent selections (Select Sky, Subject, Background, Object) run the models
+below in the browser with ONNX Runtime Web. Model files are served from this
+site (photography/editor-models/), downloaded only when a selection is first
+made, and checked against their SHA-256; photos are never uploaded.
+
+8. ONNX Runtime Web 1.31.1 (npm: onnxruntime-web@1.31.1)
+   Copyright (c) Microsoft Corporation. MIT licence:
+   https://github.com/microsoft/onnxruntime/blob/main/LICENSE
+
+9. Sky segmentation model (U²-Net trained for sky segmentation)
+   https://github.com/xiongzhu666/Sky-Segmentation-and-Post-processing
+   MIT licence. ONNX export as published at huggingface.co/JianyuanWang/skyseg
+   (skyseg.onnx, SHA-256 ab9c34c6…); weights quantised to 8 bits for this site
+   (sky-u2net-int8-a1a5aa06.onnx).
+
+10. U²-Netp salient object detection model
+    Copyright (c) 2020 Xuebin Qin. Apache License 2.0:
+    https://github.com/xuebinqin/U-2-Net/blob/master/LICENSE
+    ONNX file as distributed by rembg (u2netp.onnx), unmodified.
+
+11. MobileSAM (Segment Anything with a TinyViT image encoder)
+    Copyright (c) Chaoning Zhang et al. Apache License 2.0:
+    https://github.com/ChaoningZhang/MobileSAM/blob/master/LICENSE
+    Builds on Segment Anything, Copyright (c) Meta Platforms, Inc., Apache
+    License 2.0. ONNX exports from huggingface.co/Acly/MobileSAM (MIT),
+    unmodified (image encoder and multi-mask decoder).
