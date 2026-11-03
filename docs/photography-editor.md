@@ -53,6 +53,12 @@ Move up/down) and delete by touch, in portrait and landscape; adding Text opens 
 the keyboard; brush a mask for 10 s and compare its smoothness with 22.8; Spot Heal, Clone Stamp and
 Remove, then lift a second finger mid-stroke (nothing extra is painted); Auto Exposure on a Canon
 EOS R CR3 should suggest about +0.7 EV (camera match; Playwright WebKit cannot show it).
+Interval 22.10 additions: Diagnostics → Copy shows `build` (the commit; `+changes` for a build of
+uncommitted edits); check it against the branch before testing. Prefer the Vercel preview (HTTPS):
+the LAN preview is plain HTTP, so Safari gives it no secure context (no `crypto.subtle` or
+clipboard; the editor falls back, but Copy may fail). New brush local adjustment → set Exposure →
+wait 2 s → paint: the first point should show as fast as later ones; repeat after switching photos
+and after a crop.
 Record failures as: iOS + Safari version / URL + commit / photo format + dimensions + file
 size / tool / steps / expected vs actual / portrait or landscape / keyboard + browser toolbar
 state / whether Safari reloaded the page.
@@ -1856,6 +1862,31 @@ three import/export/remove cycles stays flat in Firefox (1.6 GB) and rises in We
   difference 1.0–4.0 codes, reopened exports identical, no busy indicator left. Auto Exposure
   differs in Playwright's Windows WebKit, which has no `OffscreenCanvas` in workers, so the
   camera match falls back to the scene key (no suggestion); Safari on iOS has it since 16.4.
+
+**First stroke (Interval 22.10).** While the brush is out over a local adjustment with no strokes,
+nothing is composited, so the renderer freed its frames and the first point allocated the three
+layer targets and drew the photo and adjustment frames through the whole pipeline (seconds in
+SwiftShader). The viewer now keeps them (`keepFrames`) and calls `warmFrames()` when idle, under the
+keys `composite()` reads, then flushes so the GPU starts at once (without the flush the work waited
+for the stroke's first frame). Any newer preview frame abandons a pending warm-up; changed settings,
+retouch, geometry or source are new keys (never read stale); the frame cache stays at two; targets
+made for a stroke that never came are freed when the brush is put away. Not warmed: Detail locals
+(CPU path), layer masks (already composited), retouch tools (reading the proxy's pixels ahead made
+no measurable difference: Spot Heal 2720 → 2593 ms, 24 MP 5144 → 5172 ms; reverted).
+`glRenderer.test.js` checks hits, parity with uncached frames, invalidation, bounds and context loss.
+Worst frame of a stroke's first four, `main` → 22.10 (8 s pause before painting; same machine):
+
+| Run | `main` | 22.10 |
+| --- | --- | --- |
+| Chromium, desktop (SwiftShader) | 7150 ms | 583 ms |
+| Chromium, Pixel 7 emulation (SwiftShader) | 4216 ms | 1366–1883 ms |
+| WebKit, iPhone 13 emulation (hardware GPU) | 180 ms | 180 ms |
+
+Continuous strokes are unchanged (p50 117 / 67 / 62–65 ms). In SwiftShader the warm-up itself takes
+seconds of GPU time (6.6 s traced on desktop at 4096×2731), so a stroke started sooner still waits
+for it, now on the main thread (Pixel 7 at 0.5 s: first point 2.9 s vs 0.3 s on `main`, worst
+frame 3.0 vs 4.0–4.6 s). On a hardware GPU it is two draws (milliseconds); the remaining ~150 ms
+to the first WebKit draw is not mask rasterization (18 ms at 11 MP) and is not yet explained.
 
 ## Known issues
 
