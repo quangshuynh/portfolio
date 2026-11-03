@@ -93,7 +93,7 @@ export default function AdjustPanel({ mobileSection, onMobileSectionChange, adju
   ));
 
   return (
-    <section className="pe-panel pe-panel--adjust" aria-labelledby="pe-adjust-title">
+    <section className="pe-panel pe-panel--adjust" aria-labelledby="pe-adjust-title" data-target={layer ? (layer.local ? 'local' : 'layer') : undefined}>
       <div className="pe-panel__head">
         <h2 id="pe-adjust-title">{layer ? <>Adjust <span className="pe-adjust-target">{layer.local ? 'local' : 'layer'} “{layer.label}”</span></> : 'Adjust'}</h2>
         <button type="button" className="pe-text-button" disabled={disabled || isNeutral(adjustments)} onClick={() => dispatch({ type: 'resetAll' })}>

@@ -13,7 +13,7 @@ const stack = () => normalizeLayers([
 ]);
 const sources = (patch = {}) => ({ missing: () => null, thumbnail: () => null, workspace: [], onAddPhoto: vi.fn(), onImport: vi.fn(), onReconnect: vi.fn(), busy: false, message: null, ...patch });
 
-function Harness({ initial = stack(), onApplySpy = () => {}, sourceProps = {} }) {
+function Harness({ initial = stack(), onApplySpy = () => {}, sourceProps = {}, onEditSettings = () => {} }) {
   const [layers, setLayers] = useState(initial);
   const [active, setActive] = useState(null);
   return (
@@ -29,7 +29,7 @@ function Harness({ initial = stack(), onApplySpy = () => {}, sourceProps = {} })
       onCommit={() => {}}
       onAddText={() => {}}
       onAddAdjustment={() => {}}
-      onEditSettings={() => {}}
+      onEditSettings={onEditSettings}
       tool={false}
       onTool={() => {}}
       freeResize={false}
@@ -152,5 +152,26 @@ describe('Layers panel', () => {
     const toggle = screen.getByRole('button', { name: /Layers/ });
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('rename from the selected layer’s actions (touch has no double click or F2)', () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: /^Title/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    const field = screen.getByRole('textbox', { name: 'Name of Title' });
+    expect(field).toHaveFocus();
+    fireEvent.change(field, { target: { value: 'Caption' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(rows()[1]).toBe('Caption');
+  });
+
+  test('every layer type opens its settings: adjustment, colour, or the text itself', () => {
+    const edit = vi.fn();
+    render(<Harness onEditSettings={edit} />);
+    for (const [name, button] of [[/^Title/, 'Edit text'], [/^sky\.png/, 'Edit layer colour'], [/^Adjustment, Adjustment layer/, 'Edit adjustment settings']]) {
+      fireEvent.click(screen.getByRole('button', { name }));
+      fireEvent.click(screen.getByRole('button', { name: button }));
+    }
+    expect(edit.mock.calls.map(([layer]) => layer.id)).toEqual(['txt', 'img', 'adj']);
   });
 });

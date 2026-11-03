@@ -814,7 +814,8 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
   .pe[data-mobile-tool='retouch'] .pe-retouch,
   .pe[data-mobile-tool='masks'] .pe-masks:not(.pe-retouch) { display: block; }
   .pe[data-mobile-tool]:not([data-mobile-tool='layers']):not([data-mobile-tool='retouch']):not([data-mobile-tool='masks']) .pe-panel--adjust { display: block; }
-  .pe-panel--adjust > .pe-panel__head { display: none; }
+  /* Phones name the layer or mask being edited (several adjustment layers look alike). */
+  .pe-panel--adjust:not([data-target]) > .pe-panel__head { display: none; }
   .pe .pe-panel { padding: 8px 12px 16px; }
   .pe button, .pe summary, .pe input:not([type='checkbox']):not([type='radio']), .pe select, .pe-segmented__option span { min-height: 44px; }
   .pe .pe-icon-button { min-width: 44px; }

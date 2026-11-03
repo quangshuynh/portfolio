@@ -339,14 +339,13 @@ export default function LayersPanel({ compact = false, onClose, layers, activeId
                 </button>
               </div>
             )}
-            {active.type !== 'text' && (
-              <button type="button" className="pe-text-button" disabled={disabled} onClick={onEditSettings}>
-                {active.type === 'adjustment' ? 'Edit adjustment settings' : 'Edit layer colour'}
-              </button>
-            )}
+            <button type="button" className="pe-text-button" disabled={disabled} onClick={() => onEditSettings(active)}>
+              {{ adjustment: 'Edit adjustment settings', image: 'Edit layer colour', text: 'Edit text' }[active.type]}
+            </button>
             <div className="pe-layers__actions">
               <button type="button" className="pe-text-button" disabled={disabled || index === layers.length - 1} onClick={() => move(active.id, index + 1)}>Move up</button>
               <button type="button" className="pe-text-button" disabled={disabled || index === 0} onClick={() => move(active.id, index - 1)}>Move down</button>
+              <button type="button" className="pe-text-button" disabled={disabled} onClick={() => setRenaming(active.id)}>Rename</button>
               <button
                 type="button"
                 className="pe-text-button"

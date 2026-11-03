@@ -910,9 +910,11 @@ function EditorWorkspace({ host }) {
   const addTextLayer = useCallback(() => {
     if (insertAboveActive(createTextOverlay(newLayerId('text')), 'A photo can hold up to 30 text layers and 40 layers in all.')) {
       if (!transformMode) setLayerToolOn(true);
+      // Phones show one tool at a time: open the Text tool so the new layer's field is on screen.
+      if (narrow) { setMobilePanel('adjust'); setMobileTool('text'); }
       setTextFocus((count) => count + 1);
     }
-  }, [insertAboveActive, transformMode]);
+  }, [insertAboveActive, transformMode, narrow]);
   const addAdjustmentLayer = useCallback(() => {
     insertAboveActive(createAdjustmentLayer(newLayerId('adjust')), 'A photo can hold up to 12 adjustment layers and 40 layers in all.');
   }, [insertAboveActive]);
@@ -1980,7 +1982,11 @@ function EditorWorkspace({ host }) {
             onCommit={() => dispatch({ type: 'commitAdjustment' })}
             onAddText={addTextLayer}
             onAddAdjustment={addAdjustmentLayer}
-            onEditSettings={() => { setMobilePanel('adjust'); setMobileTool('light'); }}
+            onEditSettings={(layer) => {
+              setMobilePanel('adjust');
+              setMobileTool(layer?.type === 'text' ? 'text' : 'light');
+              if (layer?.type === 'text') setTextFocus((count) => count + 1);
+            }}
             tool={layerToolOn}
             onTool={(on) => { if (!transformMode) setLayerToolOn(on); }}
             freeResize={freeResize}
