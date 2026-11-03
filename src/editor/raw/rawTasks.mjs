@@ -44,6 +44,9 @@ async function decodePreview({ bytes, width, height }) {
 
 export const RAW_BAND_ROWS = 256;
 
+/** stage(name, detail): a watchdog checkpoint (rawTrace.mjs) sent through the job's progress. */
+const checkpoints = (progress) => (name, detail = {}) => progress({ checkpoint: name, ...detail });
+
 /** LibRaw could not be instantiated: usually too little memory for its heap on a phone. */
 function decoderFailure(error) {
   const detail = String(error?.message ?? error ?? 'unknown error').slice(0, 160);
@@ -59,11 +62,13 @@ function decoderFailure(error) {
  * ArrayBuffer had been allocated in the worker crashed Playwright's Windows WebKit once an
  * earlier RAW worker had ended (docs/photography-editor.md, Known issues). Same files and
  * the same memory either way.
+ * `progress` receives the checkpoints ('reading', 'module-loading').
  * :returns: { Module, bytes, format }
  */
-async function openRaw(file, loadModule) {
+async function openRaw(file, loadModule, progress = () => {}) {
   if (file.size > LIMITS.maxFileBytes) throw new RawDecodeError('too-large', `The file is larger than ${LIMITS.maxFileBytes / (1024 * 1024)} MB.`);
   if (file.size === 0) throw new RawDecodeError('corrupt', 'The file is empty.');
+  progress({ checkpoint: 'reading' });
   let format;
   try {
     format = sniffRaw(new Uint8Array(await file.slice(0, RAW_SNIFF_BYTES).arrayBuffer()));
@@ -72,11 +77,13 @@ async function openRaw(file, loadModule) {
   }
   if (!format) throw new RawDecodeError('unsupported', `This is not a ${RAW_SUPPORT.replace(' and ', ' or ')} file.`);
   let Module;
+  progress({ checkpoint: 'module-loading' });
   try {
     Module = await loadModule();
   } catch (error) {
     throw decoderFailure(error);
   }
+  progress({ checkpoint: 'reading' });
   const bytes = new Uint8Array(await file.arrayBuffer());
   return { Module, bytes, format };
 }
@@ -99,10 +106,13 @@ export function createRawHandlers(loadModule, { decodePreview: readPreview = dec
      * samples Auto Exposure reads (from the same decode, so it costs no second one).
      */
     async inspect({ file, thumbnailEdge }, progress) {
-      const { Module, bytes, format } = await openRaw(file, loadModule);
+      const stage = checkpoints(progress);
+      const { Module, bytes, format } = await openRaw(file, loadModule, progress);
+      stage('hashing');
       const sha256 = await contentHash(bytes);
       progress({ stage: 'decoding' });
-      const { info, image, preview } = decodeRaw(Module, bytes, { format, halfSize: true, preview: true });
+      const { info, image, preview } = decodeRaw(Module, bytes, { format, halfSize: true, preview: true, onStage: stage });
+      stage('processing');
       const size = proxyDimensions(image, thumbnailEdge);
       const thumbnail = downsampleRaw(image, size.width, size.height);
       const exposureSamples = luminanceSamples(image, rawDevelopParams(info, { whiteBalance: 'as-shot' }));
@@ -120,9 +130,10 @@ export function createRawHandlers(loadModule, { decodePreview: readPreview = dec
      * 1:1 inspection source: the full demosaic (as an export at original size), its guide
      * source, and only `rect` of the pixels.
      */
-    async region({ file, raw, rect, geometry = null, retouch = [] }) {
-      const { Module, bytes, format } = await openRaw(file, loadModule);
-      const decoded = decodeRaw(Module, bytes, { format, halfSize: false });
+    async region({ file, raw, rect, geometry = null, retouch = [] }, progress = () => {}) {
+      const stage = checkpoints(progress);
+      const { Module, bytes, format } = await openRaw(file, loadModule, progress);
+      const decoded = decodeRaw(Module, bytes, { format, halfSize: false, onStage: stage });
       if (!sameSize(decoded.info, raw)) {
         throw new RawDecodeError('corrupt', 'The file changed since it was imported. Import it again.');
       }
@@ -140,9 +151,11 @@ export function createRawHandlers(loadModule, { decodePreview: readPreview = dec
     },
 
     /** Preview proxy: half-size sensor data, downscaled to `maxEdge` if larger. */
-    async decode({ file, maxEdge }) {
-      const { Module, bytes, format } = await openRaw(file, loadModule);
-      const { image } = decodeRaw(Module, bytes, { format, halfSize: true });
+    async decode({ file, maxEdge }, progress = () => {}) {
+      const stage = checkpoints(progress);
+      const { Module, bytes, format } = await openRaw(file, loadModule, progress);
+      const { image } = decodeRaw(Module, bytes, { format, halfSize: true, onStage: stage });
+      stage('processing');
       const size = proxyDimensions(image, maxEdge);
       const proxy = downsampleRaw(image, size.width, size.height);
       return { result: proxy, transfer: [proxy.data.buffer] };
@@ -152,9 +165,10 @@ export function createRawHandlers(loadModule, { decodePreview: readPreview = dec
      * Linear camera RGB at a given size for an HDR export (no rendering): half-size
      * sensor data when it is enough, else the full demosaic, area-averaged to the size.
      */
-    async develop({ file, raw, width, height }) {
-      const { Module, bytes, format } = await openRaw(file, loadModule);
-      const decoded = decodeRaw(Module, bytes, { format, halfSize: !needsFullDecode(raw, { width, height }) });
+    async develop({ file, raw, width, height }, progress = () => {}) {
+      const stage = checkpoints(progress);
+      const { Module, bytes, format } = await openRaw(file, loadModule, progress);
+      const decoded = decodeRaw(Module, bytes, { format, halfSize: !needsFullDecode(raw, { width, height }), onStage: stage });
       if (!sameSize(decoded.info, raw)) {
         throw new RawDecodeError('corrupt', 'The file changed since it was imported. Import it again.');
       }
@@ -172,16 +186,18 @@ export function createRawHandlers(loadModule, { decodePreview: readPreview = dec
      * band are held here.
      */
     async export({ file, raw, adjustments, lut = null, settings }, progress) {
+      const stage = checkpoints(progress);
       const started = performance.now();
       const geometry = exportGeometry(adjustments.geometry, { width: raw.width, height: raw.height }, settings.resize);
       const size = geometry.output;
       const developSize = geometry.decode;
       progress({ stage: 'decoding', fraction: 0 });
-      const { Module, bytes, format } = await openRaw(file, loadModule);
-      const decoded = decodeRaw(Module, bytes, { format, halfSize: !needsFullDecode(raw, developSize) });
+      const { Module, bytes, format } = await openRaw(file, loadModule, progress);
+      const decoded = decodeRaw(Module, bytes, { format, halfSize: !needsFullDecode(raw, developSize), onStage: stage });
       if (!sameSize(decoded.info, raw)) {
         throw new RawDecodeError('corrupt', 'The file changed since it was imported. Import it again.');
       }
+      stage('processing');
       const full = decoded.image.width > raw.width / 1.5;
       const source = full ? 'full' : 'half';
       let image = downsampleRaw(full ? cropToSize(decoded.image, raw) : decoded.image, developSize.width, developSize.height);
@@ -201,6 +217,7 @@ export function createRawHandlers(loadModule, { decodePreview: readPreview = dec
       const detail = params.spatialActive
         ? prepareDetailRender(prepared, { width: size.width, height: size.height, nativeWidth: nativeSize.width, nativeHeight: nativeSize.height, guideImage: guideSource(image) })
         : null;
+      stage('rendering');
       for (let row = 0; row < size.height; row += RAW_BAND_ROWS) {
         const rows = Math.min(RAW_BAND_ROWS, size.height - row);
         const data = new Uint8ClampedArray(size.width * rows * 4);

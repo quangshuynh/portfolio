@@ -132,17 +132,19 @@ export function cropToSize(image, { width, height }) {
  * Decodes a RAW file.
  * :param Module: the loaded libraw-wasm Emscripten module
  * :param bytes: Uint8Array of the whole file
- * :param options: { halfSize, preview } half size takes each 2×2 sensor block as one pixel
+ * :param options: { halfSize, preview, onStage } half size takes each 2×2 sensor block as one pixel
  *   (genuine sensor data at half resolution, about 5x faster); else full AHD demosaic.
  *   `preview` also returns the camera's embedded JPEG preview (only its brightness is used,
- *   by Auto Exposure), or null when there is none
+ *   by Auto Exposure), or null when there is none. `onStage(stage, detail)` is told before
+ *   each synchronous LibRaw step ('opening', then 'decoding' with the megapixels to decode)
  * :returns: { info, image: { kind: 'raw', width, height, data: Uint16Array RGB }, preview }
  */
-export function decodeRaw(Module, bytes, { format, halfSize = false, preview: wantPreview = false } = {}) {
+export function decodeRaw(Module, bytes, { format, halfSize = false, preview: wantPreview = false, onStage = () => {} } = {}) {
   const raw = new Module.LibRaw();
   Module.lastMessage = '';
   try {
     let meta;
+    onStage('opening', { full: !halfSize });
     try {
       raw.open(bytes, { ...DECODE_SETTINGS, halfSize });
       meta = raw.metadata(true);
@@ -151,6 +153,8 @@ export function decodeRaw(Module, bytes, { format, halfSize = false, preview: wa
     }
     const info = summarizeMetadata(meta, format);
     checkDecodable(meta, info);
+    // Half size reports the halved dimensions, so this is the work actually done.
+    onStage('decoding', { megapixels: Math.round((info.width * info.height) / 1e5) / 10, full: !halfSize });
     let preview = null;
     if (wantPreview) {
       try {

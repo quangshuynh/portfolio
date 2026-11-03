@@ -290,6 +290,10 @@ describe('RAW worker tasks', () => {
     expect(transfer).toEqual([result.thumbnail.data.buffer, result.exposureSamples.y.buffer, result.exposureSamples.clipped.buffer]);
     expect(result.exposureSamples.y.length).toBe(result.exposureSamples.width * result.exposureSamples.height);
     expect(progress).toHaveBeenCalledWith({ stage: 'decoding' });
+    // Watchdog checkpoints in order; the synchronous decode states the work it is about to do.
+    const stages = progress.mock.calls.map(([value]) => value.checkpoint).filter(Boolean);
+    expect(stages).toEqual(['reading', 'module-loading', 'reading', 'hashing', 'opening', 'decoding', 'processing']);
+    expect(progress.mock.calls.find(([value]) => value.checkpoint === 'decoding')[0]).toMatchObject({ megapixels: 0, full: false });
     await expect(handlers.inspect({ file: dngFile(new TextEncoder().encode('not a raw')), thumbnailEdge: 16 }, vi.fn())).rejects.toMatchObject({ code: 'unsupported' });
     await expect(handlers.inspect({ file: dngFile(new Uint8Array()), thumbnailEdge: 16 }, vi.fn())).rejects.toMatchObject({ code: 'corrupt' });
   });
@@ -363,25 +367,43 @@ describe('RAW job queue', () => {
   function fakeWorkers() {
     const started = [];
     const spawn = () => {
-      const listeners = {};
+      const listeners = { message: [], error: [] };
+      const emit = (type, event) => listeners[type].forEach((fn) => fn(event));
       const worker = {
         terminated: false,
-        addEventListener: (type, fn) => { listeners[type] = fn; },
+        addEventListener: (type, fn) => { listeners[type].push(fn); },
         postMessage: ({ id, type }) => { worker.message = { id, type }; started.push(worker); },
         terminate: () => { worker.terminated = true; },
-        finish: (result = {}) => listeners.message({ data: { id: worker.message.id, ok: true, result } }),
-        progress: (value) => listeners.message({ data: { id: worker.message.id, progress: value } }),
-        crash: () => listeners.error({ preventDefault() {} }),
+        ready: () => emit('message', { data: { ready: true } }),
+        heartbeat: () => emit('message', { data: { heartbeat: true } }),
+        finish: (result = {}) => emit('message', { data: { id: worker.message.id, ok: true, result } }),
+        progress: (value) => emit('message', { data: { id: worker.message.id, progress: value } }),
+        crash: () => emit('error', { preventDefault() {} }),
       };
       return worker;
     };
     return { spawn, started };
   }
+  // A controllable clock for the watchdog: advance(seconds) runs its 1 s ticks.
+  function fakeTimers() {
+    let time = 0;
+    const intervals = new Map();
+    let next = 0;
+    const timers = {
+      performance: { now: () => time },
+      setInterval: (fn, ms) => { next += 1; intervals.set(next, { fn, ms }); return next; },
+      clearInterval: (id) => intervals.delete(id),
+      advance(seconds) { for (let i = 0; i < seconds; i += 1) { time += 1000; [...intervals.values()].forEach(({ fn }) => fn()); } },
+      get active() { return intervals.size; },
+    };
+    return timers;
+  }
+  const quiet = () => ({ start: () => ({ checkpoints: [] }) });
   const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
   test('runs at most `limit` decoders, previews first, and ends each worker after its job', async () => {
     const { spawn, started } = fakeWorkers();
-    const queue = createRawQueue({ spawn, limit: 1 });
+    const queue = createRawQueue({ spawn, limit: 1, timers: fakeTimers(), traces: quiet() });
     const first = queue.run('inspect', {});
     const second = queue.run('inspect', {});
     const preview = queue.run('decode', {});
@@ -403,7 +425,7 @@ describe('RAW job queue', () => {
 
   test('runs one decoder at a time by default, on every device', async () => {
     const { spawn, started } = fakeWorkers();
-    const queue = createRawQueue({ spawn });
+    const queue = createRawQueue({ spawn, timers: fakeTimers(), traces: quiet() });
     queue.run('inspect', {});
     queue.run('decode', {});
     queue.run('develop', {});
@@ -420,7 +442,7 @@ describe('RAW job queue', () => {
 
   test('cancel removes a waiting job or ends a running worker', async () => {
     const { spawn, started } = fakeWorkers();
-    const queue = createRawQueue({ spawn, limit: 1 });
+    const queue = createRawQueue({ spawn, limit: 1, timers: fakeTimers(), traces: quiet() });
     const running = queue.run('export', {});
     const waiting = queue.run('inspect', {});
     waiting.cancel();
@@ -438,11 +460,95 @@ describe('RAW job queue', () => {
     await expect(queue.run('inspect', {}).promise).rejects.toMatchObject({ code: 'worker-failed', message: expect.stringMatching(/RAW decoder could not start/) });
     // A worker that has answered once and then dies was most likely stopped for memory.
     const { spawn, started } = fakeWorkers();
-    const crashing = createRawQueue({ spawn, limit: 1 });
+    const crashing = createRawQueue({ spawn, limit: 1, timers: fakeTimers(), traces: quiet() });
     const job = crashing.run('export', {}, { onProgress: () => {} });
     started[0].progress({ stage: 'decoding' });
     started[0].crash();
     await expect(job.promise).rejects.toMatchObject({ code: 'memory', message: expect.stringMatching(/ran out of memory/) });
+  });
+
+  describe('watchdog', () => {
+    const LIMITS = { startupSeconds: 30, silenceSeconds: 20, syncFloorSeconds: 120, syncSecondsPerMegapixel: { half: 1.5, full: 4 }, tickMs: 1000, maxTickSeconds: 2 };
+    const setup = ({ visible = () => true } = {}) => {
+      const { spawn, started } = fakeWorkers();
+      const timers = fakeTimers();
+      const queue = createRawQueue({ spawn, limit: 1, timers, visible, limits: LIMITS, traces: quiet() });
+      return { queue, started, timers };
+    };
+
+    test('a worker that never starts is stopped and the next job runs', async () => {
+      const { queue, started, timers } = setup();
+      const stuck = queue.run('inspect', {});
+      const next = queue.run('inspect', {});
+      timers.advance(31);
+      await expect(stuck.promise).rejects.toMatchObject({ code: 'stalled', stage: 'starting', message: expect.stringMatching(/stopped responding.*Try again/) });
+      expect(started[0].terminated).toBe(true);
+      await flush();
+      expect(started).toHaveLength(2);
+      started[1].ready();
+      started[1].finish({ ok: 1 });
+      await expect(next.promise).resolves.toEqual({ ok: 1 });
+      await flush();
+      expect(timers.active).toBe(0);
+    });
+
+    test('heartbeats keep an asynchronous stage alive; silence ends it', async () => {
+      const { queue, started, timers } = setup();
+      const stages = [];
+      const job = queue.run('inspect', {}, { onStage: (stage) => stages.push(stage) });
+      started[0].ready();
+      started[0].progress({ checkpoint: 'module-loading' });
+      for (let i = 0; i < 60; i += 1) { timers.advance(1); started[0].heartbeat(); }
+      expect(started[0].terminated).toBe(false);
+      timers.advance(21);
+      await expect(job.promise).rejects.toMatchObject({ code: 'stalled', stage: 'module-loading' });
+      expect(stages).toEqual(['queued', 'starting', 'module-loading']);
+    });
+
+    test('a synchronous decode gets a size-based budget, never a short timeout', async () => {
+      const { queue, started, timers } = setup();
+      const job = queue.run('export', {});
+      started[0].ready();
+      // 61 MP full AHD demosaic: 4 s/MP = 244 s, longer than the 120 s floor. No heartbeats.
+      started[0].progress({ checkpoint: 'decoding', megapixels: 61, full: true });
+      timers.advance(240);
+      expect(started[0].terminated).toBe(false);
+      started[0].progress({ checkpoint: 'processing' });
+      timers.advance(119);
+      started[0].finish({ done: true });
+      await expect(job.promise).resolves.toEqual({ done: true });
+      // The same stage overrunning its budget is stopped.
+      const late = queue.run('export', {});
+      await flush();
+      started[1].ready();
+      started[1].progress({ checkpoint: 'decoding', megapixels: 24, full: false });
+      timers.advance(121);
+      await expect(late.promise).rejects.toMatchObject({ code: 'stalled', stage: 'decoding' });
+    });
+
+    test('time does not count while the page is hidden (backgrounded)', async () => {
+      let shown = false;
+      const { queue, started, timers } = setup({ visible: () => shown });
+      const job = queue.run('inspect', {});
+      timers.advance(600);
+      expect(started[0].terminated).toBe(false);
+      shown = true;
+      started[0].ready();
+      started[0].finish({ back: true });
+      await expect(job.promise).resolves.toEqual({ back: true });
+    });
+
+    test('checkpoints are not passed to the job\'s progress handler', async () => {
+      const { queue, started } = setup();
+      const seen = [];
+      const job = queue.run('export', {}, { onProgress: (value) => seen.push(value) });
+      started[0].ready();
+      started[0].progress({ checkpoint: 'decoding', megapixels: 1 });
+      started[0].progress({ stage: 'rendering', fraction: 0.5 });
+      started[0].finish();
+      await job.promise;
+      expect(seen).toEqual([{ stage: 'rendering', fraction: 0.5 }]);
+    });
   });
 });
 

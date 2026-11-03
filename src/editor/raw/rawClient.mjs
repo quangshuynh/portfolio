@@ -2,6 +2,13 @@
 // the job ends or is cancelled, so the decoder's wasm heap is always returned. Jobs wait
 // in one queue that runs one decoder at a time (each needs 300–800 MB while it runs, so
 // the peak is one LibRaw heap): previews first, then exports, then imports.
+//
+// A watchdog ends a worker that stops responding (rawTrace.mjs has the limits): a worker that
+// never starts, falls silent during an asynchronous stage (they heartbeat every second), or
+// overruns a synchronous stage's size-based budget. Without it one stalled decoder left its
+// photo "importing" forever and held the queue's only slot, so every later RAW job waited too.
+// Time only counts while the page is visible, because a backgrounded page's workers may be
+// suspended. Every job's checkpoints are kept in window.__peRawTrace.
 
 import { WorkerCancelled, createWorkerClient } from '../io/workerClient.mjs';
 import { assertCanvasWorks, createCanvas, encodeCanvas } from '../io/decode.mjs';
@@ -13,6 +20,7 @@ import { renderDetailParallel, renderPixelsParallel, warpParallel } from '../io/
 import { applyRetouchAsync } from '../pipeline/retouch.mjs';
 import { createInpaintRunner } from '../pipeline/inpaintClient.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
+import { RAW_STAGES, RAW_WATCHDOG, createTraceLog, syncBudgetSeconds, toMb } from './rawTrace.mjs';
 
 const PRIORITY = { decode: 0, region: 0, export: 1, develop: 1, inspect: 2 };
 
@@ -29,7 +37,7 @@ export function constrainedDevice(win = globalThis) {
 const spawnRawWorker = () => new Worker(new URL('./rawWorker.mjs', import.meta.url), { type: 'module' });
 
 function rawError(error) {
-  if (error instanceof WorkerCancelled || error.code === 'cancelled') return error;
+  if (error instanceof WorkerCancelled || error.code === 'cancelled' || error.code === 'stalled') return error;
   if (error.code === 'worker-failed') {
     recordDiagnostic('raw-worker', error.message);
     return Object.assign(new Error('The RAW decoder could not start in this browser, so RAW files cannot be opened here. JPEG, PNG and WebP still work.'), { code: 'worker-failed' });
@@ -41,32 +49,91 @@ function rawError(error) {
   return error;
 }
 
+const pageVisible = () => typeof document === 'undefined' || document.visibilityState !== 'hidden';
+
+function stalledError(stage, seconds) {
+  const what = (RAW_STAGES[stage]?.label ?? 'Working').toLowerCase();
+  return Object.assign(new Error(`The RAW decoder stopped responding (${what}, ${Math.round(seconds)} s without progress) and was stopped so the editor stays usable. Try again; if it happens again, this browser cannot decode this file here. JPEG, PNG and WebP still work.`), { code: 'stalled', stage });
+}
+
 /**
  * Creates a RAW job queue.
- * :param options: { spawn, limit } worker factory and concurrency (tests pass fakes)
+ * :param options: { spawn, limit, timers, visible, limits } worker factory, concurrency, a
+ *   setInterval/clearInterval/now source, page visibility and watchdog limits (tests pass fakes)
  */
-export function createRawQueue({ spawn = spawnRawWorker, limit = 1 } = {}) {
+export function createRawQueue({ spawn = spawnRawWorker, limit = 1, timers = globalThis, visible = pageVisible, limits = RAW_WATCHDOG, traces = createTraceLog() } = {}) {
   const waiting = [];
   let running = 0;
+  const now = () => (timers.performance ?? globalThis.performance ?? Date).now();
+
+  const watch = (job, worker, client) => {
+    const state = { stage: 'starting', ready: false, silent: 0, inStage: 0, budget: null, last: now() };
+    const trace = job.trace;
+    const checkpoint = (stage, detail = {}) => {
+      Object.assign(state, { stage, inStage: 0, silent: 0 });
+      state.budget = RAW_STAGES[stage]?.sync ? syncBudgetSeconds({ megapixels: detail.megapixels ?? state.megapixels ?? 0, full: detail.full ?? state.full }, limits) : null;
+      if (detail.megapixels) state.megapixels = detail.megapixels;
+      if (detail.full !== undefined) state.full = detail.full;
+      trace.checkpoints.push({ stage, at: Math.round(now() - job.startedAt), worker: detail.ms ?? null, wasmMb: toMb(detail.wasmBytes) });
+      job.onStage?.(stage);
+    };
+    worker.addEventListener('message', ({ data }) => {
+      state.silent = 0;
+      if (data?.ready) { state.ready = true; return; }
+      const progress = data?.progress;
+      if (progress?.checkpoint) checkpoint(progress.checkpoint, progress);
+    });
+    checkpoint('starting');
+    const timer = timers.setInterval(() => {
+      const t = now();
+      const dt = Math.min(limits.maxTickSeconds, (t - state.last) / 1000);
+      state.last = t;
+      if (!visible()) return;
+      state.silent += dt;
+      state.inStage += dt;
+      let over = null;
+      if (!state.ready) { if (state.silent > limits.startupSeconds) over = state.silent; }
+      else if (state.budget !== null) { if (state.inStage > state.budget) over = state.inStage; }
+      else if (state.silent > limits.silenceSeconds) over = state.silent;
+      if (over === null) return;
+      job.stalled = stalledError(state.stage, over);
+      recordDiagnostic('raw-worker', `RAW ${job.type} stopped responding at "${state.stage}" after ${Math.round(over)} s; stopped. Checkpoints: ${trace.checkpoints.map((c) => `${c.stage}@${c.at}ms${c.wasmMb !== null ? `/${c.wasmMb}MB` : ''}`).join(' ')}`);
+      client.terminate();
+    }, limits.tickMs);
+    return () => timers.clearInterval(timer);
+  };
 
   const pump = () => {
     while (running < limit && waiting.length) {
       waiting.sort((a, b) => PRIORITY[a.type] - PRIORITY[b.type] || a.order - b.order);
       const job = waiting.shift();
       running += 1;
+      job.startedAt = now();
+      job.trace = traces.start(job);
       let client;
+      let stop = () => {};
       try {
-        client = createWorkerClient(spawn());
+        const worker = spawn();
+        client = createWorkerClient(worker);
+        stop = watch(job, worker, client);
       } catch (error) {
         running -= 1;
+        stop();
+        job.trace.outcome = 'worker-failed';
         job.reject(rawError(Object.assign(new Error(`The RAW worker could not start: ${error.message}`), { code: 'worker-failed' })));
         continue;
       }
       job.client = client;
-      client.call(job.type, job.payload, { onProgress: job.onProgress })
-        .then(job.resolve, (error) => job.reject(rawError(error)))
+      client.call(job.type, job.payload, { onProgress: job.onProgress && ((value) => !value.checkpoint && job.onProgress(value)) })
+        .then((result) => { job.trace.outcome = 'ok'; job.resolve(result); }, (error) => {
+          const final = job.stalled ?? rawError(error);
+          job.trace.outcome = final.code ?? 'failed';
+          job.reject(final);
+        })
         .finally(() => {
+          stop();
           client.terminate();
+          job.trace.ms = Math.round(now() - job.startedAt);
           job.client = null;
           running -= 1;
           pump();
@@ -78,14 +145,15 @@ export function createRawQueue({ spawn = spawnRawWorker, limit = 1 } = {}) {
   return {
     /**
      * Queues a job. :returns: { promise, cancel } — cancel() rejects with WorkerCancelled
-     * and ends its worker if it has started.
+     * and ends its worker if it has started. `onStage` receives each RAW_STAGES key.
      */
-    run(type, payload, { onProgress } = {}) {
+    run(type, payload, { onProgress, onStage } = {}) {
       let job;
       const promise = new Promise((resolve, reject) => {
-        job = { type, payload, onProgress, resolve, reject, client: null, order: (order += 1) };
+        job = { type, payload, onProgress, onStage, resolve, reject, client: null, order: (order += 1) };
       });
       waiting.push(job);
+      onStage?.('queued');
       pump();
       return {
         promise,
