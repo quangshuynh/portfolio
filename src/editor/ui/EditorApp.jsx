@@ -67,7 +67,7 @@ const EDITOR_THEME_COLOR = '#151515';
 
 const newId = () => (globalThis.crypto?.randomUUID ? crypto.randomUUID() : `photo-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
-/** " · 12 s" after the first few seconds of an import, so a long decode visibly progresses. */
+/** " · 12 s" after the first few seconds of the current import stage, so a long decode visibly progresses. */
 function ImportElapsed({ since }) {
   const [, tick] = useState(0);
   useEffect(() => {
@@ -449,6 +449,7 @@ function EditorWorkspace({ host }) {
     const resource = resources.current.get(entry.id);
     if (!resource) return;
     resource.startedAt = Date.now();
+    resource.stageAt = resource.startedAt;
     try {
       // Identified by content: RAW containers go to the RAW decoder, which accepts the
       // validated formats (rawFormat.mjs) and explains anything else.
@@ -456,7 +457,8 @@ function EditorWorkspace({ host }) {
       let inspected;
       if (isRawContainer(head)) {
         const job = raws().run('inspect', { file: resource.file, thumbnailEdge: THUMBNAIL_EDGE }, {
-          onStage: (stage) => dispatch({ type: 'importProgress', id: entry.id, progress: stage }),
+          // The seconds shown belong to the stage shown (not the wait for the decoder or earlier stages).
+          onStage: (stage) => { resource.stageAt = Date.now(); dispatch({ type: 'importProgress', id: entry.id, progress: stage }); },
         });
         resource.job = job;
         inspected = await job.promise.finally(() => { resource.job = null; });
@@ -1655,7 +1657,7 @@ function EditorWorkspace({ host }) {
               <span className="pe-photo__name">{item.name}</span>
               <span className="pe-photo__detail mono">
                 {item.status === 'ready' && `${item.width}×${item.height} · ${formatLabel(item.format)} · ${formatBytes(item.size)}`}
-                {item.status === 'importing' && <>{importLabel(item.progress)}<ImportElapsed since={resource?.startedAt} /></>}
+                {item.status === 'importing' && <>{importLabel(item.progress)}<ImportElapsed key={item.progress} since={resource?.stageAt} /></>}
                 {item.status === 'error' && item.error}
               </span>
               {item.restored && <span className="pe-photo__badge">Saved edits applied</span>}
