@@ -70,6 +70,20 @@ const DRAW_PROBE = () => {
       return bind.call(this, target, framebuffer);
     };
   }
+  // GPU traffic (Interval 22.8): textures created and deleted, bytes uploaded by full and sub-
+  // image uploads, and synchronous readbacks; the stroke reports the difference over its moves.
+  const gpu = { creates: 0, deletes: 0, fullUploads: 0, fullBytes: 0, subUploads: 0, subBytes: 0, readbacks: 0 };
+  window.__brushGpu = gpu;
+  const proto = globalThis.WebGL2RenderingContext?.prototype;
+  if (proto) {
+    const BYTES = { 0x8229: 1, 0x1903: 1, 0x8058: 4, 0x1908: 4, 0x8d7c: 6, 0x8815: 12, 0x8814: 16 };
+    const count = (name, fn) => { const original = proto[name]; proto[name] = function counted(...args) { fn(args, this); return original.apply(this, args); }; };
+    count('createTexture', () => { gpu.creates += 1; });
+    count('deleteTexture', () => { gpu.deletes += 1; });
+    count('readPixels', () => { gpu.readbacks += 1; });
+    count('texImage2D', (a) => { if (a.length >= 9 && typeof a[3] === 'number') { gpu.fullUploads += 1; gpu.fullBytes += a[3] * a[4] * (BYTES[a[2]] ?? 4); } });
+    count('texSubImage2D', (a) => { if (a.length >= 9 && typeof a[4] === 'number') { gpu.subUploads += 1; gpu.subBytes += a[4] * a[5] * (a[6] === 0x1903 || a[6] === 0x8d94 ? 1 : 4); } });
+  }
   window.__brushFrames = [];
   try {
     new PerformanceObserver((list) => { for (const entry of list.getEntries()) window.__brushFrames.push({ start: entry.startTime, duration: entry.duration, blocking: entry.blockingDuration, render: entry.renderStart ? entry.startTime + entry.duration - entry.renderStart : 0 }); })
@@ -235,6 +249,7 @@ async function runOne(run, file) {
       const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
       await frame();
       window.__brushFrames.length = 0;
+      const gpuBefore = { ...(window.__brushGpu ?? {}) };
       const inputs = [];
       const handler = [];
       const frameTimes = [];
@@ -256,6 +271,8 @@ async function runOne(run, file) {
       }
       // Let the last move render (MaskTool's frame, the React commit, the viewer's frame), then release.
       for (let k = 0; k < 4; k += 1) await frame(); // eslint-disable-line no-await-in-loop
+      const gpuAfter = window.__brushGpu ?? {};
+      const gpuTraffic = Object.fromEntries(Object.keys(gpuAfter).map((key) => [key, gpuAfter[key] - (gpuBefore[key] ?? 0)]));
       const draws = window.__brushDraws.slice();
       const overlay = document.querySelector('.pe-mask-overlay');
       const overlaySum = () => (overlay?.width ? overlay.getContext('2d').getImageData(0, 0, overlay.width, overlay.height).data : null);
@@ -306,7 +323,7 @@ async function runOne(run, file) {
       const firstFrames = frameTimes.slice(0, 4);
       const firstPoint = { handler: downHandler, toDraw: firstDraw === undefined ? null : firstDraw - down, toComposite: firstComposite === undefined ? null : firstComposite - down, maxFrameOfFirstFour: Math.max(...firstFrames) };
       const detailShown = quality.some(Boolean) ? { final: quality.filter((q) => q === 'final').length, draft: quality.filter((q) => q === 'draft').length, rendering: quality.filter((q) => q === 'rendering').length } : null;
-      return { handler, frameTimes, latency, commitMs, settleMs, detailShown, firstPoint, longFrames, span: inputs.at(-1) - inputs[0], overlayDiff };
+      return { handler, frameTimes, latency, commitMs, settleMs, detailShown, firstPoint, longFrames, span: inputs.at(-1) - inputs[0], overlayDiff, gpuTraffic };
     }, { moves: MOVES, pointerType: run.device ? 'touch' : 'mouse', offset });
     // With BRUSH_LOCAL a second stroke follows (painting over a local Detail that already shows).
     const measured = await paintStroke(0);
@@ -326,6 +343,8 @@ async function runOne(run, file) {
     result.inputToDrawMs = stats(measured.latency);
     result.longFrames = measured.longFrames.length ? { count: measured.longFrames.length, durationMs: stats(measured.longFrames.map((f) => f.duration)), renderMs: stats(measured.longFrames.map((f) => f.render)), busyShare: Math.round((100 * busy) / measured.span) } : 'none (or not Chromium)';
     result.commitMs = Math.round(measured.commitMs);
+    const g = measured.gpuTraffic;
+    if (g) result.gpuPerStroke = { texturesCreated: g.creates, texturesDeleted: g.deletes, fullUploads: g.fullUploads, fullUploadMb: Math.round(g.fullBytes / 1e5) / 10, subUploads: g.subUploads, subUploadMb: Math.round(g.subBytes / 1e5) / 10, readbacks: g.readbacks };
     if (measured.settleMs !== null) Object.assign(result, { detailFinalAfterReleaseMs: Math.round(measured.settleMs), detailDuringStroke: measured.detailShown });
     if (second) {
       result.secondStroke = { inputToDrawMs: stats(second.latency), frameIntervalMs: stats(second.frameTimes), detailDuringStroke: second.detailShown, commitMs: Math.round(second.commitMs), detailFinalAfterReleaseMs: second.settleMs === null ? null : Math.round(second.settleMs) };

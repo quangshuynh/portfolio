@@ -16,6 +16,7 @@ import { deriveParams } from '../pipeline/spec.mjs';
 import { renderRawRgba8 } from '../pipeline/cpuRenderer.mjs';
 import { RAW_ACCEPT, RAW_EXTENSION_LIST, RAW_FORMATS, RAW_SNIFF_BYTES, isRawContainer } from '../raw/rawFormat.mjs';
 import { constrainedDevice, createRawQueue, exportRaw } from '../raw/rawClient.mjs';
+import { RAW_STAGES } from '../raw/rawTrace.mjs';
 import { browserCapabilities, diagnosticReport } from '../io/diagnostics.mjs';
 import { readRasterExposure } from '../hdr/hdrMetadata.mjs';
 import { cropAt } from '../hdr/hdrAlign.mjs';
@@ -59,10 +60,24 @@ const THUMBNAIL_EDGE = 320;
 const PROXY_CACHE_SIZE = 2;
 const ACCEPT = ['image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp', ...RAW_ACCEPT].join(',');
 const formatLabel = (format) => (format === 'hdr' ? 'HDR merge' : FORMATS[format]?.label ?? RAW_FORMATS[format]?.label ?? format);
-const IMPORT_PROGRESS = { waiting: 'Waiting for the RAW decoder…', decoding: 'Decoding RAW sensor data…' };
+// Import failures worth another attempt with the same file (not unsupported or damaged files).
+const RETRYABLE = new Set(['cancelled', 'stalled', 'memory', 'worker-failed', 'decoder']);
+const importLabel = (progress) => `${RAW_STAGES[progress]?.label ?? 'Reading'}…`;
 const EDITOR_THEME_COLOR = '#151515';
 
 const newId = () => (globalThis.crypto?.randomUUID ? crypto.randomUUID() : `photo-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+
+/** " · 12 s" after the first few seconds of an import, so a long decode visibly progresses. */
+function ImportElapsed({ since }) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!since) return undefined;
+    const timer = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(timer);
+  }, [since]);
+  const seconds = since ? Math.floor((Date.now() - since) / 1000) : 0;
+  return seconds >= 3 ? <span className="pe-photo__elapsed"> · {seconds} s</span> : null;
+}
 
 function downloadBlob(blob, fileName) {
   const url = URL.createObjectURL(blob);
@@ -228,6 +243,8 @@ function EditorWorkspace({ host }) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const resources = useRef(new Map());
+  // Files of imports that failed in a way worth retrying (cancelled, stalled decoder, memory).
+  const retryFiles = useRef(new Map());
   const proxyCache = useRef(new Map());
   const workers = useRef({});
   const proxyJob = useRef({ busy: false, generation: 0 });
@@ -426,6 +443,51 @@ function EditorWorkspace({ host }) {
     return () => clearTimeout(timer);
   }, [host, state.photos, state.pendingEdits, state.exportSettings]);
 
+  // One photo's import. RAW files go through the RAW queue, whose watchdog ends a stalled
+  // decoder; a cancelled or recoverable failure keeps the file so the row can retry it.
+  const importOne = useCallback(async (entry) => {
+    const resource = resources.current.get(entry.id);
+    if (!resource) return;
+    resource.startedAt = Date.now();
+    try {
+      // Identified by content: RAW containers go to the RAW decoder, which accepts the
+      // validated formats (rawFormat.mjs) and explains anything else.
+      const head = new Uint8Array(await resource.file.slice(0, RAW_SNIFF_BYTES).arrayBuffer());
+      let inspected;
+      if (isRawContainer(head)) {
+        const job = raws().run('inspect', { file: resource.file, thumbnailEdge: THUMBNAIL_EDGE }, {
+          onStage: (stage) => dispatch({ type: 'importProgress', id: entry.id, progress: stage }),
+        });
+        resource.job = job;
+        inspected = await job.promise.finally(() => { resource.job = null; });
+      } else {
+        inspected = await worker('import').call('inspect', { file: resource.file, thumbnailEdge: THUMBNAIL_EDGE });
+      }
+      const { header, sha256, thumbnail, raw = null, exposureSamples = null } = inspected;
+      if (!resources.current.has(entry.id)) return;
+      const duplicate = sha256 && [...resources.current.entries()].find(([id, other]) => id !== entry.id && other.sha256 === sha256);
+      if (duplicate) {
+        const original = stateRef.current.photos.find(({ id }) => id === duplicate[0]);
+        resources.current.delete(entry.id);
+        dispatch({ type: 'importFailed', id: entry.id, error: `Already in the workspace${original ? ` as ${original.name}` : ''}.`, code: 'duplicate' });
+        return;
+      }
+      Object.assign(resource, { header, sha256, thumbnail, raw });
+      dispatch({
+        type: 'importSucceeded',
+        id: entry.id,
+        info: { format: header.format, width: header.displayWidth, height: header.displayHeight, orientation: header.orientation, sha256, raw, exposureSamples },
+      });
+    } catch (error) {
+      // Removed while it was being read: the row is gone already.
+      if (!resources.current.has(entry.id)) return;
+      resources.current.delete(entry.id);
+      const code = error.code ?? 'failed';
+      if (RETRYABLE.has(code)) retryFiles.current.set(entry.id, resource.file);
+      dispatch({ type: 'importFailed', id: entry.id, code, error: code === 'cancelled' ? 'Import cancelled.' : (error.message || 'This file could not be read.') });
+    }
+  }, [worker, raws]);
+
   const importFiles = useCallback(async (fileList) => {
     const files = Array.from(fileList ?? []);
     if (!files.length) return;
@@ -435,48 +497,21 @@ function EditorWorkspace({ host }) {
     const entries = accepted.map((file) => ({ id: newId(), name: file.name, size: file.size, lastModified: file.lastModified }));
     entries.forEach((entry, index) => resources.current.set(entry.id, { file: accepted[index] }));
     dispatch({ type: 'photosAdded', photos: entries });
+    for (const entry of entries) await importOne(entry);
+  }, [importOne]);
 
-    for (const entry of entries) {
-      const resource = resources.current.get(entry.id);
-      if (!resource) continue;
-      try {
-        // Identified by content: RAW containers go to the RAW decoder, which accepts the
-        // validated formats (rawFormat.mjs) and explains anything else.
-        const head = new Uint8Array(await resource.file.slice(0, RAW_SNIFF_BYTES).arrayBuffer());
-        let inspected;
-        if (isRawContainer(head)) {
-          const job = raws().run('inspect', { file: resource.file, thumbnailEdge: THUMBNAIL_EDGE }, {
-            onProgress: ({ stage }) => stage === 'decoding' && dispatch({ type: 'importProgress', id: entry.id, progress: 'decoding' }),
-          });
-          resource.job = job;
-          dispatch({ type: 'importProgress', id: entry.id, progress: 'waiting' });
-          inspected = await job.promise.finally(() => { resource.job = null; });
-        } else {
-          inspected = await worker('import').call('inspect', { file: resource.file, thumbnailEdge: THUMBNAIL_EDGE });
-        }
-        const { header, sha256, thumbnail, raw = null, exposureSamples = null } = inspected;
-        if (!resources.current.has(entry.id)) continue;
-        const duplicate = sha256 && [...resources.current.entries()].find(([id, other]) => id !== entry.id && other.sha256 === sha256);
-        if (duplicate) {
-          const original = stateRef.current.photos.find(({ id }) => id === duplicate[0]);
-          resources.current.delete(entry.id);
-          dispatch({ type: 'importFailed', id: entry.id, error: `Already in the workspace${original ? ` as ${original.name}` : ''}.`, code: 'duplicate' });
-          continue;
-        }
-        Object.assign(resource, { header, sha256, thumbnail, raw });
-        dispatch({
-          type: 'importSucceeded',
-          id: entry.id,
-          info: { format: header.format, width: header.displayWidth, height: header.displayHeight, orientation: header.orientation, sha256, raw, exposureSamples },
-        });
-      } catch (error) {
-        // Cancelled: the photo was removed while it was being read.
-        if (error.code === 'cancelled' || !resources.current.has(entry.id)) continue;
-        resources.current.delete(entry.id);
-        dispatch({ type: 'importFailed', id: entry.id, error: error.message || 'This file could not be read.' });
-      }
-    }
-  }, [worker, raws]);
+  /** Stops a RAW import in progress; the row keeps the file so it can be retried. */
+  const cancelImport = useCallback((id) => { resources.current.get(id)?.job?.cancel(); }, []);
+
+  /** Imports a failed photo's file again (after a cancel, a stalled decoder or low memory). */
+  const retryImport = useCallback((id) => {
+    const file = retryFiles.current.get(id);
+    if (!file) return;
+    retryFiles.current.delete(id);
+    resources.current.set(id, { file });
+    dispatch({ type: 'importRetry', id });
+    importOne({ id });
+  }, [importOne]);
 
   const loadProxy = useCallback(async (target, maxEdge) => {
     const key = `${target.id}:${maxEdge}`;
@@ -956,6 +991,7 @@ function EditorWorkspace({ host }) {
     resources.current.get(id)?.job?.cancel();
     if (resources.current.get(id)?.hdr) hdrProxyJob.current?.cancel();
     resources.current.delete(id);
+    retryFiles.current.delete(id);
     [...proxyCache.current.keys()].filter((key) => key.startsWith(`${id}:`)).forEach((key) => proxyCache.current.delete(key));
     if (exportJob.current?.id === id) exportJob.current.cancel();
     if (stateRef.current.activeId === id) inspectJob.current?.cancel();
@@ -1617,7 +1653,7 @@ function EditorWorkspace({ host }) {
               <span className="pe-photo__name">{item.name}</span>
               <span className="pe-photo__detail mono">
                 {item.status === 'ready' && `${item.width}×${item.height} · ${formatLabel(item.format)} · ${formatBytes(item.size)}`}
-                {item.status === 'importing' && (IMPORT_PROGRESS[item.progress] ?? 'Reading…')}
+                {item.status === 'importing' && <>{importLabel(item.progress)}<ImportElapsed since={resource?.startedAt} /></>}
                 {item.status === 'error' && item.error}
               </span>
               {item.restored && <span className="pe-photo__badge">Saved edits applied</span>}
@@ -1625,6 +1661,12 @@ function EditorWorkspace({ host }) {
             </span>
           )}
         </button>
+        {variant === 'list' && item.status === 'importing' && resource?.job && (
+          <button type="button" className="pe-text-button pe-photo__retry" onClick={() => cancelImport(item.id)} aria-label={`Cancel importing ${item.name}`}>Cancel</button>
+        )}
+        {variant === 'list' && item.status === 'error' && RETRYABLE.has(item.errorCode) && retryFiles.current.has(item.id) && (
+          <button type="button" className="pe-text-button pe-photo__retry" onClick={() => retryImport(item.id)} aria-label={`Try importing ${item.name} again`}>Retry</button>
+        )}
         {variant === 'list' && (
           <button type="button" className="pe-icon-button pe-photo__remove" onClick={() => removePhoto(item.id)} aria-label={`Remove ${item.name} from the workspace`} title="Remove from workspace">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>

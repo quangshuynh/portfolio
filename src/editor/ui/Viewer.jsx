@@ -8,6 +8,7 @@ import CropOverlay from './CropOverlay';
 import { GlRenderer, probeEditorContext } from '../pipeline/glRenderer.mjs';
 import { debugFlag, recordDiagnostic } from '../io/diagnostics.mjs';
 import { previewEdgeLimit } from '../io/files.mjs';
+import { RAW_STAGES } from '../raw/rawTrace.mjs';
 import InspectView from './InspectView';
 import LayerHandles from './LayerHandles';
 import { visibleLayers } from '../model/layers.mjs';
@@ -308,7 +309,9 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
     };
   }, [onEngine]);
 
-  // Load the active photo's proxy; stale loads are ignored.
+  // Load the active photo's proxy; stale loads are ignored. `loadAttempt` is bumped by Try again
+  // after a failed load (a stalled RAW decoder, low memory).
+  const [loadAttempt, setLoadAttempt] = useState(0);
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine || !photo || photo.status !== 'ready') {
@@ -334,10 +337,10 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
       // point or layer does not wait for the driver (the first brush point took ~0.5 s for this).
       if (engine.kind === 'webgl2') whenIdle(() => { if (engineRef.current === engine) engine.renderer.prepareCompositor(); });
     }).catch((error) => {
-      if (!cancelled && error.code !== 'cancelled') setStatus({ state: 'error', message: error.message });
+      if (!cancelled && error.code !== 'cancelled') setStatus({ state: 'error', message: error.message, retry: true });
     });
     return () => { cancelled = true; };
-  }, [photo?.id, photo?.status, loadProxy, canvas]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [photo?.id, photo?.status, loadProxy, canvas, loadAttempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Release the GPU texture when no photo is shown, and frames cached for another proxy:
   // they would keep that photo's pixels (tens of MB for a RAW) alive after it left.
@@ -845,7 +848,9 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
             setDetailQuality((shown) => (JSON.stringify(shown) === JSON.stringify(quality) ? shown : quality));
             if (complete) performance.mark?.('pe-local-detail');
           } else {
-            engine.renderer.render(params, { split: splitFraction, before, layers: layers?.gpu });
+            // The photo's own frame depends on these (the renderer adds its source, retouch and geometry state).
+            const baseKey = layers?.gpu?.length ? `${photo.id}|${JSON.stringify({ ...values, layers: null, local: null })}|${params.lutActive ? lut.sha256 : ''}|${glowVersion}` : null;
+            engine.renderer.render(params, { split: splitFraction, before, layers: layers?.gpu, baseKey });
           }
         }
       } else {
@@ -1183,8 +1188,8 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
         )}
         {status.state === 'loading' && <p className="pe-stage-message" role="status"><span className="pe-spinner" aria-hidden="true" />{raw ? 'Developing RAW preview from sensor data…' : 'Loading preview…'}</p>}
         {engineError && <p className="pe-stage-message pe-stage-message--error" role="alert">{engineError}</p>}
-        {!engineError && status.state === 'error' && <p className="pe-stage-message pe-stage-message--error" role="alert">{status.message || 'This photograph could not be shown.'}</p>}
-        {photo && photo.status === 'importing' && <p className="pe-stage-message" role="status"><span className="pe-spinner" aria-hidden="true" />{{ waiting: 'Waiting for the RAW decoder:', decoding: 'Decoding RAW sensor data:' }[photo.progress] ?? 'Reading'} {photo.name}…</p>}
+        {!engineError && status.state === 'error' && <p className="pe-stage-message pe-stage-message--error" role="alert">{status.message || 'This photograph could not be shown.'}{status.retry && <> <button type="button" className="pe-text-button pe-stage-message__retry" onClick={() => setLoadAttempt((n) => n + 1)}>Try again</button></>}</p>}
+        {photo && photo.status === 'importing' && <p className="pe-stage-message" role="status"><span className="pe-spinner" aria-hidden="true" />{RAW_STAGES[photo.progress]?.label ?? 'Reading'}: {photo.name}…</p>}
         {transform && proxy && proxy.id === photo?.id && !geometryError && (
           <CropOverlay
             mode={transform.mode}

@@ -2,8 +2,10 @@
 // the CPU reference (composite.mjs) for every blend mode, transforms, alpha and adjustment
 // layers, masked passes (gradients, brush strokes, inverted and layer-space masks, local
 // adjustments), and the CPU reference against the browser's own canvas blend modes (an independent
-// implementation of the same W3C formulas). Results land on window.layerParityResult for
-// scripts/check-editor-layers.mjs.
+// implementation of the same W3C formulas). The frame cache (render with a `baseKey`, as the
+// viewer draws) must equal the uncached render exactly, on a miss, on a hit and while a brush mask
+// grows under one key, then after the photo changes under that key. Results land on window.layerParityResult for
+// scripts/check-editor-layers.mjs and check-editor-masks.mjs.
 import { BLEND_MODES, createAdjustmentLayer, normalizeLayer } from '../model/layers.mjs';
 import { GlRenderer, createEditorContext } from '../pipeline/glRenderer.mjs';
 import { renderRgba8 } from '../pipeline/cpuRenderer.mjs';
@@ -156,10 +158,42 @@ function run() {
     // shader-vs-CPU parity is checked by parity.html; dodge and burn amplify any 1-code difference).
     const gpuBase = { width: W, height: H, data: Uint8ClampedArray.from(renderer.readPixels(params)) };
     compositeImageSync(gpuBase, test.passes);
-    results.push({ name: test.name, ...compare(gpu, gpuBase.data), endToEnd: compare(gpu, cpu.data) });
+    // Cached frames: every case under the same base key (the source is new each case, so the
+    // renderer's state key must tell them apart); the first render is a miss, the second a hit.
+    const miss = renderer.readPixels(params, { layers: passes, baseKey: 'parity' });
+    const hit = renderer.readPixels(params, { layers: passes, baseKey: 'parity' });
+    const cached = Math.max(compare(gpu, miss).max, compare(gpu, hit).max);
+    results.push({ name: test.name, ...compare(gpu, gpuBase.data), endToEnd: compare(gpu, cpu.data), cached });
   }
+  const brush = brushCache(renderer);
   renderer.dispose();
-  return { results, canvas: canvasReference() };
+  return { results, brush, canvas: canvasReference() };
+}
+
+// A brush stroke painted point by point on a masked adjustment layer: each point is a new mask
+// under the same base key (cached photo and adjustment frames), compared with an uncached render
+// of the same pass; then retouched pixels under the same key (the renderer's state key must miss).
+function brushCache(renderer) {
+  const canvas = { width: W, height: H };
+  const photo = backdrop();
+  renderer.setSource(photo);
+  const params = deriveParams(normalizeAdjustments({ exposure: 0.2, contrast: 10 }));
+  const layer = { ...createAdjustmentLayer('A', { exposure: -1.2, saturation: 40 }), blend: 'soft-light', opacity: 0.85 };
+  const points = [];
+  let max = 0;
+  for (let i = 0; i < 8; i += 1) {
+    points.push([0.1 + i * 0.1, 0.3 + (i % 3) * 0.15, 0.7]);
+    const def = normalizeMask({ base: 'none', components: [createBrush('b', { strokes: [{ mode: 'add', radius: 0.1, hardness: 0.5, opacity: 1, points: points.slice() }] })] }, 'canvas');
+    const pass = adjustmentPass(layer, null, { def, key: JSON.stringify(def), raster: rasterizeMask(def, canvasMaskMap(canvas), canvas) });
+    const passes = [{ ...pass, params: adjustmentParams(pass) }];
+    const cached = renderer.readPixels(params, { layers: passes, baseKey: 'brush' });
+    max = Math.max(max, compare(renderer.readPixels(params, { layers: passes }), cached).max);
+    if (i === 7) {
+      renderer.setRetouched({ ...photo, data: photo.data.map((v, j) => (j % 4 === 3 ? v : 255 - v)) });
+      max = Math.max(max, compare(renderer.readPixels(params, { layers: passes }), renderer.readPixels(params, { layers: passes, baseKey: 'brush' })).max);
+    }
+  }
+  return { points: points.length, max, hits: renderer.frameHits ?? 0, misses: renderer.frameMisses ?? 0 };
 }
 
 window.layerParityResult = run();

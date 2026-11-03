@@ -130,7 +130,10 @@ export function editorReducer(state, action) {
     case 'importProgress':
       return updatePhoto(state, action.id, (photo) => (photo.status === 'importing' ? { progress: action.progress } : {}));
     case 'importFailed':
-      return updatePhoto(state, action.id, () => ({ status: 'error', error: action.error }));
+      return updatePhoto(state, action.id, () => ({ status: 'error', error: action.error, errorCode: action.code ?? null }));
+    case 'importRetry':
+      if (state.photos.find(({ id }) => id === action.id)?.status !== 'error') return state;
+      return updatePhoto(state, action.id, () => ({ status: 'importing', progress: null, error: null, errorCode: null }));
     case 'remove': {
       const index = state.photos.findIndex(({ id }) => id === action.id);
       if (index === -1) return state;
