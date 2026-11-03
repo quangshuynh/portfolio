@@ -30,6 +30,7 @@ import { layerAdjustments, settingsNeutral, visibleLayers } from '../src/editor/
 import { adjustmentPass, compositeImageSync, rasterPass } from '../src/editor/pipeline/composite.mjs';
 import { layerMatrix, rasterSize } from '../src/editor/pipeline/layerTransform.mjs';
 import { readZip } from '../src/editor/dev/zipVerify.mjs';
+import { openEditorTool } from './editor-mobile-controls.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const work = mkdtempSync(path.join(tmpdir(), 'editor-layers-'));
@@ -243,6 +244,8 @@ async function runOne(run, files) {
   page.on('request', (request) => { if (!request.url().startsWith(`http://localhost:${PORT}/`) && !request.url().startsWith('blob:') && !request.url().startsWith('data:')) requests.push(request.url()); });
   const result = { environment: run.name, browser: `${run.type.name()} ${context.browser()?.version() ?? ''}`.trim() };
   const tab = async (index) => { if (run.device) await page.click(`.pe-tabs button:nth-child(${index})`); };
+  // Phones show one contextual tool at a time (Adjust → Layers, Light, Color…); desktop shows all.
+  const tool = async (id) => { if (run.device) await openEditorTool(page, id); };
   const step = async (name, fn) => { result.step = name; return fn(); };
   const importFiles = async (paths, count) => {
     await tab(1);
@@ -269,7 +272,8 @@ async function runOne(run, files) {
     const { data, info } = await sharp(await download.path()).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     return { data, width: info.width, height: info.height };
   };
-  const setValue = async (label, value) => {
+  const setValue = async (label, value, group = 'light') => {
+    await tool(group);
     const field = page.getByRole('textbox', { name: `${label} value` });
     await field.fill(value);
     await field.press('Enter');
@@ -288,7 +292,7 @@ async function runOne(run, files) {
     });
     const timings = {};
     await step('add a transparent PNG as an image layer; blend mode, opacity, angle', async () => {
-      await tab(2);
+      await tool('layers');
       timings.addImageMs = await timed(async () => {
         await page.setInputFiles('[data-layer-input]', files.overFile);
         await page.locator('.pe-layer[data-type=image]').waitFor();
@@ -306,9 +310,15 @@ async function runOne(run, files) {
     });
     await step('adjustment layer edited through the Adjust panel, moved below the image', async () => {
       await page.locator('.pe-layers__add button', { hasText: 'Adjustment' }).click();
+      // On a phone the layer's settings open from the Layers tray (the Light tool).
+      if (run.device) {
+        await page.locator('.pe-layers__props button', { hasText: 'Edit adjustment settings' }).click();
+        assert.equal(await page.locator('.pe').getAttribute('data-mobile-tool'), 'light');
+      }
       await page.waitForSelector('.pe-adjust-target');
       await setValue('Exposure', '0.8');
-      await setValue('Saturation', '-40');
+      await setValue('Saturation', '-40', 'color');
+      await tool('layers');
       await page.locator('.pe-layers__props button', { hasText: 'Move down' }).click();
       const a = await savedWhen('layers-base.png', (v) => v.layers?.[0]?.type === 'adjustment' && v.layers[0].settings.saturation === -40, 'adjustment layer');
       assert.equal(a.exposure, 0, 'the photo kept its own exposure');
@@ -326,7 +336,7 @@ async function runOne(run, files) {
       assert.ok(diff.ok, `export differs from the reference: ${JSON.stringify(diff)}`);
     });
     await step('reorder with the grip (adjustment on top changes the image too), then back with the keyboard', async () => {
-      await tab(2);
+      await tool('layers');
       const rows = page.locator('.pe-layer[data-layer-row]');
       const grip = rows.nth(1).locator('.pe-layer__grip');
       const target = await rows.nth(0).boundingBox();
@@ -339,12 +349,12 @@ async function runOne(run, files) {
       const values = await saved('layers-base.png');
       const diff = compare(reference(files.base, values, rasters), (await readPng(download)).data);
       assert.ok(diff.ok, `reordered export differs: ${JSON.stringify(diff)}`);
-      await tab(2);
+      await tool('layers');
       await page.locator('.pe-layer[data-type=adjustment] .pe-layer__name').press('Alt+ArrowDown');
       await savedWhen('layers-base.png', (v) => v.layers?.[0]?.type === 'adjustment', 'adjustment back below');
     });
     await step('text layer: placed where its fields say, other pixels untouched', async () => {
-      await tab(2);
+      await tool('layers');
       await page.locator('.pe-layers__add button', { hasText: /^Text$/ }).click();
       await page.getByRole('textbox', { name: 'Text' }).fill('Layers ✓');
       await page.getByRole('spinbutton', { name: /^Horizontal position value/ }).fill('30');
@@ -376,7 +386,7 @@ async function runOne(run, files) {
       await savedWhen('layers-base.png', (v) => v.layers.length === count && v.layers.some((l) => l.text === 'Layers ✓'), 'redo text layer');
     });
     await step('drag the image layer on the photo (the photo does not pan); timing', async () => {
-      await tab(2);
+      await tool('layers');
       await page.locator('.pe-layer[data-type=image] .pe-layer__name').click();
       const box = page.locator('.pe-textbox[data-kind=image]');
       await box.waitFor();
@@ -405,12 +415,12 @@ async function runOne(run, files) {
       await page.waitForSelector('.pe[data-engine]');
       await importFiles([files.baseFile], 1);
       await select('layers-base.png');
-      await tab(2);
+      await tool('layers');
       await page.locator('.pe-layer[data-type=image] .pe-layer__name').click();
       await page.locator('.pe-layers__props [role=alert]', { hasText: 'not loaded' }).waitFor();
       await tab(3);
       assert.ok(await page.locator('.pe-export-button').isEnabled() || true);
-      await tab(2);
+      await tool('layers');
       const [wrong] = await Promise.all([page.waitForEvent('filechooser'), page.locator('.pe-layers__props button', { hasText: 'Reconnect file' }).click()]);
       await wrong.setFiles(files.otherFile);
       await page.locator('.pe-layers [role=status]', { hasText: 'not the file' }).waitFor({ timeout: 60_000 });
@@ -434,27 +444,81 @@ async function runOne(run, files) {
       await page.locator('.pe-dialog button', { hasText: /^Close$/ }).click();
     });
     if (run.device) {
-      await step('phone layout: no sideways scroll, touch-size grips and handles, collapsible panel', async () => {
+      await step('phone layout: no sideways scroll, touch-size targets; select, rename, hide, lock, reorder, delete by touch; landscape', async () => {
         await select('layers-base.png');
-        await tab(2);
-        const layout = await page.evaluate(() => ({
-          overflow: document.documentElement.scrollWidth - window.innerWidth,
-          grip: Math.round(document.querySelector('.pe-layer__grip').getBoundingClientRect().width),
-          name: Math.round(document.querySelector('.pe-layer__name').getBoundingClientRect().height),
-        }));
-        result.mobile = layout;
-        assert.ok(layout.overflow <= 0, `page scrolls sideways by ${layout.overflow}px`);
-        assert.ok(layout.grip >= 44 && layout.name >= 44, `targets ${layout.grip}×${layout.name}px`);
-        await page.locator('.pe-layers .pe-section__toggle').click();
-        assert.equal(await page.locator('.pe-layers .pe-section__toggle').getAttribute('aria-expanded'), 'false');
-        await page.locator('.pe-layers .pe-section__toggle').click();
+        await tool('layers');
+        const measure = () => page.evaluate(() => {
+          const size = (selector) => { const r = document.querySelector(selector).getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; };
+          const props = document.querySelector('.pe-layers__props')?.getBoundingClientRect();
+          return {
+            viewport: `${window.innerWidth}×${window.innerHeight}`,
+            overflow: document.documentElement.scrollWidth - window.innerWidth,
+            grip: size('.pe-layer__grip'),
+            name: size('.pe-layer__name'),
+            toggle: size('.pe-layer__toggle'),
+            propsReachable: !props || props.width > 0,
+          };
+        });
+        const portrait = await measure();
+        result.mobile = { portrait };
+        const touchSize = ({ grip, name, toggle }) => Math.min(grip[0], name[1], toggle[0], toggle[1]);
+        assert.ok(portrait.overflow <= 0, `page scrolls sideways by ${portrait.overflow}px`);
+        assert.ok(touchSize(portrait) >= 44, `targets ${JSON.stringify(portrait)}`);
+        const tap = (locator) => locator.tap();
+        const image = page.locator('.pe-layer[data-type=image]');
+        // Select by tap, then rename from the layer's actions with the on-screen keyboard.
+        await tap(image.locator('.pe-layer__name'));
+        await tap(page.locator('.pe-layers__props button', { hasText: /^Rename$/ }));
+        const field = page.locator('.pe-layer__rename');
+        await field.fill('Overlay art');
+        await field.press('Enter');
+        await savedWhen('layers-base.png', (v) => v.layers.some((l) => l.type === 'image' && l.name === 'Overlay art'), 'renamed by touch');
+        // Hide and show, lock (props disabled) and unlock.
+        await tap(page.getByRole('button', { name: 'Hide Overlay art' }));
+        await savedWhen('layers-base.png', (v) => v.layers.find((l) => l.type === 'image').visible === false, 'hidden by touch');
+        await tap(page.getByRole('button', { name: 'Show Overlay art' }));
+        await tap(page.getByRole('button', { name: 'Lock Overlay art' }));
+        await savedWhen('layers-base.png', (v) => v.layers.find((l) => l.type === 'image').locked === true, 'locked by touch');
+        assert.ok(await page.locator('.pe-layers__props button', { hasText: 'Delete…' }).isDisabled(), 'a locked layer can be deleted');
+        await tap(page.getByRole('button', { name: 'Unlock Overlay art' }));
+        // Reorder with Move up/down by touch.
+        const order = async () => (await saved('layers-base.png')).layers.map((l) => l.type).join(',');
+        const before = await order();
+        await tap(page.locator('.pe-layers__props button', { hasText: 'Move down' }));
+        await savedWhen('layers-base.png', (v) => v.layers.map((l) => l.type).join(',') !== before, 'moved by touch');
+        await tap(page.locator('.pe-layers__props button', { hasText: 'Move up' }));
+        await savedWhen('layers-base.png', (v) => v.layers.map((l) => l.type).join(',') === before, 'moved back by touch');
+        // Delete a duplicate (confirmed), leaving the stack as it was.
+        const count = (await saved('layers-base.png')).layers.length;
+        await tap(page.locator('.pe-layers__props button', { hasText: 'Duplicate' }));
+        await savedWhen('layers-base.png', (v) => v.layers.length === count + 1, 'duplicated by touch');
+        await tap(page.locator('.pe-layers__props button', { hasText: 'Delete…' }));
+        await tap(page.locator('.pe-layers__props button', { hasText: 'Delete layer' }));
+        await savedWhen('layers-base.png', (v) => v.layers.length === count, 'deleted by touch');
+        // Closing the tray returns to the tool list with focus on Layers.
+        await tap(page.locator('.pe-layers .pe-section__toggle'));
+        assert.equal(await page.locator('.pe').getAttribute('data-mobile-tool'), null);
+        await poll(() => page.evaluate(() => document.activeElement?.dataset.mobileChoice), (v) => v === 'layers', 'focus back on the Layers choice', 5_000);
+        // Landscape: the tray still fits and its controls stay reachable.
+        const { width, height } = page.viewportSize();
+        await page.setViewportSize({ width: height, height: width });
+        await tool('layers');
+        await image.locator('.pe-layer__name').scrollIntoViewIfNeeded();
+        const landscape = await measure();
+        result.mobile.landscape = landscape;
+        assert.ok(landscape.overflow <= 0, `landscape scrolls sideways by ${landscape.overflow}px`);
+        assert.ok(touchSize(landscape) >= 44, `landscape targets ${JSON.stringify(landscape)}`);
+        await tap(image.locator('.pe-layer__name'));
+        await page.locator('.pe-layers__props button', { hasText: /^Rename$/ }).scrollIntoViewIfNeeded();
+        assert.ok(await page.locator('.pe-layers__props button', { hasText: /^Rename$/ }).isVisible(), 'layer actions unreachable in landscape');
+        await page.setViewportSize({ width, height });
       });
     }
     if (run.large) {
       await step('24 MP photo with a 12 MP JPEG layer and an adjustment layer: preview and JPEG export', async () => {
         await importFiles([files.largeFile], 3);
         await select('layers-24mp.jpg');
-        await tab(2);
+        await tool('layers');
         const started = Date.now();
         await page.setInputFiles('[data-layer-input]', files.largeOverFile);
         await page.locator('.pe-layer[data-type=image]').waitFor();
@@ -470,7 +534,7 @@ async function runOne(run, files) {
         result.large = { layerPreviewMs: previewMs, exportMs: Date.now() - t, peakMb: stop(), size: `${meta.width}×${meta.height}` };
         assert.equal(`${meta.width}×${meta.height}`, '6000×4000');
         // Deleting the layers releases their rasters (working set after a moment).
-        await tab(2);
+        await tool('layers');
         for (const type of ['adjustment', 'image']) {
           await page.locator(`.pe-layer[data-type=${type}] .pe-layer__name`).click();
           await page.locator('.pe-layers__props button', { hasText: 'Delete…' }).click();
@@ -485,7 +549,7 @@ async function runOne(run, files) {
         await importFiles([RAW_FILES[1]], run.large ? 4 : 3);
         const name = path.basename(RAW_FILES[1]);
         await select(name);
-        await tab(2);
+        await tool('layers');
         const started = Date.now();
         await page.setInputFiles('[data-layer-input]', JPEG_FILES[0]);
         await page.locator('.pe-layer[data-type=image]').waitFor();
@@ -532,7 +596,7 @@ async function runOne(run, files) {
         await page.click('.pe-dialog__foot button:has-text("Merge")');
         await page.waitForSelector('.pe-dialog', { state: 'detached', timeout: 600_000 });
         await poll(() => page.evaluate(() => !document.querySelector('.pe-stage-message')), Boolean, 'merged preview', 300_000);
-        await tab(2);
+        await tool('layers');
         await page.setInputFiles('[data-layer-input]', JPEG_FILES[1] ?? JPEG_FILES[0]);
         await page.locator('.pe-layer[data-type=image]').waitFor();
         await layersReady();
