@@ -351,7 +351,13 @@ function cachedMaskRows(mask, map, width, y0, y1, x0, out, cache) {
     cache.set(key, entry);
     dirty = region;
   }
-  if (dirty) {
+  if (dirty && !active.length) {
+    // No component: every code is the same, as the loop below would compute it (Interval 22.11:
+    // the empty mask a brush starts from cost ~90 ms per 6 MP in Safari's engine).
+    const base = mask.base === 'all' ? 1 : 0;
+    entry.codes.fill(code8(mask.opacity * (mask.invert ? 1 - base : base)));
+    if (from !== null) entry.version += 1;
+  } else if (dirty) {
     const base = mask.base === 'all' ? 1 : 0;
     for (let y = dirty.y0; y < dirty.y1; y += 1) {
       for (let x = dirty.x0, i = (y - y0) * width + x - x0; x < dirty.x1; x += 1, i += 1) {

@@ -454,3 +454,19 @@ test('clearing a retouch that is not there keeps the cached frames (brush moves)
   expect(deleted).toEqual([{ id: 'retouched' }]);
   expect(renderer.stateKey()).not.toBe(before);
 });
+
+test('a mask with no component fills its cached codes, equal to the per-pixel result', () => {
+  const size = { width: 50, height: 30 };
+  const map = canvasMaskMap(size);
+  for (const patch of [{}, { base: 'all' }, { invert: true }, { base: 'all', opacity: 0.4 }, { invert: true, opacity: 0.7 }]) {
+    const empty = mask([createBrush('b')], patch);
+    const cache = new Map();
+    const first = rasterizeMask(empty, map, size, cache);
+    expect(first.data).toEqual(rasterizeMask(empty, map, size).data);
+    // The brush's first point then follows that version: only its box is recomputed.
+    const painted = mask([createBrush('b', { strokes: [{ mode: 'add', radius: 0.1, hardness: 0.5, opacity: 1, points: [[0.5, 0.5]] }] })], patch);
+    const next = rasterizeMask(painted, map, size, cache);
+    expect(next.change.from).toBe(first.change.version);
+    expect(next.data).toEqual(rasterizeMask(painted, map, size).data);
+  }
+});

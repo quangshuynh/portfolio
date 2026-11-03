@@ -577,9 +577,12 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
   const paintCacheRef = useRef(new Map());
   useEffect(() => { if (!painting) paintCacheRef.current.clear(); }, [painting]);
   const maskCoverage = useCallback((def, map, out, keys) => {
-    const key = `${out.width}x${out.height}|${maskMapKey(map)}|${JSON.stringify(def)}`;
+    // A raster made with the paint cache is kept apart: one made while the brush was away (the
+    // cache cleared since) would leave the first new point to recompute the whole mask.
+    const cached = painting && def === maskTool.mask;
+    const key = `${cached ? 'paint|' : ''}${out.width}x${out.height}|${maskMapKey(map)}|${JSON.stringify(def)}`;
     keys.add(key);
-    if (!masksRef.current.has(key)) masksRef.current.set(key, rasterizeMask(def, map, out, painting && def === maskTool.mask ? paintCacheRef.current : null));
+    if (!masksRef.current.has(key)) masksRef.current.set(key, rasterizeMask(def, map, out, cached ? paintCacheRef.current : null));
     return { def, map, key, raster: masksRef.current.get(key) };
   }, [painting, maskTool?.mask]); // eslint-disable-line react-hooks/exhaustive-deps
   const overlayMask = maskTool?.overlay?.show && showLayers ? maskTool : null;
