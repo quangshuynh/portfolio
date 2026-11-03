@@ -112,6 +112,13 @@ function warmPass(local, native) {
   if (!local?.enabled || !(local.amount > 0) || maskHasComponents(local.mask)) return null;
   return localPasses(local, null, native, splitLocalSettings(local.settings)).find(({ kind }) => kind === 'detail') ?? null;
 }
+// The pass a first brush point adds to a local adjustment not shown yet (no strokes): its GPU
+// adjustment pass, or null when it would add none or a Detail pass (rendered on the CPU).
+export function strokePass(local, native) {
+  if (!local || maskHasComponents(local.mask) || !visibleLocals([{ ...local, mask: { ...local.mask, base: 'all' } }]).length) return null;
+  const passes = localPasses(local, null, native, splitLocalSettings(local.settings));
+  return passes.length === 1 && passes[0].kind === 'adjust' ? passes[0] : null;
+}
 
 /**
  * The map of a mask's owner at a canvas of `out` size: a local adjustment's mask is in the
@@ -200,6 +207,8 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
   // The loaded (untouched) proxy; proxyRef holds its retouched copy when the photo has retouch.
   const originalRef = useRef(null);
   const frameRef = useRef(0);
+  // Each preview frame abandons a stroke warm-up scheduled by an earlier one.
+  const warmFramesRef = useRef(0);
   const cpuJobRef = useRef({ latest: 0, busy: false, queued: null });
   // CPU preview of a RAW photo: its neutral development, for Original and Split.
   const cpuBeforeRef = useRef({ image: null, key: '', data: null });
@@ -787,6 +796,7 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
     if (!engine || !proxy || proxy.id !== photo?.id) return undefined;
     cancelAnimationFrame(frameRef.current);
     frameRef.current = requestAnimationFrame(() => {
+      const warmJob = (warmFramesRef.current += 1);
       const values = renderAdjustments;
       const params = deriveParams(values, { lut, raw });
       if (engine.kind === 'webgl2' && !engine.renderer.lost) engine.renderer.setGeometry(previewSpec);
@@ -856,16 +866,27 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
             if (complete) performance.mark?.('pe-local-detail');
           } else {
             // The photo's own frame depends on these (the renderer adds its source, retouch and geometry state).
-            const baseKey = layers?.gpu?.length ? `${photo.id}|${JSON.stringify({ ...values, layers: null, local: null })}|${params.lutActive ? lut.sha256 : ''}|${glowVersion}` : null;
-            engine.renderer.render(params, { split: splitFraction, before, layers: layers?.gpu, baseKey });
+            const stroke = !layers && painting && maskTool.owner.kind === 'local' ? strokePass(values.local?.find(({ id }) => id === maskTool.owner.id), plan.native) : null;
+            const baseKey = layers?.gpu?.length || stroke ? `${photo.id}|${JSON.stringify({ ...values, layers: null, local: null })}|${params.lutActive ? lut.sha256 : ''}|${glowVersion}` : null;
+            engine.renderer.render(params, { split: splitFraction, before, layers: layers?.gpu, baseKey, keepFrames: Boolean(stroke) });
+            // The brush is out over a local adjustment with no strokes yet: the frames its first
+            // point reads are drawn while idle, unless anything is drawn again first.
+            if (stroke) {
+              whenIdle(() => {
+                if (warmFramesRef.current !== warmJob || engineRef.current !== engine || engine.renderer.lost) return;
+                const started = performance.now();
+                const drawn = engine.renderer.warmFrames(params, baseKey, { ...stroke, params: adjustmentParams(stroke) });
+                performance.mark?.('pe-stroke-warm', { detail: { ms: performance.now() - started, drawn } });
+              });
+            }
           }
         }
       } else {
         drawCpu({ ...params, neutral: params.neutral && !layers?.cpu.length, adjustments: values, lutData: params.lutActive ? lut : null, split: splitFraction, raw, warp: previewSpec, nativeSize: { nativeWidth: nativeSize.width, nativeHeight: nativeSize.height }, layers });
       }
     });
-    return () => cancelAnimationFrame(frameRef.current);
-  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec, glowVersion, buildLayers, drawOverlay, layerRasters?.version, localVersion, maskTool?.owner.id, deferWork, retouchVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { cancelAnimationFrame(frameRef.current); warmFramesRef.current += 1; };
+  }, [renderAdjustments, lut, raw, splitFraction, proxy, photo?.id, drawCpu, runDetail, paintDetail, previewSpec, glowVersion, buildLayers, drawOverlay, layerRasters?.version, localVersion, maskTool?.owner.id, painting, deferWork, retouchVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
