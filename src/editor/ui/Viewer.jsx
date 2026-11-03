@@ -85,6 +85,9 @@ function createCpuEngine(host, maxPreviewEdge) {
 }
 
 const whenIdle = (task) => (typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(task, { timeout: 1000 }) : setTimeout(task, 200));
+// The next step of idle work already under way: Safari has no idle callbacks, and a 200 ms
+// wait per step made a phone's brush warm-up take seconds (Interval 22.11).
+const nextIdle = (task) => (typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(task, { timeout: 250 }) : setTimeout(task, 16));
 const clampZoom = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 const NEUTRAL_GEOMETRY = neutralGeometry();
 const specKey = (spec) => (spec ? JSON.stringify([spec.matrix, spec.width, spec.height, spec.coverage, spec.background]) : '');
@@ -574,9 +577,12 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
   const paintCacheRef = useRef(new Map());
   useEffect(() => { if (!painting) paintCacheRef.current.clear(); }, [painting]);
   const maskCoverage = useCallback((def, map, out, keys) => {
-    const key = `${out.width}x${out.height}|${maskMapKey(map)}|${JSON.stringify(def)}`;
+    // A raster made with the paint cache is kept apart: one made while the brush was away (the
+    // cache cleared since) would leave the first new point to recompute the whole mask.
+    const cached = painting && def === maskTool.mask;
+    const key = `${cached ? 'paint|' : ''}${out.width}x${out.height}|${maskMapKey(map)}|${JSON.stringify(def)}`;
     keys.add(key);
-    if (!masksRef.current.has(key)) masksRef.current.set(key, rasterizeMask(def, map, out, painting && def === maskTool.mask ? paintCacheRef.current : null));
+    if (!masksRef.current.has(key)) masksRef.current.set(key, rasterizeMask(def, map, out, cached ? paintCacheRef.current : null));
     return { def, map, key, raster: masksRef.current.get(key) };
   }, [painting, maskTool?.mask]); // eslint-disable-line react-hooks/exhaustive-deps
   const overlayMask = maskTool?.overlay?.show && showLayers ? maskTool : null;
@@ -797,14 +803,17 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
     cancelAnimationFrame(frameRef.current);
     frameRef.current = requestAnimationFrame(() => {
       const warmJob = (warmFramesRef.current += 1);
+      const frameStart = performance.now();
       const values = renderAdjustments;
       const params = deriveParams(values, { lut, raw });
       if (engine.kind === 'webgl2' && !engine.renderer.lost) engine.renderer.setGeometry(previewSpec);
       const out = previewSpec ? { width: previewSpec.width, height: previewSpec.height } : { width: proxy.width, height: proxy.height };
       let layers = buildLayers(out);
+      const layersAt = performance.now();
       setLayersLoading(layers?.loading ?? 0);
       setLayersShown(layers?.cpu.length ?? 0);
       drawOverlay(layers?.overlay ?? null);
+      const overlayAt = performance.now();
       if (layers && !layers.cpu.length) layers = null;
       // Local Detail with no global CPU stage: the GPU's own frame is the backdrop (canvas size).
       const gpuDetail = engine.kind === 'webgl2' && !engine.renderer.lost && !params.cpuOnly;
@@ -869,15 +878,27 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
             const stroke = !layers && painting && maskTool.owner.kind === 'local' ? strokePass(values.local?.find(({ id }) => id === maskTool.owner.id), plan.native) : null;
             const baseKey = layers?.gpu?.length || stroke ? `${photo.id}|${JSON.stringify({ ...values, layers: null, local: null })}|${params.lutActive ? lut.sha256 : ''}|${glowVersion}` : null;
             engine.renderer.render(params, { split: splitFraction, before, layers: layers?.gpu, baseKey, keepFrames: Boolean(stroke) });
+            // Where a GPU preview frame's main-thread time goes (browser checks read it).
+            performance.mark?.('pe-frame', { detail: { layersMs: layersAt - frameStart, overlayMs: overlayAt - layersAt, renderMs: performance.now() - overlayAt } });
             // The brush is out over a local adjustment with no strokes yet: the frames its first
-            // point reads are drawn while idle, unless anything is drawn again first.
+            // point reads are drawn band by band while idle, until anything is drawn again. While
+            // a pointer is down on the photo no band is submitted: the stroke comes first.
             if (stroke) {
-              whenIdle(() => {
+              const pass = { ...stroke, params: adjustmentParams(stroke) };
+              const started = performance.now();
+              let steps = 0;
+              let busyMs = 0;
+              const step = () => {
                 if (warmFramesRef.current !== warmJob || engineRef.current !== engine || engine.renderer.lost) return;
-                const started = performance.now();
-                const drawn = engine.renderer.warmFrames(params, baseKey, { ...stroke, params: adjustmentParams(stroke) });
-                performance.mark?.('pe-stroke-warm', { detail: { ms: performance.now() - started, drawn } });
-              });
+                if (pointersRef.current.size || toolPointersRef.current.size) { nextIdle(step); return; }
+                const t0 = performance.now();
+                const more = engine.renderer.warmStep(params, baseKey, pass);
+                busyMs += performance.now() - t0;
+                steps += 1;
+                if (more) nextIdle(step);
+                else performance.mark?.('pe-stroke-warm-done', { detail: { ms: performance.now() - started, steps, mainThreadMs: busyMs } });
+              };
+              whenIdle(step);
             }
           }
         }

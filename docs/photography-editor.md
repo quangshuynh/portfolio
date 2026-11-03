@@ -38,31 +38,29 @@ The keyboard contract covers adjustment values, layer names, text, presets, wate
 values and export suffixes. Three export/tool-switch cycles report Chromium post-GC
 JavaScript heap; GPU buffers and native decoder allocations are not included.
 
-**iPhone 16e acceptance:** after building, run `npm run preview -- --host 0.0.0.0`
-and open `http://<PC-LAN-IP>:4173/photography/editor/` on the same Wi-Fi, or use an
-owner-approved deployment. This serves the public build, not the local CMS.
-Import a JPEG and RAW; adjust, crop, mask, retouch, watermark, undo/redo and export.
-Open/close the keyboard in text, rename, numeric, preset and export fields; rotate,
-toggle fullscreen, collapse browser chrome, background Safari and return. Check that
-controls stay reachable, values survive, pinch never paints, and the downloaded file opens.
-Also: cancel a RAW import and retry it, watch its stage and seconds, pinch, pan and
-rotate while a mask or retouch tool is on, export at full resolution and download it,
-export three times in a row, and note any memory warning or page reload.
-Interval 22.9 additions: in Layers select, rename (Rename button), hide, lock, reorder (grip and
-Move up/down) and delete by touch, in portrait and landscape; adding Text opens the Text tool with
-the keyboard; brush a mask for 10 s and compare its smoothness with 22.8; Spot Heal, Clone Stamp and
-Remove, then lift a second finger mid-stroke (nothing extra is painted); Auto Exposure on a Canon
-EOS R CR3 should suggest about +0.7 EV (camera match; Playwright WebKit cannot show it).
-Interval 22.10 additions: Diagnostics → Copy shows `build` (the commit; `+changes` for a build of
-uncommitted edits); check it against the branch before testing. Prefer the Vercel preview (HTTPS):
-the LAN preview is plain HTTP, so Safari gives it no secure context (no `crypto.subtle` or
-clipboard; the editor falls back, but Copy may fail). New brush local adjustment → set Exposure →
-wait 2 s → paint: the first point should show as fast as later ones; repeat after switching photos
-and after a crop.
-Record failures as: iOS + Safari version / URL + commit / photo format + dimensions + file
-size / tool / steps / expected vs actual / portrait or landscape / keyboard + browser toolbar
-state / whether Safari reloaded the page.
-Attach a screen recording and saved edit JSON if shareable; do not attach private originals.
+**iPhone 16e acceptance** (emulation is not Safari; only results from the phone count).
+
+*Where:* the branch's Vercel preview (HTTPS, behind Vercel sign-in; the PR's deployment link) or,
+once merged, `https://quanghuynh.com/photography/editor`. Both serve only the public build: no CMS,
+no originals. Open Diagnostics → Copy and check `build` matches the commit under test. A LAN
+`npm run preview -- --host 0.0.0.0` is plain HTTP, so Safari gives it no secure context
+(no `crypto.subtle` or clipboard): use it only for layout.
+
+| Area | Steps (portrait, then landscape where it matters) | Pass when |
+| --- | --- | --- |
+| Import | JPEG, then ARW/NEF/CR3 from Files; cancel one RAW mid-import, Retry it | stage and seconds show; cancel frees the row; retry imports |
+| RAW | Camera Natural on; Auto Exposure on the Canon EOS R CR3; switch photos | a suggestion appears (≈ +0.7 EV on that sample is a reference, not a requirement) |
+| Adjust | Exposure, white balance, HSL; undo/redo | preview follows the finger |
+| Brush | New brush local adjustment → Exposure → paint at once; again after 2 s; 10 s of repeated strokes | the first point shows as fast as later ones; no hitch at stroke start |
+| Touch | pinch, pan, rotate with a mask or retouch tool on; second finger mid-stroke | nothing extra is painted |
+| Retouch | Spot Heal, Clone Stamp (Set source), Remove (Cancel, then fill) | repairs land where touched |
+| Layers | select, Rename, Move up/down, hide, lock, delete; add Text (keyboard opens) | controls stay above the keyboard and toolbar |
+| Export | watermark on; full-size export; save to Files and to Photos; three exports in a row | file opens; watermark as previewed |
+| Recovery | background Safari 30 s and return; reload; rotate | edits and session survive; no reload loop |
+
+Record: iOS and Safari version, URL and `build`, format and dimensions, pass/fail, steps for each
+failure, Diagnostics text (no file names or pixels), whether Safari reloaded the page. Attach a
+screen recording or saved edit JSON if shareable; never private originals.
 
 ## Layout of the code
 
@@ -1887,6 +1885,40 @@ seconds of GPU time (6.6 s traced on desktop at 4096×2731), so a stroke started
 for it, now on the main thread (Pixel 7 at 0.5 s: first point 2.9 s vs 0.3 s on `main`, worst
 frame 3.0 vs 4.0–4.6 s). On a hardware GPU it is two draws (milliseconds); the remaining ~150 ms
 to the first WebKit draw is not mask rasterization (18 ms at 11 MP) and is not yet explained.
+
+**Immediate strokes and the first point (Interval 22.11).** Submitted GPU work cannot be withdrawn,
+and SwiftShader renders on the CPU, so a stroke started while the 22.10 warm-up (two whole frames)
+ran had its first frame's script run 2–6× slower: long-animation-frame attribution put 0.7–2 s in
+the viewer's frame callback, with no GL or 2D call over 4 ms. `warmStep()` now draws scissored
+bands (first 2^19 px; doubled while each is done by the next step, halved after three unfinished
+polls), flushes and fences each, submits the next only when the fence has signalled and no pointer
+is down, and a stroke drops an unfinished frame (kept frames ≤ 2, pending one counted). Safari has
+no idle callbacks: later steps poll every 16 ms (the 200 ms fallback made a phone warm-up take
+5.5 s; now 0.36 s). Timing bands instead of counting polls was tried and reverted (iPhone warm-up
+3× slower).
+
+The hardware-GPU first point (~145 ms in WebKit iPhone 13 emulation) was application work, not the
+GPU: `pe-frame` split the first viewer frame into 87 ms building layers, 26 ms overlay, 2 ms render.
+The brush's empty-mask raster was cached under the same key with or without the paint cache; after
+another tool cleared the cache, the first point recomputed the whole 6.3 MP mask. Painted rasters
+now have their own key, and a mask with no components fills its codes. The rest (~50 ms) is two
+frames of scheduling (pointerdown → tool frame → React commit → viewer frame) plus ~17 ms of work.
+
+`check:editor:brush`, `BRUSH_HOVER=0 BRUSH_MOVES=60`, first point / worst of the first four frames,
+`main` (22.10) → 22.11, by pause between selecting and painting:
+
+| Run | 0 s | 0.5 s | 2 s | 8 s |
+| --- | --- | --- | --- | --- |
+| Desktop (SwiftShader) | 737 → 90 ms / 6.4 → 6.0 s | 866 → 40 ms / 5.1 → 5.6 s | 861 → 43 ms / 3.9 → 5.7 s | 40 → 40 ms / 0.58 → 0.57 s |
+| Pixel 7 (SwiftShader) | 316 → 31 ms / 4.2 → 3.5 s | 1344 → 79 ms / 3.6 → 3.7 s | 1055 → 31 ms / 2.8 → 3.6 s | 764 → 33 ms / 1.1 → 0.43 s |
+| iPhone 13 (WebKit, GPU) | 142 → 51 / 170 → 78 ms | 146 → 58 / 179 → 88 ms | 146 → 51 / 170 → 74 ms | 140 → 55 / 165 → 81 ms |
+
+Continuous strokes unchanged (p50 117 / 67 / 62 ms). Trade-off: with a software GPU the banded
+warm-up takes 5.7–9.4 s, so a stroke at 2 s gets less of it and its worst frame (the GPU finishing
+the cold frames) is longer than in 22.10, though no longer than before 22.10. The page stays
+responsive meanwhile (first point ≤ 0.1 s). Warm-up main-thread cost: 3–15 ms in total.
+`check:editor:memory` (genuine A7 III bracket, two cycles): GPU 261 → 260 MB after each cycle, no
+workers left; whole-browser working set 880 → 996 MB (allocator reuse, as in 22.9; not a trend).
 
 ## Known issues
 

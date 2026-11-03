@@ -11,6 +11,9 @@ import { openEditorTool } from './editor-mobile-controls.mjs';
 // stays under BRUSH_MAX_MAIN_MS (default 40 ms), generous enough for headless software WebGL.
 // Usage: npm run check:editor:brush (BRUSH_RUNS=chromium,cpu,iphone,pixel; CHECK_GPU=1: real GPU;
 // BRUSH_SKIP_BUILD=1 reuses dist/; BRUSH_GL_TRACE=1 times each draw; BRUSH_CHROME_TRACE=f.json; BRUSH_MOVES=120; BRUSH_PROFILE=1 prints the CPU profile;
+// BRUSH_PAUSE_MS=0 paints at once and BRUSH_HOVER=0 skips the desktop
+// hover step (which waits for an idle preview); BRUSH_GL_TRACE=cpu times calls on the main thread only;
+// BRUSH_TIMELINE=1 lists main-thread work from pointerdown to the first composited frame;
 // BRUSH_LOCAL=clarity paints a local Clarity adjustment instead of exposure, and reports the time
 // from release until the final Detail frame, then paints a second stroke; BRUSH_PAUSE_MS=500 is
 // the pause between setting the value and painting)
@@ -31,6 +34,7 @@ const ONLY_RUNS = process.env.BRUSH_RUNS?.split(',');
 const MOVES = Number(process.env.BRUSH_MOVES ?? 120);
 const MAX_MAIN_MS = Number(process.env.BRUSH_MAX_MAIN_MS ?? 40);
 const GENUINE_DIR = process.env.BRUSH_FIXTURE_DIR ?? '';
+const PAUSE_MS = Number(process.env.BRUSH_PAUSE_MS ?? 500);
 const LOCAL = process.env.BRUSH_LOCAL === 'clarity' ? { section: /^Detail/, label: 'Clarity', value: '60' } : { label: 'Exposure', value: '1.5' };
 const GENUINE = GENUINE_DIR && existsSync(GENUINE_DIR) ? readdirSync(GENUINE_DIR).filter((name) => /\.jpe?g$/i.test(name)).sort().slice(0, 1).map((name) => path.join(GENUINE_DIR, name)) : [];
 const GPU_ARGS = process.env.CHECK_GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : [];
@@ -63,6 +67,25 @@ const GL_TRACE = () => {
   };
   const programs = new WeakMap();
   let nextProgram = 0;
+  // BRUSH_GL_TRACE=cpu: every call is timed on the main thread only (no readback), so it shows
+  // which calls block the page (waiting on the GPU process) without serialising the GPU.
+  if (window.__glTraceCpu) {
+    // 2D canvas calls too (the mask overlay): an accelerated canvas also waits on the GPU process.
+    for (const [kind, target] of [['gl', proto], ['2d', globalThis.CanvasRenderingContext2D?.prototype]]) {
+      for (const name of Object.getOwnPropertyNames(target ?? {})) {
+        const fn = Object.getOwnPropertyDescriptor(target, name).value;
+        if (typeof fn !== 'function' || name === 'constructor') continue; // eslint-disable-line no-continue
+        target[name] = function timed(...args) {
+          const t0 = performance.now();
+          const result = fn.apply(this, args);
+          const ms = performance.now() - t0;
+          if (ms >= 1) window.__glTrace.push({ at: t0, ms, pass: `cpu ${kind} ${name}` });
+          return result;
+        };
+      }
+    }
+    return;
+  }
   // BRUSH_GL_TRACE=all: every other call is timed the same way, grouped by name.
   if (window.__glTraceAll) {
     for (const name of Object.getOwnPropertyNames(proto)) {
@@ -90,6 +113,26 @@ const GL_TRACE = () => {
     window.__glTrace.push({ at: t0, ms: performance.now() - t0, pass: `${target} ${w}×${h} p${programs.get(program) ?? 0}${scissor ? ' scissor' : ''}` });
     return result;
   };
+};
+// BRUSH_TIMELINE=1: every animation frame callback, React scheduler task (MessageChannel) and
+// timer is timed on the main thread, so the first point's path (pointerdown → frames → first draw)
+// splits into handler, script and waiting time; works in WebKit, which has no long-frame API.
+const TIMELINE = () => {
+  const log = (window.__timeline = []);
+  const timed = (kind, fn) => function run(...args) {
+    const start = performance.now();
+    try { return fn.apply(this, args); } finally { log.push({ kind, start, ms: performance.now() - start, name: fn.name || '' }); }
+  };
+  const raf = window.requestAnimationFrame.bind(window);
+  window.requestAnimationFrame = (cb) => raf(timed('frame', cb));
+  const timeout = window.setTimeout.bind(window);
+  window.setTimeout = (cb, ...rest) => (typeof cb === 'function' ? timeout(timed('timer', cb), ...rest) : timeout(cb, ...rest));
+  const descriptor = Object.getOwnPropertyDescriptor(MessagePort.prototype, 'onmessage');
+  Object.defineProperty(MessagePort.prototype, 'onmessage', {
+    configurable: true,
+    get() { return descriptor.get.call(this); },
+    set(fn) { descriptor.set.call(this, typeof fn === 'function' ? timed('task', fn) : fn); },
+  });
 };
 // Records when the preview draws, so a move's latency is "input → next draw call".
 const DRAW_PROBE = () => {
@@ -130,7 +173,7 @@ const DRAW_PROBE = () => {
   }
   window.__brushFrames = [];
   try {
-    new PerformanceObserver((list) => { for (const entry of list.getEntries()) window.__brushFrames.push({ start: entry.startTime, duration: entry.duration, blocking: entry.blockingDuration, render: entry.renderStart ? entry.startTime + entry.duration - entry.renderStart : 0 }); })
+    new PerformanceObserver((list) => { for (const entry of list.getEntries()) window.__brushFrames.push({ start: entry.startTime, duration: entry.duration, blocking: entry.blockingDuration, render: entry.renderStart ? entry.startTime + entry.duration - entry.renderStart : 0, styleLayout: entry.styleAndLayoutStart ? entry.startTime + entry.duration - entry.styleAndLayoutStart : 0, scripts: (entry.scripts ?? []).map((x) => ({ invoker: x.invoker, ms: Math.round(x.duration), fn: x.sourceFunctionName })) }); })
       .observe({ type: 'long-animation-frame', buffered: false });
   } catch { /* not Chromium */ }
 };
@@ -235,7 +278,9 @@ async function runOne(run, file) {
   const context = await browser.newContext(run.device ? devices[run.device] : { viewport: { width: 1440, height: 900 } });
   if (run.init) await context.addInitScript(INIT[run.init]);
   await context.addInitScript(DRAW_PROBE);
+  if (process.env.BRUSH_TIMELINE) await context.addInitScript(TIMELINE);
   if (process.env.BRUSH_GL_TRACE === 'all') await context.addInitScript(() => { window.__glTraceAll = true; });
+  if (process.env.BRUSH_GL_TRACE === 'cpu') await context.addInitScript(() => { window.__glTraceCpu = true; });
   if (process.env.BRUSH_GL_TRACE) await context.addInitScript(GL_TRACE);
   const page = await context.newPage();
   const problems = [];
@@ -268,11 +313,13 @@ async function runOne(run, file) {
     await field.fill(LOCAL.value);
     await field.press('Enter');
     if (run.device) { await openEditorTool(page, 'masks'); await page.locator('.pe-masks__tools button', { hasText: /^Brush$/ }).click(); }
-    await page.waitForTimeout(Number(process.env.BRUSH_PAUSE_MS ?? 500));
+    // The pause is timed from here: the brush is selected and the value set (tool selection).
+    await page.evaluate(() => performance.mark('brush-check-ready'));
+    if (PAUSE_MS) await page.waitForTimeout(PAUSE_MS);
     // Local Detail: the stroke starts once the frame with the setting is final.
     if (LOCAL.section) await poll(() => page.evaluate(() => document.querySelector('[data-detail-preview]')?.dataset.detailPreview ?? null), (q) => q === null || q === 'final', 'Detail preview', 120_000);
     result.engine = await page.evaluate(() => (document.querySelector('.pe-canvas-host canvas')?.getContext ? document.querySelector('.pe-engine')?.textContent ?? null : null));
-    if (!run.device) {
+    if (!run.device && process.env.BRUSH_HOVER !== '0') {
       step('hover');
       // A local Detail's warm pass may still finish (and draw) after the preview reads "final".
       await poll(async () => { const n = await page.evaluate(() => window.__brushDraws.length); await page.waitForTimeout(1000); return n === await page.evaluate(() => window.__brushDraws.length); }, Boolean, 'an idle preview', 60_000);
@@ -368,7 +415,15 @@ async function runOne(run, file) {
       const firstDraw = draws.find((d) => d >= down);
       const firstComposite = window.__brushComposites.find((d) => d >= down);
       const firstFrames = frameTimes.slice(0, 4);
-      const firstPoint = { handler: downHandler, toDraw: firstDraw === undefined ? null : firstDraw - down, toComposite: firstComposite === undefined ? null : firstComposite - down, maxFrameOfFirstFour: Math.max(...firstFrames) };
+      const firstPoint = { frames: firstFrames.map((t) => Math.round(t)), handler: downHandler, toDraw: firstDraw === undefined ? null : firstDraw - down, toComposite: firstComposite === undefined ? null : firstComposite - down, maxFrameOfFirstFour: Math.max(...firstFrames) };
+      // BRUSH_TIMELINE: main-thread work from pointerdown to the first composited frame (ms from down).
+      const until = firstComposite ?? firstDraw ?? down;
+      const timeline = window.__timeline ? window.__timeline.filter((e) => e.start >= down - 1 && e.start <= until + 1)
+        .map((e) => ({ kind: e.kind, at: Math.round(e.start - down), ms: Math.round(e.ms * 10) / 10, ...(e.name ? { name: e.name } : {}) })) : null;
+      if (timeline) firstPoint.timeline = timeline;
+      // The viewer's own split of its frames (pe-frame) between pointerdown and the first composite.
+      const frames = performance.getEntriesByName('pe-frame').filter((e) => e.startTime >= down && e.startTime <= until + 200).slice(0, 3);
+      if (timeline) firstPoint.viewerFrames = frames.map(({ startTime, detail }) => ({ at: Math.round(startTime - down), ...Object.fromEntries(Object.entries(detail).map(([k, v]) => [k, Math.round(v * 10) / 10])) }));
       const detailShown = quality.some(Boolean) ? { final: quality.filter((q) => q === 'final').length, draft: quality.filter((q) => q === 'draft').length, rendering: quality.filter((q) => q === 'rendering').length } : null;
       const glTrace = window.__glTrace ? Object.values(window.__glTrace.filter((d) => d.at >= down && d.at <= strokeEnd).reduce((all, { pass, ms }) => {
         const entry = (all[pass] ??= { pass, draws: 0, ms: 0 });
@@ -392,7 +447,9 @@ async function runOne(run, file) {
     }
     const busy = measured.longFrames.reduce((sum, f) => sum + f.duration, 0);
     result.moves = MOVES;
-    result.firstPointMs = Object.fromEntries(Object.entries(measured.firstPoint).map(([k, v]) => [k, v === null || !Number.isFinite(v) ? null : Math.round(v * 10) / 10]));
+    result.firstPointMs = Object.fromEntries(Object.entries(measured.firstPoint).filter(([k]) => k !== 'timeline' && k !== 'viewerFrames').map(([k, v]) => [k, Array.isArray(v) || v === null ? v : !Number.isFinite(v) ? null : Math.round(v * 10) / 10]));
+    if (process.env.BRUSH_LOAF) result.firstLongFrames = measured.longFrames.slice(0, 3);
+    if (measured.firstPoint.timeline) Object.assign(result, { firstPointTimeline: measured.firstPoint.timeline, firstViewerFrames: measured.firstPoint.viewerFrames });
     result.handlerMs = stats(measured.handler);
     result.frameIntervalMs = stats(measured.frameTimes);
     result.fps = Math.round((1000 * MOVES) / measured.span);
@@ -406,9 +463,17 @@ async function runOne(run, file) {
     if (second) {
       result.secondStroke = { inputToDrawMs: stats(second.latency), frameIntervalMs: stats(second.frameTimes), detailDuringStroke: second.detailShown, commitMs: Math.round(second.commitMs), detailFinalAfterReleaseMs: second.settleMs === null ? null : Math.round(second.settleMs) };
     }
-    // Frames drawn ahead of the first stroke while idle (Interval 22.10), and how long that took.
-    const warmed = await page.evaluate(() => performance.getEntriesByName('pe-stroke-warm').map(({ detail }) => detail));
-    result.strokeWarm = warmed.length ? { runs: warmed.length, drawn: warmed.reduce((sum, { drawn }) => sum + drawn, 0), ms: stats(warmed.filter(({ drawn }) => drawn).map(({ ms }) => Math.round(ms * 10) / 10)) } : 'none';
+    // Frames drawn ahead of the first stroke while idle (Intervals 22.10–22.11): warm-ups that
+    // finished before or during the stroke, their idle steps (bands and fence polls) and main-thread time.
+    const warmed = await page.evaluate(() => performance.getEntriesByName('pe-stroke-warm-done').map(({ detail }) => detail));
+    const last = warmed.at(-1);
+    result.strokeWarm = { finished: warmed.length, ...(last ? { ms: Math.round(last.ms), steps: last.steps, mainThreadMs: Math.round(last.mainThreadMs) } : {}) };
+    // Tool selection → the warm-up's GPU work done (its fence signalled), when it finished before the stroke.
+    result.selectToWarmMs = await page.evaluate(() => {
+      const ready = performance.getEntriesByName('brush-check-ready')[0]?.startTime;
+      const done = performance.getEntriesByName('pe-stroke-warm-done').at(-1);
+      return ready === undefined || !done ? null : Math.round(done.startTime - ready);
+    });
     step('overlay');
     // The overlay drawn box by box while painting equals a full redraw of the same mask (alpha
     // exactly; premultiplied colour within the canvas's rounding of one level).
