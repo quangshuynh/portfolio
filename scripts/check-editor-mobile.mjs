@@ -157,10 +157,17 @@ try {
         }
         await check();
         await page.locator('.pe-layers__add').getByRole('button', { name: 'Text', exact: true }).click();
+        // Phones open the Text tool so the new layer's field is on screen (Interval 22.9).
+        if (mobile) {
+          assert.equal(await page.locator('.pe').getAttribute('data-mobile-tool'), 'text', 'adding Text opens the Text tool');
+          await tool('layers');
+        }
         await check();
         await shot('layers');
         if (width === 390) {
-          await page.locator('.pe-layer__name').first().dblclick();
+          // Touch has no double click or F2: rename from the selected layer's actions.
+          await page.locator('.pe-layer__name').first().click();
+          await page.locator('.pe-layers__props button', { hasText: /^Rename$/ }).click();
           const rename = page.locator('.pe-layer__rename');
           await rename.fill('Mobile text');
           await checkKeyboard(page, rename);
