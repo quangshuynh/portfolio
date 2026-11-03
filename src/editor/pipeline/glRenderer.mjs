@@ -44,6 +44,9 @@ const COMPOSITE_UNIFORMS = ['uBackdrop', 'uLayer', 'uAdjust', 'uMatrix', 'uOutpu
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 // Frames kept between composites (the photo's own frame and one adjustment pass's output).
 const FRAME_CACHE = 2;
+// Pixels of a warm-up's first band: about 1/20 of a 4096 × 2731 preview, a small fraction of a
+// second in SwiftShader and well under a millisecond on a phone GPU (later bands adapt).
+const WARM_BAND_PIXELS = 1 << 19;
 
 /** An RGB16UI texture; integer textures are only read with texelFetch, so NEAREST. */
 function rawTexture(gl, width, height, data) {
@@ -430,7 +433,7 @@ export class GlRenderer {
     if (layers?.length) {
       this.composite(params, rendered, layers, baseKey);
     } else {
-      // `keepFrames`: frames warmed for a stroke about to start (warmFrames) stay. Targets a
+      // `keepFrames`: frames warmed for a stroke about to start (warmStep) stay. Targets a
       // warm-up made for a stroke that never came are freed with them.
       if (!keepFrames) {
         if (this.warmedTargets) this.releaseTargets();
@@ -464,6 +467,8 @@ export class GlRenderer {
     const width = this.outWidth;
     const height = this.outHeight;
     const c = this.ensureCompositor();
+    // A stroke started before a warm-up finished: its frames are drawn here, whole.
+    this.abandonWarm();
     this.warmedTargets = false;
     const targets = this.ensureTargets(width, height, layers.some(({ kind }) => kind === 'adjust') ? 3 : 2);
     gl.viewport(0, 0, width, height);
@@ -625,20 +630,8 @@ export class GlRenderer {
       this.frameHits = (this.frameHits ?? 0) + 1;
       return hit;
     }
-    let target = null;
-    if (this.frames.size < FRAME_CACHE) {
-      gl.activeTexture(gl.TEXTURE0 + UNIT.layer);
-      const texture = rgbaTexture(gl, this.outWidth, this.outHeight);
-      const framebuffer = gl.createFramebuffer();
-      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-      target = { texture, framebuffer, width: this.outWidth, height: this.outHeight };
-    } else {
-      const [oldKey, oldest] = [...this.frames].find(([, frame]) => !pinned.has(frame)) ?? [];
-      if (!oldest) return null;
-      this.frames.delete(oldKey);
-      target = oldest;
-    }
+    const target = this.frameTarget(pinned);
+    if (!target) return null;
     gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
     gl.viewport(0, 0, this.outWidth, this.outHeight);
     gl.useProgram(this.program);
@@ -650,39 +643,117 @@ export class GlRenderer {
   }
 
   /**
-   * Draws ahead of a stroke the kept frames its first point reads: the photo's frame and, when
-   * `pass` (the first layer pass) is an adjustment, its output, under the keys composite() uses
-   * for the same `params` and `baseKey`. Until then nothing is composited, so the first point
-   * would allocate the targets and draw both through the whole pipeline (Interval 22.10). Frames
-   * already kept are hits; a key that no longer matches is never read and is the first evicted.
-   * :returns: the number of frames drawn (0 when all were kept or nothing can be drawn)
+   * A target for a frame about to be drawn: a new one while fewer than FRAME_CACHE are kept (a
+   * warm-up's unfinished frame counts), else the least recently used frame that is not pinned.
    */
-  warmFrames(params, baseKey, pass = null) {
+  frameTarget(pinned) {
     const { gl } = this;
-    if (!this.texture || this.lost || !baseKey) return 0;
-    const misses = this.frameMisses ?? 0;
-    this.ensureCompositor();
-    const made = this.targets[0]?.width !== this.outWidth || this.targets[0]?.height !== this.outHeight;
-    this.ensureTargets(this.outWidth, this.outHeight, pass?.kind === 'adjust' ? 3 : 2);
-    if (made) this.warmedTargets = true;
-    gl.bindVertexArray(this.vao);
-    const key = `${this.stateKey()}|${baseKey}`;
-    const pinned = new Set();
-    const base = this.cachedFrame(key, pinned, () => this.draw(params));
-    if (base && pass?.kind === 'adjust' && pass.adjustments) {
-      this.cachedFrame(`${key}>${JSON.stringify(pass.adjustments)}|${pass.lut?.sha256 ?? ''}`, pinned, () => this.draw(pass.params, base.texture, true));
+    this.frames ??= new Map();
+    if (this.frames.size + (this.warmJob?.target ? 1 : 0) < FRAME_CACHE) {
+      gl.activeTexture(gl.TEXTURE0 + UNIT.layer);
+      const texture = rgbaTexture(gl, this.outWidth, this.outHeight);
+      const framebuffer = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+      return { texture, framebuffer, width: this.outWidth, height: this.outHeight };
     }
+    const [oldKey, oldest] = [...this.frames].find(([, frame]) => !pinned.has(frame)) ?? [];
+    if (!oldest) return null;
+    this.frames.delete(oldKey);
+    return oldest;
+  }
+
+  /**
+   * One step of drawing ahead of a stroke the kept frames its first point reads: the photo's
+   * frame and, when `pass` (the first layer pass) is an adjustment, its output, under the keys
+   * composite() uses for the same `params` and `baseKey`. Until then nothing is composited, so the
+   * first point would allocate the targets and draw both through the whole pipeline (Interval
+   * 22.10). Each step draws one band of rows (from WARM_BAND_PIXELS) and flushes it, and the next waits
+   * until a fence says the GPU has finished it: commands already submitted cannot be withdrawn,
+   * so a stroke starting meanwhile shares the GPU (and, with a software GPU, the CPU) with one
+   * band at most, not two whole frames (Interval 22.11). A frame is kept once its last band is
+   * drawn; a stroke (composite) drops an unfinished one. Each pixel is drawn exactly as a whole
+   * frame would draw it, so a warmed frame equals an uncached one.
+   * :returns: true while steps remain (call again later), false when done or impossible
+   */
+  warmStep(params, baseKey, pass = null) {
+    const { gl } = this;
+    if (!this.texture || this.lost || !baseKey) { this.abandonWarm(); return false; }
+    const key = `${this.stateKey()}|${baseKey}`;
+    const adjustKey = pass?.kind === 'adjust' && pass.adjustments ? `${key}>${JSON.stringify(pass.adjustments)}|${pass.lut?.sha256 ?? ''}` : null;
+    let job = this.warmJob;
+    if (job && (job.key !== key || job.adjustKey !== adjustKey)) { this.abandonWarm(); job = null; }
+    if (job?.fence) {
+      if (gl.getSyncParameter(job.fence, gl.SYNC_STATUS) !== gl.SIGNALED) { job.waits += 1; return true; }
+      gl.deleteSync(job.fence);
+      job.fence = null;
+      // The band size follows the GPU: doubled while each band is done by the next step, halved
+      // when one took several (a phone GPU warms in a few steps, a software one in small bands).
+      // Timing bands instead warmed the WebKit iPhone emulation 3× slower (Interval 22.11).
+      if (!job.waits) job.rows *= 2;
+      else if (job.waits > 2) job.rows = Math.max(job.minRows, Math.floor(job.rows / 2));
+      job.waits = 0;
+    }
+    this.frames ??= new Map();
+    if (!job) {
+      if (this.frames.has(key) && (!adjustKey || this.frames.has(adjustKey))) return false;
+      this.ensureCompositor();
+      const made = this.targets[0]?.width !== this.outWidth || this.targets[0]?.height !== this.outHeight;
+      this.ensureTargets(this.outWidth, this.outHeight, adjustKey ? 3 : 2);
+      if (made) this.warmedTargets = true;
+      const rows = Math.max(1, Math.floor(WARM_BAND_PIXELS / this.outWidth));
+      job = this.warmJob = { key, adjustKey, target: null, frameKey: null, row: 0, rows, minRows: Math.max(1, rows >> 2), waits: 0 };
+    }
+    if (!job.target) {
+      // The next frame to draw: the photo's, then the adjustment pass's over it.
+      job.frameKey = this.frames.has(key) ? adjustKey : key;
+      if (!job.frameKey || this.frames.has(job.frameKey)) { this.warmJob = null; return false; }
+      const base = this.frames.get(key);
+      job.target = this.frameTarget(new Set(base ? [base] : []));
+      if (!job.target) { this.warmJob = null; return false; }
+      job.row = 0;
+    }
+    const width = this.outWidth;
+    const height = this.outHeight;
+    const rows = Math.min(job.rows, height - job.row);
+    const base = job.frameKey === key ? null : this.frames.get(key);
+    gl.bindVertexArray(this.vao);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, job.target.framebuffer);
+    gl.viewport(0, 0, width, height);
+    gl.useProgram(this.program);
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(0, job.row, width, rows);
+    if (base) this.draw(pass.params, base.texture, true);
+    else this.draw(params);
+    gl.disable(gl.SCISSOR_TEST);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.activeTexture(gl.TEXTURE0);
-    const drawn = (this.frameMisses ?? 0) - misses;
+    this.warmBands = (this.warmBands ?? 0) + 1;
+    job.row += rows;
+    if (job.row >= height) {
+      this.frames.set(job.frameKey, job.target);
+      job.target = null;
+      this.framesWarmed = (this.framesWarmed ?? 0) + 1;
+    }
+    job.fence = gl.fenceSync?.(gl.SYNC_GPU_COMMANDS_COMPLETE, 0) ?? null;
     // Queued commands run at the next flush: without one they wait for the stroke's first frame.
-    if (drawn) gl.flush();
-    this.framesWarmed = (this.framesWarmed ?? 0) + drawn;
-    return drawn;
+    gl.flush();
+    return true;
+  }
+
+  /** Drops a warm-up in progress and the frame it had not finished. */
+  abandonWarm() {
+    const job = this.warmJob;
+    if (!job) return;
+    const { gl } = this;
+    this.warmJob = null;
+    if (job.fence) gl.deleteSync(job.fence);
+    if (job.target) { gl.deleteFramebuffer(job.target.framebuffer); gl.deleteTexture(job.target.texture); }
   }
 
   /** Frees the kept frames (no layers shown, a new size, a lost or disposed context). */
   releaseFrames() {
+    this.abandonWarm();
     if (!this.frames?.size) return;
     const { gl } = this;
     this.frames.forEach(({ texture, framebuffer }) => { gl.deleteFramebuffer(framebuffer); gl.deleteTexture(texture); });
