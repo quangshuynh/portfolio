@@ -218,7 +218,7 @@ async function parity() {
         const canvasWorst = Math.max(...r.canvas.filter(({ name }) => !/dodge|burn/.test(name)).map(({ max }) => max));
         // The frame cache must not change a single code.
         const cachedMax = Math.max(r.brush.max, ...r.results.map(({ cached }) => cached));
-        const ok = worst <= PASS_PARITY_MAX && worstAdjust <= AMPLIFIED_PARITY_MAX && canvasWorst <= 4 && cachedMax === 0 && r.brush.hits > 0;
+        const ok = worst <= PASS_PARITY_MAX && worstAdjust <= AMPLIFIED_PARITY_MAX && canvasWorst <= 4 && cachedMax === 0 && r.brush.hits > 0 && r.brush.boxMax === 0 && r.brush.boxes > 0;
         results.push({ browser: `${type.name()} ${browser.version()}`, ok, cases: r.results.length, cachedMax, brushCache: r.brush, rasterPassMax: worst, adjustmentPassMax: worstAdjust, endToEndMax: Math.max(...r.results.map(({ endToEnd }) => endToEnd.max)), canvasReferenceMax: canvasWorst, canvasDodgeBurnMax: Math.max(...r.canvas.filter(({ name }) => /dodge|burn/.test(name)).map(({ max }) => max)) });
       } finally {
         await browser.close();

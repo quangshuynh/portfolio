@@ -193,7 +193,36 @@ function brushCache(renderer) {
       max = Math.max(max, compare(renderer.readPixels(params, { layers: passes }), renderer.readPixels(params, { layers: passes, baseKey: 'brush' })).max);
     }
   }
-  return { points: points.length, max, hits: renderer.frameHits ?? 0, misses: renderer.frameMisses ?? 0 };
+  return { points: points.length, max, hits: renderer.frameHits ?? 0, misses: renderer.frameMisses ?? 0, ...brushBoxes(renderer, params, layer) };
+}
+
+// As the viewer paints (Interval 22.9): consecutive cached frames with a paint cache, so only the
+// box each mask change touched is composited, including an unchanged frame, an erase stroke and an
+// undo (full recomputes) mid-stroke. Each frame must equal an uncached render of the same pass.
+function brushBoxes(renderer, params, layer) {
+  renderer.setRetouched(null);
+  const canvas = { width: W, height: H };
+  const map = canvasMaskMap(canvas);
+  const cache = new Map();
+  const add = { mode: 'add', radius: 0.08, hardness: 0.6, opacity: 1 };
+  const points = [];
+  const steps = [];
+  for (let i = 0; i < 6; i += 1) { points.push([0.15 + i * 0.12, 0.6 - (i % 2) * 0.2, 0.8]); steps.push([{ ...add, points: points.slice() }]); }
+  steps.push(steps.at(-1));
+  steps.push([...steps.at(-1), { ...add, mode: 'erase', points: [[0.4, 0.2], [0.45, 0.8]] }]);
+  steps.push(steps[5]);
+  steps.push([{ ...add, points: [...points, [0.9, 0.9, 0.8]] }]);
+  const boxesBefore = renderer.compositeBoxes ?? 0;
+  const frames = steps.map((strokes) => {
+    const def = normalizeMask({ base: 'none', components: [createBrush('b', { strokes })] }, 'canvas');
+    const pass = adjustmentPass(layer, null, { def, key: JSON.stringify(def), raster: rasterizeMask(def, map, canvas, cache) });
+    const passes = [{ ...pass, params: adjustmentParams(pass) }];
+    return { passes, cached: renderer.readPixels(params, { layers: passes, baseKey: 'brush-boxes' }) };
+  });
+  const boxes = (renderer.compositeBoxes ?? 0) - boxesBefore;
+  let boxMax = 0;
+  for (const { passes, cached } of frames) boxMax = Math.max(boxMax, compare(renderer.readPixels(params, { layers: passes }), cached).max);
+  return { boxFrames: frames.length, boxes, boxMax };
 }
 
 window.layerParityResult = run();
