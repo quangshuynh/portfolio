@@ -80,6 +80,7 @@ screen recording or saved edit JSON if shareable; never private originals.
 | `src/editor/model/overlays.mjs`, `src/editor/text/` | Text fields (schema, validation) and their fonts, layout and drawing (`rasterizeTextLayer`). UI: `ui/TextPanel.jsx`. |
 | `src/editor/model/layers.mjs`, `pipeline/blend.mjs`, `composite.mjs`, `layerTransform.mjs`, `compositeShader.mjs` | Layers (Interval 12): stack schema, limits, migration, operations; W3C blend modes; CPU compositor and its GLSL mirror; layer placement. Export orchestration `io/composeLayers.mjs`; UI `ui/LayersPanel.jsx`, `ui/LayerHandles.jsx`, preview rasters `ui/layerRasters.mjs`; parity page `dev/layerParity.html`. |
 | `src/editor/model/masks.mjs`, `pipeline/mask.mjs` | Masks and local adjustments (Interval 13): schema, limits, editing helpers; per-pixel coverage and mask maps. UI `ui/MaskPanel.jsx`, `ui/MaskTool.jsx`; passes in `composite.mjs` (`localPasses`, `passMask`, Detail passes). |
+| `src/editor/segment/` | Intelligent selections (Interval 23): models, worker, analysis and refinement, selection grids; UI `ui/useSelections.js`. See [Intelligent selections](#intelligent-selections). |
 | `scripts/check-editor-masks.mjs` | `npm run check:editor:masks`: masked-pass parity, the Masks panel and on-photo tools, PNG exports against the Node reference (with geometry and masked layers), save and reopen, phones, CPU preview, 24 MP; genuine ARW and merged HDR with `MASK_FIXTURE_DIR`. |
 | `scripts/check-editor-layers.mjs` | `npm run check:editor:layers`: GPU/CPU and canvas parity of every blend mode, the Layers panel flow, PNG exports against the Node reference, text placement, reload and reconnect, batch ZIP, phones, CPU preview, 24 MP; genuine JPEG/RAW layers over RAW and over merged HDR with `LAYER_FIXTURE_DIR`. |
 | `scripts/check-editor-creative.mjs` | `npm run check:editor:creative`: looks and effects, PNG exports against the Node reference, text placement in preview and exports, paste and ZIP, phones, CPU preview, 24 MP; genuine ARW and merged HDR with `CREATIVE_FIXTURE_DIR`. |
@@ -941,6 +942,89 @@ composites at the preview size (drag frame 90 ms at 600×400). The RAW layer pre
 the RAW queue (one decoder at a time), so a RAW layer appears after its half-size decode.
 Repeated project switching with layers was not measured separately; the raster cache is bounded
 (8 rasters, 384 MB) and cleared when the workspace empties. No physical iPhone was tested.
+
+## Intelligent selections
+
+Masks panel → **Select**: Sky, Subject, Background (new local adjustments), Object (tap the photo);
+inside a local adjustment's mask **+ Sky**, **+ Subject**, **+ Background**, the **Object** tool.
+Each makes a `selection` component (`model/masks.mjs`), combined, inverted, faded, feathered and
+brushed like any other component. Everything runs on the device (`src/editor/segment/`).
+
+**Approach (Interval 23).** Compared on 21 published photos (cars, a motorcycle, buildings, skies,
+birds, trees) before choosing, with the editor's own code (`npm run bench:selection`):
+
+| Tried | Result | Used |
+| --- | --- | --- |
+| Hand-made sky cue (brightness, texture, colour, connected to the top) seeding SAM | selected dark trunks, light-blue car paint, water, lit windows | no |
+| Sky U²-Net (MIT, 176 MB), weights quantised to 8 bits here (44 MB) | correct skies through branches, poles and lamp posts; no sky indoors, under trees, on water; IoU with the original model median 0.998 (83 photos) | Sky |
+| U²-Netp salient object detection (Apache-2.0, 4.6 MB) | finds where the subject is; outlines are coarse | Subject (where) |
+| SlimSAM-77 (Apache-2.0, 14 MB int8) | good outlines, but its encoder peaked at 1.7 GB | no |
+| MobileSAM (Apache-2.0; 28 + 16 MB at 32 bits; 8-bit weights changed outlines, IoU down to 0.54) | outlines from a box or taps; 0.4 GB, 4.2 s per photo on one WebAssembly thread | Subject (outline), Object |
+
+Subject prompts MobileSAM with each salient region's box and centre; Background is that subject
+inverted; Object prompts it with the taps (green include, red exclude; Alt or Exclude reverses),
+and **Smaller/Larger part** steps through SAM's three answers. The SAM image embedding is kept for
+the photo, so after the first Subject or Object every further one takes about a second.
+
+Models run in `segment/selectionWorker.mjs` (onnxruntime-web 1.31.1, WebAssembly, one thread: the
+site is not cross-origin isolated). They are served from `photography/editor-models/` (no other
+origin; the editor's CSP allows none), fetched only on first use (Sky 44 MB, Subject 49 MB,
+Object 45 MB; the buttons say how much is still to download), cached by the browser and checked
+against their SHA-256 (size only without a secure context). The worker ends 90 s after the last
+selection, returning its memory; Cancel ends it at once. The analysis image is the photo's
+development (every global setting) without crop, rotation, local adjustments, layers, retouch or
+watermark, at 1024 px on the long edge, rendered by the CPU renderer (also without WebGL2).
+
+**Refinement.** Each model's coarse mask is refined against the analysis image: within a few pixels
+of its edge, each pixel is compared with the average colour of the confident inside and outside
+pixels near it (a local colour model, as simple matting), so the edge lands on the photo's edge and
+mixed pixels (branches against sky) get partial coverage; elsewhere coverage is 0 or 1. Then
+Edge (−100 contracts, +100 expands, up to 1 % of the long edge) and Feather (up to 2 %) apply.
+
+**Data.** A selection stores its grid (8 bits, run-length coded, base64; usually 20–100 KB), kind,
+algorithm version, confidence and an object's taps, never photo pixels. It is stored rather than
+regenerated so a saved edit renders identically everywhere; **Select again** reruns the same kind
+(and taps) and replaces the grid, keeping Edge, Feather and the rest. Grids larger than 300 000
+characters are reduced (×0.75 until they fit); a photo holds at most 1 000 000 characters of
+selections. Only local adjustments hold them (they are in the photo's own space, so they follow
+crop, rotation and perspective), and they are never synced to other photos. Edit documents are
+version 16; version 15 files read unchanged; older editors refuse version 16 files.
+
+**Honesty.** Each selection carries the models' confidence: Sky from how much of it is uncertain,
+Subject and Object from SAM's predicted quality and, for Subject, its agreement with the salient
+region (halved for a region spanning the whole width or height). Below 0.6–0.7 the panel says the
+outline may be wrong. "No sky was found" and "No clear subject" are reported, not guessed.
+
+**Quality** (21 published photos; no hand-drawn reference masks exist, so results were checked
+visually from overlays; `bench:selection --refs` scores IoU, boundary F and leakage against
+reference masks when there are some):
+
+- Sky found on 16, correctly absent on 5 (inside a library, a garage, under trees, water, surf).
+  Good on clear, cloudy, sunset and winter skies, around branches, wires, poles and roofs. Wrong:
+  dark bushes taken as night sky (Subaru at night, confidence 0.62); a car's rear window reflecting
+  the sky is included; sky through a chain-link fence (flagged, 0.18).
+- Subject right on 10 of the 18 photos where it found one: cars side-on, the motorcycle, a dome, a
+  spire, two birds, a stair tower. Wrong or partial on 8: a frame-filling car (only its tail
+  light), a car behind a fence (lights only), a car's rear with holes, one leak into a car behind, a
+  lamp plus part of a sofa, a lamp post's head, the sun between trunks (flagged, 0.55) and a sunset
+  band taken as the subject (0.9: not flagged). One Object tap each: the frame-filling car whole,
+  the lamp alone, the car behind the fence whole but with the fence; on two cars the first answer
+  was a part (a bumper, a decal), for Larger part to extend.
+- Not measured on people: the published photos have none, and none was used.
+
+**Speed and memory.** One WebAssembly thread on a desktop (i7 class, Node): Sky 2.3–2.9 s, Subject
+5.9–7.5 s (the SAM encoder 4.2 s, once per photo), then Background or an Object tap about 1 s.
+In the browsers (models from the local preview server, first use including loading), Sky /
+Subject / Background / Object tap: Chromium 5.7 / 14.1 / 2.3 / 1.1 s, WebKit 8.0 / 12.4 / 3.2 /
+0.9 s, iPhone 13 emulation 8.3 / 12.2 / 3.2 / 0.9 s, Pixel 7 emulation 5.6 / 11.4 / 2.3 / 1.1 s,
+no WebGL2 5.2 / 8.3 / 2.2 / 1.0 s, Firefox 39 / 64 / 22 / 2.6 s (its WebAssembly runs these
+models several times slower). Whole process with all models: about 650 MB (Node). Phones were
+emulated on a desktop CPU only; a phone's single thread will be slower.
+
+`npm run check:editor:selection` (Chromium, Firefox, WebKit, iPhone 13 and Pixel 7 emulation, no
+WebGL2) runs Cancel, Sky, a full-size export (darker inside, unchanged where the mask is 0), Subject,
+Background, Select again (identical grid), an Object tap, saving and reopening, and requires no
+request to leave the site.
 
 ## Retouch (Remove, Spot Heal and Clone Stamp)
 
