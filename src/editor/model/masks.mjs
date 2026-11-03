@@ -24,6 +24,14 @@
 // within themselves (a stroke's coverage is the most any of its segments gives a pixel);
 // overlapping strokes do.
 //
+// Selection components (Interval 23, segment/) are what Select Sky, Subject, Background or
+// Object approved: their coverage grid at analysis resolution (at most 2048 px, usually 1024) in
+// the photo's 'image' space, 8-bit, run-length coded and base64 (`data`), with the `kind`, the
+// algorithm `version` that made it, its `confidence` and, for an object, the tapped `points`.
+// The grid is stored rather than regenerated, so a saved edit renders the same in any browser.
+// `shift` (−1–1) moves its edge out or in, `feather` (0–1) softens it. Only local adjustments
+// (image space) hold them; they are specific to one photo and never synced to others.
+//
 // A local adjustment: { id, name, enabled, amount, mask, settings }. `settings` are Light,
 // Color, HSL and Detail values (relative to neutral, like a photo's); `amount` (0–1) scales how
 // strongly the mask applies them. Settings are reusable; masks are specific to one photo.
@@ -31,7 +39,8 @@
 import { ADJUSTMENTS, adjustmentSpec, clampAdjustment } from './adjustments.mjs';
 
 export const MASK_SPACES = Object.freeze(['image', 'canvas', 'layer']);
-export const COMPONENT_TYPES = Object.freeze(['brush', 'linear', 'radial']);
+export const COMPONENT_TYPES = Object.freeze(['brush', 'linear', 'radial', 'selection']);
+export const SELECTION_TYPES = Object.freeze(['sky', 'subject', 'background', 'object']);
 /** Groups a local adjustment can hold (Detail is rendered on the CPU). */
 export const LOCAL_GROUPS = Object.freeze(['light', 'color', 'hsl', 'detail']);
 
@@ -47,6 +56,12 @@ export const MASK_LIMITS = Object.freeze({
   // Brush radius and radial radii, in short edges of the mask's space.
   radius: Object.freeze([0.001, 2]),
   position: Object.freeze([-2, 3]),
+  // Selections: grid edge, encoded characters of one, and of all a photo holds (autosave and edit
+  // documents share browser storage of a few megabytes).
+  selectionEdge: 2048,
+  selectionChars: 400_000,
+  photoSelectionChars: 1_000_000,
+  selectionPoints: 16,
 });
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -144,6 +159,29 @@ export function normalizeComponent(input, budget = { points: MASK_LIMITS.photoPo
   if (input.type === 'linear') {
     return { ...common, x0: position(input.x0, 0.5), y0: position(input.y0, 0.2), x1: position(input.x1, 0.5), y1: position(input.y1, 0.6), feather: unit(input.feather, 1) };
   }
+  if (input.type === 'selection') {
+    const width = Number.isInteger(input.width) && input.width > 0 && input.width <= MASK_LIMITS.selectionEdge ? input.width : 0;
+    const height = Number.isInteger(input.height) && input.height > 0 && input.height <= MASK_LIMITS.selectionEdge ? input.height : 0;
+    const data = typeof input.data === 'string' && input.data.length <= MASK_LIMITS.selectionChars && /^[A-Za-z0-9+/]*={0,2}$/.test(input.data) ? input.data : '';
+    const budgetLeft = budget.selection ?? Infinity;
+    if (!SELECTION_TYPES.includes(input.kind) || !width || !height || !data || data.length > budgetLeft) return null;
+    if (budget.selection !== undefined) budget.selection -= data.length;
+    const points = (Array.isArray(input.points) ? input.points : []).slice(0, MASK_LIMITS.selectionPoints)
+      .filter((p) => Array.isArray(p) && [p[0], p[1]].every((v) => typeof v === 'number' && Number.isFinite(v)))
+      .map(([x, y, label]) => [position(x, 0), position(y, 0), label === 0 ? 0 : 1]);
+    return {
+      ...common,
+      kind: input.kind,
+      version: typeof input.version === 'string' && /^[\w.+/-]{1,40}$/.test(input.version) ? input.version : 'unknown',
+      width,
+      height,
+      data,
+      confidence: unit(input.confidence, 0),
+      shift: round(number(input.shift, [-1, 1], 0), 3),
+      feather: unit(input.feather, 0),
+      ...(points.length ? { points } : {}),
+    };
+  }
   if (input.type === 'radial') {
     return {
       ...common,
@@ -173,6 +211,8 @@ export function normalizeMask(input, space, budget = { points: MASK_LIMITS.photo
   const seen = new Set();
   const components = [];
   for (const entry of (Array.isArray(input.components) ? input.components : []).slice(0, MASK_LIMITS.components * 2)) {
+    // Selections are in the photo's own space: only local adjustments (image space) hold them.
+    if (entry?.type === 'selection' && space !== 'image') continue; // eslint-disable-line no-continue
     const component = normalizeComponent(entry, budget);
     if (!component || seen.has(component.id)) continue; // eslint-disable-line no-continue
     seen.add(component.id);
@@ -240,6 +280,7 @@ export const visibleLocals = (locals) => (locals ?? []).filter((local) => local.
 /** Label shown for a mask component. */
 export function componentLabel(component, index = 0) {
   if (component.name) return component.name;
+  if (component.type === 'selection') return { sky: 'Sky', subject: 'Subject', background: 'Background', object: 'Object' }[component.kind];
   return `${{ brush: 'Brush', linear: 'Linear gradient', radial: 'Radial gradient' }[component.type]} ${index + 1}`;
 }
 
@@ -280,6 +321,10 @@ export const clearStrokes = (mask, id) => ({ ...mask, components: mask.component
 export const createLinear = (id, patch = {}) => normalizeComponent({ id, type: 'linear', ...patch });
 export const createRadial = (id, patch = {}) => normalizeComponent({ id, type: 'radial', ...patch });
 export const createBrush = (id, patch = {}) => normalizeComponent({ id, type: 'brush', strokes: [], ...patch });
+/** A selection component from a segmentation result ({ kind, version, width, height, data, confidence, points? }), or null. */
+export const createSelection = (id, result, patch = {}) => normalizeComponent({ id, type: 'selection', ...result, ...patch });
+/** Characters of selection data a mask holds. */
+export const selectionChars = (mask) => (mask?.components ?? []).reduce((sum, c) => sum + (c.type === 'selection' ? c.data.length : 0), 0);
 
 export const createLocalAdjustment = (id, patch = {}) => normalizeLocalAdjustment({ id, name: '', ...patch, mask: patch.mask ?? createMask('image') });
 
@@ -287,12 +332,12 @@ export const createLocalAdjustment = (id, patch = {}) => normalizeLocalAdjustmen
 export const compactLocals = (locals) => locals.map((local) => ({ ...local }));
 
 /**
- * Local adjustments without their brush components (and without any that are left with no
- * component): what can be reused on another photo, since gradients are geometric and
- * strokes follow one photo's content.
+ * Local adjustments with only their gradients (and without any that are left with no
+ * component): what can be reused on another photo, since gradients are geometric while brush
+ * strokes and selections follow one photo's content.
  */
 export function gradientLocals(locals) {
-  return (locals ?? []).map((local) => ({ ...local, mask: { ...local.mask, components: local.mask.components.filter((c) => c.type !== 'brush') } }))
+  return (locals ?? []).map((local) => ({ ...local, mask: { ...local.mask, components: local.mask.components.filter((c) => c.type === 'linear' || c.type === 'radial') } }))
     .filter((local) => local.mask.components.length || local.mask.base === 'all' || local.mask.invert);
 }
 

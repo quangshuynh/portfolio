@@ -12,9 +12,13 @@
 //
 // Edges: a hard edge (hardness 1, feather 0) still fades over one canvas pixel (`map.scale`,
 // space pixels per canvas pixel), so it is antialiased at every render size.
+//
+// Selections (Interval 23, segment/selectionMask.mjs) are a coverage grid in the photo's space,
+// sampled bilinearly like any other shape; one that cannot be decoded covers nothing.
 
 import { IDENTITY3, invert3, project } from './geometry.mjs';
 import { matrixScale } from './layerTransform.mjs';
+import { prepareSelection, selectionAt, selectionSpaceBox } from '../segment/selectionMask.mjs';
 
 const smooth = (t) => t * t * (3 - 2 * t);
 const code8 = (v) => Math.min(255, Math.max(0, Math.floor(v * 255 + 0.5)));
@@ -385,6 +389,8 @@ function componentCoverage(component, map, region) {
   const m = map.matrix;
   const cov = new Float32Array((region.x1 - region.x0) * (region.y1 - region.y0));
   const radial = component.type === 'radial' ? prepareRadial(component, map) : null;
+  const selection = component.type === 'selection' ? prepareSelection(component) : null;
+  if (component.type === 'selection' && !selection) return cov;
   let i = 0;
   for (let y = region.y0; y < region.y1; y += 1) {
     const cy = y + 0.5;
@@ -393,7 +399,7 @@ function componentCoverage(component, map, region) {
       const w = m[6] * cx + m[7] * cy + m[8];
       const sx = (m[0] * cx + m[1] * cy + m[2]) / w;
       const sy = (m[3] * cx + m[4] * cy + m[5]) / w;
-      cov[i] = radial ? radialAt(radial, sx, sy) : linearAt(component, map, sx, sy);
+      cov[i] = radial ? radialAt(radial, sx, sy) : selection ? selectionAt(selection, map, sx, sy) : linearAt(component, map, sx, sy);
     }
   }
   return cov;
@@ -425,6 +431,8 @@ export function maskRows(mask, map, width, y0, y1, { x0 = 0, out = new Uint8Clam
       continue; // eslint-disable-line no-continue
     }
     const radial = component.type === 'radial' ? prepareRadial(component, map) : null;
+    const selection = component.type === 'selection' ? prepareSelection(component) : null;
+    if (component.type === 'selection' && !selection && !invert) continue; // eslint-disable-line no-continue
     let i = 0;
     for (let y = y0; y < y1; y += 1) {
       const cy = y + 0.5;
@@ -433,7 +441,7 @@ export function maskRows(mask, map, width, y0, y1, { x0 = 0, out = new Uint8Clam
         const w = m[6] * cx + m[7] * cy + m[8];
         const sx = (m[0] * cx + m[1] * cy + m[2]) / w;
         const sy = (m[3] * cx + m[4] * cy + m[5]) / w;
-        const raw = radial ? radialAt(radial, sx, sy) : linearAt(component, map, sx, sy);
+        const raw = radial ? radialAt(radial, sx, sy) : component.type === 'selection' ? (selection ? selectionAt(selection, map, sx, sy) : 0) : linearAt(component, map, sx, sy);
         const c = (invert ? 1 - raw : raw) * opacity;
         acc[i] = subtract ? acc[i] * (1 - c) : acc[i] + c - acc[i] * c;
       }
@@ -472,6 +480,10 @@ export function maskBounds(mask, map, size) {
         const r = Math.max(...pts.map(([, , radius]) => radius));
         add({ x0: Math.min(...pts.map(([x]) => x)) - r, y0: Math.min(...pts.map(([, y]) => y)) - r, x1: Math.max(...pts.map(([x]) => x)) + r, y1: Math.max(...pts.map(([, y]) => y)) + r });
       }
+    } else if (c.type === 'selection') {
+      const prep = prepareSelection(c);
+      const spaceBox = prep && selectionSpaceBox(prep, map);
+      if (spaceBox) add(spaceBox);
     } else if (c.type === 'radial') {
       const r = prepareRadial(c, map);
       const ex = Math.hypot(r.rx * r.cos, r.ry * r.sin);

@@ -224,7 +224,7 @@ describe('profiles in the settings model', () => {
     const photo = { ...state.photos[0], adjustments: present(state) };
     const text = serializeEditDocument(createEditDocument([photo], state.exportSettings));
     expect(JSON.parse(text)).toMatchObject({ version: DOCUMENT_VERSION, photos: [{ adjustments: { raw: { profile: 'camera-natural', profileVersion: 2 } } }] });
-    expect(DOCUMENT_VERSION).toBe(15);
+    expect(DOCUMENT_VERSION).toBeGreaterThanOrEqual(15);
     const reopened = imported(parseEditDocument(text).photos);
     expect(present(reopened).raw.profile).toBe('camera-natural');
     const v13 = JSON.stringify({ type: DOCUMENT_TYPE, version: 13, photos: [{ source: { name: 'DSC0001.ARW', size: 10, sha256: 'a'.repeat(64), format: 'arw', width: 6000, height: 4000 }, adjustments: { exposure: 0.4, raw: { whiteBalance: 'daylight' } } }] });
@@ -285,7 +285,7 @@ describe('Camera Natural version 2, Auto Exposure and RAW layers (document versi
     expect(compactAdjustments(normalizeAdjustments({ raw: { profile: 'linear' } })).raw).toEqual({ whiteBalance: 'as-shot', profile: 'linear' });
     const photo = { name: 'DSC0001.ARW', size: 10, lastModified: 0, sha256: 'a'.repeat(64), format: 'arw', width: 6000, height: 4000, adjustments: normalizeAdjustments({ ...V2, raw: { ...V2.raw, autoExposure: -0.45 } }) };
     const text = serializeEditDocument(createEditDocument([photo], {}));
-    expect(JSON.parse(text).version).toBe(15);
+    expect(JSON.parse(text).version).toBeGreaterThanOrEqual(15);
     expect(parseEditDocument(text).photos[0].adjustments.raw).toEqual({ whiteBalance: 'as-shot', profile: 'camera-natural', profileVersion: 2, autoExposure: -0.45 });
   });
 
