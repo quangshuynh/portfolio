@@ -1,5 +1,5 @@
 // JSON API of the local CMS server. Every route is behind guardRequest (session.mjs).
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { DERIVATIVES_DIRECTORY, readGeneratedManifest } from '../../scripts/photography-catalog-files.mjs';
 import { serializeCatalog } from '../../scripts/photography-catalog.mjs';
@@ -100,6 +100,8 @@ export function createApi({ repoDir, workspaceDir, libraryDir = null, git, githu
       previewIds: workspace.previewManifest.map(({ id }) => id),
       // Extracted EXIF and sizes, for display: repository records, then uploads.
       generated: Object.fromEntries([...(await readGeneratedManifest()), ...workspace.previewManifest].map((entry) => [entry.id, entry])),
+      // A token per served image file that changes with its content, for /api/images URLs (?v=).
+      imageVersions: await imageVersions(workspace.catalog.photographs.map(({ id }) => id)),
       github: { available: Boolean(github) && !offline, source: githubSource, offline },
       workspaceDir,
     };
@@ -190,6 +192,21 @@ export function createApi({ repoDir, workspaceDir, libraryDir = null, git, githu
       return state();
     }),
   };
+
+  // The file /api/images/<name> serves (same lookup order as serveImage): its size and
+  // modification time, so a replaced derivative (an upload, a rebase) gets a new URL and the
+  // dashboard never reuses the old pixels; no-store still keeps it out of the HTTP cache.
+  async function imageVersions(ids) {
+    const entries = await Promise.all(ids.flatMap((id) => ['gallery', 'viewer'].map(async (size) => {
+      const name = `${id}-${size}.jpg`;
+      for (const directory of [DERIVATIVES_DIRECTORY, paths(workspaceDir).previewDir]) {
+        const info = await stat(path.join(directory, name)).catch(() => null);
+        if (info?.isFile()) return [name, `${Math.round(info.mtimeMs).toString(36)}${info.size.toString(36)}`];
+      }
+      return null;
+    })));
+    return Object.fromEntries(entries.filter(Boolean));
+  }
 
   async function serveImage(response, name) {
     if (!IMAGE_NAME.test(name)) throw new HttpError(400, 'bad-name', 'Not a derivative name.');

@@ -103,6 +103,9 @@ export default function WatermarkView({ onNotice, onChanged }) {
   const [chosen, setChosen] = useState(() => new Set());
   const [positions, setPositions] = useState({});
   const [reports, setReports] = useState({});
+  // Placement reports by versioned image URL and settings: a workspace save re-runs the pass
+  // below, which then reads only photographs whose image or settings changed.
+  const reportCache = useRef(new Map());
   const [showMark, setShowMark] = useState(true);
   const [confirming, setConfirming] = useState(null);
   const [reviewed, setReviewed] = useState(false);
@@ -149,10 +152,16 @@ export default function WatermarkView({ onNotice, onChanged }) {
       for (const photo of photos) {
         if (!alive) return;
         const settings = settingsFor(photo.id);
+        const key = `${imageUrl(photo.id, 'gallery')}|${JSON.stringify(settings)}`;
         try {
-          const pixels = await loadPixels(imageUrl(photo.id, 'gallery'));
-          const result = placementReport(pixels, settings, { frame: nominalFrame(pixels.width, pixels.height) });
-          if (alive) setReports((current) => ({ ...current, [photo.id]: result }));
+          let result = reportCache.current.get(key);
+          if (!result) {
+            const pixels = await loadPixels(imageUrl(photo.id, 'gallery'));
+            result = placementReport(pixels, settings, { frame: nominalFrame(pixels.width, pixels.height) });
+            if (reportCache.current.size > 500) reportCache.current.clear();
+            reportCache.current.set(key, result);
+          }
+          if (alive) setReports((current) => (current[photo.id] === result ? current : { ...current, [photo.id]: result }));
         } catch { /* shown as no preview */ }
       }
     })();

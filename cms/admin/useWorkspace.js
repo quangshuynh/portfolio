@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { workspaceProblems } from '../lib/catalog-ops.mjs';
 import { summarizeChanges } from '../lib/changes.mjs';
-import { api } from './api.js';
+import { api, setImageVersions } from './api.js';
 
 const BACKUP_KEY = 'photography-cms-unsaved';
 const SAVE_DELAY_MS = 400;
@@ -34,6 +34,7 @@ export function useWorkspace({ onSessionExpired }) {
   const serverRef = useRef(null);
 
   const accept = useCallback((data) => {
+    if (data.imageVersions) setImageVersions(data.imageVersions);
     setServer(data);
     serverRef.current = data;
     revision.current = data.revision;

@@ -1,6 +1,8 @@
 // @vitest-environment node
 // The CMS server's security boundary and API, over real HTTP on the loopback interface.
+import { appendFile } from 'node:fs/promises';
 import { request as httpRequest } from 'node:http';
+import path from 'node:path';
 import { photograph, fixtureRepo } from './test-helpers.mjs';
 import { createSessions } from './lib/session.mjs';
 import { startCmsServer } from './server.mjs';
@@ -179,6 +181,20 @@ describe('uploads and images', () => {
     expect(image.status).toBe(200);
     expect(image.headers['content-type']).toBe('image/jpeg');
     expect(image.headers['cache-control']).toBe('private, no-store');
+
+    // Revision-aware URLs: the workspace state carries a token per served file, which changes
+    // when the file does; the image stays private, uncacheable and behind the session.
+    const versionOf = async () => (await call('GET', '/api/workspace', { cookie })).json.imageVersions['DSC00001-gallery.jpg'];
+    const token = await versionOf();
+    expect(token).toMatch(/^[0-9a-z]+$/);
+    const versioned = await call('GET', `/api/images/DSC00001-gallery.jpg?v=${token}`, { cookie });
+    expect(versioned.status).toBe(200);
+    expect(versioned.headers['cache-control']).toBe('private, no-store');
+    expect(versioned.headers.etag).toBeUndefined();
+    expect((await call('GET', `/api/images/DSC00001-gallery.jpg?v=${token}`)).status).not.toBe(200);
+    expect(await versionOf()).toBe(token);
+    await appendFile(path.join(fixture.workspace, 'preview', 'generated', 'DSC00001-gallery.jpg'), Buffer.alloc(64));
+    expect(await versionOf()).not.toBe(token);
   }, 60_000);
 
   test('image names cannot escape the derivative folders', async () => {

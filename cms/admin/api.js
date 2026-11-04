@@ -78,7 +78,17 @@ export const treatments = {
   removeApproved: (id, revision) => request('POST', editorPath(id, 'remove-approved'), { revision }),
 };
 
-export const imageUrl = (id, size = 'gallery') => `/api/images/${encodeURIComponent(`${id}-${size}.jpg`)}`;
+// Version tokens from the workspace state (imageVersions): a changed file gets a new URL, so
+// neither an <img> nor the pixel cache shows the previous one.
+let imageVersions = {};
+export function setImageVersions(versions) {
+  imageVersions = versions ?? {};
+}
+export const imageUrl = (id, size = 'gallery') => {
+  const name = `${id}-${size}.jpg`;
+  const version = imageVersions[name];
+  return `/api/images/${encodeURIComponent(name)}${version ? `?v=${encodeURIComponent(version)}` : ''}`;
+};
 
 /** Uploads one file with progress; resolves to the server's response. */
 export function uploadFile(file, onProgress) {
