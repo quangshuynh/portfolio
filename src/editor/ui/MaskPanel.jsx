@@ -5,6 +5,7 @@ import {
 } from '../model/masks.mjs';
 import { layerLabel } from '../model/layers.mjs';
 import { NumberField, OpacityRange } from './LayersPanel';
+import { WARN_BELOW } from '../segment/models.mjs';
 
 const TOOLS = [['brush', 'Brush'], ['linear', 'Linear'], ['radial', 'Radial']];
 const TYPE_LABEL = { brush: 'Brush', linear: 'Linear', radial: 'Radial' };
@@ -326,9 +327,9 @@ export default function MaskPanel({ compact = false, onClose,
                 <OpacityRange value={component.opacity} disabled={edit} onPreview={(v) => onPreviewMask(updateComponent(mask, component.id, { opacity: v }))} onApply={(v) => patchComponent({ opacity: v }, 'opacity')} onCommit={onCommit} />
                 {component.type === 'selection' && (
                   <>
-                    <p className="pe-note" data-confidence={component.confidence < 0.6 ? 'low' : undefined}>
-                      Selected automatically on this device · confidence {Math.round(component.confidence * 100)}%
-                      {component.confidence < 0.6 ? '. The outline may miss parts or include others: check it with the overlay and correct it with a brush or Subtract.' : ''}
+                    <p className="pe-note" data-confidence={component.confidence < (WARN_BELOW[component.kind] ?? 0.6) ? 'low' : undefined}>
+                      Selected automatically on this device · confidence {Math.round(component.confidence * 100)}% (an estimate, not a probability)
+                      {component.confidence < (WARN_BELOW[component.kind] ?? 0.6) ? '. The outline may miss parts or include others: check it with the overlay and correct it with a brush or Subtract.' : ''}
                     </p>
                     <NumberField label="Edge" unit="−100 contracts, +100 expands" value={Math.round(component.shift * 100)} min={-100} max={100} step={5} disabled={edit} onApply={(v) => patchComponent({ shift: v / 100 }, 'shift')} />
                   </>
@@ -356,6 +357,10 @@ export default function MaskPanel({ compact = false, onClose,
                 <div className="pe-layers__actions">
                   {component.type === 'brush' && <button type="button" className="pe-text-button" disabled={edit || !component.strokes.length} onClick={() => setMask(clearStrokes(mask, component.id))}>Clear strokes</button>}
                   {component.type === 'selection' && selection && <button type="button" className="pe-text-button" disabled={edit || busy} onClick={() => selection.regenerate(component)} title={selectTitle(component.kind)}>Select again</button>}
+                  {component.type === 'selection' && selection && (component.kind === 'subject' || component.kind === 'background') && (() => {
+                    const known = selection.candidateOf(component.id);
+                    return <button type="button" className="pe-text-button" disabled={edit || busy || known?.candidates === 1} onClick={() => selection.nextCandidate(component)} title="Show the next of the other answers the models found">Next candidate{known?.candidates > 1 ? ` (${known.candidate + 1} of ${known.candidates})` : ''}</button>;
+                  })()}
                   <button type="button" className="pe-text-button" disabled={edit || mask.components.length >= MASK_LIMITS.components} onClick={() => { const id = newId(component.type); setMask(duplicateComponent(mask, component.id, id)); onSelect(id); }}>Duplicate</button>
                   <button type="button" className="pe-text-button pe-text-button--danger" disabled={edit} onClick={() => { setMask(removeComponent(mask, component.id)); onSelect(null); }}>Delete</button>
                 </div>
