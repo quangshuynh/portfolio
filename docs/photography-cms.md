@@ -216,7 +216,7 @@ The **Watermark** view uses the editor's own renderer (no CMS renderer).
   or **Needs regeneration** (the treatment changed: edits, crop, geometry or
   watermark settings) gets a watermark draft from QuangEdit, one photograph at a
   time in an off-screen frame (`WatermarkAutopilot.jsx`, the queue below in
-  `auto` mode); progress, **Stop** (after this photograph) and **Cancel now**
+  `auto` mode); progress, **Stop** (after this photograph; drafting pauses until the CMS is reloaded) and **Cancel now**
   (unloads the frame at once; drafting pauses until the CMS is reloaded) sit at
   the bottom left, and a reload or restart resumes. Idle planning runs every 30 s
   while the tab is visible and measures each photograph's placement once per
