@@ -50,7 +50,11 @@ const PHOTOS = [
 const slug = (record) => published.get(record.id).slug;
 
 const near = (a, b, tolerance = 2) => Math.abs(a - b) <= tolerance;
-const measure = (page) => page.evaluate(() => {
+// Geometry is read once the image's CSS transitions (transform 80–200 ms) have finished: a fixed
+// sleep sampled mid-transition on a loaded machine (seen in WebKit on main and this branch).
+const settled = (page) => page.waitForFunction(() => !document.getAnimations().some((animation) => animation instanceof CSSTransition && animation.playState === 'running'), null, { timeout: 5_000, polling: 'raf' }).catch(() => {});
+const measure = async (page) => { await settled(page); return readLayout(page); };
+const readLayout = (page) => page.evaluate(() => {
   const rect = (element) => { const { left, top, width, height } = element.getBoundingClientRect(); return { left, top, width, height, right: left + width, bottom: top + height }; };
   const stage = document.querySelector('.photography-lightbox-image-wrap');
   const image = stage.querySelector('img');
