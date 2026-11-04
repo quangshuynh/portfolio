@@ -263,8 +263,7 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
   const backToAbout = useCallback((event) => {
     event.preventDefault();
     const nextState = { ...(window.history.state ?? {}), restorePhotographyModal: true, returnSection: 'beyond-software' };
-    window.history.pushState(nextState, '', appHref('/about'));
-    window.dispatchEvent(new Event('portfolio:locationchange'));
+    navigate(appHref('/about'), { state: nextState });
   }, []);
 
   // The URL hash belongs to the photo viewer, so in-page jumps scroll instead of linking.

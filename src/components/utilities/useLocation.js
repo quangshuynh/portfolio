@@ -1,25 +1,21 @@
 import { useEffect, useState } from 'react';
-import { locationChangeEvent } from '../../util/navigation';
+import { currentLocation, discardPendingNavigation, locationChangeEvent } from '../../util/navigation';
 
 export default function useLocation() {
-  const [location, setLocation] = useState(() => ({
-    pathname: window.location.pathname,
-    search: window.location.search,
-    hash: window.location.hash,
-  }));
+  const [location, setLocation] = useState(currentLocation);
 
   useEffect(() => {
-    const updateLocation = () => setLocation({
-      pathname: window.location.pathname,
-      search: window.location.search,
-      hash: window.location.hash,
-    });
-    window.addEventListener('popstate', updateLocation);
-    window.addEventListener('hashchange', updateLocation);
+    const updateLocation = () => setLocation(currentLocation());
+    const browserNavigated = () => {
+      discardPendingNavigation();
+      updateLocation();
+    };
+    window.addEventListener('popstate', browserNavigated);
+    window.addEventListener('hashchange', browserNavigated);
     window.addEventListener(locationChangeEvent, updateLocation);
     return () => {
-      window.removeEventListener('popstate', updateLocation);
-      window.removeEventListener('hashchange', updateLocation);
+      window.removeEventListener('popstate', browserNavigated);
+      window.removeEventListener('hashchange', browserNavigated);
       window.removeEventListener(locationChangeEvent, updateLocation);
     };
   }, []);
