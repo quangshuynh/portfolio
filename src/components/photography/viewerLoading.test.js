@@ -56,8 +56,8 @@ test('prefetch follows the direction of travel and the network', () => {
   const neighbours = { previous: a, next: c };
   expect(prefetchPlan(neighbours, 1, 'normal', pixels, none)).toEqual(['/c-medium.jpg', '/a-medium.jpg']);
   expect(prefetchPlan(neighbours, -1, 'normal', pixels, none)).toEqual(['/a-medium.jpg', '/c-medium.jpg']);
-  // Slow or Data Saver: only the photograph in the direction of travel, at the first size.
-  expect(prefetchPlan(neighbours, 1, 'slow', pixels, none)).toEqual(['/c-medium.jpg']);
+  // Slow: both at the first size, the direction of travel first; Data Saver: only that one.
+  expect(prefetchPlan(neighbours, 1, 'slow', pixels, none)).toEqual(['/c-medium.jpg', '/a-medium.jpg']);
   expect(prefetchPlan(neighbours, -1, 'save', pixels, none)).toEqual(['/a-medium.jpg']);
   // Fast: the full-size files.
   expect(prefetchPlan(neighbours, 1, 'fast', pixels, none)).toEqual(['/c-viewer.jpg', '/a-viewer.jpg']);
@@ -66,6 +66,6 @@ test('prefetch follows the direction of travel and the network', () => {
   expect(prefetchPlan(neighbours, 1, 'normal', pixels, loaded)).toEqual([]);
   expect(prefetchPlan(neighbours, 1, 'fast', pixels, loaded)).toEqual(['/c-viewer.jpg']);
   // At the ends of the collection.
-  expect(prefetchPlan({ previous: null, next: b }, -1, 'slow', pixels, none)).toEqual(['/b-medium.jpg']);
+  expect(prefetchPlan({ previous: null, next: b }, -1, 'save', pixels, none)).toEqual(['/b-medium.jpg']);
   expect(prefetchPlan({ previous: null, next: null }, 1, 'fast', pixels, none)).toEqual([]);
 });

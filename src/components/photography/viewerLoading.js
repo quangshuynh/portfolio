@@ -38,8 +38,8 @@ export function isWiderSource(photograph, candidate, current) {
 }
 
 /**
- * Neighbour files to prefetch, most likely next first: the one in the direction of travel, and
- * the other one too unless the network is slow. Files already loaded (at either size) are left
+ * Neighbour files to prefetch, most likely next first: the one in the direction of travel, then
+ * the other one unless Data Saver is on (slow links download them one at a time). Files already loaded (at either size) are left
  * out; a fast network prefetches the full-size files.
  * :param neighbours: { previous, next } photographs (either may be null)
  * :param direction: 1 after moving forward (or on opening), -1 after moving back
@@ -47,7 +47,7 @@ export function isWiderSource(photograph, candidate, current) {
  */
 export function prefetchPlan({ previous, next }, direction, tier, pixelsFor, isLoaded) {
   const ordered = direction < 0 ? [previous, next] : [next, previous];
-  const wanted = ordered.filter(Boolean).slice(0, tier === 'save' || tier === 'slow' ? 1 : 2);
+  const wanted = ordered.filter(Boolean).slice(0, tier === 'save' ? 1 : 2);
   return wanted.flatMap((photograph) => {
     const { step, full } = photographTiers(photograph, pixelsFor(photograph));
     if (isLoaded(full) || (tier !== 'fast' && isLoaded(step))) return [];

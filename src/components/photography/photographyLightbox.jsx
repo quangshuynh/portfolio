@@ -162,6 +162,8 @@ export function resetPhotographyPreloadsForTests() {
   loadedSources.clear();
   prefetches.forEach((image) => image.removeAttribute('src'));
   prefetches.clear();
+  prefetchQueue = [];
+  prefetching.clear();
 }
 
 /** The device pixels a photograph needs fitted into the stage (or the window, before layout). */
@@ -185,26 +187,60 @@ export function loadedPlaceholder(photograph) {
 }
 
 /**
- * Prefetches the neighbours' files at low priority and cancels prefetches no longer wanted,
- * so rapid navigation never queues a backlog in front of the photograph being shown.
+ * Whether the file is already loaded: by the viewer, or by an <img> on the page (the hero, a
+ * featured or archive frame), so opening a photograph reuses what the page already has.
  */
-export function prefetchViewerSources(wanted) {
-  const keep = new Set(wanted.filter(Boolean));
-  prefetches.forEach((image, src) => {
-    if (keep.has(src)) return;
-    if (!image.complete) image.removeAttribute('src');
-    prefetches.delete(src);
-  });
-  keep.forEach((src) => {
-    if (loadedSources.has(src) || prefetches.has(src)) return;
+export function isSourceLoaded(src) {
+  if (loadedSources.has(src)) return true;
+  const absolute = new URL(src, document.baseURI).href;
+  const shown = [...document.querySelectorAll('main img')].some((image) => image.complete && image.naturalWidth > 0 && image.currentSrc === absolute);
+  if (shown) loadedSources.add(src);
+  return shown;
+}
+
+// Wanted prefetches in order, and how many may download at once.
+let prefetchQueue = [];
+let prefetchConcurrency = 2;
+const prefetching = new Set(); // started and not yet loaded, failed or cancelled
+
+function pumpPrefetches() {
+  let free = prefetchConcurrency - prefetching.size;
+  for (const src of prefetchQueue) {
+    if (free <= 0) return;
+    if (loadedSources.has(src) || prefetches.has(src)) continue;
     const image = new Image();
     image.fetchPriority = 'low';
     image.decoding = 'async';
-    image.onload = () => loadedSources.add(src);
+    image.onload = () => { prefetching.delete(src); loadedSources.add(src); pumpPrefetches(); };
+    image.onerror = () => { prefetching.delete(src); pumpPrefetches(); };
+    prefetching.add(src);
     image.src = src;
     prefetches.set(src, image);
-    while (prefetches.size > PREFETCH_LIMIT) prefetches.delete(prefetches.keys().next().value);
+    while (prefetches.size > PREFETCH_LIMIT) {
+      const oldest = prefetches.keys().next().value;
+      if (prefetching.delete(oldest)) prefetches.get(oldest).removeAttribute('src');
+      prefetches.delete(oldest);
+    }
+    free -= 1;
+  }
+}
+
+/**
+ * Prefetches the neighbours' files at low priority, in order, at most `concurrency` at a time
+ * (1 on slow links, so the likeliest next photograph gets the bandwidth), and cancels prefetches
+ * no longer wanted, so rapid navigation never queues a backlog in front of the one shown.
+ */
+export function prefetchViewerSources(wanted, { concurrency = 2 } = {}) {
+  prefetchQueue = [...new Set(wanted.filter(Boolean))];
+  prefetchConcurrency = concurrency;
+  const keep = new Set(prefetchQueue);
+  prefetches.forEach((image, src) => {
+    if (keep.has(src)) return;
+    if (prefetching.has(src)) image.removeAttribute('src');
+    prefetching.delete(src);
+    prefetches.delete(src);
   });
+  pumpPrefetches();
 }
 
 export default function PhotographyLightbox({ photograph, collection, onNavigate, onClose, returnFocusRef }) {
@@ -258,7 +294,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   const neededPixels = viewerDevicePixels(photograph, ...stageBox(), Math.max(1, scale));
   const networkTier = viewerNetworkTier();
   if (sourceRef.current.id !== photograph.id) {
-    sourceRef.current = { id: photograph.id, src: initialViewerSource(photograph, neededPixels, networkTier, (src) => loadedSources.has(src)) };
+    sourceRef.current = { id: photograph.id, src: initialViewerSource(photograph, neededPixels, networkTier, isSourceLoaded) };
   }
   const displaySrc = sourceRef.current.src;
   const targetSrc = photographTiers(photograph, neededPixels).full;
@@ -425,8 +461,9 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   useEffect(() => {
     if (shownId !== photograph.id) return;
     const [width, height] = stageBox();
-    prefetchViewerSources(prefetchPlan({ previous, next }, directionRef.current.direction, viewerNetworkTier(),
-      (adjacent) => viewerDevicePixels(adjacent, width, height), (src) => loadedSources.has(src)));
+    const tier = viewerNetworkTier();
+    prefetchViewerSources(prefetchPlan({ previous, next }, directionRef.current.direction, tier,
+      (adjacent) => viewerDevicePixels(adjacent, width, height), isSourceLoaded), { concurrency: tier === 'normal' || tier === 'fast' ? 2 : 1 });
   }, [shownId, photograph.id, previous, next]);
 
   // The full-size file, once the photograph has stayed shown long enough (at once when zoomed):

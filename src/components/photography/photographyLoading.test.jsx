@@ -125,6 +125,28 @@ test('obsolete prefetches are cancelled and the prefetch set stays bounded', () 
   expect(created.filter((entry) => entry.getAttribute('src'))).toHaveLength(0);
 });
 
+test('on a slow link prefetches download one at a time, in order', () => {
+  prefetchViewerSources(['/next.jpg', '/previous.jpg'], { concurrency: 1 });
+  expect(created.map((entry) => entry.getAttribute('src'))).toEqual(['/next.jpg']);
+  created[0].onload();
+  expect(created.map((entry) => entry.getAttribute('src'))).toEqual(['/next.jpg', '/previous.jpg']);
+  // A new plan before the second starts replaces it.
+  prefetchViewerSources(['/other.jpg'], { concurrency: 1 });
+  expect(created[1].getAttribute('src')).toBeNull();
+});
+
+test('opening a photograph reuses a full-size file the page already shows (the hero)', async () => {
+  const { isSourceLoaded } = await import('./photographyLightbox');
+  const main = document.body.appendChild(document.createElement('main'));
+  const image = main.appendChild(document.createElement('img'));
+  Object.defineProperties(image, { complete: { value: true }, naturalWidth: { value: 2200 }, currentSrc: { value: new URL('/hero-viewer.jpg', document.baseURI).href } });
+  expect(isSourceLoaded('/hero-viewer.jpg')).toBe(true);
+  expect(isSourceLoaded('/hero-medium.jpg')).toBe(false);
+  main.remove();
+  // Remembered once seen.
+  expect(isSourceLoaded('/hero-viewer.jpg')).toBe(true);
+});
+
 test('rapid next/previous shows the last photograph, ignores stale loads and offers a loaded placeholder', async () => {
   const start = ordered[3];
   window.history.replaceState({}, '', photographyHref(start.slug));
