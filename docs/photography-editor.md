@@ -1047,7 +1047,10 @@ decoder (one mask fell to IoU 0.10) and encoder (0.54, Interval 23). Session opt
 pattern, arena, optimisation level) did not lower memory: U²-Net's 320 × 320 intermediates dominate,
 and a WebAssembly heap never shrinks, so the peak is about the largest single run (Sky ≈ 470 MB in
 Node, all models ≈ 580 MB), freed only when the worker ends: 90 s after the last selection, on
-Cancel, after a failure, or at once when the page is hidden. A selection that sends nothing for
+Cancel, after a failure, or at once when the page is hidden. On phones and devices reporting
+≤ 4 GB (`constrainedDevice`), sessions the current kind does not use are released first (Interval
+23.2), so their space in the heap is reused: the peak stays near the largest kind instead of all
+models together; a released model returns from the HTTP cache. A selection that sends nothing for
 180 s is ended with an error (a suspended or dead worker); the status shows elapsed seconds and,
 after 20 s, that some browsers run these models slowly.
 

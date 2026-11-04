@@ -15,6 +15,7 @@ read it before changing projects or project assets.
 | `src/components/sections/projectMedia.jsx` | Logo/screenshot gallery; `homeLightbox.jsx` is the image trigger, fallback, and viewer. |
 | `scripts/asset-refresh.mjs` | Logic for `npm run assets:refresh` (CLI: `refresh-project-assets.mjs`). |
 | `scripts/check-project-assets.mjs` | `npm run check:assets`: validation plus network probe of every remote image. |
+| `scripts/photography-responsive.mjs` | Build-time 1600 px photography derivative (from the viewer file, cached in `node_modules/.cache`); `npm run measure:photography` measures page, viewer and editor loading. |
 | `scripts/prepare-site-images.mjs` | `npm run prepare:images`: WebP derivatives in `src/assets/optimized`. |
 | `docs/project-assets.md` | Data model, caching rationale, screenshot guidelines. |
 | `src/data/photography.catalog.json` | Photography catalog: every photograph, published or draft, in curated order. Schema and workflows in `docs/photography-catalog.md`; logic in `scripts/photography-catalog.mjs`. |
