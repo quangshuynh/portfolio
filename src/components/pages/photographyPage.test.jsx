@@ -747,3 +747,36 @@ test('the archive is laid out in justified rows: every photograph once, in order
     });
   });
 });
+
+// WebKit throws a SecurityError past 100 history writes per 10 s (a held arrow key or
+// fast swiping reaches it). The viewer must keep stepping and closing; the URL catches up.
+test('the viewer still steps and closes when the browser refuses history writes', async () => {
+  const orderedPhotographs = sortPhotographs(photographs);
+  const [firstPhotograph, secondPhotograph] = orderedPhotographs;
+
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole('link', { name: `Open photograph: ${firstPhotograph.caption}` }));
+  expect(window.location.hash).toBe(`#${firstPhotograph.slug}`);
+
+  const refuse = () => {
+    throw new DOMException('Attempt to use history.pushState() more than 100 times per 10 seconds', 'SecurityError');
+  };
+  const push = vi.spyOn(window.history, 'pushState').mockImplementation(refuse);
+  const replace = vi.spyOn(window.history, 'replaceState').mockImplementation(refuse);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
+  expect(screen.getByRole('dialog', { name: new RegExp(secondPhotograph.caption, 'i') })).toBeInTheDocument();
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(document.querySelector('.photography-page')).not.toHaveAttribute('inert');
+  await waitFor(() => expect(document.documentElement).not.toHaveClass('overlay-open'));
+  expect(window.location.hash).toBe(`#${firstPhotograph.slug}`);
+
+  // Once the browser accepts writes again, the address bar shows the closed gallery.
+  push.mockRestore();
+  replace.mockRestore();
+  await waitFor(() => expect(window.location.hash).toBe(''), { timeout: 3000 });
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
