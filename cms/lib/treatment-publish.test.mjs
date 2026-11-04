@@ -7,6 +7,9 @@ import { execFileSync } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { createEditDocument, serializeEditDocument } from '../../src/editor/model/editDocument.mjs';
 import { neutralAdjustments } from '../../src/editor/model/adjustments.mjs';
+import { encodeCodes } from '../../src/editor/segment/analysis.mjs';
+import { WATERMARK_DEFAULTS } from '../../src/editor/watermark/watermark.mjs';
+import { watermarkStatus } from './watermark-rules.mjs';
 import { fakeGitHub, fakeRaw, fixtureRepo, photograph } from '../test-helpers.mjs';
 import { addDraft, setStatus } from './catalog-ops.mjs';
 import { createGit } from './git.mjs';
@@ -96,6 +99,40 @@ test('Interval 22 treatments keep their hash; Auto Exposure, a profile version o
   expect(changed({ raw: { autoExposure: 0.4 } })).not.toBe(before.documentHash);
   expect(changed({ raw: { profileVersion: 2 } })).not.toBe(before.documentHash);
   expect(changed({ layer: { rawProfile: { profile: 'camera-natural', profileVersion: 2 } } })).not.toBe(before.documentHash);
+});
+
+test('Interval 23 selections: kept in the treatment; changing one is a new draft, the approval stands', async () => {
+  const grid = Uint8Array.from({ length: 40 * 30 }, (_, i) => (Math.floor(i / 40) < 12 ? 255 : 0));
+  const sky = { id: 'sky1', type: 'selection', kind: 'sky', version: 'sky-u2net-int8/1', width: 40, height: 30, data: encodeCodes(grid), confidence: 0.95 };
+  const local = (patch = {}) => [{ id: 'l1', name: 'Sky', settings: { exposure: -0.7 }, mask: { components: [{ ...sky, ...patch }] } }];
+  const source = { name: 'a.jpg', size: 10, sha256: 'a'.repeat(64), format: 'jpeg' };
+  // A treatment saved before selections existed keeps its hash under the version 16 editor.
+  const v15 = JSON.stringify({ ...JSON.parse(document(source, { exposure: 0.5 })), version: 15 });
+  expect(canonicalDocument(v15).documentHash).toBe(canonicalDocument(document(source, { exposure: 0.5 })).documentHash);
+  const withSky = canonicalDocument(document(source, { exposure: 0.5, local: local() }));
+  expect(withSky.document.photos[0].adjustments.local[0].mask.components[0]).toMatchObject({ type: 'selection', kind: 'sky', data: sky.data });
+  expect(canonicalDocument(document(source, { exposure: 0.5, local: local({ shift: 0.2 }) })).documentHash).not.toBe(withSky.documentHash);
+
+  const dir = fixture.workspace;
+  let treatment = await treat('alpha');
+  const approvedHash = treatment.approved.documentHash;
+  const sources = await editingSources({ workspaceDir: dir, record: (await readWorkspace(dir)).catalog.photographs.find((photo) => photo.id === 'alpha'), treatment, derivativesDir: `${fixture.repo}/src/assets/photography/generated` });
+  treatment = await saveTreatment(dir, 'alpha', { text: document(sources[0], { exposure: 0.5, local: local() }), revision: treatment.revision, sources });
+  // A selection is a new unapproved edit: the approved snapshot and its render stand until approved again.
+  expect(treatment.status).toBe('draft');
+  expect(treatment.approved.documentHash).toBe(approvedHash);
+  const saved = await readTreatment(dir, 'alpha');
+  expect(JSON.stringify(saved)).toContain(sky.data);
+  // Selecting again (another grid) is another change.
+  const again = await saveTreatment(dir, 'alpha', { text: document(sources[0], { exposure: 0.5, local: local({ data: encodeCodes(grid.map((v) => 255 - v)) }) }), revision: saved.revision, sources });
+  expect(again.documentHash).not.toBe(saved.documentHash);
+  // With the HUYNH Photography watermark, a rendered draft whose selection then changes needs a new render.
+  const watermark = { ...WATERMARK_DEFAULTS, enabled: true };
+  let marked = await saveTreatment(dir, 'alpha', { text: document(sources[0], { exposure: 0.5, local: local(), watermark }), revision: again.revision, sources });
+  marked = await storeRender(dir, 'alpha', { request: Readable.from([await photograph({ width: 2600, height: 1700 })]), name: sources[0].name, documentHash: marked.documentHash, revision: marked.revision });
+  expect(watermarkStatus(marked)).toBe('needs-review');
+  marked = await saveTreatment(dir, 'alpha', { text: document(sources[0], { exposure: 0.5, local: local({ shift: 0.3 }), watermark }), revision: marked.revision, sources });
+  expect(watermarkStatus(marked)).toBe('needs-regeneration');
 });
 
 test('a treatment developed from a Nikon NEF publishes only its JPEG derivatives', async () => {

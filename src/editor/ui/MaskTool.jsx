@@ -8,6 +8,8 @@ const MOVE_STEP_LARGE = 0.02;
 const POINT_SPACING_PX = 1.5;
 const POINT_SPACING_RADIUS = 0.15;
 const MIN_GRADIENT_PX = 4;
+// A press that moves less than this (stage px) is a tap (Select Object).
+const TAP_PX = 8;
 
 /**
  * Direct manipulation of the selected mask on the preview: paint brush strokes, drag out a new
@@ -20,10 +22,12 @@ const MIN_GRADIENT_PX = 4;
  * so hovering re-renders nothing and the outline is in the same frame as the move.
  * :param mask: the mask being edited; `map`: maskMap at `output` (the canvas at full resolution)
  * :param box: the photo's displayed rectangle in stage pixels
- * :param tool: 'brush' | 'linear' | 'radial' | null (handles only)
+ * :param tool: 'brush' | 'linear' | 'radial' | 'object' | null (handles only)
  * :param brush: { radius, hardness, opacity, mode: 'add' | 'erase', pressure }
+ * :param onPick: Select Object: (u, v, alt) for a tap at that point of the mask's space (0–1)
+ * :param points: Select Object's points so far, [[u, v, label]] (1 included, 0 excluded)
  */
-export default function MaskTool({ mask, map, box, output, tool, brush, selectedId, newId, onSelect, onPreview, onCommit, onRemove }) {
+export default function MaskTool({ mask, map, box, output, tool, brush, selectedId, newId, onSelect, onPreview, onCommit, onRemove, onPick = null, points = null }) {
   const dragRef = useRef(null);
   const frameRef = useRef(0);
   const cursorRef = useRef(null);
@@ -201,7 +205,8 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     }
     try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* a synthetic pointer */ }
     const point = local(event);
-    if (tool === 'brush') startPaint(event, point);
+    if (tool === 'object') dragRef.current = { kind: 'tap', pointer: event.pointerId, origin: mask, start: point, alt: event.altKey, latest: null };
+    else if (tool === 'brush') startPaint(event, point);
     else startCreate(event, point);
   };
   const onPointerMove = (event) => {
@@ -210,6 +215,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     const drag = dragRef.current;
     if (!drag || drag.pointer !== event.pointerId) return;
     if (event.pointerType !== 'touch') event.stopPropagation();
+    if (drag.kind === 'tap') return;
     if (drag.kind === 'paint') extendPaint(event, drag);
     else if (drag.kind === 'handle') moveHandle(drag, point);
     else {
@@ -226,6 +232,16 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     const drag = dragRef.current;
     if (!drag || drag.pointer !== event.pointerId) return;
     if (event.pointerType !== 'touch') event.stopPropagation();
+    if (drag.kind === 'tap') {
+      // A tap, not a drag or a pinch: the point where the finger or pointer came down.
+      dragRef.current = null;
+      const point = local(event);
+      if (event.type === 'pointerup' && Math.hypot(point.x - drag.start.x, point.y - drag.start.y) < TAP_PX && onPick) {
+        const { u, v } = toSpace(drag.start.x, drag.start.y);
+        if (u >= 0 && u <= 1 && v >= 0 && v <= 1) onPick(u, v, drag.alt);
+      }
+      return;
+    }
     if (event.type === 'pointerup' && drag.kind !== 'paint') onPointerMove(event);
     else if (event.type === 'pointerup') extendPaint(event, drag);
     dragRef.current = null;
@@ -279,7 +295,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
   const shapes = [];
   const handles = [];
   mask.components.forEach((component, index) => {
-    if (component.type === 'brush' || !component.enabled) return;
+    if (component.type === 'brush' || component.type === 'selection' || !component.enabled) return;
     const isSelected = component.id === selectedId;
     const label = componentLabel(component, index);
     if (component.type === 'linear') {
@@ -356,6 +372,10 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
         {shapes}
       </svg>
       {handles}
+      {points?.map(([u, v, label], i) => {
+        const p = toStage(u, v);
+        return <span key={`${i}-${u}-${v}`} className="pe-masktool__point" data-label={label ? 'include' : 'exclude'} style={{ left: p.x, top: p.y }} aria-hidden="true" />;
+      })}
       {tool === 'brush' && (
         // Positioned by moveCursor; React sets only its size, so a re-render never moves it.
         <div ref={cursorRef} className="pe-masktool__cursor" aria-hidden="true" hidden data-mode={brush.mode}>

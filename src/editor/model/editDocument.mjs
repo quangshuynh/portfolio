@@ -34,7 +34,10 @@ export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // (`raw.profileVersion`: 2 for new imports, absent = 1), an accepted Auto Exposure correction
 // (`raw.autoExposure`, EV) and a RAW image layer's profile (`rawProfile`, model/layers.mjs);
 // version 14 files read with Camera Natural version 1, no Auto Exposure and legacy RAW layers.
-export const DOCUMENT_VERSION = 15;
+// Version 16 added selection mask components (Select Sky, Subject, Background, Object;
+// model/masks.mjs): the approved coverage grid of one photo, compressed, never the photo's pixels;
+// version 15 files read unchanged.
+export const DOCUMENT_VERSION = 16;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).

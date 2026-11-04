@@ -190,8 +190,15 @@ refused. In short: **Discard** drops a working edit with nothing approved, **Rev
 approved** drops a newer working edit, **Reject** keeps a proposal for reference while the
 approved one stands, **Remove approved treatment** withdraws the approved edit itself.
 
+**Intelligent selections** (Interval 23; Select Sky, Subject, Background, Object) work in the CMS
+editor as on the public page: the models are served by the CMS's own server from `public/` and
+run in the browser. A treatment stores each selection's grid (edit document version 16, never
+pixels of the photo); adding, changing or selecting again is a new unapproved edit, so the render
+and a watermarked draft need regenerating (`needs-regeneration`) while the approved version stays
+what publication uses. Treatments saved before keep their hash.
+
 **Not built:** reverting to an earlier approved treatment other than the current one;
-automatic HDD discovery or AI selection.
+automatic HDD discovery.
 
 ## Watermark
 

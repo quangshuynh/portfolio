@@ -39,6 +39,7 @@ import { imageMaskMap } from '../pipeline/mask.mjs';
 import { createRasterCache } from './layerRasters.mjs';
 import LayersPanel, { newLayerId } from './LayersPanel';
 import MaskPanel, { DEFAULT_BRUSH, DEFAULT_OVERLAY } from './MaskPanel';
+import useSelections from './useSelections';
 import RetouchPanel from './RetouchPanel';
 import { RETOUCH_DEFAULTS, RETOUCH_LIMITS, removeRetouchOperation, updateRetouchOperation } from '../model/retouch.mjs';
 import { thumbnailSource } from './filterThumbs.mjs';
@@ -877,6 +878,25 @@ function EditorWorkspace({ host }) {
     applyMask({ ...mask, components: mask.components.filter((c) => c.id !== id) });
     setMaskComponent(null);
   }, [applyMask]);
+  // Select Sky, Subject, Background and Object (Interval 23).
+  const selections = useSelections({
+    photo,
+    ready,
+    viewProxy,
+    adjustments,
+    lut: ready ? lutFor(adjustments) : null,
+    renderInWorker,
+    locals: ready ? adjustments.local : [],
+    onApplyLocals: (local) => dispatch({ type: 'applySettings', patch: { local } }),
+    onSelectLocal: selectLocal,
+    target: maskTarget,
+    onApplyMask: applyMask,
+    onPreviewMask: previewMask,
+    onSelectComponent: setMaskComponent,
+    newId: newLayerId,
+  });
+  // An object outline not accepted is dropped when its tool is put away.
+  useEffect(() => { if (maskTool !== 'object' && selections.object.draft) selections.object.discard(); }, [maskTool]); // eslint-disable-line react-hooks/exhaustive-deps
   const maskSpace = maskTarget?.kind === 'layer' && maskTarget.layer.type === 'image'
     ? { width: maskTarget.layer.source.width, height: maskTarget.layer.source.height }
     : maskTarget?.kind === 'local' ? { width: photo.width, height: photo.height } : canvasSize;
@@ -1841,6 +1861,8 @@ function EditorWorkspace({ host }) {
             onPreview: (mask) => previewMask(mask),
             onCommit: (mask, coalesceKey = null) => applyMask(mask, coalesceKey),
             onRemove: removeMaskComponent,
+            onPick: maskTool === 'object' && maskTarget.kind === 'local' ? selections.object.tap : null,
+            points: maskTool === 'object' ? selections.object.draft?.points ?? null : null,
           } : null}
           onCancelFill={(ids) => applyRetouch(adjustments.retouch.filter((op) => !ids.includes(op.id)))}
           retouchTool={ready && !transformMode && (retouchTool || retouchSelected || retouchArea) ? {
@@ -2039,6 +2061,7 @@ function EditorWorkspace({ host }) {
             onCommit={() => dispatch({ type: 'commitAdjustment' })}
             newId={newLayerId}
             onEditSettings={() => { setMobilePanel('adjust'); setMobileTool('light'); }}
+            selection={ready ? selections : null}
           />
           <AdjustPanel
             mobileSection={narrow ? mobileTool : undefined}

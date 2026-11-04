@@ -8,6 +8,9 @@ import { NumberField, OpacityRange } from './LayersPanel';
 
 const TOOLS = [['brush', 'Brush'], ['linear', 'Linear'], ['radial', 'Radial']];
 const TYPE_LABEL = { brush: 'Brush', linear: 'Linear', radial: 'Radial' };
+// Intelligent selections (Interval 23): made by models on this device (useSelections).
+const SELECTS = [['sky', 'Sky'], ['subject', 'Subject'], ['background', 'Background']];
+const megabytes = (bytes) => `${Math.max(1, Math.round(bytes / 1e6))} MB`;
 const OVERLAY_COLORS = [['#ff3b30', 'Red'], ['#34c759', 'Green'], ['#0a84ff', 'Blue'], ['#ffd60a', 'Yellow']];
 export const DEFAULT_BRUSH = Object.freeze({ radius: 0.06, hardness: 0.5, opacity: 1, mode: 'add', pressure: true });
 export const DEFAULT_OVERLAY = Object.freeze({ show: true, color: '#ff3b30', view: 'overlay' });
@@ -22,10 +25,11 @@ const newComponent = (type, id) => (type === 'brush' ? createBrush(id) : type ==
  * numeric fields for the selected gradient. Every change is an ordinary undo step.
  * :param target: { kind: 'local', local } | { kind: 'layer', layer } | null, the mask being edited
  * :param space: { width, height } of the target mask's space in pixels (gradient fields)
+ * :param selection: useSelections() (Select Sky, Subject, Background, Object), or null
  */
 export default function MaskPanel({ compact = false, onClose,
   disabled, locals, layer, target, space, selectedId, onSelect, onSelectLocal, onSelectLayerMask, tool, onTool, brush, onBrush, overlay, onOverlay,
-  onApplyLocals, onApplyMask, onPreviewMask, onCommit, newId, onEditSettings,
+  onApplyLocals, onApplyMask, onPreviewMask, onCommit, newId, onEditSettings, selection = null,
 }) {
   const [open, setOpen] = useState(true);
   const [renaming, setRenaming] = useState(false);
@@ -56,6 +60,13 @@ export default function MaskPanel({ compact = false, onClose,
   };
   const patchComponent = (patch, key) => setMask(updateComponent(mask, component.id, patch), key && `mask:${component.id}:${key}`);
   const short = Math.min(space?.width ?? 1, space?.height ?? 1);
+  const busy = Boolean(selection?.status?.busy);
+  const local = target?.kind === 'local';
+  const selectTitle = (kind) => {
+    const bytes = selection?.downloadBytes(kind) ?? 0;
+    return `Select the ${kind} automatically, on this device${bytes ? ` (downloads ${megabytes(bytes)} the first time)` : ''}`;
+  };
+  const draft = selection?.object.draft ?? null;
   const linear = component?.type === 'linear' && space ? linearCentre(component, space) : null;
   const setLinear = (patch, key) => patchComponent(linearFromCentre({ ...linear, ...patch }, space), key);
 
@@ -69,7 +80,7 @@ export default function MaskPanel({ compact = false, onClose,
           </button>
         </h2>
         {target && (
-          <button type="button" className="pe-text-button" aria-pressed={Boolean(tool)} disabled={edit} onClick={() => onTool(tool ? null : (component?.type ?? 'brush'))} title="Paint or drag on the photo (M)">
+          <button type="button" className="pe-text-button" aria-pressed={Boolean(tool)} disabled={edit} onClick={() => onTool(tool ? null : (component && component.type !== 'selection' ? component.type : 'brush'))} title="Paint or drag on the photo (M)">
             {tool ? 'Done' : 'Edit on photo'}
           </button>
         )}
@@ -81,6 +92,22 @@ export default function MaskPanel({ compact = false, onClose,
             <button key={type} type="button" className="pe-button" disabled={disabled || locals.length >= MASK_LIMITS.local} onClick={() => addLocal(type)}>{label}</button>
           ))}
         </div>
+        {selection && (
+          <div className="pe-masks__add" role="group" aria-label="New local adjustment from a selection">
+            <span className="pe-masks__label">Select</span>
+            {SELECTS.map(([kind, label]) => (
+              <button key={kind} type="button" className="pe-button" title={selectTitle(kind)} disabled={disabled || busy || locals.length >= MASK_LIMITS.local} onClick={() => selection.select(kind, { mode: 'new' })}>{label}</button>
+            ))}
+            <button type="button" className="pe-button" title={`${selectTitle('object')}: tap the object on the photo`} disabled={disabled || busy || locals.length >= MASK_LIMITS.local} onClick={() => addLocal('object')}>Object</button>
+          </div>
+        )}
+        {selection?.status && (
+          <div className="pe-masks__select-status" role="status" data-state={selection.status.error ? 'error' : selection.status.note ? 'note' : 'busy'}>
+            <span>{selection.status.text}</span>
+            {selection.status.busy && <progress max="1" value={selection.status.stage === 'download' ? selection.status.fraction ?? 0 : undefined} aria-label="Selection progress" />}
+            {selection.status.busy && <button type="button" className="pe-text-button" onClick={selection.cancel}>Cancel</button>}
+          </div>
+        )}
         {locals.length > 0 && (
           <ul className="pe-masks__list" aria-label="Local adjustments">
             {locals.map((local, index) => {
@@ -91,7 +118,7 @@ export default function MaskPanel({ compact = false, onClose,
                   <button type="button" className="pe-mask-row__name" aria-pressed={selected} disabled={disabled} onClick={() => onSelectLocal(selected ? null : local.id)} onDoubleClick={() => setRenaming(true)}>
                     <span className="pe-layer__label">{label}</span>
                     <span className="pe-layer__meta">
-                      {local.mask.components.map((c) => TYPE_LABEL[c.type]).join(' + ') || 'Empty mask'}
+                      {local.mask.components.map((c) => (c.type === 'selection' ? componentLabel(c) : TYPE_LABEL[c.type])).join(' + ') || 'Empty mask'}
                       {local.amount < 1 ? ` · ${Math.round(local.amount * 100)}%` : ''}
                       {!Object.keys(local.settings).length ? ' · no settings yet' : ''}
                     </span>
@@ -129,7 +156,7 @@ export default function MaskPanel({ compact = false, onClose,
           </div>
         )}
         {!target && !locals.length && <p className="pe-note">Add a local adjustment, then paint or drag on the photo where it should apply.</p>}
-        {mask && !mask.components.length && tool && <p className="pe-note" role="status">{tool === 'brush' ? 'Paint on the photo.' : `Drag on the photo to place the ${tool} gradient.`}</p>}
+        {mask && !mask.components.length && tool && tool !== 'object' && <p className="pe-note" role="status">{tool === 'brush' ? 'Paint on the photo.' : `Drag on the photo to place the ${tool} gradient.`}</p>}
         {target && mask && (
           <div className="pe-masks__props" role="group" aria-label={target.kind === 'local' ? 'Local adjustment' : 'Layer mask'}>
             {locked && <p className="pe-note" role="status">The layer is locked: unlock it to edit its mask.</p>}
@@ -216,7 +243,7 @@ export default function MaskPanel({ compact = false, onClose,
                 const label = componentLabel(c, index);
                 return (
                   <li key={c.id} className="pe-mask-row" data-selected={selected || undefined}>
-                    <button type="button" className="pe-mask-row__name" aria-pressed={selected} disabled={disabled} onClick={() => { onSelect(selected ? null : c.id); if (!selected && tool) onTool(c.type); }}>
+                    <button type="button" className="pe-mask-row__name" aria-pressed={selected} disabled={disabled} onClick={() => { onSelect(selected ? null : c.id); if (!selected && tool) onTool(c.type === 'selection' ? null : c.type); }}>
                       <span className="pe-layer__label">{label}</span>
                       <span className="pe-layer__meta">
                         {c.op === 'subtract' ? 'Subtract' : 'Add'}{c.invert ? ' · inverted' : ''}{c.opacity < 1 ? ` · ${Math.round(c.opacity * 100)}%` : ''}
@@ -234,13 +261,36 @@ export default function MaskPanel({ compact = false, onClose,
               {TOOLS.map(([type, label]) => (
                 <button key={type} type="button" className="pe-text-button" disabled={edit || mask.components.length >= MASK_LIMITS.components} onClick={() => add(type)}>+ {label}</button>
               ))}
+              {selection && local && SELECTS.map(([kind, label]) => (
+                <button key={kind} type="button" className="pe-text-button" title={selectTitle(kind)} disabled={edit || busy || mask.components.length >= MASK_LIMITS.components} onClick={() => selection.select(kind, { mode: 'add' })}>+ {label}</button>
+              ))}
             </div>
 
             <div className="pe-masks__tools" role="group" aria-label="Tool on the photo">
               {TOOLS.map(([type, label]) => (
                 <button key={type} type="button" className="pe-button" aria-pressed={tool === type} disabled={edit} onClick={() => onTool(tool === type ? null : type)}>{label}</button>
               ))}
+              {selection && local && <button type="button" className="pe-button" aria-pressed={tool === 'object'} title={selectTitle('object')} disabled={edit} onClick={() => onTool(tool === 'object' ? null : 'object')}>Object</button>}
             </div>
+            {tool === 'object' && selection && (
+              <div className="pe-masks__brush" role="group" aria-label="Select Object">
+                <p className="pe-note">{draft?.points.length ? 'Tap more of the object to include it, or switch to Exclude and tap what should not be selected.' : 'Tap the object to select on the photo.'}</p>
+                <div className="pe-masks__tools">
+                  <button type="button" className="pe-button" aria-pressed={!selection.object.exclude} onClick={() => selection.object.setExclude(false)}>Include</button>
+                  <button type="button" className="pe-button" aria-pressed={selection.object.exclude} onClick={() => selection.object.setExclude(true)} title="Exclude (or hold Alt while tapping)">Exclude</button>
+                </div>
+                {draft && (
+                  <div className="pe-layers__actions">
+                    <button type="button" className="pe-text-button" disabled={busy || !draft.result || draft.candidate === 0} onClick={() => selection.object.resize(-1)}>Smaller part</button>
+                    <button type="button" className="pe-text-button" disabled={busy || !draft.result || draft.candidate >= draft.candidates.length - 1} onClick={() => selection.object.resize(1)}>Larger part</button>
+                    <button type="button" className="pe-text-button" disabled={busy || !draft.points.length} onClick={selection.object.undoPoint}>Undo point</button>
+                    <button type="button" className="pe-button" disabled={busy || !draft.result || mask.components.length >= MASK_LIMITS.components} onClick={() => { selection.object.accept('add'); onTool(null); }}>Add selection</button>
+                    <button type="button" className="pe-text-button" disabled={busy || !draft.result || mask.components.length >= MASK_LIMITS.components} onClick={() => { selection.object.accept('subtract'); onTool(null); }}>Subtract it</button>
+                    <button type="button" className="pe-text-button" onClick={() => { selection.object.discard(); onTool(null); }}>Discard</button>
+                  </div>
+                )}
+              </div>
+            )}
             {tool === 'brush' && (
               <div className="pe-masks__brush" role="group" aria-label="Brush">
                 <div className="pe-masks__tools">
@@ -274,6 +324,15 @@ export default function MaskPanel({ compact = false, onClose,
                   </label>
                 </div>
                 <OpacityRange value={component.opacity} disabled={edit} onPreview={(v) => onPreviewMask(updateComponent(mask, component.id, { opacity: v }))} onApply={(v) => patchComponent({ opacity: v }, 'opacity')} onCommit={onCommit} />
+                {component.type === 'selection' && (
+                  <>
+                    <p className="pe-note" data-confidence={component.confidence < 0.6 ? 'low' : undefined}>
+                      Selected automatically on this device · confidence {Math.round(component.confidence * 100)}%
+                      {component.confidence < 0.6 ? '. The outline may miss parts or include others: check it with the overlay and correct it with a brush or Subtract.' : ''}
+                    </p>
+                    <NumberField label="Edge" unit="−100 contracts, +100 expands" value={Math.round(component.shift * 100)} min={-100} max={100} step={5} disabled={edit} onApply={(v) => patchComponent({ shift: v / 100 }, 'shift')} />
+                  </>
+                )}
                 {component.type !== 'brush' && (
                   <OpacityRange label="Feather" value={component.feather} disabled={edit} onPreview={(v) => onPreviewMask(updateComponent(mask, component.id, { feather: v }))} onApply={(v) => patchComponent({ feather: v }, 'feather')} onCommit={onCommit} />
                 )}
@@ -296,6 +355,7 @@ export default function MaskPanel({ compact = false, onClose,
                 )}
                 <div className="pe-layers__actions">
                   {component.type === 'brush' && <button type="button" className="pe-text-button" disabled={edit || !component.strokes.length} onClick={() => setMask(clearStrokes(mask, component.id))}>Clear strokes</button>}
+                  {component.type === 'selection' && selection && <button type="button" className="pe-text-button" disabled={edit || busy} onClick={() => selection.regenerate(component)} title={selectTitle(component.kind)}>Select again</button>}
                   <button type="button" className="pe-text-button" disabled={edit || mask.components.length >= MASK_LIMITS.components} onClick={() => { const id = newId(component.type); setMask(duplicateComponent(mask, component.id, id)); onSelect(id); }}>Duplicate</button>
                   <button type="button" className="pe-text-button pe-text-button--danger" disabled={edit} onClick={() => { setMask(removeComponent(mask, component.id)); onSelect(null); }}>Delete</button>
                 </div>

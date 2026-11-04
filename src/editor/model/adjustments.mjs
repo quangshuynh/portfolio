@@ -286,7 +286,7 @@ export function neutralAdjustments() {
 export function normalizeAdjustments(input = {}) {
   const source = input !== null && typeof input === 'object' ? input : {};
   // Brush points allowed for the whole photo, shared by local adjustments and layer masks.
-  const budget = { points: MASK_LIMITS.photoPoints };
+  const budget = { points: MASK_LIMITS.photoPoints, selection: MASK_LIMITS.photoSelectionChars };
   const local = normalizeLocalAdjustments(source.local, budget);
   return {
     ...Object.fromEntries(ADJUSTMENTS.map(({ key, default: value }) => [

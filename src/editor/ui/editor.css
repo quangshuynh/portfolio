@@ -702,7 +702,15 @@ output.pe-adjust__value { display: inline-flex; align-items: center; justify-con
 .pe-mask-overlay[hidden] { display: none; }
 .pe-masktool { position: absolute; inset: 0; touch-action: none; }
 .pe-masktool[data-tool='brush'] { cursor: none; }
-.pe-masktool[data-tool='linear'], .pe-masktool[data-tool='radial'] { cursor: crosshair; }
+.pe-masktool[data-tool='linear'], .pe-masktool[data-tool='radial'], .pe-masktool[data-tool='object'] { cursor: crosshair; }
+/* Select Object's points: included (filled) and excluded (ringed). */
+.pe-masktool__point { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; pointer-events: none; border: 2px solid #fff; background: #34c759; box-shadow: 0 0 0 1px rgba(0, 0, 0, .7); }
+.pe-masktool__point[data-label='exclude'] { background: #ff3b30; }
+/* Intelligent selection: what runs, its progress and Cancel, or what it found. */
+.pe-masks__select-status { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .6rem; margin: .5rem 0 0; font-size: .75rem; color: var(--pe-text-2, inherit); }
+.pe-masks__select-status progress { flex: 1 1 8rem; min-width: 6rem; height: .4rem; }
+.pe-masks__select-status[data-state='error'] { color: var(--pe-danger); }
+.pe-masks__select-status[data-state='note'] { color: var(--pe-warning, #ffd60a); }
 .pe-masktool[data-tool='handles'] { pointer-events: none; }
 .pe-masktool__shapes { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .pe-masktool__shapes line, .pe-masktool__shapes path { fill: none; stroke: rgba(255, 255, 255, .55); stroke-width: 1; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 1px rgba(0, 0, 0, .8)); }
