@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
-  analysisSize, components, decodeCodes, encodeCodes, fromBase64, quantize, refineEdges, salientRegions, skyFromProbability, subjectFromParts, toBase64,
+  analysisSize, components, decodeCodes, encodeCodes, fromBase64, quantize, refineEdges, skyFromProbability, subjectFromParts, toBase64,
 } from './analysis.mjs';
 import { createSegmenter } from './segmenter.mjs';
 import { prepareSelection, selectionAt } from './selectionMask.mjs';
@@ -101,15 +101,6 @@ describe('selection post-processing', () => {
     expect(subjectFromParts([], [], image)).toMatchObject({ found: false });
   });
 
-  test('salient regions keep the main subject and others of comparable size', () => {
-    const size = 20;
-    const s = new Float32Array(size * size);
-    const fill = (x0, y0, x1, y1) => { for (let y = y0; y < y1; y += 1) for (let x = x0; x < x1; x += 1) s[y * size + x] = 1; };
-    fill(2, 2, 9, 9); fill(12, 12, 17, 17); fill(18, 0, 19, 1);
-    const { regions } = salientRegions(s, size, split(100, 100, 50));
-    expect(regions.length).toBe(2);
-    expect(regions[0].area).toBeGreaterThan(regions[1].area);
-  });
 });
 
 describe('segmenter', () => {
@@ -148,7 +139,7 @@ describe('segmenter', () => {
     const segmenter = createSegmenter({ ort: fakeOrt(runs), loadModel: async (name) => { loads.push(name); return new TextEncoder().encode(name); } });
     const image = split(64, 48, 32);
     const sky = await segmenter.select({ kind: 'sky', image, imageKey: 'a' });
-    expect(sky).toMatchObject({ found: true, width: 64, height: 48, version: 'sky-u2net-int8/1' });
+    expect(sky).toMatchObject({ found: true, width: 64, height: 48, version: 'sky-u2net-int8/2' });
     expect(decodeCodes(sky.data, 64 * 48)[0]).toBe(255);
     const subject = await segmenter.select({ kind: 'subject', image, imageKey: 'a' });
     expect(subject.found).toBe(true);

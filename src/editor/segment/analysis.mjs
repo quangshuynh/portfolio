@@ -14,6 +14,8 @@
 // a doubtful selection is reported as such, never presented as accurate.
 
 export const ANALYSIS_EDGE = 1024;
+/** Below this confidence a sky selection says what is doubtful about it. */
+export const SKY_WARN = 0.7; // WARN_BELOW.sky in models.mjs
 const MEAN = [0.485, 0.456, 0.406];
 const STD = [0.229, 0.224, 0.225];
 
@@ -309,8 +311,33 @@ export function skyFromProbability(prob, size, image) {
   const hard = new Uint8Array(p.length);
   for (let i = 0; i < p.length; i += 1) hard[i] = p[i] > 0.5 ? 1 : 0;
   const { labels, stats } = components(hard, width, height, p);
-  const keep = new Set(stats.filter((s) => s && s.area >= 0.002 * width * height && s.peak >= 0.95).map((s) => s.label));
-  if (!keep.size) return { coverage: new Float32Array(p.length), found: false, confidence: 0, area: 0, regions: 0, note: 'No sky was found in this photo.' };
+  const candidates = stats.filter((s) => s && s.area >= 0.002 * width * height && s.peak >= 0.95);
+  // Spatial evidence (Interval 23.1): the sky is above the scene. The main sky is the largest
+  // region reaching the top edge (unless a region not reaching it is four times larger). Another
+  // region is kept when it reaches the top too, lies next to such sky, or starts shortly below the
+  // sky's lowest point and lies mostly in the upper half (sky beyond a branch). Regions further down (a reflection
+  // in a car's window or in water, a dark driveway or bushes at night) are dropped. A dark region
+  // must reach the top: at night the network cannot tell a dark sky from dark foliage by colour.
+  const lum = luminance(image);
+  const mean = new Float32Array(stats.length);
+  for (let i = 0; i < labels.length; i += 1) if (labels[i]) mean[labels[i]] += lum[i];
+  candidates.forEach((s) => { s.lum = mean[s.label] / s.area; s.top = s.y0 <= 1; });
+  const darkAt = 0.12;
+  const bySize = [...candidates].sort((a, b) => b.area - a.area);
+  const topMain = bySize.find((s) => s.top);
+  const main = topMain && topMain.area * 4 >= bySize[0].area ? topMain : bySize[0];
+  const lowest = Math.max(main?.y1 ?? 0, ...candidates.filter((s) => s.top).map((s) => s.y1));
+  // Sky next to sky that reaches the top (within 3 % of the long edge: across a branch or a wire).
+  const anchors = new Uint8Array(labels.length);
+  const anchorLabels = new Set(candidates.filter((s) => s.top || s === main).map((s) => s.label));
+  for (let i = 0; i < labels.length; i += 1) anchors[i] = anchorLabels.has(labels[i]) ? 1 : 0;
+  const nearSky = dilate(anchors, width, height, Math.max(2, Math.round(0.03 * Math.max(width, height))));
+  const touchesSky = new Set();
+  for (let i = 0; i < labels.length; i += 1) if (labels[i] && nearSky[i]) touchesSky.add(labels[i]);
+  const kept = candidates.filter((s) => (s.top ? true : s.lum >= darkAt && (s === main || touchesSky.has(s.label)
+    || (s.y0 <= lowest + 0.15 * height && s.cy <= Math.max(0.55 * height, lowest + 0.15 * height)))));
+  const keep = new Set(kept.map((s) => s.label));
+  if (!keep.size) return { coverage: new Float32Array(p.length), found: false, confidence: 0, area: 0, regions: 0, warnings: [], dropped: candidates.length, note: 'No sky was found in this photo.' };
   const near = new Uint8Array(p.length);
   for (let i = 0; i < p.length; i += 1) near[i] = keep.has(labels[i]) ? 1 : 0;
   const reach = dilate(near, width, height, 8);
@@ -321,33 +348,23 @@ export function skyFromProbability(prob, size, image) {
   const unsure = uncertainty(p, region);
   let area = 0;
   for (let i = 0; i < coverage.length; i += 1) area += coverage[i];
-  const confidence = Math.max(0, Math.min(1, 1 - unsure * 3));
+  let confidence = Math.max(0, Math.min(1, 1 - unsure * 3));
+  const warnings = [];
+  // A dark sky is the night-time case where foliage and sky look alike. An open night sky across
+  // the whole top of the photo is the reliable case; any other dark sky is flagged.
+  const dark = kept.reduce((sum, s) => sum + s.lum * s.area, 0) / kept.reduce((sum, s) => sum + s.area, 0) < darkAt
+    && !kept.some((s) => s.top && s.x0 <= 1 && s.x1 >= width - 2);
+  if (dark) { confidence = Math.min(confidence, 0.65); warnings.push('dark'); }
+  if (confidence < SKY_WARN && !dark) warnings.push('edges');
+  const notes = {
+    dark: 'This is a dark (night) sky, which is hard to tell from dark trees or buildings: check it with the overlay before adjusting strongly.',
+    edges: 'Parts of this sky are uncertain: check its edges before adjusting strongly.',
+  };
   return {
-    coverage, found: true, confidence, area: area / coverage.length, regions: keep.size,
-    note: confidence < 0.7 ? 'Parts of this sky are uncertain: check its edges before adjusting strongly.' : null,
+    coverage, found: true, confidence, area: area / coverage.length, regions: keep.size, warnings, dropped: candidates.length - kept.length,
+    note: confidence < SKY_WARN ? notes[warnings[0]] : null,
   };
 }
-
-/** The salient regions to prompt SAM with: boxes and centres in analysis pixels. */
-export function salientRegions(saliency, size, image) {
-  const { width, height } = image;
-  const raw = resizeMap(saliency, size, size, width, height);
-  let lo = Infinity; let hi = -Infinity;
-  for (let i = 0; i < raw.length; i += 1) { if (raw[i] < lo) lo = raw[i]; if (raw[i] > hi) hi = raw[i]; }
-  const span = hi - lo || 1;
-  const s = new Float32Array(raw.length);
-  const hard = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) { s[i] = (raw[i] - lo) / span; hard[i] = s[i] > 0.5 ? 1 : 0; }
-  const { labels, stats } = components(hard, width, height, s);
-  const found = stats.filter(Boolean);
-  if (!found.length) return { regions: [], saliency: s, labels };
-  const biggest = Math.max(...found.map((r) => r.area));
-  const regions = found.filter((r) => r.area >= Math.max(0.2 * biggest, 0.002 * width * height)).sort((a, b) => b.area - a.area).slice(0, 4);
-  return { regions, saliency: s, labels };
-}
-
-/** SAM prompt points for a salient region: its box (labels 2 and 3) and centre (1). */
-export const regionPrompt = (r) => ({ points: [[r.x0, r.y0], [r.x1 + 1, r.y1 + 1], [r.cx, r.cy]], labels: [2, 3, 1] });
 
 /** SAM's mask logits at the analysis size (the decoder resizes to it) → probability. */
 export function samCoverage(logits) {
