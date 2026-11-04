@@ -1021,6 +1021,12 @@ no WebGL2 5.2 / 8.3 / 2.2 / 1.0 s, Firefox 39 / 64 / 22 / 2.6 s (its WebAssembly
 models several times slower). Whole process with all models: about 650 MB (Node). Phones were
 emulated on a desktop CPU only; a phone's single thread will be slower.
 
+RAW photos are selected on their development like any other (no per-format code). Genuine files
+(`SELECTION_RAW_DIR`, Chromium): Subject found on a Sony A7 III ARW (0.75), Canon 5D IV CR2 (1.0),
+Canon EOS R CR3 (0.91), Fujifilm X-T4 RAF (0.87), Nikon Z6 NEF (0.33, flagged) and an iPhone 12
+Pro DNG (0.98); Sky on the DNG (0.88) and the CR3 (0.46, flagged), none reported on the others.
+Merged HDR photos were not tried.
+
 `npm run check:editor:selection` (Chromium, Firefox, WebKit, iPhone 13 and Pixel 7 emulation, no
 WebGL2) runs Cancel, Sky, a full-size export (darker inside, unchanged where the mask is 0), Subject,
 Background, Select again (identical grid), an Object tap, saving and reopening, and requires no

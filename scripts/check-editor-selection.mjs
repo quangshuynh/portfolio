@@ -266,9 +266,12 @@ async function checkRaws(dir) {
         const t0 = Date.now();
         await page.locator('.pe-masks__add[aria-label="New local adjustment from a selection"] button', { hasText: new RegExp(`^${label}$`) }).click();
         await poll(() => page.evaluate(() => { const s = document.querySelector('.pe-masks__select-status'); return !s || s.dataset.state !== 'busy'; }), Boolean, label, 300_000);
-        const values = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null')?.photos[0]?.adjustments ?? null, AUTOSAVE_KEY);
-        const found = values?.local?.flatMap((l) => l.mask.components).find((c) => c.kind === kind);
-        const message = await page.evaluate(() => document.querySelector('.pe-masks__select-status')?.textContent ?? null);
+        // The selection (autosaved 400 ms after it is applied) or the panel's message.
+        const read = () => page.evaluate(([key, k]) => ({
+          found: JSON.parse(localStorage.getItem(key) ?? 'null')?.photos[0]?.adjustments.local?.flatMap((l) => l.mask.components).find((c) => c.kind === k) ?? null,
+          message: document.querySelector('.pe-masks__select-status')?.textContent ?? null,
+        }), [AUTOSAVE_KEY, kind]);
+        const { found, message } = await poll(read, (r) => r.found || r.message, `${label} result`, 5000).catch(read);
         row[kind] = found ? { confidence: found.confidence, grid: `${found.width}×${found.height}`, ms: Date.now() - t0 } : { found: false, message, ms: Date.now() - t0 };
       }
     } catch (error) {

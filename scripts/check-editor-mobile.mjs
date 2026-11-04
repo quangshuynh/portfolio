@@ -7,6 +7,7 @@ import path from 'node:path';
 import { chromium, firefox, webkit, devices } from 'playwright';
 import sharp from 'sharp';
 import { build, preview } from 'vite';
+import { DOCUMENT_VERSION } from '../src/editor/model/editDocument.mjs';
 
 const output = process.env.EDITOR_MOBILE_OUTPUT || mkdtempSync(path.join(tmpdir(), 'editor-mobile-'));
 mkdirSync(output, { recursive: true });
@@ -262,10 +263,10 @@ try {
           await page.getByRole('button', { name: 'Exit fullscreen', exact: true }).click();
           await page.locator('.pe:not([data-fullscreen])').waitFor();
           await check();
-          await page.waitForFunction(() => {
+          await page.waitForFunction((version) => {
             const saved = JSON.parse(localStorage.getItem('photo-editor:edits:v1'));
-            return saved?.version === 15 && saved.photos[0].adjustments.watermark?.enabled && saved.photos[0].adjustments.layers.some((layer) => layer.text === 'Mobile session');
-          });
+            return saved?.version === version && saved.photos[0].adjustments.watermark?.enabled && saved.photos[0].adjustments.layers.some((layer) => layer.text === 'Mobile session');
+          }, DOCUMENT_VERSION);
           await page.reload();
           await page.locator('.pe-empty').waitFor();
           await check();
