@@ -137,6 +137,16 @@ async function measureLoad(browser, engine, profile, network, warm) {
   };
 }
 
+const widths = new Map();
+async function fileWidth(name) {
+  if (!widths.has(name)) {
+    const { default: sharp } = await import('sharp');
+    const bytes = remote ? Buffer.from(await (await fetch(`${base}/assets/${name}`)).arrayBuffer()) : await import('node:fs/promises').then(({ readFile }) => readFile(path.join(dist, 'assets', name)));
+    widths.set(name, (await sharp(bytes).metadata()).width);
+  }
+  return widths.get(name);
+}
+
 async function measureScroll(browser, engine, profile) {
   const context = await newContext(browser, engine, profile);
   const page = await context.newPage();
@@ -151,10 +161,11 @@ async function measureScroll(browser, engine, profile) {
   const images = await page.evaluate(IMAGE_ENTRIES);
   // Frames whose rendered width needs more pixels than the file chosen (upscaled) or less than
   // half of it (oversized), at the device pixel ratio.
-  const fit = await page.evaluate(() => [...document.querySelectorAll('main img')].filter((image) => image.currentSrc && image.complete).map((image) => {
-    const need = image.getBoundingClientRect().width * devicePixelRatio;
-    return { need, have: image.naturalWidth };
-  }));
+  // naturalWidth is density-corrected for srcset images, so the chosen file's own width is read.
+  const shown = await page.evaluate(() => [...document.querySelectorAll('main img')].filter((image) => image.currentSrc && image.complete && /\/assets\/.*\.jpe?g/.test(image.currentSrc))
+    .map((image) => ({ need: image.getBoundingClientRect().width * devicePixelRatio, name: image.currentSrc.split('/').pop() })));
+  const fit = [];
+  for (const { need, name } of shown) fit.push({ need, have: await fileWidth(name) });
   await context.close();
   return {
     imageCount: images.length,
