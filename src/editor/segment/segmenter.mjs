@@ -40,6 +40,19 @@ export function createSegmenter({ ort, loadModel, sessionOptions = {} }) {
     return sessions.get(name);
   }
 
+  // On a phone or a device with little memory only the models of the selection being made stay
+  // loaded (Sky's and Subject's together hold several hundred megabytes); a model released here
+  // comes back from the HTTP cache when next needed.
+  async function releaseExcept(keep) {
+    const names = [...sessions.keys()].filter((name) => !keep.includes(name));
+    for (const name of names) {
+      const pending = sessions.get(name);
+      sessions.delete(name);
+      if (name === 'samEncoder') embedding = null;
+      await pending.then((s) => s.release?.()).catch(() => {}); // eslint-disable-line no-await-in-loop
+    }
+  }
+
   const tensor = (data, dims, type = 'float32') => new ort.Tensor(type, data, dims);
   const run = async (s, feeds) => s.run(feeds);
 
@@ -132,8 +145,9 @@ export function createSegmenter({ ort, loadModel, sessionOptions = {} }) {
    * :param request: { kind, image, imageKey, points? [[x, y, label]] in analysis pixels, candidate? }
    * :returns: { width, height, data (encoded codes), found, confidence, area, regions, note, version, candidates? }
    */
-  async function select({ kind, image, imageKey, points = [], candidate = null }, onProgress = () => {}) {
+  async function select({ kind, image, imageKey, points = [], candidate = null, lowMemory = false }, onProgress = () => {}) {
     if (!SELECTION_KINDS[kind]) throw new SelectionError(`Unknown selection: ${kind}.`, 'bad-request');
+    if (lowMemory) await releaseExcept(SELECTION_KINDS[kind].models);
     const started = Date.now();
     let result;
     if (kind === 'sky') {
@@ -177,5 +191,5 @@ export function createSegmenter({ ort, loadModel, sessionOptions = {} }) {
     return masks.map((m) => ({ score: m.score, coverage: samCoverage(m.logits) }));
   }
 
-  return { select, outline, forgetImage: () => { embedding = null; } };
+  return { select, outline, forgetImage: () => { embedding = null; }, loadedModels: () => [...sessions.keys()] };
 }
