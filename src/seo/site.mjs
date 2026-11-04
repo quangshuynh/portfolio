@@ -20,6 +20,7 @@ export const ROUTES = Object.freeze([
     id: 'home',
     path: '/',
     file: 'index.html',
+    chunk: 'src/components/pages/homePage.jsx',
     title: 'Quang Huynh | Software Engineer & Developer',
     description: 'Quang Huynh is a software engineer and computer science student at Rochester Institute of Technology, building backend systems, developer tools, automation, and native applications.',
     ogType: 'website',

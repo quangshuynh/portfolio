@@ -33,10 +33,13 @@ const records = photographOverrides.map((override) => {
   if (generated.sourceFilename !== override.sourceFilename) throw new Error(`Source filename mismatch for ${override.id}.`);
   const merged = mergePhotographyMetadata(generated, override);
   if (!PHOTOGRAPHY_CATEGORIES.includes(merged.category)) throw new Error(`Unknown photography category for ${override.id}.`);
+  // The CMS preview has no medium derivative; the gallery and viewer files are enough.
+  const medium = publicCollection.medium?.[override.id];
   return {
     ...merged,
     gallerySrc: resolveDerivative(generated.galleryFilename),
     viewerSrc: resolveDerivative(generated.viewerFilename),
+    ...(medium ? { mediumSrc: medium.src, mediumWidth: medium.width, mediumHeight: medium.height } : {}),
   };
 });
 
@@ -49,6 +52,28 @@ export const photographs = Object.freeze(records.map((record) => Object.freeze(r
 export const featuredPhotographs = Object.freeze(
   photographs.filter(({ featured }) => featured).sort((a, b) => a.featured - b.featured),
 );
+
+/** The photograph's files, narrowest first: [{ src, width }]. */
+export function photographSources(photograph) {
+  return [
+    { src: photograph.gallerySrc, width: photograph.galleryWidth },
+    ...(photograph.mediumSrc ? [{ src: photograph.mediumSrc, width: photograph.mediumWidth }] : []),
+    { src: photograph.viewerSrc, width: photograph.viewerWidth },
+  ];
+}
+
+export function photographSrcSet(photograph) {
+  return photographSources(photograph).map(({ src, width }) => `${src} ${width}w`).join(', ');
+}
+
+/**
+ * The narrowest file at least `devicePixels` wide (the widest when none is), so every engine
+ * picks the same file, and the viewer can prefetch exactly what it will show.
+ */
+export function pickPhotographSource(photograph, devicePixels) {
+  const sources = photographSources(photograph);
+  return (sources.find(({ width }) => width >= devicePixels) ?? sources[sources.length - 1]).src;
+}
 
 export function filterPhotographs(items, category = 'All') {
   return category === 'All' ? [...items] : items.filter((photograph) => photograph.category === category);

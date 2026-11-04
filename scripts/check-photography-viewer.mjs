@@ -50,7 +50,11 @@ const PHOTOS = [
 const slug = (record) => published.get(record.id).slug;
 
 const near = (a, b, tolerance = 2) => Math.abs(a - b) <= tolerance;
-const measure = (page) => page.evaluate(() => {
+// Geometry is read once the image's CSS transitions (transform 80–200 ms) have finished: a fixed
+// sleep sampled mid-transition on a loaded machine (seen in WebKit on main and this branch).
+const settled = (page) => page.waitForFunction(() => !document.getAnimations().some((animation) => animation instanceof CSSTransition && animation.playState === 'running'), null, { timeout: 5_000, polling: 'raf' }).catch(() => {});
+const measure = async (page) => { await settled(page); return readLayout(page); };
+const readLayout = (page) => page.evaluate(() => {
   const rect = (element) => { const { left, top, width, height } = element.getBoundingClientRect(); return { left, top, width, height, right: left + width, bottom: top + height }; };
   const stage = document.querySelector('.photography-lightbox-image-wrap');
   const image = stage.querySelector('img');
@@ -172,7 +176,8 @@ async function runEngine(run, fixtures) {
       Element.prototype[name] = function capture(...args) { try { return original.apply(this, args); } catch { return undefined; } };
     }
   });
-  await page.route(`**/${substitute.viewerFilename.replace(/\.jpg$/, '')}*`, (route, request) => {
+  // Every file of the photograph (the viewer picks gallery, medium or viewer by fitted size).
+  await page.route(new RegExp(`/${substitute.id}-(gallery|medium|viewer)[-.]`), (route, request) => {
     const size = page.currentSize;
     if (!size || request.resourceType() !== 'image') return route.continue();
     return route.fulfill({ contentType: 'image/jpeg', body: fixtures[size.join('x')] });

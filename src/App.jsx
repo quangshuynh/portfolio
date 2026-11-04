@@ -1,15 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import './App.css';
-import Header from './components/sections/header';
-import Experience from './components/sections/experience';
-import FeaturedProjects from './components/sections/featuredProjects';
-import TechStack from './components/sections/techStack';
-import MoreProjects from './components/sections/moreProjects';
-import Education from './components/sections/education';
-import Footer from './components/sections/footer';
-import HashScroll from './components/utilities/hashScroll';
-import { HomeLightboxProvider } from './components/utilities/homeLightbox';
-import SiteNav from './components/sections/siteNav';
 import RevealAnimations from './components/utilities/revealAnimations';
 import RouteErrorBoundary from './components/utilities/routeErrorBoundary';
 import useLocation from './components/utilities/useLocation';
@@ -17,6 +7,7 @@ import { findPhotograph } from './data/photographs';
 import { getAppPathname } from './util/navigation';
 import { routeForAppPath } from './seo/site.mjs';
 
+const HomePage = lazy(() => import('./components/pages/homePage'));
 const AboutPage = lazy(() => import('./components/pages/aboutPage'));
 const PhotographyPage = lazy(() => import('./components/pages/photographyPage'));
 // Stages feed the editor's HTML-shell startup report (public/photography/editor-startup.js).
@@ -74,25 +65,7 @@ function App() {
     return <RouteErrorBoundary name="Photography"><Suspense fallback={null}><PhotographyPage selectedPhotograph={selectedPhotograph} invalidPhotoId={Boolean(photoId && !selectedPhotograph)} search={location.search} /><RevealAnimations /></Suspense></RouteErrorBoundary>;
   }
 
-  return (
-    <HomeLightboxProvider>
-    <div className="app-shell">
-      <HashScroll />
-      <a className="skip-link" href="#main-content">Skip to main content</a>
-      <SiteNav current="home" />
-      <Header />
-      <main id="main-content">
-        <Experience />
-        <FeaturedProjects />
-        <MoreProjects />
-        <TechStack />
-        <Education />
-      </main>
-      <Footer />
-      <RevealAnimations />
-    </div>
-    </HomeLightboxProvider>
-  );
+  return <RouteErrorBoundary name="The homepage"><Suspense fallback={null}><HomePage /></Suspense></RouteErrorBoundary>;
 }
 
 export default App;

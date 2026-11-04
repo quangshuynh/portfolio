@@ -256,3 +256,42 @@ describe('selection masks', () => {
     expect(createMask('image').components).toEqual([]);
   });
 });
+
+describe('model sessions', () => {
+  // onnxruntime stand-in: every session answers zeros and records its release.
+  function fakeOrt() {
+    const created = [];
+    const ort = {
+      Tensor: class { constructor(type, data, dims) { Object.assign(this, { type, data, dims }); } },
+      InferenceSession: {
+        create: async () => {
+          const session = { inputNames: ['input'], outputNames: ['output'], released: false, run: async () => ({ output: { data: new Float32Array(MODELS.sky.size ** 2) } }), release: async () => { session.released = true; } };
+          created.push(session);
+          return session;
+        },
+      },
+    };
+    return { ort, created };
+  }
+  const image = split(64, 48, 32);
+
+  test('sessions are created once and reused; low-memory devices keep only the current kind\'s models', async () => {
+    const { ort, created } = fakeOrt();
+    const loads = [];
+    const segmenter = createSegmenter({ ort, loadModel: async (name) => { loads.push(name); return new Uint8Array(4); } });
+    await segmenter.select({ kind: 'sky', image, imageKey: 'a' });
+    await segmenter.select({ kind: 'sky', image, imageKey: 'a' });
+    expect(loads).toEqual(['sky']);
+    expect(created).toHaveLength(1);
+    // Without low memory, models stay loaded across kinds.
+    await expect(segmenter.select({ kind: 'object', image, imageKey: 'a' })).rejects.toMatchObject({ code: 'bad-request' });
+    expect(segmenter.loadedModels()).toEqual(['sky']);
+    // With low memory, the Sky session is released before an Object selection.
+    await expect(segmenter.select({ kind: 'object', image, imageKey: 'a', lowMemory: true })).rejects.toMatchObject({ code: 'bad-request' });
+    expect(created[0].released).toBe(true);
+    expect(segmenter.loadedModels()).toEqual([]);
+    // And comes back (from the cache in a browser) when Sky is needed again.
+    await segmenter.select({ kind: 'sky', image, imageKey: 'a', lowMemory: true });
+    expect(loads).toEqual(['sky', 'sky']);
+  });
+});

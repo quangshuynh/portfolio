@@ -1,12 +1,14 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within,  } from '@testing-library/react';
 
 import App from './App';
+
+// The homepage is a lazy chunk: load it once, then let each render resolve it.
+beforeAll(() => import('./components/pages/homePage'));
+async function renderApp(ui = <App />) {
+  let view;
+  await act(async () => { view = render(ui); });
+  return view;
+}
 
 
 beforeEach(() => {
@@ -31,8 +33,8 @@ afterEach(() => {
 
 
 describe('portfolio homepage', () => {
-  test('renders the main portfolio sections', () => {
-    render(<App />);
+  test('renders the main portfolio sections', async () => {
+    await renderApp();
 
     expect(
       screen.getByText('Hi, I’m Quang.'),
@@ -52,8 +54,8 @@ describe('portfolio homepage', () => {
   });
 
 
-  test('links to the dedicated About page', () => {
-    render(<App />);
+  test('links to the dedicated About page', async () => {
+    await renderApp();
 
     expect(
       screen.getByRole('link', {
@@ -66,8 +68,8 @@ describe('portfolio homepage', () => {
   });
 
 
-  test('expands and collapses additional projects', () => {
-    render(<App />);
+  test('expands and collapses additional projects', async () => {
+    await renderApp();
 
     const toggle =
       screen.getByRole('button', {
@@ -110,8 +112,8 @@ describe('portfolio homepage', () => {
   });
 
 
-  test('project galleries can switch views', () => {
-    render(<App />);
+  test('project galleries can switch views', async () => {
+    await renderApp();
 
     const flipperGallery = within(
       screen.getByLabelText(
@@ -160,8 +162,8 @@ describe('portfolio homepage', () => {
   });
 
 
-  test('theme toggle switches between dark and light modes', () => {
-    render(<App />);
+  test('theme toggle switches between dark and light modes', async () => {
+    await renderApp();
 
     const toggle =
       screen.getByRole('button', {
@@ -188,7 +190,7 @@ describe('portfolio homepage', () => {
 
 describe('shared image lightbox', () => {
   test('opens, closes with Escape, and restores focus', async () => {
-    render(<App />);
+    await renderApp();
 
     const trigger =
       screen.getByRole('button', {
@@ -252,7 +254,7 @@ describe('routing', () => {
       '/about',
     );
 
-    render(<App />);
+    await renderApp();
 
     expect(
       await screen.findByRole(
@@ -284,7 +286,7 @@ describe('routing', () => {
       '/photography/',
     );
 
-    render(<App />);
+    await renderApp();
 
     expect(
       await screen.findByRole(
@@ -307,8 +309,8 @@ describe('routing', () => {
   });
 
 
-  test('homepage navigation remains available', () => {
-    render(<App />);
+  test('homepage navigation remains available', async () => {
+    await renderApp();
 
     const nav =
       screen.getByRole(
@@ -357,16 +359,16 @@ describe('page metadata', () => {
 
   test('applies the route metadata on known routes', async () => {
     window.history.replaceState({}, '', '/about/');
-    render(<App />);
+    await renderApp();
     await screen.findByRole('heading', { name: 'Hi, I’m Quang.' });
     expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute('href', 'https://quanghuynh.com/about');
     expect(robots()).toHaveAttribute('content', 'index, follow, max-image-preview:large');
   });
 
-  test('leaves the 404 page head alone on unknown paths', () => {
+  test('leaves the 404 page head alone on unknown paths', async () => {
     document.title = 'Page not found | Quang Huynh';
     window.history.replaceState({}, '', '/no-such-page');
-    render(<App />);
+    await renderApp();
     expect(document.title).toBe('Page not found | Quang Huynh');
     expect(robots()).toHaveAttribute('content', 'noindex, follow');
   });

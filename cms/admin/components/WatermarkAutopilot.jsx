@@ -32,6 +32,9 @@ export default function WatermarkAutopilot({ onChanged }) {
   const planning = useRef(false);
   const paused = useRef(false);
   const progressAt = useRef(Date.now());
+  // Placements already measured, by photograph, treatment revision and policy: an idle tick
+  // re-plans without downloading and decoding the same gallery images again.
+  const placementCache = useRef(new Map());
   // The CMS passes a new callback on every render; keep the timers independent of it.
   const changed = useRef(onChanged);
   changed.current = onChanged;
@@ -66,11 +69,19 @@ export default function WatermarkAutopilot({ onChanged }) {
       const candidates = overview.photographs.filter((photo) => AUTO_STATUSES.includes(photo.treatment.watermarkStatus) && !skip.has(photo.id));
       if (!candidates.length) return;
       const placements = {};
+      const policyKey = JSON.stringify(policy);
       for (const photo of candidates.filter(({ treatment }) => !treatment.watermarked)) {
-        try {
-          const pixels = await loadPixels(imageUrl(photo.id, 'gallery'));
-          placements[photo.id] = placementReport(pixels, policy, { frame: nominalFrame(pixels.width, pixels.height) });
-        } catch { /* placed at the policy's corner */ }
+        const key = `${photo.id}:${photo.treatment.revision ?? 0}:${policyKey}`;
+        if (!placementCache.current.has(key)) {
+          let placement = null;
+          try {
+            const pixels = await loadPixels(imageUrl(photo.id, 'gallery'));
+            placement = placementReport(pixels, policy, { frame: nominalFrame(pixels.width, pixels.height) });
+          } catch { /* placed at the policy's corner */ }
+          placementCache.current.set(key, placement);
+        }
+        const placement = placementCache.current.get(key);
+        if (placement) placements[photo.id] = placement;
       }
       const { ids, settings, hdr } = autoDraftPlan(candidates, policy, placements, skip);
       if (ids.length) start({ mode: 'auto', ids, settings, hdr, index: 0, results: [], startedAt: new Date().toISOString() });
@@ -93,7 +104,7 @@ export default function WatermarkAutopilot({ onChanged }) {
           if (running(next)) start(next);
           else { writeWatermarkQueue(next); setQueue(next); setSrc(null); changed.current?.(); }
         }
-      } else if (!src) plan();
+      } else if (!src && !document.hidden) plan();
     }, src ? 5_000 : IDLE_MS);
     return () => clearInterval(timer);
   }, [plan, src, start]);
@@ -123,7 +134,10 @@ export default function WatermarkAutopilot({ onChanged }) {
     };
   }, []);
 
+  // Stop after this photograph: automatic planning also pauses until the CMS is reloaded, or the
+  // re-plan that follows the run's end would start the remaining photographs straight away.
   const stop = () => {
+    paused.current = true;
     const current = readWatermarkQueue();
     if (current?.mode === 'auto') writeWatermarkQueue({ ...current, stopped: true });
     setQueue((previous) => previous && { ...previous, stopped: true });

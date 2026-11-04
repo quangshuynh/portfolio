@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { analysisSize, resampleRgba } from '../segment/analysis.mjs';
 import { createSelectionRunner } from '../segment/selectionClient.mjs';
+import { constrainedDevice } from '../raw/rawClient.mjs';
 import { downloadBytes } from '../segment/models.mjs';
 import { addComponent, createLocalAdjustment, createMask, createSelection, MASK_LIMITS, updateComponent } from '../model/masks.mjs';
 import { neutralGeometry } from '../pipeline/geometry.mjs';
@@ -82,7 +83,7 @@ export default function useSelections({ photo, ready, viewProxy, adjustments, lu
     try {
       const { image, key } = await analysisImage();
       if (job !== jobRef.current) return null;
-      const result = await runner().run({ kind, image, imageKey: key, ...request }, (progress) => {
+      const result = await runner().run({ kind, image, imageKey: key, lowMemory: constrainedDevice(), ...request }, (progress) => {
         if (job === jobRef.current) setStatus((s) => ({ ...s, kind, ...progress }));
       });
       if (job !== jobRef.current) return null;

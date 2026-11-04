@@ -3,8 +3,14 @@ import { createPortal } from 'react-dom';
 import { FaChevronLeft, FaChevronRight, FaCompress, FaExpand, FaInfoCircle, FaMinus, FaPlus, FaTimes } from 'react-icons/fa';
 import useOverlayLock from '../utilities/overlayLock';
 import useFullscreen from '../utilities/useFullscreen';
+import { photographSources, pickPhotographSource } from '../../data/photographs';
 
-const preloadedSources = new Set();
+// Files the viewer has seen load: shown at once (from the browser's cache) as a placeholder
+// or as the photograph itself. Strings only; the decoded images belong to the browser.
+const loadedSources = new Set();
+// Neighbour prefetches in flight or done, at most PREFETCH_LIMIT, oldest dropped first.
+const prefetches = new Map();
+const PREFETCH_LIMIT = 4;
 const metadataFields = [
   ['capturedAt', 'Captured'],
   ['camera', 'Camera'],
@@ -152,7 +158,52 @@ export function zoomAround({ scale, position }, nextScale, point, to = point) {
 }
 
 export function resetPhotographyPreloadsForTests() {
-  preloadedSources.clear();
+  loadedSources.clear();
+  prefetches.forEach((image) => image.removeAttribute('src'));
+  prefetches.clear();
+}
+
+/** The device pixels a photograph needs fitted into the stage (or the window, before layout). */
+export function viewerDevicePixels(photograph, stageWidth, stageHeight, scale = 1) {
+  const fit = calculateFittedImageDimensions(photograph.viewerWidth, photograph.viewerHeight, stageWidth, stageHeight);
+  return fit.width * scale * (window.devicePixelRatio || 1);
+}
+
+/**
+ * The best file of the photograph already loaded, to show while the chosen one arrives: one
+ * the viewer loaded, else one a gallery <img> on the page has finished. Null when none has.
+ */
+export function loadedPlaceholder(photograph) {
+  const sources = photographSources(photograph).map(({ src }) => src).reverse();
+  const known = sources.find((src) => loadedSources.has(src));
+  if (known) return known;
+  const absolute = (src) => new URL(src, document.baseURI).href;
+  const resolved = new Set(sources.map(absolute));
+  const shown = [...document.querySelectorAll('main img')].find((image) => image.complete && image.naturalWidth > 0 && resolved.has(image.currentSrc));
+  return shown ? sources.find((src) => absolute(src) === shown.currentSrc) : null;
+}
+
+/**
+ * Prefetches the neighbours' files at low priority and cancels prefetches no longer wanted,
+ * so rapid navigation never queues a backlog in front of the photograph being shown.
+ */
+export function prefetchViewerSources(wanted) {
+  const keep = new Set(wanted.filter(Boolean));
+  prefetches.forEach((image, src) => {
+    if (keep.has(src)) return;
+    if (!image.complete) image.removeAttribute('src');
+    prefetches.delete(src);
+  });
+  keep.forEach((src) => {
+    if (loadedSources.has(src) || prefetches.has(src)) return;
+    const image = new Image();
+    image.fetchPriority = 'low';
+    image.decoding = 'async';
+    image.onload = () => loadedSources.add(src);
+    image.src = src;
+    prefetches.set(src, image);
+    while (prefetches.size > PREFETCH_LIMIT) prefetches.delete(prefetches.keys().next().value);
+  });
 }
 
 export default function PhotographyLightbox({ photograph, collection, onNavigate, onClose, returnFocusRef }) {
@@ -176,6 +227,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   const sheetCloseRef = useRef(null);
   const stageRef = useRef(null);
   const imageRef = useRef(null);
+  const placeholderRef = useRef(null);
   const dragRef = useRef(null);
   // Touch gestures: pointers down on the image, a pinch in progress and the last tap.
   const pointersRef = useRef(new Map());
@@ -183,6 +235,11 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   const tapRef = useRef(null);
   const tapZoomRef = useRef(-Infinity);
   const latestPhotograph = useRef(photograph);
+  // The file shown: chosen for the fitted size and upgraded (never downgraded) for zoom or a
+  // larger stage, per photograph. Before layout the window stands in for the stage.
+  const sourceRef = useRef({ id: null, src: null, pixels: 0 });
+  const [placeholder, setPlaceholder] = useState(() => loadedPlaceholder(photograph));
+  const [shownId, setShownId] = useState(null);
   const sheetTitleId = useId();
   const index = collection.findIndex(({ id }) => id === photograph.id);
   const previous = index > 0 ? collection[index - 1] : null;
@@ -191,6 +248,14 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   useOverlayLock();
   // The backdrop goes fullscreen, so the information sheet (its sibling) stays reachable.
   const fullscreen = useFullscreen(backdropRef);
+
+  const stageBox = () => [stageRef.current?.clientWidth || window.innerWidth, stageRef.current?.clientHeight || window.innerHeight];
+  const neededPixels = viewerDevicePixels(photograph, ...stageBox(), Math.max(1, scale));
+  if (sourceRef.current.id !== photograph.id || neededPixels > sourceRef.current.pixels) {
+    const src = pickPhotographSource(photograph, neededPixels);
+    if (sourceRef.current.id !== photograph.id || src !== sourceRef.current.src) sourceRef.current = { id: photograph.id, src, pixels: neededPixels };
+  }
+  const displaySrc = sourceRef.current.src;
 
   const measureFit = React.useCallback(() => {
     const stage = stageRef.current;
@@ -224,7 +289,9 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
 
   const paint = React.useCallback(() => {
     const { scale: currentScale, position: { x, y } } = viewRef.current;
-    if (imageRef.current) imageRef.current.style.transform = `translate3d(${x + swipeOffsetRef.current}px, ${y}px, 0) scale(${currentScale})`;
+    const transform = `translate3d(${x + swipeOffsetRef.current}px, ${y}px, 0) scale(${currentScale})`;
+    if (imageRef.current) imageRef.current.style.transform = transform;
+    if (placeholderRef.current) placeholderRef.current.style.transform = transform;
     const label = `${Math.round(currentScale * 100)}%`;
     if (scaleLabelRef.current && scaleLabelRef.current.textContent !== label) scaleLabelRef.current.textContent = label;
   }, []);
@@ -265,7 +332,11 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   useLayoutEffect(() => {
     clearTimeout(settleTimerRef.current);
     stageRef.current?.classList.remove('is-settling');
+    setPlaceholder(loadedPlaceholder(latestPhotograph.current));
     reset();
+    // The photograph is left for another: stop its download if it is still arriving.
+    const image = imageRef.current;
+    return () => { if (image && !image.complete) image.removeAttribute('src'); };
   }, [photograph.id, reset]);
   useEffect(() => () => clearTimeout(settleTimerRef.current), []);
 
@@ -277,19 +348,30 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     measureFit();
     const image = imageRef.current;
     if (!image) return undefined;
-    // The photograph fades in once decoded (CSS), so a switch never shows a half-drawn image.
-    const shown = () => { image.dataset.loaded = 'true'; };
-    if (image.complete) {
-      shown();
+    // The photograph fades in once decoded (CSS), so a switch never shows a half-drawn image;
+    // until then the placeholder (an already-loaded smaller file) is shown in its place.
+    const id = photograph.id;
+    const shown = (loaded) => {
+      if (latestPhotograph.current.id !== id || !image.isConnected) return; // a stale response
+      image.dataset.loaded = 'true';
+      if (loaded) loadedSources.add(image.getAttribute('src'));
+      setShownId(id);
+    };
+    if (image.complete && image.naturalWidth) {
+      shown(true);
       measureFit();
       return undefined;
     }
-    const handleLoad = () => { shown(); measureFit(); };
+    const handleLoad = () => {
+      measureFit();
+      Promise.resolve(image.decode?.()).catch(() => {}).then(() => shown(true));
+    };
+    const handleError = () => shown(false);
     image.addEventListener('load', handleLoad);
-    image.addEventListener('error', shown);
+    image.addEventListener('error', handleError);
     return () => {
       image.removeEventListener('load', handleLoad);
-      image.removeEventListener('error', shown);
+      image.removeEventListener('error', handleError);
     };
   }, [measureFit, photograph.id]);
 
@@ -327,15 +409,15 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     paint();
   }, [clampPosition, paint]);
 
+  // Neighbours are prefetched only once the shown photograph has arrived, so they never
+  // compete with it; leaving the viewer cancels whatever is still downloading.
   useEffect(() => {
-    preloadedSources.add(photograph.viewerSrc);
-    [previous, next].forEach((adjacent) => {
-      if (!adjacent || preloadedSources.has(adjacent.viewerSrc)) return;
-      preloadedSources.add(adjacent.viewerSrc);
-      const preload = new Image();
-      preload.src = adjacent.viewerSrc;
-    });
-  }, [photograph.viewerSrc, previous, next]);
+    if (shownId !== photograph.id) return;
+    const width = stageRef.current?.clientWidth || window.innerWidth;
+    const height = stageRef.current?.clientHeight || window.innerHeight;
+    prefetchViewerSources([previous, next].map((adjacent) => adjacent && pickPhotographSource(adjacent, viewerDevicePixels(adjacent, width, height))));
+  }, [shownId, photograph.id, previous, next]);
+  useEffect(() => () => prefetchViewerSources([]), []);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -575,7 +657,10 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
               onPointerCancel={endDrag}
               onDoubleClick={onDoubleClick}
             >
-              <img ref={imageRef} key={photograph.id} src={photograph.viewerSrc} width={photograph.viewerWidth} height={photograph.viewerHeight} alt={photograph.alt} loading="eager" fetchPriority="high" decoding="async" style={{ width: `${fitSize.width}px`, height: `${fitSize.height}px` }} />
+              <img ref={imageRef} key={photograph.id} data-full="" src={displaySrc} width={photograph.viewerWidth} height={photograph.viewerHeight} alt={photograph.alt} loading="eager" fetchPriority="high" decoding="async" style={{ width: `${fitSize.width}px`, height: `${fitSize.height}px` }} />
+              {placeholder && shownId !== photograph.id && placeholder !== displaySrc && (
+                <img ref={placeholderRef} key={`${photograph.id}-placeholder`} className="photography-lightbox-placeholder" data-loaded="" src={placeholder} alt="" aria-hidden="true" style={{ width: `${fitSize.width}px`, height: `${fitSize.height}px`, transform: imageRef.current?.style.transform }} />
+              )}
             </div>
             <button type="button" onClick={() => next && onNavigate(next)} disabled={!next} aria-label="Next photograph"><FaChevronRight aria-hidden="true" /></button>
           </div>

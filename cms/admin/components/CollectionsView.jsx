@@ -34,7 +34,7 @@ export default function CollectionsView({ catalog, run, onFilter }) {
           const cover = coverOf(catalog, category);
           return (
             <li key={category} className="cms-collection">
-              <span className="cms-collection-cover">{cover ? <img src={imageUrl(cover.id)} alt="" /> : <span>No published cover</span>}</span>
+              <span className="cms-collection-cover">{cover ? <img src={imageUrl(cover.id)} alt="" loading="lazy" decoding="async" /> : <span>No published cover</span>}</span>
               <div className="cms-collection-body">
                 <h2>{category}</h2>
                 <p className="mono">{members.length} photographs · {members.filter(({ status }) => status === 'published').length} published{cover ? ` · cover ${cover.id}` : ''}</p>

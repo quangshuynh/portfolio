@@ -11,6 +11,7 @@ Interval 1 (2026-10-22).
 | `src/data/photography.catalog.json` | People, or later the CMS | Copy, status, category, tags, curated and featured order, manual metadata corrections |
 | `src/data/photographs.generated.json` | `npm run prepare:photography` | Derivative names and sizes and the public EXIF subset, for **published** photographs only |
 | `src/assets/photography/generated/` | `npm run prepare:photography` | Gallery (900×1200 box) and viewer (2200×1800 box) JPEGs, for **published** photographs only |
+| `node_modules/.cache/photography-medium/` | every build (`scripts/photography-responsive.mjs`) | 1600 px JPEG (q84) resized from the viewer file, for viewer files ≥ 1840 px (landscapes); cached by content hash, never committed |
 | `scripts/photography-sources.mjs` | People | Build-only camera-library paths (never shipped) |
 
 ## Schema (version 1)
@@ -206,6 +207,17 @@ was the old mobile bug (a pinch enlarged the photo only inside its fitted box). 
 transform from a ref without re-rendering. `npm run check:photography:viewer` checks this in
 real layout (see PROJECT_MAINTENANCE.md). Zooming past 100% enlarges the 2200 px viewer image;
 there is no larger public derivative.
+
+**Loading** (Interval 23.2). Pages offer gallery, medium (1600 px, landscapes) and viewer files in
+`srcset`; archive frames state their exact rendered width in `sizes`, the hero is preloaded with
+the same `srcset`. The viewer picks the narrowest file covering the fitted size at the device
+pixel ratio (`pickPhotographSource`), upgrades it when zooming, and shows an already-loaded file
+underneath until it is decoded. Neighbours are prefetched at low priority only after the shown
+photograph has arrived (at most four; obsolete ones and abandoned downloads are cancelled).
+Archive `sizes` cap the density at 2× (`ARCHIVE_MAX_DENSITY`), so 3× phones keep the 900 px files
+there. `npm run measure:photography` measures it (see PROJECT_MAINTENANCE.md); against Interval
+23.1, a full scroll fell from 35.1 to 14.1 MB on a 2× desktop, 12.2 to 10.8 MB on a 3× phone and
+11.4 to 10.5 MB at 1×, and slow-4G hero LCP from 2.67 to 2.33 s (desktop) and 2.58 to 2.22 s (phone).
 
 **Zoom gestures** (`photographyLightbox.jsx`, tested in `photographyGestures.test.jsx`): the
 image area has `touch-action: none`, so the viewer handles them itself. Two fingers zoom

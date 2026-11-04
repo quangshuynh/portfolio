@@ -2,7 +2,9 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadPublicCollection } from './photography-catalog-files.mjs';
+import { DERIVATIVES_DIRECTORY, loadPublicCollection } from './photography-catalog-files.mjs';
+import { MEDIUM_CACHE_DIRECTORY } from './photography-catalog-plugin.mjs';
+import { ensureMediumDerivatives } from './photography-responsive.mjs';
 import {
   DEFAULT_SOCIAL_IMAGE,
   EDITOR_ROUTE,
@@ -20,6 +22,7 @@ import {
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLACEHOLDER = '<!--seo-head-->';
 const PHOTO_ASSET_DIR = 'src/assets/photography/generated/';
+const MEDIUM_ASSET_DIR = 'node_modules/.cache/photography-medium/';
 // React-independent startup watchdog for the editor (public/photography/editor-startup.js).
 const EDITOR_STARTUP_SCRIPT = 'photography/editor-startup.js';
 
@@ -94,10 +97,16 @@ export default function seoPlugin() {
       };
 
       const { heroSlug, photographs: publicPhotographs } = await loadPhotographs();
+      // The build-time 1600 px derivative (photography-responsive.mjs), when the photograph has one.
+      const mediumFile = (id) => [...assets.entries()].find(([original]) => original.startsWith(`${MEDIUM_ASSET_DIR}${id}-medium-`))?.[1];
+      const { generated } = await loadPublicCollection();
+      const medium = await ensureMediumDerivatives(generated, DERIVATIVES_DIRECTORY, MEDIUM_CACHE_DIRECTORY);
       const photographs = publicPhotographs.map((photograph) => ({
         ...photograph,
         galleryFile: assetPath(photograph.galleryFilename),
         viewerFile: assetPath(photograph.viewerFilename),
+        mediumFile: mediumFile(photograph.id),
+        mediumWidth: medium.get(photograph.id)?.width,
       })).map((photograph) => ({
         ...photograph,
         galleryUrl: `${SITE_URL}/${photograph.galleryFile}`,
@@ -116,7 +125,11 @@ export default function seoPlugin() {
           rel: 'preload',
           as: 'image',
           href: `${base}${hero.viewerFile}`,
-          imagesrcset: `${base}${hero.galleryFile} ${hero.galleryWidth}w, ${base}${hero.viewerFile} ${hero.viewerWidth}w`,
+          imagesrcset: [
+            `${base}${hero.galleryFile} ${hero.galleryWidth}w`,
+            ...(hero.mediumFile ? [`${base}${hero.mediumFile} ${hero.mediumWidth}w`] : []),
+            `${base}${hero.viewerFile} ${hero.viewerWidth}w`,
+          ].join(', '),
           imagesizes: '100vw',
           fetchpriority: 'high',
         });

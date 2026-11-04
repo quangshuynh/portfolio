@@ -6,6 +6,7 @@ import {
   filterPhotographs,
   findPhotograph,
   photographs,
+  photographSrcSet as srcSet,
   sortPhotographs,
 } from '../../data/photographs';
 import { appHref, navigate, photographyHref } from '../../util/navigation';
@@ -24,10 +25,6 @@ export function formatExposure({ focalLength, aperture, shutterSpeed, iso }) {
 
 const padNumber = (value) => String(value).padStart(2, '0');
 const aspectOf = (photograph) => (photograph.galleryWidth && photograph.galleryHeight ? photograph.galleryWidth / photograph.galleryHeight : 1.5);
-
-function srcSet(photograph) {
-  return `${photograph.gallerySrc} ${photograph.galleryWidth}w, ${photograph.viewerSrc} ${photograph.viewerWidth}w`;
-}
 
 // ---------- collections in the URL ----------
 // `?collection=automotive` filters the archive; the hash stays the photo viewer's.
@@ -134,14 +131,23 @@ function FeaturedFigure({ photograph, sizes, onOpen, href, priority }) {
   );
 }
 
-function PhotographFigure({ photograph, onOpen, href }) {
+// Archive frames have exact widths (row height × aspect), so `sizes` states them and the
+// browser picks the right file instead of guessing from a viewport fraction. Above 2× the
+// archive asks for 2× only: on a 3× phone a 1600 px file for a 350 px thumbnail doubled the
+// archive's bytes for no visible gain (the hero, Featured and the viewer still use full density).
+export const ARCHIVE_MAX_DENSITY = 2;
+export const archiveFrameSizes = (photograph, rowHeight, density = (typeof window === 'undefined' ? 1 : window.devicePixelRatio) || 1) => (
+  `${Math.max(1, Math.round(aspectOf(photograph) * rowHeight * Math.min(1, ARCHIVE_MAX_DENSITY / density)))}px`
+);
+
+function PhotographFigure({ photograph, onOpen, href, sizes }) {
   return (
     <figure data-photo-slug={photograph.slug} className={`photo-frame photo-frame--${photograph.shape ?? 'landscape'}`} style={{ '--aspect': aspectOf(photograph) }}>
       <a href={href} onClick={(event) => onOpen(event, 'collection')} aria-label={`Open photograph: ${photograph.caption}`}>
         <img
           src={photograph.gallerySrc}
           srcSet={srcSet(photograph)}
-          sizes="(max-width: 760px) 50vw, 34vw"
+          sizes={sizes}
           width={photograph.galleryWidth}
           height={photograph.galleryHeight}
           alt={photograph.alt}
@@ -399,7 +405,7 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
             <div ref={galleryRef} className="photography-page-grid" id="photography-gallery" aria-label="Photography collection" style={{ '--row-gap': `${rowGap}px` }}>
               {archiveRows.map((row) => (
                 <div className={`photography-row${row.complete ? '' : ' photography-row--last'}`} style={{ '--row-target': `${Math.round(row.height)}px` }} key={row.items[0].id}>
-                  {row.items.map((photograph) => <PhotographFigure photograph={photograph} onOpen={openPhotograph} href={hrefFor(photograph)} key={photograph.id} />)}
+                  {row.items.map((photograph) => <PhotographFigure photograph={photograph} sizes={archiveFrameSizes(photograph, row.height)} onOpen={openPhotograph} href={hrefFor(photograph)} key={photograph.id} />)}
                 </div>
               ))}
             </div>
