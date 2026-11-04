@@ -132,8 +132,13 @@ function FeaturedFigure({ photograph, sizes, onOpen, href, priority }) {
 }
 
 // Archive frames have exact widths (row height × aspect), so `sizes` states them and the
-// browser picks the right file instead of guessing from a viewport fraction.
-export const archiveFrameSizes = (photograph, rowHeight) => `${Math.max(1, Math.round(aspectOf(photograph) * rowHeight))}px`;
+// browser picks the right file instead of guessing from a viewport fraction. Above 2× the
+// archive asks for 2× only: on a 3× phone a 1600 px file for a 350 px thumbnail doubled the
+// archive's bytes for no visible gain (the hero, Featured and the viewer still use full density).
+export const ARCHIVE_MAX_DENSITY = 2;
+export const archiveFrameSizes = (photograph, rowHeight, density = (typeof window === 'undefined' ? 1 : window.devicePixelRatio) || 1) => (
+  `${Math.max(1, Math.round(aspectOf(photograph) * rowHeight * Math.min(1, ARCHIVE_MAX_DENSITY / density)))}px`
+);
 
 function PhotographFigure({ photograph, onOpen, href, sizes }) {
   return (

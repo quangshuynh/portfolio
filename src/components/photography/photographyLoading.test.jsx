@@ -53,6 +53,15 @@ test('landscape photographs get a medium derivative between gallery and viewer w
   expect(Math.abs(withMedium.mediumWidth / withMedium.mediumHeight - withMedium.viewerWidth / withMedium.viewerHeight)).toBeLessThan(0.01);
 });
 
+test('archive sizes cap the pixel density at 2×', async () => {
+  const { archiveFrameSizes } = await import('../pages/photographyPage');
+  const frame = { galleryWidth: 900, galleryHeight: 600 };
+  expect(archiveFrameSizes(frame, 200, 1)).toBe('300px');
+  expect(archiveFrameSizes(frame, 200, 2)).toBe('300px');
+  // 3×: asks for 600 device pixels' worth (300 × 2), so the 900 px file is chosen, not 1600 px.
+  expect(archiveFrameSizes(frame, 200, 3)).toBe('200px');
+});
+
 test('the hero loads first at high priority; featured and archive frames are lazy with exact archive sizes', async () => {
   render(<App />);
   await screen.findAllByRole('link', { name: /^View photograph:/ });
