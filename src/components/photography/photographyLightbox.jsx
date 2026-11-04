@@ -400,7 +400,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     const id = photograph.id;
     const shown = (loaded) => {
       if (latestPhotograph.current.id !== id || !image.isConnected) return; // a stale response
-      image.dataset.loaded = 'true';
+      if (image.dataset.loaded !== 'true') image.dataset.loaded = 'true'; // no DOM write mid-gesture
       if (loaded) loadedSources.add(image.getAttribute('src'));
       setShownId(id);
     };
@@ -476,6 +476,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     if (delay === null || delay === undefined) return undefined;
     const id = photograph.id;
     let image = null;
+    let retry = null;
     const timer = setTimeout(() => {
       image = new Image();
       image.decoding = 'async';
@@ -486,13 +487,20 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
         if (!image || latestPhotograph.current.id !== id || sourceRef.current.id !== id) return;
         image = null; // done: nothing left to cancel
         loadedSources.add(targetSrc);
-        if (!isWiderSource(latestPhotograph.current, targetSrc, sourceRef.current.src)) return;
-        sourceRef.current = { id, src: targetSrc };
-        setUpgradedSrc(targetSrc);
+        // Swapped once the fingers lift, so a pinch or swipe never re-renders.
+        const swap = () => {
+          if (latestPhotograph.current.id !== id || sourceRef.current.id !== id) return;
+          if (pointersRef.current.size) { retry = setTimeout(swap, 120); return; }
+          if (!isWiderSource(latestPhotograph.current, targetSrc, sourceRef.current.src)) return;
+          sourceRef.current = { id, src: targetSrc };
+          setUpgradedSrc(targetSrc);
+        };
+        swap();
       }).catch(() => {});
     }, delay);
     return () => {
       clearTimeout(timer);
+      clearTimeout(retry);
       if (image && !image.complete) image.removeAttribute('src');
       image = null;
     };

@@ -241,6 +241,22 @@ describe('on a 2× display', () => {
     expect(image.style.transform).toContain('scale(1.25)');
   });
 
+  test('the sharper file waits until the fingers lift', async () => {
+    const photograph = ordered[landscape];
+    window.history.replaceState({}, '', photographyHref(photograph.slug));
+    render(<App />);
+    await screen.findByRole('dialog', { name: new RegExp(escape(photograph.caption), 'i') });
+    const image = document.querySelector('.photography-lightbox-image-wrap img[data-full]');
+    const stage = document.querySelector('.photography-lightbox-image-wrap');
+    await act(async () => { fireEvent.load(image); await Promise.resolve(); await Promise.resolve(); });
+    fireEvent.pointerDown(stage, { pointerId: 7, pointerType: 'touch', clientX: 100, clientY: 100, buttons: 1 });
+    await wait(450);
+    expect(image.getAttribute('src')).toBe(photograph.mediumSrc);
+    fireEvent.pointerUp(stage, { pointerId: 7, pointerType: 'touch', clientX: 100, clientY: 100 });
+    await wait(200);
+    expect(image.getAttribute('src')).toBe(photograph.viewerSrc);
+  });
+
   test('going back prefetches the previous photograph first', async () => {
     const photograph = ordered[landscape];
     window.history.replaceState({}, '', photographyHref(ordered[landscape + 1].slug));
