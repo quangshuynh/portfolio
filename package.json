@@ -55,7 +55,8 @@
     "check:cms:editor": "node scripts/check-cms-editor.mjs",
     "check:editor:sustained": "node scripts/check-editor-sustained.mjs",
     "check:editor:selection": "node scripts/check-editor-selection.mjs",
-    "bench:selection": "node scripts/bench-selection.mjs"
+    "bench:selection": "node scripts/bench-selection.mjs",
+    "selection:references": "node scripts/selection-references.mjs"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
