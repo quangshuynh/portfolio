@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { FaChevronLeft, FaChevronRight, FaCompress, FaExpand, FaInfoCircle, FaMinus, FaPlus, FaTimes } from 'react-icons/fa';
 import useOverlayLock from '../utilities/overlayLock';
 import useFullscreen from '../utilities/useFullscreen';
-import { photographSources, pickPhotographSource } from '../../data/photographs';
+import { photographSources, photographTiers } from '../../data/photographs';
+import { initialViewerSource, isWiderSource, prefetchPlan, upgradeDelay, viewerNetworkTier } from './viewerLoading';
 
 // Files the viewer has seen load: shown at once (from the browser's cache) as a placeholder
 // or as the photograph itself. Strings only; the decoded images belong to the browser.
@@ -161,6 +162,8 @@ export function resetPhotographyPreloadsForTests() {
   loadedSources.clear();
   prefetches.forEach((image) => image.removeAttribute('src'));
   prefetches.clear();
+  prefetchQueue = [];
+  prefetching.clear();
 }
 
 /** The device pixels a photograph needs fitted into the stage (or the window, before layout). */
@@ -184,26 +187,60 @@ export function loadedPlaceholder(photograph) {
 }
 
 /**
- * Prefetches the neighbours' files at low priority and cancels prefetches no longer wanted,
- * so rapid navigation never queues a backlog in front of the photograph being shown.
+ * Whether the file is already loaded: by the viewer, or by an <img> on the page (the hero, a
+ * featured or archive frame), so opening a photograph reuses what the page already has.
  */
-export function prefetchViewerSources(wanted) {
-  const keep = new Set(wanted.filter(Boolean));
-  prefetches.forEach((image, src) => {
-    if (keep.has(src)) return;
-    if (!image.complete) image.removeAttribute('src');
-    prefetches.delete(src);
-  });
-  keep.forEach((src) => {
-    if (loadedSources.has(src) || prefetches.has(src)) return;
+export function isSourceLoaded(src) {
+  if (loadedSources.has(src)) return true;
+  const absolute = new URL(src, document.baseURI).href;
+  const shown = [...document.querySelectorAll('main img')].some((image) => image.complete && image.naturalWidth > 0 && image.currentSrc === absolute);
+  if (shown) loadedSources.add(src);
+  return shown;
+}
+
+// Wanted prefetches in order, and how many may download at once.
+let prefetchQueue = [];
+let prefetchConcurrency = 2;
+const prefetching = new Set(); // started and not yet loaded, failed or cancelled
+
+function pumpPrefetches() {
+  let free = prefetchConcurrency - prefetching.size;
+  for (const src of prefetchQueue) {
+    if (free <= 0) return;
+    if (loadedSources.has(src) || prefetches.has(src)) continue;
     const image = new Image();
     image.fetchPriority = 'low';
     image.decoding = 'async';
-    image.onload = () => loadedSources.add(src);
+    image.onload = () => { prefetching.delete(src); loadedSources.add(src); pumpPrefetches(); };
+    image.onerror = () => { prefetching.delete(src); pumpPrefetches(); };
+    prefetching.add(src);
     image.src = src;
     prefetches.set(src, image);
-    while (prefetches.size > PREFETCH_LIMIT) prefetches.delete(prefetches.keys().next().value);
+    while (prefetches.size > PREFETCH_LIMIT) {
+      const oldest = prefetches.keys().next().value;
+      if (prefetching.delete(oldest)) prefetches.get(oldest).removeAttribute('src');
+      prefetches.delete(oldest);
+    }
+    free -= 1;
+  }
+}
+
+/**
+ * Prefetches the neighbours' files at low priority, in order, at most `concurrency` at a time
+ * (1 on slow links, so the likeliest next photograph gets the bandwidth), and cancels prefetches
+ * no longer wanted, so rapid navigation never queues a backlog in front of the one shown.
+ */
+export function prefetchViewerSources(wanted, { concurrency = 2 } = {}) {
+  prefetchQueue = [...new Set(wanted.filter(Boolean))];
+  prefetchConcurrency = concurrency;
+  const keep = new Set(prefetchQueue);
+  prefetches.forEach((image, src) => {
+    if (keep.has(src)) return;
+    if (prefetching.has(src)) image.removeAttribute('src');
+    prefetching.delete(src);
+    prefetches.delete(src);
   });
+  pumpPrefetches();
 }
 
 export default function PhotographyLightbox({ photograph, collection, onNavigate, onClose, returnFocusRef }) {
@@ -235,9 +272,13 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   const tapRef = useRef(null);
   const tapZoomRef = useRef(-Infinity);
   const latestPhotograph = useRef(photograph);
-  // The file shown: chosen for the fitted size and upgraded (never downgraded) for zoom or a
-  // larger stage, per photograph. Before layout the window stands in for the stage.
-  const sourceRef = useRef({ id: null, src: null, pixels: 0 });
+  // The file shown, per photograph: the first file (at most 1600 px unless already loaded or the
+  // network is fast), then upgraded (never downgraded) to the file the fitted size, zoom or a
+  // larger stage needs. Before layout the window stands in for the stage.
+  const sourceRef = useRef({ id: null, src: null });
+  const [, setUpgradedSrc] = useState(null);
+  // 1 after moving forward or on opening, -1 after moving back: the neighbour prefetched first.
+  const directionRef = useRef({ id: photograph.id, index: -1, direction: 1 });
   const [placeholder, setPlaceholder] = useState(() => loadedPlaceholder(photograph));
   const [shownId, setShownId] = useState(null);
   const sheetTitleId = useId();
@@ -251,11 +292,17 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
 
   const stageBox = () => [stageRef.current?.clientWidth || window.innerWidth, stageRef.current?.clientHeight || window.innerHeight];
   const neededPixels = viewerDevicePixels(photograph, ...stageBox(), Math.max(1, scale));
-  if (sourceRef.current.id !== photograph.id || neededPixels > sourceRef.current.pixels) {
-    const src = pickPhotographSource(photograph, neededPixels);
-    if (sourceRef.current.id !== photograph.id || src !== sourceRef.current.src) sourceRef.current = { id: photograph.id, src, pixels: neededPixels };
+  const networkTier = viewerNetworkTier();
+  if (sourceRef.current.id !== photograph.id) {
+    sourceRef.current = { id: photograph.id, src: initialViewerSource(photograph, neededPixels, networkTier, isSourceLoaded) };
   }
   const displaySrc = sourceRef.current.src;
+  const targetSrc = photographTiers(photograph, neededPixels).full;
+  const upgradePending = targetSrc !== displaySrc && isWiderSource(photograph, targetSrc, displaySrc);
+  if (directionRef.current.id !== photograph.id) {
+    const previousIndex = directionRef.current.index;
+    directionRef.current = { id: photograph.id, index, direction: previousIndex >= 0 && index < previousIndex ? -1 : 1 };
+  } else directionRef.current.index = index;
 
   const measureFit = React.useCallback(() => {
     const stage = stageRef.current;
@@ -353,7 +400,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     const id = photograph.id;
     const shown = (loaded) => {
       if (latestPhotograph.current.id !== id || !image.isConnected) return; // a stale response
-      image.dataset.loaded = 'true';
+      if (image.dataset.loaded !== 'true') image.dataset.loaded = 'true'; // no DOM write mid-gesture
       if (loaded) loadedSources.add(image.getAttribute('src'));
       setShownId(id);
     };
@@ -413,10 +460,51 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   // compete with it; leaving the viewer cancels whatever is still downloading.
   useEffect(() => {
     if (shownId !== photograph.id) return;
-    const width = stageRef.current?.clientWidth || window.innerWidth;
-    const height = stageRef.current?.clientHeight || window.innerHeight;
-    prefetchViewerSources([previous, next].map((adjacent) => adjacent && pickPhotographSource(adjacent, viewerDevicePixels(adjacent, width, height))));
+    const [width, height] = stageBox();
+    const tier = viewerNetworkTier();
+    prefetchViewerSources(prefetchPlan({ previous, next }, directionRef.current.direction, tier,
+      (adjacent) => viewerDevicePixels(adjacent, width, height), isSourceLoaded), { concurrency: tier === 'normal' || tier === 'fast' ? 2 : 1 });
   }, [shownId, photograph.id, previous, next]);
+
+  // The full-size file, once the photograph has stayed shown long enough (at once when zoomed):
+  // decoded off screen, then swapped in, so the sharper file never shows half-drawn. Moving on
+  // first cancels it.
+  const zoomed = scale > 1;
+  useEffect(() => {
+    if (shownId !== photograph.id || !upgradePending) return undefined;
+    const delay = upgradeDelay(viewerNetworkTier(), zoomed);
+    if (delay === null || delay === undefined) return undefined;
+    const id = photograph.id;
+    let image = null;
+    let retry = null;
+    const timer = setTimeout(() => {
+      image = new Image();
+      image.decoding = 'async';
+      image.src = targetSrc;
+      const loaded = new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; });
+      // decode() can reject for a large image that did load (WebKit); then the load event decides.
+      (image.decode ? image.decode().catch(() => loaded) : loaded).then(() => {
+        if (!image || latestPhotograph.current.id !== id || sourceRef.current.id !== id) return;
+        image = null; // done: nothing left to cancel
+        loadedSources.add(targetSrc);
+        // Swapped once the fingers lift, so a pinch or swipe never re-renders.
+        const swap = () => {
+          if (latestPhotograph.current.id !== id || sourceRef.current.id !== id) return;
+          if (pointersRef.current.size) { retry = setTimeout(swap, 120); return; }
+          if (!isWiderSource(latestPhotograph.current, targetSrc, sourceRef.current.src)) return;
+          sourceRef.current = { id, src: targetSrc };
+          setUpgradedSrc(targetSrc);
+        };
+        swap();
+      }).catch(() => {});
+    }, delay);
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(retry);
+      if (image && !image.complete) image.removeAttribute('src');
+      image = null;
+    };
+  }, [shownId, photograph.id, upgradePending, targetSrc, zoomed]);
   useEffect(() => () => prefetchViewerSources([]), []);
 
   useEffect(() => {
@@ -657,7 +745,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
               onPointerCancel={endDrag}
               onDoubleClick={onDoubleClick}
             >
-              <img ref={imageRef} key={photograph.id} data-full="" src={displaySrc} width={photograph.viewerWidth} height={photograph.viewerHeight} alt={photograph.alt} loading="eager" fetchPriority="high" decoding="async" style={{ width: `${fitSize.width}px`, height: `${fitSize.height}px` }} />
+              <img ref={imageRef} key={photograph.id} data-full="" data-sharp={upgradePending ? 'false' : 'true'} src={displaySrc} width={photograph.viewerWidth} height={photograph.viewerHeight} alt={photograph.alt} loading="eager" fetchPriority="high" decoding="async" style={{ width: `${fitSize.width}px`, height: `${fitSize.height}px` }} />
               {placeholder && shownId !== photograph.id && placeholder !== displaySrc && (
                 <img ref={placeholderRef} key={`${photograph.id}-placeholder`} className="photography-lightbox-placeholder" data-loaded="" src={placeholder} alt="" aria-hidden="true" style={{ width: `${fitSize.width}px`, height: `${fitSize.height}px`, transform: imageRef.current?.style.transform }} />
               )}

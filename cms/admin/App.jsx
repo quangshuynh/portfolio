@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { movePhotograph } from '../lib/catalog-ops.mjs';
 import { api } from './api.js';
+import { clearPixelCache } from './watermarkImages.js';
 import BulkBar from './components/BulkBar.jsx';
 import CollectionsView from './components/CollectionsView.jsx';
 import DetailsPanel from './components/DetailsPanel.jsx';
@@ -28,7 +29,8 @@ function matches(record, { query, status, category }, problems) {
 
 export default function App() {
   const [expired, setExpired] = useState(false);
-  const onSessionExpired = useCallback(() => setExpired(true), []);
+  // Decoded private images stay in memory only while signed in.
+  const onSessionExpired = useCallback(() => { clearPixelCache(); setExpired(true); }, []);
   const ws = useWorkspace({ onSessionExpired });
   // #watermark (the end of a bulk watermark run) opens the Watermark view.
   const [view, setView] = useState(() => (window.location.hash === '#watermark' ? 'watermark' : 'library'));
@@ -110,7 +112,7 @@ export default function App() {
         onReload={ws.reload}
         theme={theme}
         onTheme={() => setTheme((current) => (current === 'light' ? 'dark' : 'light'))}
-        onSignOut={async () => { await api.signOut(); setExpired(true); }}
+        onSignOut={async () => { await api.signOut(); onSessionExpired(); }}
       />
       <main className="cms-main" id="main-content">
         {ws.recovered && (

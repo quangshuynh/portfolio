@@ -6,6 +6,8 @@
 // unthrottled. Every scenario repeats RUNS times and reports p50/p95.
 // Usage: npm run build && npm run measure:photography [-- --url https://quanghuynh.com | --dist other-dist] [--json out.json]
 //   MEASURE_ENGINES=chromium,firefox,webkit  MEASURE_RUNS=5  MEASURE_SCENARIOS=load,scroll,viewer,editor
+//   MEASURE_VIEWER_SLOW_PAGE=1 throttles the viewer scenario from page load (default: from opening).
+//   MEASURE_PROFILES=desktop,desktop-2x,mobile (also mobile-2x)  MEASURE_NETWORKS=broadband,slow-4g
 //   RAW_COMPAT_DIR=<genuine RAW files> adds RAW previews to the editor scenario (MEASURE_RAW_FILES to choose).
 import { createReadStream, existsSync, mkdtempSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -69,7 +71,8 @@ const PROFILES = [
   { key: 'desktop', viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 },
   { key: 'desktop-2x', viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 },
   { key: 'mobile', device: 'iPhone 13' },
-];
+  { key: 'mobile-2x', device: 'iPhone SE', optional: true },
+].filter((profile) => (process.env.MEASURE_PROFILES ? process.env.MEASURE_PROFILES.split(',').includes(profile.key) : !profile.optional));
 const NETWORKS = {
   broadband: null,
   'slow-4g': { latency: 150, downloadThroughput: (1.6 * 1024 * 1024) / 8, uploadThroughput: (750 * 1024) / 8, cpu: 4 },
@@ -194,40 +197,62 @@ async function measureViewer(browser, engine, profile, network) {
     requestAnimationFrame(sample);
   });
   const page = await context.newPage();
+  // MEASURE_VIEWER_SLOW_PAGE=1: the whole visit on the network (the archive loads on it too).
+  const early = Boolean(process.env.MEASURE_VIEWER_SLOW_PAGE);
+  if (early) await throttle(page, engine, network);
   await page.goto(`${base}/photography/`, { waitUntil: 'load' });
   await heroReady(page);
-  // Load the archive area as a visitor would before opening a photograph from it.
-  await page.locator('#photography-gallery').scrollIntoViewIfNeeded();
+  // Load the archive area as a visitor would before opening a photograph from it. The frame to
+  // click is brought into view first: click() would otherwise scroll there under throttling,
+  // waking lazy images above it that a visitor scrolling down has already loaded.
+  const first = page.locator('#photography-gallery figure a').first();
+  await first.scrollIntoViewIfNeeded();
   await page.waitForTimeout(1500);
-  await throttle(page, engine, network);
+  if (!early) await throttle(page, engine, network);
   const viewerShown = () => page.waitForFunction(() => {
     const image = document.querySelector('.photography-lightbox-image-wrap img[data-full]') ?? document.querySelector('.photography-lightbox-image-wrap img');
     return image && image.complete && image.naturalWidth > 0 && image.dataset.loaded === 'true';
   }, null, { timeout: 60_000 });
+  // The file the fitted size needs at the device pixel ratio is on screen (not the first, smaller one).
+  const viewerSharp = () => page.waitForFunction(() => document.querySelector('.photography-lightbox-image-wrap img[data-full]')?.dataset.sharp !== 'false'
+    && document.querySelector('.photography-lightbox-image-wrap img[data-full]').complete, null, { timeout: 60_000 });
   const anyShown = () => page.waitForFunction(() => [...document.querySelectorAll('.photography-lightbox-image-wrap img')].some((image) => image.complete && image.naturalWidth > 0 && getComputedStyle(image).opacity !== '0'), null, { timeout: 60_000, polling: 'raf' });
-  const first = page.locator('#photography-gallery figure a').first();
+  const openedAt = await page.evaluate(() => performance.now());
   let started = Date.now();
   await first.click();
   await anyShown();
   const openVisible = Date.now() - started;
   await viewerShown();
   const openFull = Date.now() - started;
+  await viewerSharp();
+  const openSharp = Date.now() - started;
   const steps = [];
   for (const key of ['ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'ArrowRight']) {
     await page.waitForTimeout(400);
     started = Date.now();
+    if (process.env.MEASURE_VERBOSE) console.log(`  press ${key} at ${Math.round(await page.evaluate(() => performance.now()) - openedAt)} ms`);
     await page.keyboard.press(key);
     await anyShown();
     const visible = Date.now() - started;
     await viewerShown();
-    steps.push({ visible, full: Date.now() - started });
+    const full = Date.now() - started;
+    await viewerSharp();
+    steps.push({ visible, full, sharp: Date.now() - started });
   }
   // Rapid navigation: ten steps without waiting, then the shown photograph must be the last one.
   for (let i = 0; i < 10; i += 1) await page.keyboard.press('ArrowRight');
   await viewerShown();
+  await page.waitForTimeout(1500);
   const frames = await page.evaluate(() => window.__viewerFrames);
+  // Image files requested after opening: bytes and how many were 2200 px viewer files.
+  const fetched = (await page.evaluate(IMAGE_ENTRIES)).filter(({ start }) => start >= openedAt);
+  if (process.env.MEASURE_VERBOSE) {
+    console.log('steps', JSON.stringify(steps));
+    for (const entry of fetched) console.log(`  ${Math.round(entry.start - openedAt)}–${Math.round(entry.end - openedAt)} ms ${entry.name} ${kb(sizeOf(entry))} KB${entry.cached ? ' (cache)' : ''}`);
+  }
   await context.close();
-  return { openVisible, openFull, steps, blankFrames: frames.blank, frames: frames.total };
+  return { openVisible, openFull, openSharp, steps, blankFrames: frames.blank, frames: frames.total,
+    viewerKB: kb(fetched.reduce((sum, entry) => sum + sizeOf(entry), 0)), viewerFiles: fetched.filter(({ name }) => name.includes('-viewer')).length, files: fetched.length };
 }
 
 
@@ -306,7 +331,8 @@ try {
     try {
       for (const profile of PROFILES) {
         if (engineName === 'firefox' && profile.device) continue;
-        const networks = engineName === 'chromium' ? Object.keys(NETWORKS) : ['broadband'];
+        const networks = (engineName === 'chromium' ? Object.keys(NETWORKS) : ['broadband'])
+          .filter((network) => !process.env.MEASURE_NETWORKS || process.env.MEASURE_NETWORKS.split(',').includes(network));
         if (SCENARIOS.includes('load')) {
           for (const network of networks) {
             for (const warm of [false, true]) {
@@ -348,6 +374,10 @@ try {
               openFull: summary(samples.map(({ openFull }) => openFull)),
               stepVisible: summary(steps.map(({ visible }) => visible)),
               stepFull: summary(steps.map(({ full }) => full)),
+              openSharp: summary(samples.map(({ openSharp }) => openSharp)),
+              stepSharp: summary(steps.map(({ sharp }) => sharp)),
+              viewerKB: summary(samples.map(({ viewerKB }) => viewerKB)),
+              viewerFiles: summary(samples.map(({ viewerFiles }) => viewerFiles)),
               blankFramePct: round((100 * samples.reduce((sum, { blankFrames }) => sum + blankFrames, 0)) / Math.max(1, samples.reduce((sum, { frames }) => sum + frames, 0))),
             });
           }

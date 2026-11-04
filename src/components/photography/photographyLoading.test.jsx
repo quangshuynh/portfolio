@@ -2,7 +2,7 @@
 // lazy archive frames, neighbour prefetch, cancellation and stale responses.
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import App from '../../App';
-import { photographs, photographSources, photographSrcSet, pickPhotographSource, sortPhotographs } from '../../data/photographs';
+import { photographs, photographSources, photographSrcSet, photographTiers, pickPhotographSource, sortPhotographs } from '../../data/photographs';
 import { photographyHref } from '../../util/navigation';
 import { loadedPlaceholder, prefetchViewerSources, resetPhotographyPreloadsForTests, viewerDevicePixels } from './photographyLightbox';
 
@@ -24,6 +24,7 @@ beforeEach(() => {
   const NativeImage = window.Image;
   vi.spyOn(window, 'Image').mockImplementation(function MockImage() {
     const image = new NativeImage();
+    image.decode = () => Promise.resolve();
     created.push(image);
     return image;
   });
@@ -124,6 +125,28 @@ test('obsolete prefetches are cancelled and the prefetch set stays bounded', () 
   expect(created.filter((entry) => entry.getAttribute('src'))).toHaveLength(0);
 });
 
+test('on a slow link prefetches download one at a time, in order', () => {
+  prefetchViewerSources(['/next.jpg', '/previous.jpg'], { concurrency: 1 });
+  expect(created.map((entry) => entry.getAttribute('src'))).toEqual(['/next.jpg']);
+  created[0].onload();
+  expect(created.map((entry) => entry.getAttribute('src'))).toEqual(['/next.jpg', '/previous.jpg']);
+  // A new plan before the second starts replaces it.
+  prefetchViewerSources(['/other.jpg'], { concurrency: 1 });
+  expect(created[1].getAttribute('src')).toBeNull();
+});
+
+test('opening a photograph reuses a full-size file the page already shows (the hero)', async () => {
+  const { isSourceLoaded } = await import('./photographyLightbox');
+  const main = document.body.appendChild(document.createElement('main'));
+  const image = main.appendChild(document.createElement('img'));
+  Object.defineProperties(image, { complete: { value: true }, naturalWidth: { value: 2200 }, currentSrc: { value: new URL('/hero-viewer.jpg', document.baseURI).href } });
+  expect(isSourceLoaded('/hero-viewer.jpg')).toBe(true);
+  expect(isSourceLoaded('/hero-medium.jpg')).toBe(false);
+  main.remove();
+  // Remembered once seen.
+  expect(isSourceLoaded('/hero-viewer.jpg')).toBe(true);
+});
+
 test('rapid next/previous shows the last photograph, ignores stale loads and offers a loaded placeholder', async () => {
   const start = ordered[3];
   window.history.replaceState({}, '', photographyHref(start.slug));
@@ -147,4 +170,104 @@ test('rapid next/previous shows the last photograph, ignores stale loads and off
   expect(current.dataset.loaded).toBeUndefined();
   // One viewer image element for the current photograph (plus at most its placeholder).
   expect(document.querySelectorAll('.photography-lightbox-image-wrap img[data-full]')).toHaveLength(1);
+});
+
+describe('on a 2× display', () => {
+  let ratio;
+  beforeEach(() => {
+    ratio = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
+    Object.defineProperty(window, 'devicePixelRatio', { value: 2, configurable: true });
+  });
+  afterEach(() => {
+    if (ratio) Object.defineProperty(window, 'devicePixelRatio', ratio);
+    else delete window.devicePixelRatio;
+  });
+  const wait = (ms) => act(() => new Promise((resolve) => { setTimeout(resolve, ms); }));
+  const landscape = ordered.findIndex((photograph, index) => photograph.mediumSrc && index > 0 && index < ordered.length - 2);
+
+  test('the 1600 px file shows first and the 2200 px file replaces it once decoded, if the visitor stays', async () => {
+    const photograph = ordered[landscape];
+    // The fitted width at 2× needs more than 1600 px, so the full-size file is the viewer file.
+    expect(viewerDevicePixels(photograph, window.innerWidth, window.innerHeight)).toBeGreaterThan(1600);
+    window.history.replaceState({}, '', photographyHref(photograph.slug));
+    render(<App />);
+    await screen.findByRole('dialog', { name: new RegExp(escape(photograph.caption), 'i') });
+    const image = document.querySelector('.photography-lightbox-image-wrap img[data-full]');
+    expect(image.getAttribute('src')).toBe(photograph.mediumSrc);
+    expect(image.dataset.sharp).toBe('false');
+    await act(async () => { fireEvent.load(image); await Promise.resolve(); await Promise.resolve(); });
+    // Neighbours at the first size only (1600 px when they have it), on an unknown network.
+    const prefetched = created.map((entry) => entry.getAttribute('src'));
+    const pixels = (adjacent) => viewerDevicePixels(adjacent, window.innerWidth, window.innerHeight);
+    expect(prefetched).toEqual([ordered[landscape + 1], ordered[landscape - 1]].map((adjacent) => photographTiers(adjacent, pixels(adjacent)).step));
+    expect(created.some((entry) => entry.getAttribute('src') === photograph.viewerSrc)).toBe(false);
+    await wait(400);
+    expect(created.some((entry) => entry.getAttribute('src') === photograph.viewerSrc)).toBe(true);
+    // Same element: no remount, no blank frame; the sharper file is swapped in.
+    expect(document.querySelector('.photography-lightbox-image-wrap img[data-full]')).toBe(image);
+    expect(image.getAttribute('src')).toBe(photograph.viewerSrc);
+    expect(image.dataset.sharp).toBe('true');
+    expect(image.dataset.loaded).toBe('true');
+  });
+
+  test('moving on before the dwell never requests the 2200 px file, and a late upgrade is ignored', async () => {
+    const photograph = ordered[landscape];
+    window.history.replaceState({}, '', photographyHref(photograph.slug));
+    render(<App />);
+    await screen.findByRole('dialog', { name: new RegExp(escape(photograph.caption), 'i') });
+    const image = document.querySelector('.photography-lightbox-image-wrap img[data-full]');
+    await act(async () => { fireEvent.load(image); await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => { fireEvent.keyDown(document, { key: 'ArrowRight' }); });
+    await act(async () => { fireEvent.keyDown(document, { key: 'ArrowRight' }); });
+    await wait(400);
+    expect(created.some((entry) => entry.getAttribute('src') === photograph.viewerSrc)).toBe(false);
+    const target = ordered[landscape + 2];
+    const current = document.querySelector('.photography-lightbox-image-wrap img[data-full]');
+    expect(photographSources(target).map(({ src }) => src)).toContain(current.getAttribute('src'));
+    // Nothing of the photograph left behind is shown or still downloading.
+    expect(created.filter((entry) => entry.getAttribute('src') === photograph.viewerSrc)).toHaveLength(0);
+  });
+
+  test('zooming loads the full-size file at once, without waiting for the dwell', async () => {
+    const photograph = ordered[landscape];
+    window.history.replaceState({}, '', photographyHref(photograph.slug));
+    render(<App />);
+    await screen.findByRole('dialog', { name: new RegExp(escape(photograph.caption), 'i') });
+    const image = document.querySelector('.photography-lightbox-image-wrap img[data-full]');
+    await act(async () => { fireEvent.load(image); await Promise.resolve(); await Promise.resolve(); });
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    await wait(30);
+    expect(image.getAttribute('src')).toBe(photograph.viewerSrc);
+    expect(image.style.transform).toContain('scale(1.25)');
+  });
+
+  test('the sharper file waits until the fingers lift', async () => {
+    const photograph = ordered[landscape];
+    window.history.replaceState({}, '', photographyHref(photograph.slug));
+    render(<App />);
+    await screen.findByRole('dialog', { name: new RegExp(escape(photograph.caption), 'i') });
+    const image = document.querySelector('.photography-lightbox-image-wrap img[data-full]');
+    const stage = document.querySelector('.photography-lightbox-image-wrap');
+    await act(async () => { fireEvent.load(image); await Promise.resolve(); await Promise.resolve(); });
+    fireEvent.pointerDown(stage, { pointerId: 7, pointerType: 'touch', clientX: 100, clientY: 100, buttons: 1 });
+    await wait(450);
+    expect(image.getAttribute('src')).toBe(photograph.mediumSrc);
+    fireEvent.pointerUp(stage, { pointerId: 7, pointerType: 'touch', clientX: 100, clientY: 100 });
+    await wait(200);
+    expect(image.getAttribute('src')).toBe(photograph.viewerSrc);
+  });
+
+  test('going back prefetches the previous photograph first', async () => {
+    const photograph = ordered[landscape];
+    window.history.replaceState({}, '', photographyHref(ordered[landscape + 1].slug));
+    render(<App />);
+    await screen.findByRole('dialog');
+    await act(async () => { fireEvent.keyDown(document, { key: 'ArrowLeft' }); });
+    await screen.findByRole('dialog', { name: new RegExp(escape(photograph.caption), 'i') });
+    created.length = 0;
+    const image = document.querySelector('.photography-lightbox-image-wrap img[data-full]');
+    await act(async () => { fireEvent.load(image); await Promise.resolve(); await Promise.resolve(); });
+    const sources = photographSources(ordered[landscape - 1]).map(({ src }) => src);
+    expect(sources).toContain(created[0]?.getAttribute('src'));
+  });
 });
