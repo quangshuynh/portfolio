@@ -52,6 +52,7 @@
     "assets:refresh": "node scripts/refresh-project-assets.mjs",
     "test:hero:browser": "node scripts/check-hero-browser.mjs",
     "measure:hero": "node scripts/measure-hero-bundles.mjs",
+    "measure:photography": "node scripts/measure-photography.mjs",
     "check:cms:editor": "node scripts/check-cms-editor.mjs",
     "check:editor:sustained": "node scripts/check-editor-sustained.mjs",
     "check:editor:selection": "node scripts/check-editor-selection.mjs",
