@@ -130,11 +130,13 @@ made, and checked against their SHA-256; photos are never uploaded.
 10. U²-Netp salient object detection model
     Copyright (c) 2020 Xuebin Qin. Apache License 2.0:
     https://github.com/xuebinqin/U-2-Net/blob/master/LICENSE
-    ONNX file as distributed by rembg (u2netp.onnx), unmodified.
+    ONNX file as distributed by rembg (u2netp.onnx); weights stored as 16-bit
+    floats for this site (u2netp-fp16w-381406e5.onnx), computed as before.
 
 11. MobileSAM (Segment Anything with a TinyViT image encoder)
     Copyright (c) Chaoning Zhang et al. Apache License 2.0:
     https://github.com/ChaoningZhang/MobileSAM/blob/master/LICENSE
     Builds on Segment Anything, Copyright (c) Meta Platforms, Inc., Apache
     License 2.0. ONNX exports from huggingface.co/Acly/MobileSAM (MIT),
-    unmodified (image encoder and multi-mask decoder).
+    image encoder and multi-mask decoder, weights stored as 16-bit floats for
+    this site (mobilesam-*-fp16w-*.onnx), computed as before.
