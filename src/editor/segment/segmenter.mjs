@@ -3,8 +3,9 @@
 // is kept, for the last analysis image: Subject, Background and every Object tap on the same
 // photo then cost only the prompt decoder (tens of milliseconds) after the first.
 import {
-  encodeCodes, quantize, regionPrompt, resizeMap, salientRegions, samCoverage, samInput, skyFromProbability, squareTensor, subjectFromParts,
+  encodeCodes, quantize, refineEdges, resizeMap, samCoverage, samInput, skyFromProbability, squareTensor, subjectFromParts,
 } from './analysis.mjs';
+import { SALIENT_PEAK, normaliseMap, rankSubjects, stability, subjectNote, subjectPrompts } from './subject.mjs';
 import { MODELS, SELECTION_KINDS } from './models.mjs';
 import { MASK_LIMITS } from '../model/masks.mjs';
 
@@ -83,6 +84,50 @@ export function createSegmenter({ ort, loadModel, sessionOptions = {} }) {
   }
 
   /**
+   * Select Subject: SAM's masks for prompts from the saliency (subject.mjs), ranked. `choice` 0 is
+   * the automatic answer, 1… the other distinct candidates (Next candidate).
+   */
+  async function subject(image, imageKey, choice, onProgress) {
+    const { width, height } = image;
+    const raw = resizeMap(await probability('saliency', image, onProgress), MODELS.saliency.size, MODELS.saliency.size, width, height);
+    const none = { coverage: new Float32Array(width * height), found: false, confidence: 0, area: 0, regions: 0, warnings: [], candidate: 0, candidates: 0, note: 'No clear subject was found. Try Select Object and tap the subject.' };
+    // Nothing stands out (an open landscape, a sky): measured peaks there are below 0.65, and at
+    // least 0.77 where a subject was present (docs/photography-editor.md).
+    let peak = 0;
+    for (let i = 0; i < raw.length; i += 1) if (raw[i] > peak) peak = raw[i];
+    if (peak < SALIENT_PEAK) return { ...none, note: 'Nothing in this photo stands out clearly as a subject. Use Select Object and tap what you want to select.' };
+    const s = normaliseMap(raw);
+    const prompts = subjectPrompts(s, width, height);
+    if (!prompts.length) return none;
+    const state = await samEmbedding(image, imageKey, onProgress);
+    onProgress({ stage: 'outline' });
+    const candidates = [];
+    for (const prompt of prompts) {
+      const corners = [[prompt.box[0], prompt.box[1]], [prompt.box[2], prompt.box[3]], prompt.point];
+      const masks = await samMasks(state, corners, [2, 3, 1], image, onProgress); // eslint-disable-line no-await-in-loop
+      for (const m of masks) candidates.push({ coverage: samCoverage(m.logits), score: m.score, stable: stability(m.logits) });
+    }
+    // The most salient point alone: SAM's largest answer for it is the whole object the salient
+    // part belongs to (the car behind a tail light, the building below a tower).
+    for (const prompt of prompts.filter((p) => p.source !== 'all').slice(0, 2)) {
+      const masks = await samMasks(state, [prompt.point], [1], image, onProgress); // eslint-disable-line no-await-in-loop
+      for (const m of masks) candidates.push({ coverage: samCoverage(m.logits), score: m.score, stable: stability(m.logits), whole: true });
+    }
+    const { options } = rankSubjects(candidates, s, width, height, { peak });
+    if (!options.length) return none;
+    const index = Math.min(options.length - 1, Math.max(0, choice));
+    const option = options[index];
+    const coarse = new Float32Array(width * height);
+    for (const k of option.pick) { const c = candidates[k].coverage; for (let i = 0; i < c.length; i += 1) if (c[i] > coarse[i]) coarse[i] = c[i]; }
+    const coverage = refineEdges(coarse, image, { band: 4 });
+    let area = 0;
+    for (let i = 0; i < coverage.length; i += 1) area += coverage[i];
+    area /= coverage.length;
+    if (area < 0.001) return none;
+    return { coverage, found: true, confidence: option.confidence, area, regions: option.pick.length, warnings: option.warnings, note: subjectNote(option.warnings), candidate: index, candidates: options.length };
+  }
+
+  /**
    * One selection on an analysis image (RGBA at analysis size).
    * :param request: { kind, image, imageKey, points? [[x, y, label]] in analysis pixels, candidate? }
    * :returns: { width, height, data (encoded codes), found, confidence, area, regions, note, version, candidates? }
@@ -94,27 +139,8 @@ export function createSegmenter({ ort, loadModel, sessionOptions = {} }) {
     if (kind === 'sky') {
       result = skyFromProbability(await probability('sky', image, onProgress), MODELS.sky.size, image);
     } else if (kind === 'subject' || kind === 'background') {
-      const saliency = await probability('saliency', image, onProgress);
-      const { regions, labels } = salientRegions(saliency, MODELS.saliency.size, image);
-      const parts = [];
-      const regionMasks = [];
-      if (regions.length) {
-        const state = await samEmbedding(image, imageKey, onProgress);
-        onProgress({ stage: 'outline' });
-        for (const region of regions) {
-          const prompt = regionPrompt(region);
-          const masks = await samMasks(state, prompt.points, prompt.labels, image, onProgress);
-          const best = masks.reduce((a, b) => (b.score > a.score ? b : a));
-          // A region spanning the whole width or height (a band of sky, a horizon) is rarely a subject.
-          const spans = (region.x0 <= 1 && region.x1 >= image.width - 2) || (region.y0 <= 1 && region.y1 >= image.height - 2);
-          parts.push({ coverage: samCoverage(best.logits), score: best.score * (spans ? 0.5 : 1) });
-          const own = new Uint8Array(labels.length);
-          for (let i = 0; i < labels.length; i += 1) own[i] = labels[i] === region.label ? 1 : 0;
-          regionMasks.push(own);
-        }
-      }
-      result = subjectFromParts(parts, regionMasks, image);
-      if (kind === 'background' && result.found) result.note = result.note?.replace('This subject is uncertain', 'The subject this background is cut around is uncertain') ?? null;
+      result = await subject(image, imageKey, candidate ?? 0, onProgress);
+      if (kind === 'background' && result.found) result.note = result.warnings.length ? subjectNote(result.warnings, { background: true }) : null;
     } else {
       if (!points.length || !points.some(([, , label]) => label === 1)) throw new SelectionError('Tap the object to select first.', 'bad-request');
       const state = await samEmbedding(image, imageKey, onProgress);
@@ -144,5 +170,12 @@ export function createSegmenter({ ort, loadModel, sessionOptions = {} }) {
     return { ...rest, width: grid.width, height: grid.height, data, version: SELECTION_KINDS[kind].version, ms: Date.now() - started };
   }
 
-  return { select, forgetImage: () => { embedding = null; } };
+  /** SAM's three masks for prompts (analysis pixels; labels as samMasks), for reference masks. */
+  async function outline({ image, imageKey, points, labels }, onProgress = () => {}) {
+    const state = await samEmbedding(image, imageKey, onProgress);
+    const masks = await samMasks(state, points, labels, image, onProgress);
+    return masks.map((m) => ({ score: m.score, coverage: samCoverage(m.logits) }));
+  }
+
+  return { select, outline, forgetImage: () => { embedding = null; } };
 }

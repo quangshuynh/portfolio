@@ -184,6 +184,19 @@ async function check(run, file) {
     await waitIdle('select again');
     assert.equal((await saved()).local[1].mask.components[0].data, subject.data, 'Select again is deterministic');
 
+    result.step = 'next candidate';
+    // Next candidate shows another of the models' answers (or says there is none); Select again
+    // returns to the automatic one.
+    const next = page.locator('button', { hasText: /^Next candidate/ });
+    result.candidates = (await next.textContent()).match(/of (\d+)/)?.[1] ?? '?';
+    await next.click();
+    await poll(async () => (await saved()).local[1].mask.components[0].data !== subject.data || /no other candidate/i.test((await status()) ?? ''), Boolean, 'next candidate', 120_000);
+    await waitIdle('next candidate');
+    result.nextLabel = (await next.textContent()).trim();
+    await page.locator('button', { hasText: 'Select again' }).click();
+    await waitIdle('select again after next');
+    await savedWhen((v) => v.local[1].mask.components[0].data === subject.data, 'automatic answer restored');
+
     result.step = 'object';
     await page.locator('.pe-masks__tools button', { hasText: /^Object$/ }).click();
     const t0 = Date.now();
