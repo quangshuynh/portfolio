@@ -6,6 +6,7 @@
 // unthrottled. Every scenario repeats RUNS times and reports p50/p95.
 // Usage: npm run build && npm run measure:photography [-- --url https://quanghuynh.com | --dist other-dist] [--json out.json]
 //   MEASURE_ENGINES=chromium,firefox,webkit  MEASURE_RUNS=5  MEASURE_SCENARIOS=load,scroll,viewer,editor
+//   MEASURE_VIEWER_SLOW_PAGE=1 throttles the viewer scenario from page load (default: from opening).
 //   MEASURE_PROFILES=desktop,desktop-2x,mobile (also mobile-2x)  MEASURE_NETWORKS=broadband,slow-4g
 //   RAW_COMPAT_DIR=<genuine RAW files> adds RAW previews to the editor scenario (MEASURE_RAW_FILES to choose).
 import { createReadStream, existsSync, mkdtempSync, statSync, writeFileSync } from 'node:fs';
@@ -196,12 +197,18 @@ async function measureViewer(browser, engine, profile, network) {
     requestAnimationFrame(sample);
   });
   const page = await context.newPage();
+  // MEASURE_VIEWER_SLOW_PAGE=1: the whole visit on the network (the archive loads on it too).
+  const early = Boolean(process.env.MEASURE_VIEWER_SLOW_PAGE);
+  if (early) await throttle(page, engine, network);
   await page.goto(`${base}/photography/`, { waitUntil: 'load' });
   await heroReady(page);
-  // Load the archive area as a visitor would before opening a photograph from it.
-  await page.locator('#photography-gallery').scrollIntoViewIfNeeded();
+  // Load the archive area as a visitor would before opening a photograph from it. The frame to
+  // click is brought into view first: click() would otherwise scroll there under throttling,
+  // waking lazy images above it that a visitor scrolling down has already loaded.
+  const first = page.locator('#photography-gallery figure a').first();
+  await first.scrollIntoViewIfNeeded();
   await page.waitForTimeout(1500);
-  await throttle(page, engine, network);
+  if (!early) await throttle(page, engine, network);
   const viewerShown = () => page.waitForFunction(() => {
     const image = document.querySelector('.photography-lightbox-image-wrap img[data-full]') ?? document.querySelector('.photography-lightbox-image-wrap img');
     return image && image.complete && image.naturalWidth > 0 && image.dataset.loaded === 'true';
@@ -210,7 +217,6 @@ async function measureViewer(browser, engine, profile, network) {
   const viewerSharp = () => page.waitForFunction(() => document.querySelector('.photography-lightbox-image-wrap img[data-full]')?.dataset.sharp !== 'false'
     && document.querySelector('.photography-lightbox-image-wrap img[data-full]').complete, null, { timeout: 60_000 });
   const anyShown = () => page.waitForFunction(() => [...document.querySelectorAll('.photography-lightbox-image-wrap img')].some((image) => image.complete && image.naturalWidth > 0 && getComputedStyle(image).opacity !== '0'), null, { timeout: 60_000, polling: 'raf' });
-  const first = page.locator('#photography-gallery figure a').first();
   const openedAt = await page.evaluate(() => performance.now());
   let started = Date.now();
   await first.click();
@@ -224,6 +230,7 @@ async function measureViewer(browser, engine, profile, network) {
   for (const key of ['ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'ArrowRight']) {
     await page.waitForTimeout(400);
     started = Date.now();
+    if (process.env.MEASURE_VERBOSE) console.log(`  press ${key} at ${Math.round(await page.evaluate(() => performance.now()) - openedAt)} ms`);
     await page.keyboard.press(key);
     await anyShown();
     const visible = Date.now() - started;
@@ -239,6 +246,10 @@ async function measureViewer(browser, engine, profile, network) {
   const frames = await page.evaluate(() => window.__viewerFrames);
   // Image files requested after opening: bytes and how many were 2200 px viewer files.
   const fetched = (await page.evaluate(IMAGE_ENTRIES)).filter(({ start }) => start >= openedAt);
+  if (process.env.MEASURE_VERBOSE) {
+    console.log('steps', JSON.stringify(steps));
+    for (const entry of fetched) console.log(`  ${Math.round(entry.start - openedAt)}–${Math.round(entry.end - openedAt)} ms ${entry.name} ${kb(sizeOf(entry))} KB${entry.cached ? ' (cache)' : ''}`);
+  }
   await context.close();
   return { openVisible, openFull, openSharp, steps, blankFrames: frames.blank, frames: frames.total,
     viewerKB: kb(fetched.reduce((sum, entry) => sum + sizeOf(entry), 0)), viewerFiles: fetched.filter(({ name }) => name.includes('-viewer')).length, files: fetched.length };
