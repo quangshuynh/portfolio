@@ -134,7 +134,10 @@ export default function WatermarkAutopilot({ onChanged }) {
     };
   }, []);
 
+  // Stop after this photograph: automatic planning also pauses until the CMS is reloaded, or the
+  // re-plan that follows the run's end would start the remaining photographs straight away.
   const stop = () => {
+    paused.current = true;
     const current = readWatermarkQueue();
     if (current?.mode === 'auto') writeWatermarkQueue({ ...current, stopped: true });
     setQueue((previous) => previous && { ...previous, stopped: true });

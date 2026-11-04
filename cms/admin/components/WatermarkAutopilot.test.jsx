@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 const portfolio = vi.fn();
 const loadPixels = vi.fn();
@@ -6,6 +6,7 @@ vi.mock('../api.js', () => ({ imageUrl: (id) => `/api/images/${id}-gallery.jpg`,
 vi.mock('../watermarkImages.js', () => ({ loadPixels: (...args) => loadPixels(...args), nominalFrame: (width, height) => ({ x: 0, y: 0, width, height }) }));
 
 const { default: WatermarkAutopilot } = await import('./WatermarkAutopilot.jsx');
+const { QUEUE_DONE_MESSAGE, WATERMARK_QUEUE_KEY } = await import('../editorHost.jsx');
 
 // A photograph that needs a watermark but has no original attached: it stays a candidate on
 // every idle tick and is never drafted.
@@ -53,4 +54,19 @@ test('idle planning decodes each gallery image once per treatment revision and p
   await act(async () => { vi.advanceTimersByTime(90_000); });
   await flush();
   expect(portfolio).toHaveBeenCalledTimes(5);
+});
+
+test('Stop finishes the current photograph and plans nothing more until a reload', async () => {
+  localStorage.setItem(WATERMARK_QUEUE_KEY, JSON.stringify({ mode: 'auto', ids: ['first', 'second'], settings: {}, index: 0, results: [] }));
+  render(<WatermarkAutopilot onChanged={() => {}} />);
+  await flush();
+  fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+  // The frame finishes the first photograph and reports the stopped queue done.
+  localStorage.setItem(WATERMARK_QUEUE_KEY, JSON.stringify({ mode: 'auto', ids: ['first', 'second'], settings: {}, index: 1, results: [{ id: 'first', outcome: 'drafted' }], stopped: true }));
+  await act(async () => { window.dispatchEvent(new MessageEvent('message', { origin: window.location.origin, data: { type: QUEUE_DONE_MESSAGE } })); });
+  await flush();
+  await act(async () => { vi.advanceTimersByTime(120_000); });
+  await flush();
+  expect(portfolio).not.toHaveBeenCalled();
+  expect(document.querySelector('iframe')).toBeNull();
 });
