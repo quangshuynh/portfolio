@@ -5,7 +5,8 @@
 // in fullscreen the stage fills the viewport, the photo fits without cropping (portrait, landscape,
 // square and panoramic), a pinch and pan use the whole viewport within bounds, double tap and reset
 // work, rotation refits, previous/next and swipes work (a zoomed drag only pans), the page behind
-// never scrolls and closing restores it; pinch and pan change nothing in the DOM but the image.
+// never scrolls and closing restores it; pinch and pan change nothing in the DOM but the image;
+// opening while archive frames are still downloading leaves them alone and closing restores the scroll.
 // Gestures are synthesised pointer events; emulation is evidence, not a physical-device test.
 // Usage: npm run check:photography:viewer  (VIEWER_ENGINES=webkit-iphone,... to narrow; SHOTS_DIR saves screenshots)
 import assert from 'node:assert/strict';
@@ -161,6 +162,47 @@ async function refullscreen(page) {
   await page.waitForTimeout(300);
 }
 
+// Opening the viewer while archive frames are still downloading (their responses held back):
+// the photograph shows, the frames keep their files (the viewer never takes them away, see
+// docs/photography-catalog.md), closing returns to the same scroll, and the frames load once
+// their responses arrive.
+async function checkOpenDuringGalleryLoad(browser, options, run) {
+  // A fresh context: nothing cached, so the archive frames really download.
+  const context = await browser.newContext(options);
+  const page = await context.newPage();
+  const held = [];
+  const gallery = /-gallery[-.][^/]*\.jpe?g$/;
+  await page.route(gallery, (route) => { held.push(route); });
+  try {
+    await page.goto(`http://localhost:${PORT}/photography/`);
+    // After the page's own scroll to the top on entering the route.
+    await page.waitForSelector('#photography-gallery img');
+    await page.waitForTimeout(300);
+    const link = page.locator('[data-photo-slug] a').nth(10);
+    await link.evaluate((element) => element.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await page.waitForTimeout(800);
+    assert.ok(held.length >= 3, `${run.name}: archive frames were downloading when the viewer opened (${held.length})`);
+    const scrolled = await page.evaluate(() => window.scrollY);
+    const files = () => page.evaluate(() => [...document.querySelectorAll('#photography-gallery img')].map((image) => image.getAttribute('srcset')));
+    const before = await files();
+    await link.click();
+    await page.waitForFunction(() => document.querySelector('.photography-lightbox img')?.naturalWidth > 0);
+    assert.deepEqual(await files(), before, `${run.name}: the viewer leaves gallery frames alone`);
+    await page.unroute(gallery);
+    for (const route of held.splice(0)) await route.continue().catch(() => {});
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('.photography-lightbox') && document.body.style.position !== 'fixed');
+    assert.ok(near(await page.evaluate(() => window.scrollY), scrolled, 2), `${run.name}: closing during gallery downloads restores the scroll`);
+    await page.waitForFunction(() => [...document.querySelectorAll('#photography-gallery img')].every((image) => {
+      const { top, bottom } = image.getBoundingClientRect();
+      return bottom <= 0 || top >= innerHeight || (image.complete && image.naturalWidth > 0);
+    }), null, { timeout: 15_000 });
+  } finally {
+    for (const route of held) await route.continue().catch(() => {});
+    await context.close();
+  }
+}
+
 async function runEngine(run, fixtures) {
   const browser = await run.type.launch();
   const options = run.device ? { ...devices[run.device] } : { viewport: { width: 1440, height: 900 } };
@@ -306,6 +348,7 @@ async function runEngine(run, fixtures) {
     await page.waitForFunction(() => !document.querySelector('.photography-lightbox'));
     await page.waitForTimeout(200);
     assert.ok(scrolled > 0 && near(await page.evaluate(() => window.scrollY), scrolled, 2), `${run.name}: closing restores the gallery scroll (${scrolled})`);
+    await checkOpenDuringGalleryLoad(browser, options, run);
     assert.deepEqual(errors, [], `${run.name}: no page errors`);
     console.log(`ok  ${run.name}`);
   } finally {

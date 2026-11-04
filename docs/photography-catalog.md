@@ -237,6 +237,40 @@ Featured lazy images (fixed). With the whole visit on slow 4G (`MEASURE_VIEWER_S
 viewer requests compete with archive images still downloading behind the overlay; that, not the
 viewer's choice of file, is the remaining delay (41–68% blank frames in both builds).
 
+**Viewer priority** (Interval 23.4). Moving to another photograph cancels neighbour prefetches no
+longer wanted at once (the new photograph's own file keeps downloading); the shown photograph's
+sharper file loads at `fetchPriority="high"` and no further prefetch starts until it arrives.
+Placeholders and "already loaded" also count files the browser finished without a load event
+(Resource Timing), because Chromium and WebKit complete a cancelled download once its response
+has started. Gallery images behind the viewer are **not** paused, by measurement:
+
+| Removing `src`/`srcset` from a downloading `<img>` | Chromium | WebKit | Firefox |
+| --- | --- | --- | --- |
+| Request not yet answered | cancelled | not cancelled | cancelled |
+| Response already streaming | finishes anyway | finishes anyway | cancelled |
+
+Pausing them (tried and reverted) saved nothing in Chromium/WebKit and lost the placeholders those
+files would have given: WebKit desktop blank frames went 3% → 34%. In Firefox it cut step p95
+5.8 → 1.9 s but raised p50 48 → 186 ms. `measure:photography` now logs every request (CDP in
+Chromium, or the server with `MEASURE_THROTTLE=server` in every engine). Whole-visit slow 4G,
+p50/p95 over 4 sessions × 6 steps, main → this interval: server-throttled Chromium phone step
+p95 7.2 → 0.3 s and blank frames 31.8 → 10.4%, WebKit phone 37.6 → 31.6%; WebKit desktop
+(3.0%), Chromium desktop (5.6 → 6.4%) and CDP-throttled Chromium (phone 31.2 → 30.7%) unchanged
+within noise; blank frames swing ±10 points between rounds of one build. The remaining contention
+is gallery downloads already started before opening (2.6–3.1 MB arrive while the viewer is open
+on a CDP-throttled desktop), which only fewer simultaneous gallery requests could reduce. Thirty
+sessions (`MEASURE_SCENARIOS=sessions`): Chromium heap after GC 4–5.5 MB, flat after session 10,
+DOM nodes and listeners flat; no viewer images left in any engine. WebKit refuses more than 100
+`history.pushState` calls per 10 s, after which in-viewer navigation and closing stop working
+(main too; a held arrow key can reach it).
+
+**Physical iPhone (pending).** Not run: no device access. On the deployed commit, note iOS and
+Safari versions and the network, then check: first gallery load and fast scrolling; open a frame
+before the archive finishes loading; ten rapid swipes; pinch to 400% and pan; double tap;
+portrait/landscape rotation while zoomed; toolbar collapse/expand; close returns to the same frame;
+thirty open/close cycles; background Safari for a minute and resume; open after other heavy tabs
+(memory pressure).
+
 **Zoom gestures** (`photographyLightbox.jsx`, tested in `photographyGestures.test.jsx`): the
 image area has `touch-action: none`, so the viewer handles them itself. Two fingers zoom
 (100–500%) around their midpoint, which follows the fingers; lifting one continues as a pan;

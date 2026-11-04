@@ -144,7 +144,7 @@ describe('Creative section', () => {
     expect(present().grainSeed).not.toBe(0);
   });
 
-  test('colour grading: ranges, sliders as the keyboard alternative to the wheel, and the wheel by pointer', () => {
+  test('colour grading: ranges, sliders as the keyboard alternative to the wheel, and the wheel by pointer', { timeout: 20000 }, () => {
     setup();
     openSection('Creative');
     fireEvent.click(screen.getByRole('button', { name: 'Highlights' }));

@@ -164,6 +164,7 @@ export function resetPhotographyPreloadsForTests() {
   prefetches.clear();
   prefetchQueue = [];
   prefetching.clear();
+  prefetchHolds = 0;
 }
 
 /** The device pixels a photograph needs fitted into the stage (or the window, before layout). */
@@ -173,8 +174,20 @@ export function viewerDevicePixels(photograph, stageWidth, stageHeight, scale = 
 }
 
 /**
+ * Whether the page finished downloading `url` (Resource Timing), so the browser's cache has it.
+ * Chromium and WebKit finish a prefetch the viewer cancelled once its response has started, and
+ * no load event reports it. Entries past the buffer (250 by default) are not recorded, which only
+ * means a file is treated as not yet loaded.
+ */
+function fetchedByPage(url) {
+  const entries = typeof performance === 'undefined' ? [] : performance.getEntriesByName?.(url, 'resource') ?? [];
+  return entries.some((entry) => entry.responseEnd > 0 && entry.decodedBodySize > 0);
+}
+
+/**
  * The best file of the photograph already loaded, to show while the chosen one arrives: one
- * the viewer loaded, else one a gallery <img> on the page has finished. Null when none has.
+ * the viewer loaded, else one a gallery <img> on the page has finished, else one the browser
+ * downloaded without reporting it. Null when none has.
  */
 export function loadedPlaceholder(photograph) {
   const sources = photographSources(photograph).map(({ src }) => src).reverse();
@@ -183,17 +196,19 @@ export function loadedPlaceholder(photograph) {
   const absolute = (src) => new URL(src, document.baseURI).href;
   const resolved = new Set(sources.map(absolute));
   const shown = [...document.querySelectorAll('main img')].find((image) => image.complete && image.naturalWidth > 0 && resolved.has(image.currentSrc));
-  return shown ? sources.find((src) => absolute(src) === shown.currentSrc) : null;
+  if (shown) return sources.find((src) => absolute(src) === shown.currentSrc);
+  return sources.find((src) => fetchedByPage(absolute(src))) ?? null;
 }
 
 /**
- * Whether the file is already loaded: by the viewer, or by an <img> on the page (the hero, a
- * featured or archive frame), so opening a photograph reuses what the page already has.
+ * Whether the file is already loaded: by the viewer, by an <img> on the page (the hero, a
+ * featured or archive frame) or without reporting it, so opening a photograph reuses what the page has.
  */
 export function isSourceLoaded(src) {
   if (loadedSources.has(src)) return true;
   const absolute = new URL(src, document.baseURI).href;
-  const shown = [...document.querySelectorAll('main img')].some((image) => image.complete && image.naturalWidth > 0 && image.currentSrc === absolute);
+  const shown = [...document.querySelectorAll('main img')].some((image) => image.complete && image.naturalWidth > 0 && image.currentSrc === absolute)
+    || fetchedByPage(absolute);
   if (shown) loadedSources.add(src);
   return shown;
 }
@@ -202,8 +217,11 @@ export function isSourceLoaded(src) {
 let prefetchQueue = [];
 let prefetchConcurrency = 2;
 const prefetching = new Set(); // started and not yet loaded, failed or cancelled
+// While the shown photograph's sharper file downloads, no further prefetch starts.
+let prefetchHolds = 0;
 
 function pumpPrefetches() {
+  if (prefetchHolds) return;
   let free = prefetchConcurrency - prefetching.size;
   for (const src of prefetchQueue) {
     if (free <= 0) return;
@@ -233,14 +251,41 @@ function pumpPrefetches() {
 export function prefetchViewerSources(wanted, { concurrency = 2 } = {}) {
   prefetchQueue = [...new Set(wanted.filter(Boolean))];
   prefetchConcurrency = concurrency;
-  const keep = new Set(prefetchQueue);
+  cancelPrefetchesExcept(prefetchQueue);
+  pumpPrefetches();
+}
+
+/**
+ * On moving to another photograph, before its own file is chosen: cancels prefetches in flight
+ * except `keep` (the new photograph's file, which the viewer joins rather than repeats) and
+ * starts nothing until the new photograph's plan arrives.
+ */
+export function cancelPrefetchesExcept(keep) {
+  const kept = new Set(keep.filter(Boolean));
+  prefetchQueue = prefetchQueue.filter((src) => kept.has(src));
   prefetches.forEach((image, src) => {
-    if (keep.has(src)) return;
+    if (kept.has(src)) return;
     if (prefetching.has(src)) image.removeAttribute('src');
     prefetching.delete(src);
     prefetches.delete(src);
   });
-  pumpPrefetches();
+}
+
+/** Holds prefetches not yet started (the shown photograph's own download goes first); returns the release. */
+export function holdPrefetches() {
+  prefetchHolds += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    prefetchHolds -= 1;
+    pumpPrefetches();
+  };
+}
+
+/** Viewer request state for tests and diagnostics. */
+export function viewerRequestState() {
+  return { queued: [...prefetchQueue], inFlight: [...prefetching], kept: prefetches.size, held: prefetchHolds > 0, known: loadedSources.size };
 }
 
 export default function PhotographyLightbox({ photograph, collection, onNavigate, onClose, returnFocusRef }) {
@@ -287,6 +332,9 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
   const next = index >= 0 && index < collection.length - 1 ? collection[index + 1] : null;
   latestPhotograph.current = photograph;
   useOverlayLock();
+  // Page images still downloading behind the viewer are left alone (Interval 23.4): Chromium and
+  // WebKit finish a download whose <img> loses its `src`, so pausing them saved no bandwidth there
+  // and only took away placeholders (docs/photography-catalog.md, Viewer priority).
   // The backdrop goes fullscreen, so the information sheet (its sibling) stays reachable.
   const fullscreen = useFullscreen(backdropRef);
 
@@ -381,6 +429,9 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     stageRef.current?.classList.remove('is-settling');
     setPlaceholder(loadedPlaceholder(latestPhotograph.current));
     reset();
+    // Neighbour prefetches of the photograph left are cancelled at once (the new photograph's file
+    // keeps downloading if it was one), so they never compete with the photograph now shown.
+    cancelPrefetchesExcept([sourceRef.current.src]);
     // The photograph is left for another: stop its download if it is still arriving.
     const image = imageRef.current;
     return () => { if (image && !image.complete) image.removeAttribute('src'); };
@@ -477,13 +528,17 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     const id = photograph.id;
     let image = null;
     let retry = null;
+    let release = null;
     const timer = setTimeout(() => {
+      // The shown photograph's sharper file comes before prefetches not yet started.
+      release = holdPrefetches();
       image = new Image();
       image.decoding = 'async';
+      image.fetchPriority = 'high';
       image.src = targetSrc;
       const loaded = new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; });
       // decode() can reject for a large image that did load (WebKit); then the load event decides.
-      (image.decode ? image.decode().catch(() => loaded) : loaded).then(() => {
+      (image.decode ? image.decode().catch(() => loaded) : loaded).finally(() => release?.()).then(() => {
         if (!image || latestPhotograph.current.id !== id || sourceRef.current.id !== id) return;
         image = null; // done: nothing left to cancel
         loadedSources.add(targetSrc);
@@ -501,6 +556,7 @@ export default function PhotographyLightbox({ photograph, collection, onNavigate
     return () => {
       clearTimeout(timer);
       clearTimeout(retry);
+      release?.();
       if (image && !image.complete) image.removeAttribute('src');
       image = null;
     };

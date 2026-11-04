@@ -5,7 +5,9 @@
 // on broadband and Lighthouse-style slow 4G (CDP throttling, CPU 4x); Firefox and WebKit run
 // unthrottled. Every scenario repeats RUNS times and reports p50/p95.
 // Usage: npm run build && npm run measure:photography [-- --url https://quanghuynh.com | --dist other-dist] [--json out.json]
-//   MEASURE_ENGINES=chromium,firefox,webkit  MEASURE_RUNS=5  MEASURE_SCENARIOS=load,scroll,viewer,editor
+//   MEASURE_ENGINES=chromium,firefox,webkit  MEASURE_RUNS=5  MEASURE_SCENARIOS=load,scroll,viewer,editor,sessions
+//   MEASURE_SESSIONS=30: viewer openings in the long-session scenario (heap, DOM nodes, listeners).
+//   MEASURE_THROTTLE=server throttles in the server instead (every engine; logs cancelled responses).
 //   MEASURE_VIEWER_SLOW_PAGE=1 throttles the viewer scenario from page load (default: from opening).
 //   MEASURE_PROFILES=desktop,desktop-2x,mobile (also mobile-2x)  MEASURE_NETWORKS=broadband,slow-4g
 //   RAW_COMPAT_DIR=<genuine RAW files> adds RAW previews to the editor scenario (MEASURE_RAW_FILES to choose).
@@ -27,6 +29,38 @@ const SCENARIOS = (process.env.MEASURE_SCENARIOS || 'load,scroll,viewer').split(
 
 // ---------- Vercel-like static server ----------
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.avif': 'image/avif', '.png': 'image/png', '.woff2': 'font/woff2', '.json': 'application/json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.ico': 'image/x-icon' };
+// Server-side slow network (MEASURE_THROTTLE=server), for every engine: a latency per request
+// and one bandwidth shared by all responses, sent in 8 KB chunks. Every response is logged
+// with its chunks and whether the browser abandoned it, which shows cancellation in Firefox
+// and WebKit too. Local HTTP/1.1 (six connections) unlike production HTTP/2.
+let serverNetwork = null;
+let serverLog = [];
+let bucketFree = 0;
+function sendThrottled(stream, response, entry) {
+  const { latency, downloadThroughput } = serverNetwork;
+  const chunks = [];
+  let ended = false;
+  let pumping = false;
+  const pump = async () => {
+    if (pumping) return;
+    pumping = true;
+    await new Promise((resolve) => setTimeout(resolve, latency));
+    while (chunks.length || !ended) {
+      if (!chunks.length) { await new Promise((resolve) => setTimeout(resolve, 5)); continue; }
+      if (response.destroyed) return;
+      const chunk = chunks.shift();
+      const now = Date.now();
+      bucketFree = Math.max(bucketFree, now) + (chunk.length / downloadThroughput) * 1000;
+      await new Promise((resolve) => setTimeout(resolve, bucketFree - now));
+      if (response.destroyed) return;
+      response.write(chunk);
+      entry.chunks.push([Date.now(), chunk.length]);
+    }
+    response.end();
+  };
+  stream.on('data', (data) => { for (let i = 0; i < data.length; i += 8192) chunks.push(data.subarray(i, i + 8192)); pump(); });
+  stream.on('end', () => { ended = true; pump(); });
+}
 function serve() {
   if (!existsSync(path.join(dist, 'photography/index.html'))) throw new Error('Run `npm run build` first.');
   const server = createServer((request, response) => {
@@ -43,7 +77,17 @@ function serve() {
       ...(compress ? { 'content-encoding': 'gzip', vary: 'accept-encoding' } : { 'content-length': statSync(file).size }),
       'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'public, max-age=0, must-revalidate',
     });
-    (compress ? createReadStream(file).pipe(createGzip()) : createReadStream(file)).pipe(response);
+    const stream = compress ? createReadStream(file).pipe(createGzip()) : createReadStream(file);
+    if (!serverNetwork) { stream.pipe(response); return; }
+    const entry = { url: new URL(request.url, 'http://x').pathname, start: Date.now(), end: null, chunks: [], bytes: 0, canceled: false };
+    serverLog.push(entry);
+    response.on('close', () => {
+      stream.destroy();
+      entry.end = Date.now();
+      entry.bytes = entry.chunks.reduce((sum, [, bytes]) => sum + bytes, 0);
+      entry.canceled = !response.writableFinished;
+    });
+    sendThrottled(stream, response, entry);
   });
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
 }
@@ -84,11 +128,13 @@ async function newContext(browser, engine, profile) {
   return browser.newContext({ ...options, reducedMotion: 'reduce' });
 }
 
+const SERVER_THROTTLE = process.env.MEASURE_THROTTLE === 'server';
 async function throttle(page, engine, network) {
+  if (SERVER_THROTTLE && network) serverNetwork = network;
   if (engine !== 'chromium' || !network) return;
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Network.enable');
-  await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: network.latency, downloadThroughput: network.downloadThroughput, uploadThroughput: network.uploadThroughput });
+  if (!SERVER_THROTTLE) await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: network.latency, downloadThroughput: network.downloadThroughput, uploadThroughput: network.uploadThroughput });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: network.cpu });
 }
 
@@ -125,6 +171,7 @@ async function measureLoad(browser, engine, profile, network, warm) {
   const heroMs = Date.now() - started;
   await page.waitForLoadState('load');
   await page.waitForTimeout(1500);
+  serverNetwork = null;
   const result = await page.evaluate(`({ perf: window.__perf, images: ${IMAGE_ENTRIES}, hero: document.querySelector('.photography-hero__media img').currentSrc.split('/').pop(), navStart: performance.timeOrigin })`);
   await context.close();
   // A cold context has nothing cached (WebKit reports transferSize 0 even for network responses).
@@ -179,17 +226,132 @@ async function measureScroll(browser, engine, profile) {
   };
 }
 
-// Opens the viewer from the archive, then steps forward and back. "Blank" means a sampled
-// animation frame where the viewer shows no painted photograph.
+// Long session: SESSIONS openings from the archive, each stepping, zooming and closing, with the
+// viewport rotated every fifth (phones). Chromium samples, after a forced GC, the JS heap, DOM
+// nodes and event listeners (CDP); every engine reports viewer images left in the page and
+// gallery images still without a file (paused and never resumed).
+const SESSIONS = Number(process.env.MEASURE_SESSIONS || 30);
+async function measureSessions(browser, engine, profile, network) {
+  const context = await newContext(browser, engine, profile);
+  const page = await context.newPage();
+  await throttle(page, engine, network);
+  await page.goto(`${base}/photography/`, { waitUntil: 'load' });
+  await heroReady(page);
+  const first = page.locator('#photography-gallery figure a').first();
+  await first.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(1500);
+  const cdp = engine === 'chromium' ? await context.newCDPSession(page) : null;
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => message.type() === 'error' && errors.push(message.text()));
+  const sample = async () => {
+    const dom = await page.evaluate(() => ({
+      viewerImages: document.querySelectorAll('.photography-lightbox-image-wrap img').length,
+      unresumed: [...document.querySelectorAll('main img')].filter((image) => !image.hasAttribute('src') && !image.hasAttribute('srcset')).length,
+      scrollY: Math.round(window.scrollY),
+    }));
+    if (!cdp) return dom;
+    await cdp.send('HeapProfiler.collectGarbage');
+    const { usedSize } = await cdp.send('Runtime.getHeapUsage');
+    const { nodes, jsEventListeners } = await cdp.send('Memory.getDOMCounters');
+    return { ...dom, heapMB: round(usedSize / 1048576), nodes, listeners: jsEventListeners };
+  };
+  const samples = [{ session: 0, ...(await sample()) }];
+  const shown = () => page.waitForFunction(() => document.querySelector('.photography-lightbox-image-wrap img[data-full]')?.dataset.loaded === 'true', null, { timeout: 60_000 })
+    .catch(async (error) => {
+      console.log('  stalled', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('.photography-lightbox-image-wrap img')].map((image) => ({ src: image.getAttribute('src'), complete: image.complete, w: image.naturalWidth, loaded: image.dataset.loaded, sharp: image.dataset.sharp })))));
+      throw error;
+    });
+  const viewport = page.viewportSize();
+  const trace = (step) => process.env.MEASURE_VERBOSE && console.log(`  ${step}`);
+  for (let session = 1; session <= SESSIONS; session += 1) {
+    trace(`session ${session}`);
+    await page.locator('#photography-gallery figure a').nth(session % 8).click();
+    await shown();
+    trace('step');
+    for (const key of ['ArrowRight', 'ArrowRight', 'ArrowLeft']) await page.keyboard.press(key);
+    await shown();
+    trace('zoom');
+    await page.keyboard.press('+');
+    await page.keyboard.press('+');
+    await page.waitForTimeout(150);
+    await page.keyboard.press('0');
+    for (let i = 0; i < 5; i += 1) await page.keyboard.press('ArrowRight');
+    await shown();
+    if (profile.device && session % 5 === 0) {
+      const rotated = page.viewportSize().width === viewport.width;
+      await page.setViewportSize(rotated ? { width: viewport.height, height: viewport.width } : viewport);
+      await page.waitForTimeout(200);
+    }
+    trace('close');
+    // The button, not Escape: WebKit desktop (Playwright, main as well) sometimes drops that key here.
+    await page.getByRole('button', { name: 'Close photograph' }).click();
+    await page.waitForFunction(() => !document.querySelector('.photography-lightbox-image-wrap')).catch(async (error) => {
+      console.log('  close stalled', JSON.stringify(await page.evaluate(() => ({ hash: location.hash, body: document.body.style.position }))), [...new Set(errors)].slice(0, 3));
+      throw error;
+    });
+    // Each session makes ~10 history entries; WebKit refuses more than 100 per 10 s.
+    await page.waitForTimeout(1200);
+    if (session % 10 === 0) samples.push({ session, ...(await sample()) });
+  }
+  await context.close();
+  serverNetwork = null;
+  return samples;
+}
+
+// Every request of the page with its bytes per moment (Chromium, CDP): resource timing has no
+// entry for a cancelled request, so this is how cancellation and contention are seen. Times are
+// wall-clock ms, comparable with Date.now() here.
+async function recordRequests(page) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Network.enable');
+  const requests = new Map();
+  let offset = 0; // wall ms − monotonic ms
+  cdp.on('Network.requestWillBeSent', ({ requestId, request, timestamp, wallTime }) => {
+    offset = wallTime * 1000 - timestamp * 1000;
+    requests.set(requestId, { url: request.url, start: wallTime * 1000, end: null, chunks: [], bytes: 0, canceled: false, failed: false });
+  });
+  cdp.on('Network.dataReceived', ({ requestId, timestamp, encodedDataLength, dataLength }) => {
+    const entry = requests.get(requestId);
+    if (entry) entry.chunks.push([timestamp * 1000 + offset, encodedDataLength || dataLength]);
+  });
+  cdp.on('Network.loadingFinished', ({ requestId, timestamp, encodedDataLength }) => {
+    const entry = requests.get(requestId);
+    if (entry) Object.assign(entry, { end: timestamp * 1000 + offset, bytes: encodedDataLength });
+  });
+  cdp.on('Network.loadingFailed', ({ requestId, timestamp, canceled }) => {
+    const entry = requests.get(requestId);
+    if (entry) Object.assign(entry, { end: timestamp * 1000 + offset, canceled: Boolean(canceled), failed: true, bytes: entry.chunks.reduce((sum, [, b]) => sum + b, 0) });
+  });
+  return () => [...requests.values()].filter(({ url }) => /\/assets\/.*\.(jpe?g|webp|avif|png)(\?|$)/.test(url));
+}
+const receivedBetween = (entry, from, to) => entry.chunks.reduce((sum, [time, bytes]) => sum + (time >= from && time <= to ? bytes : 0), 0);
+
+// Opens the viewer from the archive, then steps forward and back, zooms, steps rapidly and
+// closes. "Blank" means a sampled animation frame where the viewer shows no painted photograph.
+// Files the viewer asked for (its <img> elements and Image() prefetches/upgrades) are told
+// apart from the gallery's, so background traffic while the viewer is open can be counted.
 async function measureViewer(browser, engine, profile, network) {
   const context = await newContext(browser, engine, profile);
   await context.addInitScript(() => {
     window.__viewerFrames = { blank: 0, total: 0 };
+    window.__viewerUrls = new Set();
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+    Object.defineProperty(HTMLImageElement.prototype, 'src', {
+      ...descriptor,
+      set(value) {
+        if (!this.isConnected && window.__viewerOpen && value) window.__viewerUrls.add(new URL(value, document.baseURI).href);
+        descriptor.set.call(this, value);
+      },
+    });
     const sample = () => {
       const wrap = document.querySelector('.photography-lightbox-image-wrap');
+      window.__viewerOpen = Boolean(wrap) || window.__viewerOpen;
       if (wrap) {
         window.__viewerFrames.total += 1;
-        const shown = [...wrap.querySelectorAll('img')].some((image) => image.complete && image.naturalWidth > 0 && getComputedStyle(image).opacity !== '0');
+        const images = [...wrap.querySelectorAll('img')];
+        images.forEach((image) => image.currentSrc && window.__viewerUrls.add(image.currentSrc));
+        const shown = images.some((image) => image.complete && image.naturalWidth > 0 && getComputedStyle(image).opacity !== '0');
         if (!shown) window.__viewerFrames.blank += 1;
       }
       requestAnimationFrame(sample);
@@ -197,6 +359,9 @@ async function measureViewer(browser, engine, profile, network) {
     requestAnimationFrame(sample);
   });
   const page = await context.newPage();
+  serverLog = [];
+  const requests = SERVER_THROTTLE && network ? () => serverLog.filter(({ url }) => /\/assets\/.*\.(jpe?g|webp|avif|png)$/.test(url))
+    : engine === 'chromium' ? await recordRequests(page) : null;
   // MEASURE_VIEWER_SLOW_PAGE=1: the whole visit on the network (the archive loads on it too).
   const early = Boolean(process.env.MEASURE_VIEWER_SLOW_PAGE);
   if (early) await throttle(page, engine, network);
@@ -218,6 +383,8 @@ async function measureViewer(browser, engine, profile, network) {
     && document.querySelector('.photography-lightbox-image-wrap img[data-full]').complete, null, { timeout: 60_000 });
   const anyShown = () => page.waitForFunction(() => [...document.querySelectorAll('.photography-lightbox-image-wrap img')].some((image) => image.complete && image.naturalWidth > 0 && getComputedStyle(image).opacity !== '0'), null, { timeout: 60_000, polling: 'raf' });
   const openedAt = await page.evaluate(() => performance.now());
+  const scrollBefore = await page.evaluate(() => window.scrollY);
+  const openedWall = Date.now();
   let started = Date.now();
   await first.click();
   await anyShown();
@@ -239,6 +406,13 @@ async function measureViewer(browser, engine, profile, network) {
     await viewerSharp();
     steps.push({ visible, full, sharp: Date.now() - started });
   }
+  // Zoom to 200 % (keyboard): the full-size file must arrive.
+  await page.waitForTimeout(400);
+  started = Date.now();
+  for (let i = 0; i < 4; i += 1) await page.keyboard.press('+');
+  await viewerSharp();
+  const zoomSharp = Date.now() - started;
+  await page.keyboard.press('0');
   // Rapid navigation: ten steps without waiting, then the shown photograph must be the last one.
   for (let i = 0; i < 10; i += 1) await page.keyboard.press('ArrowRight');
   await viewerShown();
@@ -246,13 +420,52 @@ async function measureViewer(browser, engine, profile, network) {
   const frames = await page.evaluate(() => window.__viewerFrames);
   // Image files requested after opening: bytes and how many were 2200 px viewer files.
   const fetched = (await page.evaluate(IMAGE_ENTRIES)).filter(({ start }) => start >= openedAt);
+  const viewerUrls = new Set(await page.evaluate(() => [...window.__viewerUrls].map((url) => new URL(url).pathname)));
+  // Close: the page must be back where it was, and the gallery must recover without a burst.
+  const closedWall = Date.now();
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.photography-lightbox-image-wrap'));
+  // WebKit unlocks the page (and restores the scroll) a frame after the viewer is gone.
+  await page.waitForFunction(() => document.body.style.position !== 'fixed');
+  const scrollAfter = await page.evaluate(() => window.scrollY);
+  await page.waitForTimeout(network ? 6000 : 2000);
+  const recovered = await page.evaluate(() => {
+    const visible = [...document.querySelectorAll('main img')].filter((image) => {
+      const rect = image.getBoundingClientRect();
+      return rect.bottom > 0 && rect.top < innerHeight && rect.width > 0;
+    });
+    return { visible: visible.length, complete: visible.filter((image) => image.complete && image.naturalWidth > 0).length };
+  });
+  const log = requests ? requests() : [];
+  // A file the viewer showed may have been requested by the gallery before opening: only
+  // requests made after opening count as the viewer's.
+  const isViewer = ({ url, start }) => start >= openedWall && viewerUrls.has(new URL(url, 'http://x').pathname);
+  const gallery = log.filter((entry) => !isViewer(entry));
+  const viewer = log.filter(isViewer);
+  const overlapping = gallery.filter(({ start, end }) => start < closedWall && (end === null || end > openedWall));
+  const network_ = requests ? {
+    // From the click to the first viewer request.
+    viewerStartMs: Math.round(Math.min(...viewer.filter(({ start }) => start >= openedWall).map(({ start }) => start)) - openedWall),
+    galleryOverlap: overlapping.length,
+    galleryStartedOpen: gallery.filter(({ start }) => start >= openedWall && start < closedWall).length,
+    galleryKBOpen: kb(gallery.reduce((sum, entry) => sum + receivedBetween(entry, openedWall, closedWall), 0)),
+    viewerKBOpen: kb(viewer.reduce((sum, entry) => sum + receivedBetween(entry, openedWall, closedWall), 0)),
+    canceled: log.filter(({ canceled, start }) => canceled && start < closedWall).length,
+    canceledKB: kb(log.filter(({ canceled }) => canceled).reduce((sum, { chunks }) => sum + chunks.reduce((s, [, b]) => s + b, 0), 0)),
+    totalKB: kb(log.reduce((sum, { bytes, chunks, end }) => sum + (end ? bytes : chunks.reduce((s, [, b]) => s + b, 0)), 0)),
+    // Gallery requests in the first second after closing (a burst would be many).
+    burstAfterClose: gallery.filter(({ start }) => start >= closedWall && start < closedWall + 1000).length,
+  } : {};
   if (process.env.MEASURE_VERBOSE) {
-    console.log('steps', JSON.stringify(steps));
-    for (const entry of fetched) console.log(`  ${Math.round(entry.start - openedAt)}–${Math.round(entry.end - openedAt)} ms ${entry.name} ${kb(sizeOf(entry))} KB${entry.cached ? ' (cache)' : ''}`);
+    console.log('steps', JSON.stringify(steps), 'zoomSharp', zoomSharp, JSON.stringify(network_));
+    for (const entry of log) console.log(`  ${isViewer(entry) ? 'V' : 'g'} ${Math.round(entry.start - openedWall)}–${entry.end ? Math.round(entry.end - openedWall) : '…'} ms ${entry.url.split('/').pop()} ${kb(entry.bytes)} KB${entry.canceled ? ' (cancelled)' : ''}`);
+    if (!requests) for (const entry of fetched) console.log(`  ${Math.round(entry.start - openedAt)}–${Math.round(entry.end - openedAt)} ms ${entry.name} ${kb(sizeOf(entry))} KB${entry.cached ? ' (cache)' : ''}`);
   }
   await context.close();
-  return { openVisible, openFull, openSharp, steps, blankFrames: frames.blank, frames: frames.total,
-    viewerKB: kb(fetched.reduce((sum, entry) => sum + sizeOf(entry), 0)), viewerFiles: fetched.filter(({ name }) => name.includes('-viewer')).length, files: fetched.length };
+  serverNetwork = null;
+  return { openVisible, openFull, openSharp, steps, zoomSharp, blankFrames: frames.blank, frames: frames.total,
+    viewerKB: kb(fetched.reduce((sum, entry) => sum + sizeOf(entry), 0)), viewerFiles: fetched.filter(({ name }) => name.includes('-viewer')).length, files: fetched.length,
+    scrollRestored: scrollBefore === scrollAfter, recovered, network: network_ };
 }
 
 
@@ -315,6 +528,7 @@ async function measureEditor(browser, engine, profile, network) {
     imports.push({ label, status, previewMs: Date.now() - t0 });
   }
   await context.close();
+  serverNetwork = null;
   return { readyMs, ...startup, imports };
 }
 
@@ -331,7 +545,7 @@ try {
     try {
       for (const profile of PROFILES) {
         if (engineName === 'firefox' && profile.device) continue;
-        const networks = (engineName === 'chromium' ? Object.keys(NETWORKS) : ['broadband'])
+        const networks = (engineName === 'chromium' || SERVER_THROTTLE ? Object.keys(NETWORKS) : ['broadband'])
           .filter((network) => !process.env.MEASURE_NETWORKS || process.env.MEASURE_NETWORKS.split(',').includes(network));
         if (SCENARIOS.includes('load')) {
           for (const network of networks) {
@@ -364,6 +578,9 @@ try {
             if (process.env.MEASURE_VERBOSE) console.log(samples[0].jsFiles.join(' '));
           }
         }
+        if (SCENARIOS.includes('sessions')) {
+          for (const network of networks) log(`sessions ${engineName} ${profile.key} ${network}`, { samples: await measureSessions(browser, engineName, profile, NETWORKS[network]) });
+        }
         if (SCENARIOS.includes('viewer')) {
           for (const network of networks) {
             const samples = [];
@@ -378,7 +595,13 @@ try {
               stepSharp: summary(steps.map(({ sharp }) => sharp)),
               viewerKB: summary(samples.map(({ viewerKB }) => viewerKB)),
               viewerFiles: summary(samples.map(({ viewerFiles }) => viewerFiles)),
+              zoomSharp: summary(samples.map(({ zoomSharp }) => zoomSharp)),
               blankFramePct: round((100 * samples.reduce((sum, { blankFrames }) => sum + blankFrames, 0)) / Math.max(1, samples.reduce((sum, { frames }) => sum + frames, 0))),
+              scrollRestored: samples.every(({ scrollRestored }) => scrollRestored),
+              recovered: samples.map(({ recovered }) => `${recovered.complete}/${recovered.visible}`).join(' '),
+              ...(samples[0].network.viewerStartMs !== undefined ? {
+                net: Object.fromEntries(Object.keys(samples[0].network).map((key) => [key, summary(samples.map(({ network: values }) => values[key]))])),
+              } : {}),
             });
           }
         }
