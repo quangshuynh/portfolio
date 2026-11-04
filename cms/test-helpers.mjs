@@ -32,6 +32,26 @@ export async function photograph({ width = 1600, height = 1000, format = 'jpeg',
   return sharp({ create: { width, height, channels: 3, background: color } })[format]({ quality: 85 }).toBuffer();
 }
 
+// Every git process of a test (fixtures and the CMS code under test) gets the fixture identity,
+// LF line endings and no automatic maintenance from the environment: on Windows each git process
+// costs ~70 ms, and per-repository `git config` calls plus the `maintenance run --auto` git starts
+// after commits and fetches were a quarter of the processes in the CMS tests.
+const TEST_GIT_CONFIG = [
+  ['user.email', 'cms-test@example.invalid'],
+  ['user.name', 'CMS Test'],
+  ['core.autocrlf', 'false'],
+  ['maintenance.auto', 'false'],
+  ['gc.auto', '0'],
+];
+process.env.GIT_CONFIG_COUNT = String(TEST_GIT_CONFIG.length);
+TEST_GIT_CONFIG.forEach(([key, value], index) => {
+  process.env[`GIT_CONFIG_KEY_${index}`] = key;
+  process.env[`GIT_CONFIG_VALUE_${index}`] = value;
+});
+// A test that builds a fixture repository runs 20–40 git processes (2–3 s alone on Windows, twice
+// that when the suite runs files in parallel), so the 5 s default is too tight for these files.
+vi.setConfig({ testTimeout: 20_000 });
+
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /** A repository with `main` holding the catalog, manifest and derivatives, cloned from a bare origin. */
@@ -53,17 +73,12 @@ export async function fixtureRepo(catalog = baseCatalog()) {
   writeFileSync(path.join(seed, 'src', 'data', 'photographs.generated.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   writeFileSync(path.join(seed, 'README.md'), 'fixture\n');
   git(seed, 'init', '--quiet', '--initial-branch=main');
-  git(seed, 'config', 'core.autocrlf', 'false');
-  git(seed, 'config', 'user.email', 'cms-test@example.invalid');
-  git(seed, 'config', 'user.name', 'CMS Test');
-  git(seed, 'config', 'core.autocrlf', 'false');
   git(seed, 'add', '-A');
   git(seed, 'commit', '--quiet', '-m', 'fixture');
   git(root, 'clone', '--quiet', '--bare', seed, origin);
   // core.autocrlf=false from the start, so the checkout matches the index on Windows too.
   git(root, 'clone', '--quiet', '-c', 'core.autocrlf=false', origin, repo);
-  git(repo, 'config', 'user.email', 'cms-test@example.invalid');
-  git(repo, 'config', 'user.name', 'CMS Test');
+  // Also in the repository itself, for git processes started outside this test process.
   git(repo, 'config', 'core.autocrlf', 'false');
   return {
     root,
@@ -75,8 +90,6 @@ export async function fixtureRepo(catalog = baseCatalog()) {
     pushToMain(edit, message = 'upstream change') {
       const other = path.join(root, `other-${Date.now()}-${Math.random().toString(36).slice(2)}`);
       git(root, 'clone', '--quiet', '-c', 'core.autocrlf=false', origin, other);
-      git(other, 'config', 'user.email', 'cms-test@example.invalid');
-      git(other, 'config', 'user.name', 'CMS Test');
       edit(other);
       git(other, 'add', '-A');
       git(other, 'commit', '--quiet', '-m', message);
