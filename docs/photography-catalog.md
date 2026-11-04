@@ -219,6 +219,24 @@ there. `npm run measure:photography` measures it (see PROJECT_MAINTENANCE.md); a
 23.1, a full scroll fell from 35.1 to 14.1 MB on a 2× desktop, 12.2 to 10.8 MB on a 3× phone and
 11.4 to 10.5 MB at 1×, and slow-4G hero LCP from 2.67 to 2.33 s (desktop) and 2.58 to 2.22 s (phone).
 
+**Viewer loading** (Interval 23.3, `viewerLoading.js`). Where the fitted size needs the 2200 px
+file (2× desktops, large 1× fullscreen) the viewer shows the 1600 px file first, or the full file
+when the page or viewer already loaded it, and swaps the full file in, decoded off screen, once
+the photograph stays shown: 0 ms on fast links, 250 ms by default, 700 ms on slow links, only on
+zoom with Data Saver; zooming upgrades at once. The tier comes from `navigator.connection`
+(`downlink`, `rtt`, `saveData`; Chromium's throttling sets those, not `effectiveType`) and
+`deviceMemory`; Safari and Firefox expose none and get the default. Neighbours are prefetched
+in the direction of travel first, at the first size (full size on fast links), two at once, one
+at a time on slow links, only the next with Data Saver. The `img[data-full]` carries
+`data-sharp`. Measured A/B against Interval 23.2 (Chromium p50/p95, 4 runs × 6 steps, two rounds):
+step latency, blank frames and open times are unchanged within noise on every profile; 2×
+viewer bytes fell (Chromium p95 0.7–1.8 → 0.6–0.9 MB; Firefox 6.3 → 5.5 MB, WebKit 2.3 → 1.5 MB
+per session) with half as many 2200 px downloads in WebKit. The "2× slow 4G barely improved"
+result of 23.2 was mostly the harness: `click()` scrolled back ~3900 px under throttling and woke
+Featured lazy images (fixed). With the whole visit on slow 4G (`MEASURE_VIEWER_SLOW_PAGE=1`),
+viewer requests compete with archive images still downloading behind the overlay; that, not the
+viewer's choice of file, is the remaining delay (41–68% blank frames in both builds).
+
 **Zoom gestures** (`photographyLightbox.jsx`, tested in `photographyGestures.test.jsx`): the
 image area has `touch-action: none`, so the viewer handles them itself. Two fingers zoom
 (100–500%) around their midpoint, which follows the fingers; lifting one continues as a pan;
