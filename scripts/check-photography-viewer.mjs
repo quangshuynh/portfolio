@@ -172,7 +172,8 @@ async function runEngine(run, fixtures) {
       Element.prototype[name] = function capture(...args) { try { return original.apply(this, args); } catch { return undefined; } };
     }
   });
-  await page.route(`**/${substitute.viewerFilename.replace(/\.jpg$/, '')}*`, (route, request) => {
+  // Every file of the photograph (the viewer picks gallery, medium or viewer by fitted size).
+  await page.route(new RegExp(`/${substitute.id}-(gallery|medium|viewer)[-.]`), (route, request) => {
     const size = page.currentSize;
     if (!size || request.resourceType() !== 'image') return route.continue();
     return route.fulfill({ contentType: 'image/jpeg', body: fixtures[size.join('x')] });
