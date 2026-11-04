@@ -961,15 +961,29 @@ birds, trees) before choosing, with the editor's own code (`npm run bench:select
 | SlimSAM-77 (Apache-2.0, 14 MB int8) | good outlines, but its encoder peaked at 1.7 GB | no |
 | MobileSAM (Apache-2.0; 28 + 16 MB at 32 bits; 8-bit weights changed outlines, IoU down to 0.54) | outlines from a box or taps; 0.4 GB, 4.2 s per photo on one WebAssembly thread | Subject (outline), Object |
 
-Subject prompts MobileSAM with each salient region's box and centre; Background is that subject
-inverted; Object prompts it with the taps (green include, red exclude; Alt or Exclude reverses),
-and **Smaller/Larger part** steps through SAM's three answers. The SAM image embedding is kept for
-the photo, so after the first Subject or Object every further one takes about a second.
+**Subject (Interval 23.1, `segment/subject.mjs`).** U²-Netp's raw peak gates it: below 0.7 nothing
+stands out (benchmark: open landscapes ≤ 0.65, photos with a subject ≥ 0.77) and that is reported.
+Otherwise SAM is prompted with each salient region above 0.5 and above 0.25 (box and most salient
+point), the box around all of them, and the two most salient points alone; each prompt gives three
+masks. Candidates are ranked on SAM's predicted quality and stability, the saliency they capture
+and the non-salient area they add, and shape (a band across the photo, many pieces, a sliver, most
+of the photo touching three edges). Separate salient objects of the same standing join (two swans).
+When SAM confidently outlines a whole at least 3× larger that contains the best candidate (a car
+around its tail light), the whole is chosen. **Next candidate** steps through the other distinct
+answers; **Select again** returns to the automatic one. Background is that subject inverted; Object
+prompts SAM with the taps (green include, red exclude; Alt or Exclude reverses), and
+**Smaller/Larger part** steps through SAM's three answers. The SAM image embedding is kept for the
+photo, so after the first Subject or Object every further one takes about a second.
+
+**Sky (23.1).** Regions the network finds are kept only where sky can be: the main sky reaching the
+top, regions next to it (within 3 % of the long edge: across a branch) or starting just below it.
+Regions further down (a dark driveway at night, a reflection in a window) are dropped, and a dark
+region must reach the top. A dark sky not spanning the whole top is flagged as easily confused.
 
 Models run in `segment/selectionWorker.mjs` (onnxruntime-web 1.31.1, WebAssembly, one thread: the
 site is not cross-origin isolated). They are served from `photography/editor-models/` (no other
-origin; the editor's CSP allows none), fetched only on first use (Sky 44 MB, Subject 49 MB,
-Object 45 MB; the buttons say how much is still to download), cached by the browser and checked
+origin; the editor's CSP allows none), fetched only on first use (Sky 44 MB, Subject 27.5 MB,
+Object 25 MB; the buttons say how much is still to download), cached by the browser and checked
 against their SHA-256 (size only without a secure context). The worker ends 90 s after the last
 selection, returning its memory; Cancel ends it at once. The analysis image is the photo's
 development (every global setting) without crop, rotation, local adjustments, layers, retouch or
@@ -990,36 +1004,65 @@ selections. Only local adjustments hold them (they are in the photo's own space,
 crop, rotation and perspective), and they are never synced to other photos. Edit documents are
 version 16; version 15 files read unchanged; older editors refuse version 16 files.
 
-**Honesty.** Each selection carries the models' confidence: Sky from how much of it is uncertain,
-Subject and Object from SAM's predicted quality and, for Subject, its agreement with the salient
-region (halved for a region spanning the whole width or height). Below 0.6–0.7 the panel says the
-outline may be wrong. "No sky was found" and "No clear subject" are reported, not guessed.
+**Honesty.** Each selection stores a confidence (0–1): a heuristic from the models' own evidence,
+**not a calibrated probability** (the panel says so). Below 0.7 (Sky) or 0.6 (Subject, Background,
+Object) the panel gives the reasons in words (a band across the photo, a competing answer, salient
+parts left out, background included, pieces, a sliver, an unsure outline, a dark sky) and suggests
+Next candidate, Add/Subtract or Select Object. "No sky was found" and "No clear subject" are
+reported, not guessed. Saved selections keep their grid and algorithm version
+(`sky-u2net-int8/2`, `u2netp+mobilesam/2`, `mobilesam/2` since 23.1); older ones render exactly as
+saved and change only with Select again.
 
-**Quality** (21 published photos; no hand-drawn reference masks exist, so results were checked
-visually from overlays; `bench:selection --refs` scores IoU, boundary F and leakage against
-reference masks when there are some):
+**Benchmark (23.1).** `scripts/selection-benchmark.json`: 49 published photos and 9 previews of the
+owner's RAW samples (cars, motorcycles, birds, architecture, skies, night, foliage, reflections;
+**no people**: none of the usable photos is a portrait). Reference masks come from prompts placed by
+hand, outlined by SAM, edge-refined and reviewed on overlays (`npm run selection:references --
+--out <dir>`); they are SAM-assisted, not hand-painted, so boundary scores favour SAM, and skies
+through branches are coarse. `npm run bench:selection -- --out <dir> --refs <dir> [--root
+<checkout>]` scores IoU, precision, recall, boundary F (2 px), false-positive and -negative regions
+(≥ 0.5 % of the photo) and warnings; reports and RAW previews stay outside the repository.
+"Correct" is IoU ≥ 0.75, or nothing selected where nothing should be.
 
-- Sky found on 16, correctly absent on 5 (inside a library, a garage, under trees, water, surf).
-  Good on clear, cloudy, sunset and winter skies, around branches, wires, poles and roofs. Wrong:
-  dark bushes taken as night sky (Subaru at night, confidence 0.62); a car's rear window reflecting
-  the sky is included; sky through a chain-link fence (flagged, 0.18).
-- Subject right on 10 of the 18 photos where it found one: cars side-on, the motorcycle, a dome, a
-  spire, two birds, a stair tower. Wrong or partial on 8: a frame-filling car (only its tail
-  light), a car behind a fence (lights only), a car's rear with holes, one leak into a car behind, a
-  lamp plus part of a sofa, a lamp post's head, the sun between trunks (flagged, 0.55) and a sunset
-  band taken as the subject (0.9: not flagged). One Object tap each: the frame-filling car whole,
-  the lamp alone, the car behind the fence whole but with the fence; on two cars the first answer
-  was a part (a bumper, a decal), for Larger part to extend.
-- Not measured on people: the published photos have none, and none was used.
+| Same photos and references | Interval 23 (main) | 23.1 |
+| --- | --- | --- |
+| Subject correct (51 judged) | 34 | 37 |
+| Subject IoU mean / boundary F median | 0.754 / 0.79 | 0.827 / 0.89 |
+| Subject wrong and not flagged | 11 of 17 | 7 of 14 |
+| Subject right but flagged | 2 of 30 | 1 of 32 |
+| Sky correct (47 judged) / IoU mean | 37 / 0.880 | 37 / 0.886 |
+| Sky wrong flagged / right flagged | 8 of 10 / 2 of 29 | 8 of 10 / 2 of 29 |
 
-**Speed and memory.** One WebAssembly thread on a desktop (i7 class, Node): Sky 2.3–2.9 s, Subject
-5.9–7.5 s (the SAM encoder 4.2 s, once per photo), then Background or an Object tap about 1 s.
-In the browsers (models from the local preview server, first use including loading), Sky /
-Subject / Background / Object tap: Chromium 5.7 / 14.1 / 2.3 / 1.1 s, WebKit 8.0 / 12.4 / 3.2 /
-0.9 s, iPhone 13 emulation 8.3 / 12.2 / 3.2 / 0.9 s, Pixel 7 emulation 5.6 / 11.4 / 2.3 / 1.1 s,
-no WebGL2 5.2 / 8.3 / 2.2 / 1.0 s, Firefox 39 / 64 / 22 / 2.6 s (its WebAssembly runs these
-models several times slower). Whole process with all models: about 650 MB (Node). Phones were
-emulated on a desktop CPU only; a phone's single thread will be slower.
+Fixed: the frame-filling M3 (tail light only, IoU 0.12 → whole car), the spire, the lit arch bridge
+(0 → 0.79), the Impreza behind a fence (0.08 unflagged → 0.38 flagged), the Afterglow sunset band
+(0.9 confidence → flagged), and the night Subaru's driveway taken as sky (sky IoU 0.39 → 0.61,
+flagged). Still wrong and not flagged: the backlit GT2 RS (0.65), a stone and a brick tower (part
+only), rose hips, three landscapes where U²-Netp finds a lamp post, trees or dunes salient; sky on
+two cars' reflective bodywork and the Afterglow treeline. 58 photos are a small collection: these
+numbers do not establish general reliability.
+
+**Models and memory (23.1).** SAM and U²-Netp weights are stored as 16-bit floats and cast back to
+32 bits when the session is created (every SAM mask on the benchmark kept IoU ≥ 0.998): Subject
+downloads 27.5 MB instead of 49 MB, all models 71.7 MB instead of 93.4 MB. Rejected: an 8-bit SAM
+decoder (one mask fell to IoU 0.10) and encoder (0.54, Interval 23). Session options (memory
+pattern, arena, optimisation level) did not lower memory: U²-Net's 320 × 320 intermediates dominate,
+and a WebAssembly heap never shrinks, so the peak is about the largest single run (Sky ≈ 470 MB in
+Node, all models ≈ 580 MB), freed only when the worker ends: 90 s after the last selection, on
+Cancel, after a failure, or at once when the page is hidden. A selection that sends nothing for
+180 s is ended with an error (a suspended or dead worker); the status shows elapsed seconds and,
+after 20 s, that some browsers run these models slowly.
+
+**Speed.** One WebAssembly thread (Node, i7 class, quiet machine, 8 photos, main → 23.1): Sky median
+2.8 → 2.6 s, Subject 6.6 → 6.5 s, then Background or an Object tap about 1 s. Browsers (first use,
+models from the local preview server; Sky / Subject / Background / Object tap): Chromium 5.7 / 12.7
+/ 3.4 / 1.1 s, WebKit 7.6 / 12.0 / 3.6 / 0.9, iPhone 13 emulation 18.7 / 11.4 / 8.6 / 0.9, Pixel 7
+emulation 5.8 / 19.5 / 2.7 / 1.2, no WebGL2 5.7 / 14.3 / 2.4 / 1.0, Firefox 42 / 67 / 35 / 3.1
+(Background reruns the candidates, slower than in Interval 23 in Firefox: 22 → 35 s). **Firefox** is slow on every run, not on loading: U²-Netp takes 21 s per inference
+against 2 s in Chromium, after a 0.8 s session creation, so it is Firefox's WebAssembly speed on
+onnxruntime's kernels, not download, initialisation or our pre- and post-processing. Four threads
+would help (Chromium 2.0 → 0.5 s, Firefox 21 → 6.5 s) but need a cross-origin isolated page
+(COOP/COEP headers, which GitHub Pages cannot send) and onnxruntime's thread worker bundled: not
+done. WebGPU was unavailable in the test browsers. Phones were emulated on a desktop CPU; no
+physical phone was measured.
 
 RAW photos are selected on their development like any other (no per-format code). Genuine files
 (`SELECTION_RAW_DIR`, Chromium): Subject found on a Sony A7 III ARW (0.75), Canon 5D IV CR2 (1.0),
@@ -1029,7 +1072,7 @@ Merged HDR photos were not tried.
 
 `npm run check:editor:selection` (Chromium, Firefox, WebKit, iPhone 13 and Pixel 7 emulation, no
 WebGL2) runs Cancel, Sky, a full-size export (darker inside, unchanged where the mask is 0), Subject,
-Background, Select again (identical grid), an Object tap, saving and reopening, and requires no
+Background, Select again (identical grid), Next candidate and back, an Object tap, saving and reopening, and requires no
 request to leave the site.
 
 ## Retouch (Remove, Spot Heal and Clone Stamp)
