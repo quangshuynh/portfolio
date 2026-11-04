@@ -75,6 +75,27 @@ export function pickPhotographSource(photograph, devicePixels) {
   return (sources.find(({ width }) => width >= devicePixels) ?? sources[sources.length - 1]).src;
 }
 
+// The widest file the viewer shows first. On a 2× desktop or a large 1× fullscreen the fitted
+// size needs the 2200 px file (~1.8× the bytes of the 1600 px one); showing 1600 px first and
+// upgrading once the visitor stays keeps rapid navigation from paying for files never looked at.
+export const VIEWER_STEP_PIXELS = 1600;
+
+/**
+ * The file to show first (`step`) and the one the fitted size, at the device pixel ratio, needs
+ * (`full`); the same file when the need is at most VIEWER_STEP_PIXELS.
+ */
+export function photographTiers(photograph, devicePixels) {
+  return {
+    step: pickPhotographSource(photograph, Math.min(devicePixels, VIEWER_STEP_PIXELS)),
+    full: pickPhotographSource(photograph, devicePixels),
+  };
+}
+
+/** A source's width, or 0 when it is not one of the photograph's files. */
+export function photographSourceWidth(photograph, src) {
+  return photographSources(photograph).find((source) => source.src === src)?.width ?? 0;
+}
+
 export function filterPhotographs(items, category = 'All') {
   return category === 'All' ? [...items] : items.filter((photograph) => photograph.category === category);
 }
