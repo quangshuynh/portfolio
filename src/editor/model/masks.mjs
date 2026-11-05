@@ -185,6 +185,12 @@ export function normalizeComponent(input, budget = { points: MASK_LIMITS.photoPo
       shift: round(number(input.shift, [-1, 1], 0), 3),
       feather: unit(input.feather, 0),
       ...(points.length ? { points } : {}),
+      ...(input.refine && typeof input.refine === 'object' ? {
+        refine: {
+          version: typeof input.refine.version === 'string' && /^[\w.+/-]{1,40}$/.test(input.refine.version) ? input.refine.version : 'unknown',
+          radius: round(unit(input.refine.radius, 0), 3),
+        },
+      } : {}),
     };
   }
   if (input.type === 'radial') {

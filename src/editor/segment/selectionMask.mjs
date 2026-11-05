@@ -2,7 +2,75 @@
 // (in the photo's own space, at analysis resolution) decoded once, with its edge refinements
 // (shift, feather) applied once, then sampled bilinearly wherever a preview or an export renders.
 // Grids are cached by their data string (a few at a time: each is at most about 4 MB of floats).
+//
+// Refined selections (Interval 24.2, segment/refine.mjs): a component whose `refine` is set is
+// sampled from its refined tile map once one is registered here under the key the editor gave it
+// (`refinedKey`, set on render copies of the mask, never saved). Until then it is sampled from its
+// grid, as before; an export registers every map it needs first (on its render workers too), so a
+// preview and its export sample the same map.
 import { boxMean, decodeCodes } from './analysis.mjs';
+import { tileMapBytes, tileMapSample } from './refine.mjs';
+
+const REFINED = new Map();
+let refinedBudget = 96 * 1024 * 1024;
+let refinedVersion = 0;
+
+/** A short hash of a string (two FNV-1a lanes, hex): identifies a selection's data in keys. */
+export function textHash(text) {
+  let h1 = 0x811c9dc5; let h2 = 0x050c5d1f;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+    h2 = Math.imul(h2 ^ c, 2246822519) >>> 0;
+  }
+  return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
+}
+
+/**
+ * The key of a component's refinement for an owner (the image its grid describes): everything the
+ * refined map depends on. Null when the component is not refined.
+ */
+export const refinementKey = (ownerKey, c) => (c?.type === 'selection' && c.refine
+  ? `${ownerKey}|${textHash(c.data)}|${c.width}x${c.height}|${c.refine.version}|${c.refine.radius}|${c.shift}|${c.feather}`
+  : null);
+
+/** Registers a refined tile map; the least recently registered leave past the byte budget. */
+export function registerRefined(key, map) {
+  REFINED.delete(key);
+  REFINED.set(key, map);
+  let bytes = 0;
+  for (const m of REFINED.values()) bytes += tileMapBytes(m);
+  for (const [k, m] of REFINED) {
+    if (bytes <= refinedBudget || k === key) break;
+    REFINED.delete(k);
+    bytes -= tileMapBytes(m);
+  }
+  refinedVersion += 1;
+}
+export const refinedMap = (key) => REFINED.get(key) ?? null;
+/** Changes whenever a map is registered or dropped. */
+export const refinedState = () => refinedVersion;
+/** Drops maps (those `keep(key)` rejects, or all). */
+export function forgetRefined(keep = null) {
+  for (const k of [...REFINED.keys()]) if (!keep || !keep(k)) REFINED.delete(k);
+  refinedVersion += 1;
+}
+export function setRefinedBudget(bytes) { refinedBudget = bytes; }
+export const refinedBytes = () => [...REFINED.values()].reduce((sum, m) => sum + tileMapBytes(m), 0);
+
+/** Box (refined pixels, exclusive) of a tile map's non-zero tiles, or null. */
+function tileBox(map) {
+  let box = null;
+  for (let ty = 0; ty < map.rows; ty += 1) {
+    for (let tx = 0; tx < map.cols; tx += 1) {
+      if (!map.states[ty * map.cols + tx]) continue; // eslint-disable-line no-continue
+      const b = { x0: tx * map.tile, y0: ty * map.tile, x1: Math.min(map.width, (tx + 1) * map.tile), y1: Math.min(map.height, (ty + 1) * map.tile) };
+      box = box ? { x0: Math.min(box.x0, b.x0), y0: Math.min(box.y0, b.y0), x1: Math.max(box.x1, b.x1), y1: Math.max(box.y1, b.y1) } : b;
+    }
+  }
+  return box;
+}
+const REFINED_PREP = new WeakMap();
 
 const CACHE = new Map();
 const CACHE_ENTRIES = 6;
@@ -31,6 +99,11 @@ function feathered(grid, width, height, feather) {
  *   ({ x0, y0, x1, y1 }, exclusive) or null when none is
  */
 export function prepareSelection(c) {
+  const refined = c.refinedKey ? REFINED.get(c.refinedKey) : null;
+  if (refined) {
+    if (!REFINED_PREP.has(refined)) REFINED_PREP.set(refined, { refined, width: refined.width, height: refined.height, box: tileBox(refined) });
+    return REFINED_PREP.get(refined);
+  }
   const params = `${c.width}x${c.height}|${c.shift}|${c.feather}`;
   let entry = CACHE.get(c.data);
   if (entry) { CACHE.delete(c.data); CACHE.set(c.data, entry); }
@@ -64,6 +137,7 @@ export const selectionDecodes = (c) => Boolean(prepareSelection(c));
 
 /** Coverage (0–1) at a point of the mask's space, in its pixels (`map.width` × `map.height`). */
 export function selectionAt(prep, map, sx, sy) {
+  if (prep.refined) return tileMapSample(prep.refined, (sx / map.width) * prep.width, (sy / map.height) * prep.height);
   const { grid, width, height } = prep;
   const gx = Math.min(width - 1, Math.max(0, (sx / map.width) * width - 0.5));
   const gy = Math.min(height - 1, Math.max(0, (sy / map.height) * height - 0.5));
