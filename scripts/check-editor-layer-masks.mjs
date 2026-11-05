@@ -298,9 +298,15 @@ async function check(run, files) {
 
     result.step = 'PNG export equals the Node reference';
     await settled();
-    // The preview as shown (overlays and handles hidden), for the preview/export comparison.
-    await page.addStyleTag({ content: '.pe-mask-overlay, .pe-watermark-overlay, .pe-textbox, .pe-masktool, .pe-layer-handles { visibility: hidden !important; }' });
-    const shot = await sharp(await page.locator('.pe-canvas-host').screenshot()).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    // The preview's own pixels (window.__photoEditorPreview, the output frame at preview size):
+    // Playwright's WebKit on Windows can screenshot a stale WebGL frame.
+    const png = await page.evaluate(() => {
+      const { width, height, data } = window.__photoEditorPreview.read();
+      const scratch = Object.assign(document.createElement('canvas'), { width, height });
+      scratch.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
+      return scratch.toDataURL('image/png').split(',')[1];
+    });
+    const shot = await sharp(Buffer.from(png, 'base64')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     const full = await exportPng();
     timings.exportMs = full.ms;
     // LAYER_MASK_SAVE=<dir>: the export and the preview, for looking at the edges.
