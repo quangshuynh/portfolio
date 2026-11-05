@@ -54,6 +54,7 @@ import PhotoThumb from './PhotoThumb';
 import RecipeDialog from './RecipeDialog';
 import { createRefiner, layerOwnerKey, maskOwner, photoOwnerKey, refinedMapsOf, refinedMask, refinedValues, refinementsOf } from '../segment/refineClient.mjs';
 import { REFINE_VERSION } from '../segment/refine.mjs';
+import { RECOVER_VERSION } from '../segment/recover.mjs';
 import { refinedMap, refinementKey, setRefinedBudget } from '../segment/selectionMask.mjs';
 import Viewer from './Viewer';
 import useFullscreen from '../../components/utilities/useFullscreen';
@@ -843,8 +844,9 @@ function EditorWorkspace({ host }) {
     if (component?.type !== 'selection' || !component.refine) return { state: 'off' };
     if (!ownerKey) return { state: 'unavailable', message: photo?.hdr ? 'Edges of selections on a merged HDR photo are not refined (it has no original file to refine against).' : 'The file of this image is not loaded.' };
     if (component.refine.version !== REFINE_VERSION) return { state: 'unavailable', message: `This selection was refined by a newer editor (${component.refine.version}); it is shown unrefined.` };
+    if (component.recover && component.recover.version !== RECOVER_VERSION) return { state: 'unavailable', message: `Its recovered detail was made by a newer editor (${component.recover.version}) and is not shown.` };
     const key = refinementKey(ownerKey, component);
-    if (refinedMap(key)) return { state: 'done' };
+    if (refinedMap(key)) return { state: 'done', recovered: refinedMap(key).recovered ?? null };
     const failure = refinerRef.current?.failure(key);
     return failure ? { state: 'failed', message: failure } : { state: 'pending' };
   }, [photo?.hdr, refineTick]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1209,7 +1211,7 @@ function EditorWorkspace({ host }) {
           throw Object.assign(new Error(`A selection's edge could not be refined (${error.message}). Turn off Refine edge on it, or try again.`), { code: 'refine' });
         }
       }
-      const composed = refinedValues(values, ownerKey);
+      const composed = refinedValues(values, ownerKey, { exact: true });
       const refined = refinedMapsOf(composed);
       if (refined.length < needed.length) throw Object.assign(new Error('Refined selections were released before the export used them (too little memory). Try again.'), { code: 'refine' });
       await composeLayers(context, composed.layers, {
@@ -1655,7 +1657,7 @@ function EditorWorkspace({ host }) {
     if (key === 'm') chooseMaskTool(maskTool ? null : 'brush');
     else if (key === 'o') setMaskOverlay((value) => ({ ...value, show: !value.show }));
     else if (key === 'x' && maskTool === 'brush') setBrush((value) => ({ ...value, mode: value.mode === 'erase' ? 'add' : 'erase' }));
-    else if ((key === '[' || key === ']') && maskTool === 'brush') setBrush((value) => ({ ...value, radius: Math.min(0.5, Math.max(0.002, value.radius * (key === ']' ? 1.2 : 1 / 1.2))) }));
+    else if ((key === '[' || key === ']') && (maskTool === 'brush' || maskTool === 'recover')) setBrush((value) => ({ ...value, radius: Math.min(0.5, Math.max(0.002, value.radius * (key === ']' ? 1.2 : 1 / 1.2))) }));
     else if (key === 'escape' && maskTool) chooseMaskTool(null);
     else return false;
     return true;
