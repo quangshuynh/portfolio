@@ -88,9 +88,12 @@ export const LAYER_LIMITS = Object.freeze({
 export const IMAGE_SOURCE_FORMATS = Object.freeze(['jpeg', 'png', 'webp', ...Object.keys(RAW_FORMATS)]);
 
 // Settings an image or adjustment layer may carry: the per-pixel colour controls, which the
-// compositor applies to the layer's pixels or to the composite below. Detail, glow, grain,
-// vignette, noise, capture and lens effects need neighbouring pixels or the frame position and
-// stay with the background; RAW and HDR controls stay with their own source.
+// compositor applies to the layer's pixels or to the composite below. Adjustment layers also
+// carry Detail (Texture, Clarity, Dehaze, Sharpening, noise reduction; Interval 24.1, document
+// version 18): a neighbourhood filter of the composite at the layer's place (composite.mjs,
+// adjustmentLayerPass). Their keys are kept only when not neutral, so stacks saved before keep
+// their exact form. Glow, grain, vignette, noise, capture and lens effects need the frame
+// position and stay with the background; RAW and HDR controls stay with their own source.
 const CREATIVE_COLOR_SECTIONS = new Set(['bleach', 'film', 'grading']);
 const CREATIVE_COLOR_KEYS = new Set(['sensorColor', 'cameraResponse', 'highlightClip', 'quantizeAmount']);
 // Computed on first use: adjustments.mjs imports this module, so its registry is not ready
@@ -101,6 +104,12 @@ export function layerSettingKeys() {
     || key === 'lutIntensity'
     || (group === 'creative' && (CREATIVE_COLOR_SECTIONS.has(section) || CREATIVE_COLOR_KEYS.has(key)))).map(({ key }) => key));
   return settingKeys;
+}
+let detailKeys = null;
+/** Detail controls an adjustment layer may carry (kept only when not neutral). */
+export function layerDetailKeys() {
+  detailKeys ??= Object.freeze(ADJUSTMENTS.filter(({ group }) => group === 'detail').map(({ key }) => key));
+  return detailKeys;
 }
 /** Panel groups that edit a layer's settings. */
 export const LAYER_SETTING_GROUPS = Object.freeze(['light', 'color', 'hsl', 'curves', 'lut', 'creative']);
@@ -123,28 +132,42 @@ export function cleanName(input) {
 }
 
 /**
- * A layer's colour settings from untrusted input: the LAYER_SETTING_KEYS (clamped), tone
- * curves and a LUT reference; anything else is dropped. Missing keys are neutral.
+ * A layer's settings from untrusted input: the layerSettingKeys (clamped), tone curves and a LUT
+ * reference, and for an adjustment layer (`type`) its Detail controls that are not neutral;
+ * anything else is dropped. Missing keys are neutral.
  */
-export function normalizeLayerSettings(input) {
+export function normalizeLayerSettings(input, type = 'image') {
   const source = isObject(input) ? input : {};
   const keys = layerSettingKeys();
-  const full = normalizeAdjustments(Object.fromEntries(Object.entries(source).filter(([key]) => keys.includes(key) || key === 'curves' || key === 'lut')));
-  return { ...Object.fromEntries(keys.map((key) => [key, full[key]])), curves: full.curves, lut: full.lut };
+  const detail = type === 'adjustment' ? layerDetailKeys() : [];
+  const full = normalizeAdjustments(Object.fromEntries(Object.entries(source).filter(([key]) => keys.includes(key) || detail.includes(key) || key === 'curves' || key === 'lut')));
+  const neutral = normalizeAdjustments({});
+  const kept = detail.filter((key) => full[key] !== neutral[key]);
+  return { ...Object.fromEntries(keys.map((key) => [key, full[key]])), curves: full.curves, lut: full.lut, ...Object.fromEntries(kept.map((key) => [key, full[key]])) };
+}
+
+/** A layer's settings split into its Detail controls (null when neutral) and the rest. */
+export function splitLayerSettings(settings) {
+  const detail = {};
+  const color = {};
+  Object.entries(settings ?? {}).forEach(([key, value]) => { (layerDetailKeys().includes(key) ? detail : color)[key] = value; });
+  return { detail: Object.keys(detail).length ? detail : null, color };
 }
 
 /** Full adjustments (neutral outside the layer's settings) for deriveParams and the panels. */
 export const layerAdjustments = (settings) => normalizeAdjustments(settings ?? {});
 
 /** True when a layer's settings change nothing. */
-export const settingsNeutral = (settings) => ['light', 'color', 'hsl', 'curves', 'lut', 'creative'].every((group) => groupIsNeutral(layerAdjustments(settings), group));
+export const settingsNeutral = (settings) => ['light', 'color', 'hsl', 'curves', 'lut', 'creative', 'detail'].every((group) => groupIsNeutral(layerAdjustments(settings), group));
 
 /** Settings in their saved form: only what differs from neutral. */
 export function compactLayerSettings(settings) {
-  const s = normalizeLayerSettings(settings);
+  // Detail keys are only ever present (not neutral) on adjustment layers.
+  const s = normalizeLayerSettings(settings, 'adjustment');
   const neutral = normalizeLayerSettings({});
   const out = {};
   layerSettingKeys().forEach((key) => { if (s[key] !== neutral[key]) out[key] = s[key]; });
+  layerDetailKeys().forEach((key) => { if (Object.hasOwn(s, key)) out[key] = s[key]; });
   const curves = CURVE_CHANNELS.filter((channel) => !isNeutralCurve(s.curves[channel]));
   if (curves.length) out.curves = Object.fromEntries(curves.map((channel) => [channel, s.curves[channel].map((point) => [...point])]));
   if (s.lut) out.lut = s.lut;
@@ -220,7 +243,7 @@ function normalizeLayerFields(input) {
     const { opacity, ...fields } = text;
     return { ...common(input), ...fields, type: 'text', flipH: input.flipH === true, flipV: input.flipV === true };
   }
-  if (input.type === 'adjustment') return { ...common(input), settings: normalizeLayerSettings(input.settings) };
+  if (input.type === 'adjustment') return { ...common(input), settings: normalizeLayerSettings(input.settings, 'adjustment') };
   if (input.type === 'group') return common(input);
   const source = normalizeSource(input.source);
   if (!source) return null;

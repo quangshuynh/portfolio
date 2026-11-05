@@ -88,7 +88,7 @@ function retarget(present, { layerId, localId }, change) {
   if (!layerId) return change(present);
   const layer = present.layers.find(({ id }) => id === layerId);
   if (!layer?.settings || layer.locked) return present;
-  return { ...present, layers: updateLayer(present.layers, layerId, { settings: normalizeLayerSettings(change(layerAdjustments(layer.settings))) }) };
+  return { ...present, layers: updateLayer(present.layers, layerId, { settings: normalizeLayerSettings(change(layerAdjustments(layer.settings)), layer.type) }) };
 }
 
 /** Settings of a newly imported photo: neutral, and a RAW (not a merged HDR) starts with Camera Natural (current version). */

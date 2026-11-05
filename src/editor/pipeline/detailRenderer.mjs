@@ -91,6 +91,69 @@ export function guideSource(image) {
 }
 
 /**
+ * A guide source with its transparent cells filled from the visible colours around them
+ * (push-pull: alpha-weighted averages over a pyramid, finer levels first), all opaque. Clarity
+ * and Dehaze build their guide with plain box filters, which would read the black of empty
+ * cells: next to transparency (an isolated group, a clipping base, a cut-out) the local mean
+ * then drops and the edge brightens. Visible cells keep their colour exactly where opaque.
+ */
+export function fillTransparentGuide(image) {
+  const { width, height, data } = image;
+  if (channelsOf(image) !== 4 || !rowsHaveAlpha(image, 0, height)) return image;
+  // Level 0: premultiplied colour and weight (0–1); coarser levels sum 2 × 2 blocks.
+  const levels = [{ w: width, h: height, c: new Float64Array(width * height * 3), a: new Float64Array(width * height) }];
+  for (let i = 0; i < width * height; i += 1) {
+    const alpha = data[i * 4 + 3] / 255;
+    levels[0].a[i] = alpha;
+    for (let k = 0; k < 3; k += 1) levels[0].c[i * 3 + k] = data[i * 4 + k] * alpha;
+  }
+  while (levels.at(-1).w > 1 || levels.at(-1).h > 1) {
+    const f = levels.at(-1);
+    const w = Math.ceil(f.w / 2);
+    const h = Math.ceil(f.h / 2);
+    const next = { w, h, c: new Float64Array(w * h * 3), a: new Float64Array(w * h) };
+    for (let y = 0; y < f.h; y += 1) {
+      for (let x = 0; x < f.w; x += 1) {
+        const i = y * f.w + x;
+        const t = (y >> 1) * w + (x >> 1);
+        next.a[t] += f.a[i];
+        for (let k = 0; k < 3; k += 1) next.c[t * 3 + k] += f.c[i * 3 + k];
+      }
+    }
+    // Normalised so a level's weight stays 0–1 (a fully visible block weighs 1).
+    for (let t = 0; t < w * h; t += 1) {
+      const sum = next.a[t];
+      if (sum > 1) { next.a[t] = 1; for (let k = 0; k < 3; k += 1) next.c[t * 3 + k] /= sum; }
+    }
+    levels.push(next);
+  }
+  // Colour per level, coarse to fine: own premultiplied colour, the rest from the level above.
+  let colour = new Float64Array(3);
+  const top = levels.at(-1);
+  for (let k = 0; k < 3; k += 1) colour[k] = top.a[0] > 0 ? top.c[k] / top.a[0] : 0;
+  for (let l = levels.length - 2; l >= 0; l -= 1) {
+    const f = levels[l];
+    const coarse = levels[l + 1];
+    const out = new Float64Array(f.w * f.h * 3);
+    for (let y = 0; y < f.h; y += 1) {
+      for (let x = 0; x < f.w; x += 1) {
+        const i = y * f.w + x;
+        const t = (y >> 1) * coarse.w + (x >> 1);
+        const rest = 1 - Math.min(1, f.a[i]);
+        for (let k = 0; k < 3; k += 1) out[i * 3 + k] = f.c[i * 3 + k] + rest * colour[t * 3 + k];
+      }
+    }
+    colour = out;
+  }
+  const filled = new Uint8ClampedArray(width * height * 4);
+  for (let i = 0; i < width * height; i += 1) {
+    for (let k = 0; k < 3; k += 1) filled[i * 4 + k] = Math.round(colour[i * 3 + k]);
+    filled[i * 4 + 3] = 255;
+  }
+  return { width, height, data: filled };
+}
+
+/**
  * Writes the base stage (encoded, 0–1 nominal) of a rectangle into float planes.
  * :param image: { kind, width, data, y0, x0 } where `data` starts at image row `y0` and
  *   column `x0` (default 0), `width` columns per row

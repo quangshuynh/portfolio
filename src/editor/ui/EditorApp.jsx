@@ -621,8 +621,8 @@ function EditorWorkspace({ host }) {
   }, [exporting]);
   // A local Detail pass over a whole preview frame, in a worker of its own so brush moves never
   // wait behind it; only the settings travel (the mask is applied on the page).
-  const renderLocalDetail = useCallback((image, { kind, adjustments: values, native }) => worker('local')
-    .call('localDetailFrame', { image, pass: { kind, adjustments: values, native } }, { transfer: [image.data.buffer] }), [worker]);
+  const renderLocalDetail = useCallback((image, { kind, adjustments: values, native, color = null }) => worker('local')
+    .call('localDetailFrame', { image, pass: { kind, adjustments: values, native, color } }, { transfer: [image.data.buffer] }), [worker]);
   const onEngine = useCallback((info) => setEngine(info), []);
 
 
@@ -1753,7 +1753,7 @@ function EditorWorkspace({ host }) {
     ['hsl', 'HSL'], ['curves', 'Tone Curve'], ['creative', 'Creative'], ['text', 'Text'],
     ['lut', 'LUT'], ['presets', 'Presets'], ['recipes', 'Recipes'],
     ...(photo?.raw ? [['raw', 'RAW']] : []), ...(photo?.hdr ? [['hdr', 'HDR']] : []),
-  ].filter(([id]) => !targetLocal && !targetLayer || ['layers', 'masks', 'retouch', 'light', 'color', 'hsl', ...(targetLocal ? ['detail'] : ['curves', 'lut', 'creative', 'presets'])].includes(id));
+  ].filter(([id]) => !targetLocal && !targetLayer || ['layers', 'masks', 'retouch', 'light', 'color', 'hsl', ...(targetLocal ? ['detail'] : ['curves', 'lut', 'creative', 'presets']), ...(targetLayer?.type === 'adjustment' ? ['detail'] : [])].includes(id));
 
   return (
     <div ref={rootRef} className="pe" data-fullscreen={fullscreen.mode ?? undefined} data-engine={engine?.kind} data-mobile-panel={mobilePanel} data-mobile-tool={mobileTool || undefined} data-ready={ready || undefined} data-empty={!state.photos.length || undefined} data-menu={mobileMenu || undefined} data-dragging={dragDepth > 0 || undefined} {...dragHandlers}>

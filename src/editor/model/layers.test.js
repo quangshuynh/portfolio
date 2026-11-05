@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
   LAYER_LIMITS, canAddLayer, compactLayers, createAdjustmentLayer, createImageLayer, duplicateLayer, insertLayer, layerAdjustments,
-  layerSettingKeys, moveLayer, normalizeLayer, normalizeLayers, removeLayer, updateLayer, visibleLayers,
+  layerDetailKeys, layerSettingKeys, moveLayer, normalizeLayer, normalizeLayers, removeLayer, splitLayerSettings, updateLayer, visibleLayers,
 } from './layers.mjs';
 import { compactAdjustments, normalizeAdjustments, normalizeRawSettings } from './adjustments.mjs';
 import { DOCUMENT_VERSION, createEditDocument, parseEditDocument, serializeEditDocument } from './editDocument.mjs';
@@ -100,16 +100,27 @@ describe('layer records', () => {
     expect(normalizeLayer({ id: 'a', type: 'adjustment', name: 'x'.repeat(200) }).name).toHaveLength(LAYER_LIMITS.name);
   });
 
-  test('settings hold only per-pixel colour controls; spatial and source controls are dropped', () => {
-    const layer = createAdjustmentLayer('A', { exposure: 1, texture: 50, grainAmount: 30, vignetteAmount: -20, rawTemperature: 3000, bleachAmount: 20, gradeShadowsSat: 40, geometry: { angle: 4 } });
-    expect(layer.settings).toMatchObject({ exposure: 1, bleachAmount: 20, gradeShadowsSat: 40 });
-    ['texture', 'grainAmount', 'vignetteAmount', 'rawTemperature', 'geometry', 'layers'].forEach((key) => expect(layer.settings).not.toHaveProperty(key));
-    const params = deriveParams(layerAdjustments(layer.settings));
+  test('settings hold per-pixel colour controls (adjustment layers also Detail); other spatial and source controls are dropped', () => {
+    const input = { exposure: 1, texture: 50, sharpening: 0, grainAmount: 30, vignetteAmount: -20, rawTemperature: 3000, bleachAmount: 20, gradeShadowsSat: 40, geometry: { angle: 4 } };
+    const layer = createAdjustmentLayer('A', input);
+    // Interval 24.1: an adjustment layer keeps its Detail controls that are not neutral.
+    expect(layer.settings).toMatchObject({ exposure: 1, texture: 50, bleachAmount: 20, gradeShadowsSat: 40 });
+    ['sharpening', 'grainAmount', 'vignetteAmount', 'rawTemperature', 'geometry', 'layers'].forEach((key) => expect(layer.settings).not.toHaveProperty(key));
+    const { detail, color } = splitLayerSettings(layer.settings);
+    expect(detail).toEqual({ texture: 50 });
+    const params = deriveParams(layerAdjustments(color));
     expect(params.spatialActive).toBe(false);
     expect(params.cpuOnly).toBeFalsy();
-    // Every allowed key alone stays per pixel.
+    // Every colour key alone stays per pixel.
     layerSettingKeys().forEach((key) => expect(deriveParams(normalizeAdjustments({ [key]: 50 })).spatialActive).toBe(false));
-    expect(compactLayers([layer])[0].settings).toEqual({ exposure: 1, bleachAmount: 20, gradeShadowsSat: 40 });
+    expect(compactLayers([layer])[0].settings).toEqual({ exposure: 1, bleachAmount: 20, gradeShadowsSat: 40, texture: 50 });
+    // An image layer has no Detail: its pixels are developed on their own.
+    const img = normalizeLayer({ ...createImageLayer('i', source, canvas), settings: input });
+    expect(img.settings).not.toHaveProperty('texture');
+    // A version 17 adjustment layer (no Detail) normalises to exactly its earlier form.
+    const old = createAdjustmentLayer('B', { exposure: 1 });
+    expect(Object.keys(old.settings).filter((key) => layerDetailKeys().includes(key))).toEqual([]);
+    expect(splitLayerSettings(old.settings).detail).toBeNull();
   });
 });
 
@@ -193,7 +204,9 @@ describe('undo, presets and sync', () => {
     state = editorReducer(state, { type: 'setAdjustment', key: 'contrast', value: 40, layerId: 'adj' });
     state = editorReducer(state, { type: 'applySettings', patch: { curves: { master: [[0, 10], [255, 245]] }, texture: 80 }, layerId: 'adj' });
     expect(present(state)).toMatchObject({ exposure: 0.5, contrast: 0, texture: 0 });
-    expect(present(state).layers[0].settings).toMatchObject({ contrast: 40, curves: { master: [[0, 10], [255, 245]] } });
+    // Interval 24.1: an adjustment layer keeps Detail settings.
+    expect(present(state).layers[0].settings).toMatchObject({ contrast: 40, texture: 80, curves: { master: [[0, 10], [255, 245]] } });
+    state = editorReducer(state, { type: 'setAdjustment', key: 'texture', value: 0, layerId: 'adj' });
     expect(present(state).layers[0].settings).not.toHaveProperty('texture');
     state = editorReducer(state, { type: 'resetAll', layerId: 'adj' });
     expect(present(state).layers[0].settings.contrast).toBe(0);
