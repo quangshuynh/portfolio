@@ -910,6 +910,59 @@ resolves it. Presets never contain layers; Paste never copies them; **Sync…** 
 stack only when **Layers** is ticked (it replaces the target's stack). Thumbnails and the Filter
 Library show the photo without layers.
 
+### Groups and clipping (Interval 24)
+
+**Using them.** **Group** (button, or Ctrl/Cmd+G on a row) puts the selected layer in a new group
+(with nothing selected it adds an empty one); **Ungroup** (Ctrl/Cmd+Shift+G) keeps the children in
+place. **In group** moves a layer into a group or back to the top level; dragging the grip drops a
+layer above or below the row under the pointer, as that row's sibling (so into its group).
+Groups collapse with their chevron or ←/→ on the row (a view setting, not an undo step). **Clip
+to layer below** (Ctrl/Cmd+Alt+G) clips a layer; **Add clipped adjustment** adds one already
+clipped. Rows are indented per group level; clipped rows show an arrow and "Clipped to …". A
+layer with a mask shows its mask thumbnail, which opens it in the Masks panel. **From
+selection…** adds an adjustment layer masked by a selection the photo already holds; in a canvas
+layer mask, **+ Sky/Subject/Background** run the models and **+ Saved selection…** copies an
+existing grid (no model run). Delete on a group deletes its contents (asked first; a locked layer
+inside blocks it).
+
+**Behaviour** (`model/layerTree.mjs`; composited by `composite.mjs`, its GLSL mirror and exports):
+
+| | Result |
+| --- | --- |
+| Clip run (a base and the layers clipped to it) | Isolated: the base at full opacity in Normal onto transparency, clipped layers composited *atop* (colour moves to `B(Cb, Cs)` by their alpha × mask × opacity; the base's alpha, soft edges and mask are kept), then the run over what lies below with the base's mode and opacity. A clipped adjustment changes only the run. |
+| Bases | Image, text and group layers; never an adjustment layer; groups are never clipped. A hidden, empty or fully transparent base hides its clipped layers. Deleting a base releases them (unclipped, in place). Moving a base moves its run; a clipped layer moves within its run, and dragging it elsewhere releases it. |
+| Pass-through group (default) | Children act on everything below, as if ungrouped (no extra buffer); opacity and mask then fade between that and what lay below, in premultiplied colour. |
+| Group with a blend mode (Normal included) | Isolated: children composited onto transparency (an adjustment inside changes only the group), then blended as one with the group's mode, opacity and mask. A group used as a clipping base is isolated in Normal, its mode and opacity applying to the run. |
+| Limits | 12 groups, nested 3 deep, within 40 layers. Invalid saved trees are repaired on load (missing, circular or non-group parents go to the top level, too-deep groups move up, invalid clips are removed); no layer is dropped. |
+
+Blending stays sRGB-encoded 8-bit W3C (see above); every isolated level is one more canvas-sized
+RGBA8 buffer while it is drawn (preview: one framebuffer per open group; exports and the CPU
+preview: one canvas each). Layer masks on the canvas (adjustment, text, group) may hold selection
+components, evaluated in the photo's own space through its Crop & Transform like a local
+adjustment's; image layer masks cannot (a selection of the photo says nothing about another
+image), and Select Object stays with local adjustments. Selection data counts toward the photo's
+1 M-character selection budget, shared by local adjustments and layer masks.
+
+Not in this interval: Detail-based settings (Texture, Clarity, Dehaze, Sharpening, noise
+reduction) on adjustment layers (they need neighbouring pixels; local adjustments keep them),
+running selections on an image layer's own content, per-layer fill opacity, knockout, and group
+blend modes inside clip runs other than the base's. Layers from other cameras keep their own
+dimensions, orientation (applied on decode) and RAW profile; everything is composited in sRGB at
+the canvas's size.
+
+**Documents.** Version 17 adds `type: 'group'`, a layer's `parent`, `clip` and selections in
+canvas layer masks; the keys are absent when unused. Version 16 documents read and render exactly
+as before (`fixtures/edits-v16.json`, written by the Interval 23.5 editor, 298d719); version 16
+editors refuse version 17 files rather than flatten them. CMS treatments store the same document.
+
+**Accuracy and cost.** Unit references (`pipeline/groups.test.js`) check clipping with partial
+alpha and opacity, clipped blend modes and adjustments, base masks, pass-through and isolated
+groups, nested opacity, group masks and banded = whole-image composites against float
+references (≤ 1 code). GPU vs CPU (`check:editor:layers` parity: a clip run over opaque and
+transparent backdrops, nested isolated > pass-through masked groups): 0 codes in Chromium,
+≤ 1 in Firefox and WebKit. CPU cost at 6 MP (Node, one thread, 3 image + 2 adjustment layers):
+4.7 s flat, 5.3 s as a clip run in nested groups (depth 2, +46 MB of buffers).
+
 **Accuracy and measurements** (`npm run check:editor:layers`): Windows i7-9700, headless Playwright,
 whole browser memory, Chromium without `CHECK_GPU` (SwiftShader).
 
@@ -1659,6 +1712,9 @@ Settings never change the text or typography.
   `sharpening`, `luminanceNoise`, `colorNoise`; older files open with Detail neutral.
 - Version 4 added merged HDR sources (see [Merge HDR](#merge-hdr)) and the HDR tone
   controls `hdrHighlights`, `hdrShadows`.
+- Version 17 added layer groups (`type: 'group'`, a layer's `parent`), `clip` and selections in
+  canvas layer masks (see [Groups and clipping](#groups-and-clipping-interval-24)); version 16 files
+  read and render unchanged.
 - Version 15 added `raw.profileVersion` (2 for new imports; absent = 1), an accepted Auto
   Exposure (`raw.autoExposure`, EV) and a RAW image layer's `rawProfile`; version 14 files
   read and save unchanged.
