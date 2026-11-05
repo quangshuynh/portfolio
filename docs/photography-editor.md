@@ -1367,10 +1367,23 @@ over a 3 px antenna on a house facade, background the ring never saw (a patch of
 beside it. A 3 px antenna drawn over the 350Z layer's facade at four positions, each painted five
 times ±3 px off: with brushes of 0.8–2 % it was recovered in 51 of 60 strokes (69–103 % of its
 pixel count at 0.8–1.2 %; up to 118 % at 2 %, its soft edge and a few pixels beside it); where it crosses a dark window it can be lost (a few strokes
-found nothing: reported, Add brush). **Real photos** (no reviewed references: judged on crops). The Emira's missing black mirror: only its darkest parts (its shell
+found nothing: reported, Add brush). Two failure modes remain: a dark line crossing the stroke and
+joining the part (a gutter's shadow line behind the antenna) is added within the brush width, as a
+small cross (Subtract or Erase it); a part wider than the stroke spills into its surroundings, which
+then count as background, leaving notches in it (paint over all of it). **Real photos** (no reviewed references: judged on crops). The Emira's missing black mirror: only its darkest parts (its shell
 reflects a sky as grey as the road). The Huracán's missing rear wing: almost nothing (wider than
 the brush; the ring falls on the wing itself). Whole parts are better selected with **Object** (a
 tap); Recover detail is for thin ones. No portraits, fur or fences with references were available.
+
+**Checks (24.3).** `recover.test.js` (a thin part joined to the selection, nothing outside strokes,
+detached background parts dropped, low contrast adds nothing, partial coverage, transparency,
+Edge/Feather after recovery, determinism, scattered surroundings, bounded windows, v20 strokes and
+budget, keys, preview fallback vs exact export). `check:editor:masks` and `check:editor:selection`
+(Chromium, WebKit), `check:editor:mobile` and `check:cms:editor` (Chromium, WebKit) pass; genuine
+RAW layers (ARW, CR2, CR3, RAF, NEF, DNG) are refined from their development as before (recovery
+uses the same guide; no RAW stroke was run in a browser). An HDR exported to a file and imported as a
+layer is an ordinary image. No physical iPhone was available: the checklist above applies, plus a
+Recover detail stroke with a finger at 200 % (no stroke from a pinch).
 
 **Colour decontamination** (replacing edge colours by the subject's) was measured and not added: on
 the synthetic scenes the halo over white or black (mean 8-bit error in the edge band) was 66–79 with
