@@ -24,7 +24,7 @@
 // Steps: { op: 'layer', layer, clip }, { op: 'begin', id, isolate }, { op: 'end', id, isolate,
 // blend, opacity, owner } (`owner`: the group whose mask applies, or null).
 
-import { LAYER_LIMITS, PASS_THROUGH, canAddLayer, cleanName, layerDraws, normalizeLayer } from './layers.mjs';
+import { LAYER_LIMITS, PASS_THROUGH, canAddLayer, cleanName, layerDraws, layerLabel, normalizeLayer } from './layers.mjs';
 import { maskActive } from './masks.mjs';
 
 const key = (layer) => layer.parent ?? null;
@@ -406,4 +406,14 @@ export function programDepth(steps) {
     if (step.op === 'end') depth -= 1;
   }
   return max;
+}
+
+/** What an adjustment layer changes, in words, when not everything below it: its clipping base or its isolated group. */
+export function adjustmentScope(layers, layer) {
+  if (layer.clip) {
+    const base = clipBase(layers, layer.id);
+    return base ? `only “${layerLabel(base)}” (clipped)` : null;
+  }
+  const isolated = ancestors(layers, layer.id).find((group) => group.blend !== PASS_THROUGH);
+  return isolated ? `only the layers below it in the group “${layerLabel(isolated)}”` : null;
 }

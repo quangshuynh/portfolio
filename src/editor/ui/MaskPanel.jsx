@@ -27,10 +27,12 @@ const newComponent = (type, id) => (type === 'brush' ? createBrush(id) : type ==
  * :param target: { kind: 'local', local } | { kind: 'layer', layer } | null, the mask being edited
  * :param space: { width, height } of the target mask's space in pixels (gradient fields)
  * :param selection: useSelections() (Select Sky, Subject, Background, Object), or null
+ * :param savedSelections: [{ id, label, mask }] selections this photo already holds, which can be
+ *   copied into the mask being edited (no model runs again)
  */
 export default function MaskPanel({ compact = false, onClose,
   disabled, locals, layer, target, space, selectedId, onSelect, onSelectLocal, onSelectLayerMask, tool, onTool, brush, onBrush, overlay, onOverlay,
-  onApplyLocals, onApplyMask, onPreviewMask, onCommit, newId, onEditSettings, selection = null,
+  onApplyLocals, onApplyMask, onPreviewMask, onCommit, newId, onEditSettings, selection = null, savedSelections = [],
 }) {
   const [open, setOpen] = useState(true);
   const [renaming, setRenaming] = useState(false);
@@ -63,6 +65,18 @@ export default function MaskPanel({ compact = false, onClose,
   const short = Math.min(space?.width ?? 1, space?.height ?? 1);
   const busy = Boolean(selection?.status?.busy);
   const local = target?.kind === 'local';
+  // Selections cover the photo: local adjustments and canvas-space layer masks (adjustment, text and
+  // group layers) can hold them; an image layer's mask is in its own box (Interval 24).
+  const selectable = local || (target?.kind === 'layer' && mask?.space === 'canvas');
+  const copySelection = (id) => {
+    const chosen = savedSelections.find((entry) => entry.id === id);
+    if (!chosen) return;
+    const copy = { ...chosen.mask.components[0], id: newId('selection') };
+    const next = addComponent(mask, copy);
+    if (next === mask) return;
+    setMask(next);
+    onSelect(copy.id);
+  };
   const selectTitle = (kind) => {
     const bytes = selection?.downloadBytes(kind) ?? 0;
     return `Select the ${kind} automatically, on this device${bytes ? ` (downloads ${megabytes(bytes)} the first time)` : ''}`;
@@ -262,10 +276,20 @@ export default function MaskPanel({ compact = false, onClose,
               {TOOLS.map(([type, label]) => (
                 <button key={type} type="button" className="pe-text-button" disabled={edit || mask.components.length >= MASK_LIMITS.components} onClick={() => add(type)}>+ {label}</button>
               ))}
-              {selection && local && SELECTS.map(([kind, label]) => (
+              {selection && selectable && SELECTS.map(([kind, label]) => (
                 <button key={kind} type="button" className="pe-text-button" title={selectTitle(kind)} disabled={edit || busy || mask.components.length >= MASK_LIMITS.components} onClick={() => selection.select(kind, { mode: 'add' })}>+ {label}</button>
               ))}
+              {selectable && savedSelections.length > 0 && (
+                <label className="pe-layers__photo">
+                  <span className="visually-hidden">Copy a saved selection into this mask</span>
+                  <select value="" disabled={edit || mask.components.length >= MASK_LIMITS.components} onChange={(event) => copySelection(event.target.value)}>
+                    <option value="">+ Saved selection…</option>
+                    {savedSelections.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+                  </select>
+                </label>
+              )}
             </div>
+            {target.kind === 'layer' && !selectable && <p className="pe-note">Sky, Subject and Object selections cover the photo, so an image layer's mask cannot hold them; use a brush or gradient, or clip an adjustment layer with a selection to it.</p>}
 
             <div className="pe-masks__tools" role="group" aria-label="Tool on the photo">
               {TOOLS.map(([type, label]) => (

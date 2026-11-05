@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { LAYER_LIMITS, createAdjustmentLayer, createGroupLayer, normalizeLayers, repairLayerTree, visibleLayers } from './layers.mjs';
 import {
-  ancestors, canClip, canMoveUnit, clipBase, clippedTo, descendantIds, drawnLayers, dropUnit, duplicateUnit, groupTargets, groupUnits, layerProgram,
-  moveIntoGroup, moveUnit, programDepth, removeBlocked, removeUnit, setClip, ungroup,
+  adjustmentScope, ancestors, canClip, canClipAbove, canMoveUnit, clipBase, clippedTo, descendantIds, drawnLayers, dropUnit, duplicateUnit, groupTargets, groupUnits, layerProgram,
+  insertAbove, moveIntoGroup, moveUnit, programDepth, removeBlocked, removeUnit, setClip, ungroup,
 } from './layerTree.mjs';
 import { compactAdjustments, normalizeAdjustments } from './adjustments.mjs';
 import { DOCUMENT_VERSION, createEditDocument, parseEditDocument, serializeEditDocument } from './editDocument.mjs';
@@ -294,5 +294,31 @@ describe('selections in layer masks', () => {
     const kept = adjustments.layers.filter((layer) => layer.mask.components.length).length;
     expect(kept).toBe(3);
     expect(createAdjustmentLayer('x').type).toBe('adjustment');
+  });
+});
+
+describe('adding layers next to the selection', () => {
+  const stack = () => norm([image('a'), image('b', { parent: 'g' }), image('bc', { parent: 'g', clip: true }), group('g', { name: 'Shapes' }), image('d')]);
+
+  test('a new layer goes above the selected unit, in its group, never inside a clip run', () => {
+    expect(ids(norm(insertAbove(stack(), adjust('n'), 'b')))).toEqual(['a', 'b', 'bc', 'n', 'g', 'd']);
+    expect(norm(insertAbove(stack(), adjust('n'), 'b')).find(({ id }) => id === 'n').parent).toBe('g');
+    expect(ids(norm(insertAbove(stack(), adjust('n'), 'g')))).toEqual(['a', 'b', 'bc', 'g', 'n', 'd']);
+    expect(ids(norm(insertAbove(stack(), adjust('n'), null)))).toEqual(['a', 'b', 'bc', 'g', 'd', 'n']);
+  });
+
+  test('a clipped adjustment joins the selected layer\'s run; adjustment bases are not offered', () => {
+    const clipped = norm(insertAbove(stack(), adjust('n'), 'b', { clip: true }));
+    expect(ids(clipped)).toEqual(['a', 'b', 'bc', 'n', 'g', 'd']);
+    expect(clipBase(clipped, 'n').id).toBe('b');
+    expect(canClipAbove(stack(), 'bc')).toBe(true);
+    expect(canClipAbove(norm([adjust('x')]), 'x')).toBe(false);
+  });
+
+  test('the Adjust panel names what a clipped or isolated adjustment changes', () => {
+    const layers = norm([image('a', { name: 'Sky photo' }), adjust('c', { clip: true }), adjust('in', { parent: 'g' }), group('g', { name: 'Look', blend: 'normal' }), adjust('free')]);
+    expect(adjustmentScope(layers, layers[1])).toBe('only “Sky photo” (clipped)');
+    expect(adjustmentScope(layers, layers[2])).toBe('only the layers below it in the group “Look”');
+    expect(adjustmentScope(layers, layers[4])).toBeNull();
   });
 });

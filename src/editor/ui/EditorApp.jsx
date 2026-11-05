@@ -32,11 +32,11 @@ import { rasterizeTextLayer } from '../text/textRender.mjs';
 import { WATERMARK_DEFAULTS, normalizeWatermark, watermarkActive } from '../watermark/watermark.mjs';
 import { applyWatermark, loadWatermarkFonts } from '../watermark/watermarkRender.mjs';
 import { createImageLayer, createAdjustmentLayer, layerAdjustments, layerDevelopment, layerLabel, settingsNeutral, updateLayer } from '../model/layers.mjs';
-import { drawnLayers, insertAbove } from '../model/layerTree.mjs';
+import { adjustmentScope, drawnLayers, insertAbove } from '../model/layerTree.mjs';
 import { rasterSize } from '../pipeline/layerTransform.mjs';
 import { composeLayers } from '../io/composeLayers.mjs';
-import { visibleLocals } from '../model/masks.mjs';
-import { imageMaskMap } from '../pipeline/mask.mjs';
+import { componentLabel, createMask, visibleLocals } from '../model/masks.mjs';
+import { canvasMaskMap, imageMaskMap, maskMap, maskUsesImage, rasterizeMask } from '../pipeline/mask.mjs';
 import { createRasterCache } from './layerRasters.mjs';
 import LayersPanel, { newLayerId } from './LayersPanel';
 import MaskPanel, { DEFAULT_BRUSH, DEFAULT_OVERLAY } from './MaskPanel';
@@ -986,7 +986,51 @@ function EditorWorkspace({ host }) {
     }
   }, [raws, worker, addImageLayer]);
 
+  // Saved selections of this photo (local adjustments and layer masks): each can start an
+  // adjustment layer's mask without running a model again (the grid is copied).
+  const savedSelections = useMemo(() => {
+    if (!ready) return [];
+    const seen = new Set();
+    const out = [];
+    const owners = [
+      ...adjustments.local.map((local) => ({ name: local.name || 'Local adjustment', id: `local:${local.id}`, mask: local.mask })),
+      ...adjustments.layers.filter((layer) => layer.mask).map((layer) => ({ name: layerLabel(layer), id: `layer:${layer.id}`, mask: layer.mask })),
+    ];
+    for (const owner of owners) {
+      owner.mask.components.forEach((c, i) => {
+        const key = `${c.kind}|${c.invert}|${c.data}`;
+        if (c.type !== 'selection' || seen.has(key)) return;
+        seen.add(key);
+        out.push({ id: `${owner.id}:${c.id}`, label: `${owner.name} · ${componentLabel(c, i)}`, name: componentLabel(c, i), mask: { ...createMask('canvas', 'none'), components: [{ ...c, op: 'add' }] } });
+      });
+    }
+    return out;
+  }, [ready, adjustments.local, adjustments.layers]);
+  // Mask thumbnails in the Layers panel: the mask in its own space, about 32 px wide (kept per mask).
+  const maskThumbsRef = useRef(new Map());
+  const photoMaskMap = (size, native) => {
+    try { return imageMaskMap(exportGeometry(adjustments.geometry, native, { mode: 'original' }).plan, size, native); } catch { return null; }
+  };
+  const maskThumbnail = (layer) => {
+    if (!ready || !layer.mask || !canvasSize) return null;
+    const box = layer.mask.space === 'layer' ? layer.source : canvasSize;
+    const size = { width: 32, height: Math.max(8, Math.min(48, Math.round((32 * box.height) / box.width))) };
+    const usesImage = maskUsesImage(layer.mask);
+    const key = `${size.width}x${size.height}|${usesImage ? JSON.stringify(adjustments.geometry) : ''}|${JSON.stringify(layer.mask)}`;
+    const kept = maskThumbsRef.current;
+    if (!kept.has(key)) {
+      const native = { width: photo.width, height: photo.height };
+      const map = layer.mask.space === 'layer'
+        ? maskMap([box.width / size.width, 0, 0, 0, box.height / size.height, 0, 0, 0, 1], box.width, box.height)
+        : canvasMaskMap(size, usesImage ? photoMaskMap(size, native) : null);
+      kept.set(key, rasterizeMask(layer.mask, map, size));
+      while (kept.size > 48) kept.delete(kept.keys().next().value);
+    }
+    return kept.get(key);
+  };
   const layerSourcesUi = {
+    selections: savedSelections,
+    maskThumbnail,
     missing: (layer) => {
       if (layer.type !== 'image') return null;
       if (!sourceFor(layer.source.sha256)) return `Its file ${layer.source.name || ''} (${layer.source.width}×${layer.source.height}) is not loaded. Reconnect it (or import it as a photo) to show and export this layer.`;
@@ -2009,6 +2053,14 @@ function EditorWorkspace({ host }) {
             onCommit={() => dispatch({ type: 'commitAdjustment' })}
             onAddText={addTextLayer}
             onAddAdjustment={addAdjustmentLayer}
+            maskEditing={maskTarget?.kind === 'layer' ? maskTarget.layer.id : null}
+            onEditMask={(layer) => {
+              if (activeLayer !== layer.id) selectLayer(layer.id);
+              setLayerMaskOn(true);
+              setMaskComponent(null);
+              setLayerToolOn(false);
+              if (narrow) { setMobilePanel('adjust'); setMobileTool('masks'); }
+            }}
             onEditSettings={(layer) => {
               setMobilePanel('adjust');
               setMobileTool(layer?.type === 'text' ? 'text' : 'light');
@@ -2065,12 +2117,13 @@ function EditorWorkspace({ host }) {
             newId={newLayerId}
             onEditSettings={() => { setMobilePanel('adjust'); setMobileTool('light'); }}
             selection={ready ? selections : null}
+            savedSelections={savedSelections}
           />
           <AdjustPanel
             mobileSection={narrow ? mobileTool : undefined}
             onMobileSectionChange={selectMobileTool}
             adjustments={panelAdjustments}
-            layer={targetLocal ? { label: targetLocal.name || 'Local adjustment', local: true } : targetLayer ? { label: layerLabel(targetLayer), adjustment: targetLayer.type === 'adjustment' } : null}
+            layer={targetLocal ? { label: targetLocal.name || 'Local adjustment', local: true } : targetLayer ? { label: layerLabel(targetLayer), adjustment: targetLayer.type === 'adjustment', scope: adjustmentScope(adjustments.layers, targetLayer) } : null}
             disabled={!ready || (!targetLocal && Boolean(targetLayer?.locked))}
             dispatch={panelDispatch}
             lut={{ library: [...luts.values()], onImport: importLut, status: lutStatus }}

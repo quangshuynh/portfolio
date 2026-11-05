@@ -834,6 +834,12 @@ export class GlRenderer {
   ensureTargets(width, height, count) {
     const { gl } = this;
     if (this.targets.length && (this.targets[0].width !== width || this.targets[0].height !== height)) this.releaseTargets();
+    // Group targets (beyond the ping-pong pair and the scratch) are freed once no group needs them.
+    if (this.targets.length > Math.max(3, count)) {
+      this.partialComposite = null;
+      this.warmedTargets = false;
+      this.targets.splice(Math.max(3, count)).forEach(({ texture, framebuffer }) => { gl.deleteFramebuffer(framebuffer); gl.deleteTexture(texture); });
+    }
     while (this.targets.length < count) {
       gl.activeTexture(gl.TEXTURE0 + UNIT.layer);
       const texture = rgbaTexture(gl, width, height);
