@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { invert3, project } from '../pipeline/geometry.mjs';
 import { addComponent, appendRecoverStroke, appendStroke, componentLabel, createBrush, createLinear, createRadial, MASK_LIMITS, updateComponent } from '../model/masks.mjs';
 import { RECOVER_VERSION } from '../segment/recover.mjs';
@@ -90,10 +90,13 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
       document.removeEventListener('visibilitychange', hidden);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // A Recover Detail stroke changes nothing until it is computed: while painting only its outline
+  // is redrawn (the mask's own preview would re-rasterise the whole mask at every move).
+  const [, redraw] = useState(0);
   const preview = (next) => {
     dragRef.current.latest = next;
     cancelAnimationFrame(frameRef.current);
-    frameRef.current = requestAnimationFrame(() => onPreview(next));
+    frameRef.current = requestAnimationFrame(() => (tool === 'recover' ? redraw((n) => n + 1) : onPreview(next)));
   };
 
   const selected = mask.components.find((c) => c.id === selectedId) ?? null;
@@ -120,7 +123,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     // The first point is shown at once (moves are coalesced to one preview per frame).
     const first = append(base, id, stroke);
     dragRef.current.latest = first;
-    onPreview(first);
+    if (recovering) redraw((n) => n + 1); else onPreview(first);
     return true;
   };
   const extendPaint = (event, drag) => {
@@ -386,7 +389,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
       {recovering && selected?.type === 'selection' && (
         // The selection's Recover Detail strokes (and the one being painted): where detail is looked for.
         <svg className="pe-masktool__recover" aria-hidden="true">
-          {(selected.recover?.strokes ?? []).map((s, i) => (
+          {[...(selected.recover?.strokes ?? []), ...(dragRef.current?.kind === 'paint' ? [dragRef.current.stroke] : [])].map((s, i) => (
             <polyline key={i} points={s.points.map(([u, v]) => { const p = toStage(u, v); return `${p.x.toFixed(1)},${p.y.toFixed(1)}`; }).join(' ')} strokeWidth={(2 * s.radius * short) / spacePerStage} />
           ))}
         </svg>
