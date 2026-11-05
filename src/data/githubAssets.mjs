@@ -16,14 +16,17 @@ export const ASSET_HOST = 'cdn.jsdelivr.net';
 export const repositories = {
   ordixa: { owner: 'quangshuynh', repo: 'ordixa', commit: 'f6f9c0b0f7a0ee3017463dee3f462a8b7381f55e' },
   flipper: { owner: 'quangshuynh', repo: 'flipper', commit: '652b25cfbb73fa44d4d47a3dfcf2b228176526aa' },
-  gitprofilelens: { owner: 'quangshuynh', repo: 'gitprofilelens', commit: 'efefe676f02327c2404f5f817437ff292ba891e7' },
+  gitprofilelens: { owner: 'quangshuynh', repo: 'gitprofilelens', commit: '7501a40b66e6e9aa5fff460052cc8d6454aa1b1c' },
   scribekit: { owner: 'quangshuynh', repo: 'scribekit', commit: '33232da133c71f264d341f0527e11335873d45e4' },
-  puzzlepress: { owner: 'quangshuynh', repo: 'puzzlepress', commit: '7491b7ea51db95b1e386765a58ced445314767ea' },
-  dashpilot: { owner: 'quangshuynh', repo: 'dashpilot', commit: '8d6ceffa8caab866c23d929ab4d0ea21471f6eb0' },
+  puzzlepress: { owner: 'quangshuynh', repo: 'puzzlepress', commit: '17ed02ea152455c3699534399ae40451a99aa9d1' },
+  dashpilot: { owner: 'quangshuynh', repo: 'dashpilot', commit: '05861e02c0d93228e0c6083b540ebfc53412cb07' },
   casenotes: { owner: 'quangshuynh', repo: 'casenotes', commit: '46a3f991ad19496b453d3b5c08c4ec4177abf01f' },
   'repo-radar': { owner: 'quangshuynh', repo: 'repo-radar', commit: '3abf290cf33e27aa1d2651591ce5f9185c6a1750' },
   chessed: { owner: 'quangshuynh', repo: 'chessed', commit: '7d5f22f4929ef76f92e39be666cda667011e53df' },
   inboxsweep: { owner: 'quangshuynh', repo: 'inboxsweep', commit: 'a2429fb1d23eb3b06a8dd9e5c65ee30952ba292f' },
+  carebridge: { owner: 'quangshuynh', repo: 'carebridge', commit: 'b1a9c140c2181ae617ca60ef3b68a488cb62ba7f' },
+  homemade: { owner: 'quangshuynh', repo: 'homemade', commit: 'f8a8cc1a66bef923c3277040aa4f5546700aaa78' },
+  'mover-git': { owner: 'quangshuynh', repo: 'mover-git', commit: '1039517e97edd4d0be88a943ab32cdd0bb55f4d6' },
   'hymical-forms': { owner: 'hymical', repo: 'forms', commit: '235f8afe0c056449f3226250854a03d6a82cb7b6' },
 };
 
