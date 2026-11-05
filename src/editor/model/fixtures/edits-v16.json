@@ -1,0 +1,274 @@
+{
+  "type": "quanghuynh.photo-editor.edits",
+  "version": 16,
+  "savedAt": "1970-01-01T00:00:00.000Z",
+  "exportSettings": {
+    "format": "jpeg",
+    "quality": 0.92,
+    "resize": {
+      "mode": "original",
+      "longEdge": 3840,
+      "maxWidth": 3840,
+      "maxHeight": 3840
+    },
+    "suffix": "-quangedit",
+    "includeWatermark": true
+  },
+  "photos": [
+    {
+      "source": {
+        "name": "DSC00001.jpg",
+        "size": 2048,
+        "lastModified": 0,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "format": "jpeg",
+        "width": 1200,
+        "height": 800,
+        "orientation": 1
+      },
+      "adjustments": {
+        "exposure": 0.2,
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "temperature": 0,
+        "tint": 0,
+        "vibrance": 0,
+        "saturation": 0,
+        "layers": [
+          {
+            "id": "img-1",
+            "type": "image",
+            "name": "Overlay photo",
+            "visible": true,
+            "locked": false,
+            "opacity": 0.85,
+            "blend": "multiply",
+            "source": {
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "name": "over.jpg",
+              "size": 12345,
+              "format": "jpeg",
+              "width": 800,
+              "height": 600
+            },
+            "x": 0.4,
+            "y": 0.6,
+            "width": 0.7,
+            "height": 0.5,
+            "rotation": 12,
+            "flipH": false,
+            "flipV": false,
+            "settings": {
+              "exposure": 0.4,
+              "saturation": -20
+            },
+            "mask": {
+              "space": "layer",
+              "base": "all",
+              "enabled": true,
+              "invert": false,
+              "opacity": 1,
+              "components": [
+                {
+                  "id": "b1",
+                  "type": "brush",
+                  "name": "",
+                  "enabled": true,
+                  "op": "subtract",
+                  "invert": false,
+                  "opacity": 1,
+                  "strokes": [
+                    {
+                      "mode": "add",
+                      "radius": 0.05,
+                      "hardness": 0.6,
+                      "opacity": 1,
+                      "points": [
+                        [
+                          0.2,
+                          0.3,
+                          1
+                        ],
+                        [
+                          0.4,
+                          0.35,
+                          0.8
+                        ],
+                        [
+                          0.6,
+                          0.5,
+                          1
+                        ]
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "adj-1",
+            "type": "adjustment",
+            "name": "Warm",
+            "visible": true,
+            "locked": false,
+            "opacity": 0.7,
+            "blend": "soft-light",
+            "settings": {
+              "contrast": 15,
+              "temperature": 25
+            },
+            "mask": {
+              "space": "canvas",
+              "base": "none",
+              "enabled": true,
+              "invert": false,
+              "opacity": 1,
+              "components": [
+                {
+                  "id": "r1",
+                  "type": "radial",
+                  "name": "",
+                  "enabled": true,
+                  "op": "add",
+                  "invert": false,
+                  "opacity": 1,
+                  "x": 0.5,
+                  "y": 0.45,
+                  "rx": 0.3,
+                  "ry": 0.2,
+                  "rotation": 15,
+                  "feather": 0.6
+                }
+              ]
+            }
+          },
+          {
+            "id": "txt-1",
+            "type": "text",
+            "name": "",
+            "visible": true,
+            "locked": false,
+            "opacity": 0.9,
+            "blend": "screen",
+            "text": "Shoreline\nmorning",
+            "font": "sans",
+            "weight": 700,
+            "italic": false,
+            "size": 0.06,
+            "x": 0.5,
+            "y": 0.85,
+            "rotation": 0,
+            "scale": 1,
+            "color": "#ffffff",
+            "align": "center",
+            "outline": null,
+            "shadow": null,
+            "flipH": false,
+            "flipV": false,
+            "mask": {
+              "space": "canvas",
+              "base": "all",
+              "enabled": true,
+              "invert": false,
+              "opacity": 1,
+              "components": [
+                {
+                  "id": "l1",
+                  "type": "linear",
+                  "name": "",
+                  "enabled": true,
+                  "op": "add",
+                  "invert": false,
+                  "opacity": 1,
+                  "x0": 0.5,
+                  "y0": 0.7,
+                  "x1": 0.5,
+                  "y1": 0.95,
+                  "feather": 0.4
+                }
+              ]
+            }
+          },
+          {
+            "id": "adj-2",
+            "type": "adjustment",
+            "name": "Locked fade",
+            "visible": false,
+            "locked": true,
+            "opacity": 1,
+            "blend": "normal",
+            "settings": {
+              "exposure": -0.5
+            }
+          }
+        ],
+        "local": [
+          {
+            "id": "local-1",
+            "name": "Sky",
+            "enabled": true,
+            "amount": 0.8,
+            "mask": {
+              "space": "image",
+              "base": "none",
+              "enabled": true,
+              "invert": false,
+              "opacity": 1,
+              "components": [
+                {
+                  "id": "sky-1",
+                  "type": "selection",
+                  "name": "",
+                  "enabled": true,
+                  "op": "add",
+                  "invert": false,
+                  "opacity": 1,
+                  "kind": "sky",
+                  "version": "skyseg-u2net-int8/1",
+                  "width": 64,
+                  "height": 48,
+                  "data": "gAr/gAKAgAwA",
+                  "confidence": 0.83,
+                  "shift": 0.1,
+                  "feather": 0.2
+                }
+              ]
+            },
+            "settings": {
+              "exposure": -0.3,
+              "dehaze": 20
+            }
+          }
+        ]
+      }
+    },
+    {
+      "source": {
+        "name": "plain.png",
+        "size": 99,
+        "lastModified": 0,
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "format": "png",
+        "width": 640,
+        "height": 480,
+        "orientation": 1
+      },
+      "adjustments": {
+        "exposure": 0,
+        "contrast": 10,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "temperature": 0,
+        "tint": 0,
+        "vibrance": 0,
+        "saturation": 0
+      }
+    }
+  ]
+}
