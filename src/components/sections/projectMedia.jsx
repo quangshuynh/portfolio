@@ -144,35 +144,25 @@ export function ProjectVideo({ project }) {
 }
 
 /**
- * renders a project's video, logo, and screenshot tabs; only the selected
- * slide is in the DOM, so screenshots and video are fetched when chosen
- * :param project: project entry with a video, or a logo and screenshots
+ * renders a project's video and screenshot tabs, opening on the product itself
+ * (the video, else the first screenshot); only the selected slide is in the
+ * DOM, so later screenshots and the video are fetched when chosen
+ * :param project: project entry with a video or several screenshots
  * :returns: gallery markup
  */
 export function ProjectGallery({ project }) {
-  const { video, logo, screenshots = [] } = project;
-  const [slide, setSlide] = useState(video ? 'video' : 'logo');
+  const { video, screenshots = [] } = project;
+  const [slide, setSlide] = useState(video ? 'video' : 0);
   const shotClass = `project-result-image${project.tallScreenshots ? ' vertical-project-shot' : ''}`;
   const tabs = [
     ...(video ? [{ id: 'video', label: 'Video' }] : []),
-    ...(logo ? [{ id: 'logo', label: 'Logo' }] : []),
     ...screenshots.map((shot, index) => ({ id: index, label: shot.label })),
   ];
 
   return (
-    <div className="project-visual gallery">
+    <div className={`project-visual gallery${project.tallScreenshots ? ' gallery--tall' : ''}`}>
       <div className={`gallery-stage${slide === 'video' ? ' gallery-stage--video' : ''}`}>
         {slide === 'video' && <ProjectVideo project={project} />}
-        {slide === 'logo' && (
-          <img
-            src={optimizedImage(logo.file)}
-            width={logo.width}
-            height={logo.height}
-            alt={logo.alt}
-            loading="lazy"
-            decoding="async"
-          />
-        )}
         {typeof slide === 'number' && (
           <ProjectScreenshot project={project} index={slide} imageClassName={shotClass} />
         )}
@@ -189,14 +179,15 @@ export function ProjectGallery({ project }) {
 }
 
 /**
- * selects the visual for a featured project: a gallery when it has a video, or
- * a logo and screenshots; otherwise its single production screenshot or logo
+ * selects the visual for a featured project: a gallery for a video or several
+ * screenshots, its single screenshot, or (with no screenshots) its logo
  * :param project: project entry
  * :returns: visual markup
  */
 export function ProjectVisual({ project }) {
-  if (project.video || (project.logo && project.screenshots?.length)) return <ProjectGallery project={project} />;
-  if (project.screenshots?.length) {
+  const shots = project.screenshots ?? [];
+  if (project.video || shots.length > 1) return <ProjectGallery project={project} />;
+  if (shots.length) {
     return (
       <div className="project-visual production-site-visual">
         <ProjectScreenshot project={project} index={0} />

@@ -5,7 +5,7 @@ import { isPinnedGithubAsset, pinnedAssetUrl } from '../../data/githubAssets.mjs
 import { featuredProjects, projects } from '../../data/projects.mjs';
 import FeaturedProjects from './featuredProjects';
 import MoreProjects from './moreProjects';
-import { ProjectGallery, ProjectScreenshot, ProjectVisual } from './projectMedia';
+import { imageSource, ProjectGallery, ProjectScreenshot, ProjectVisual } from './projectMedia';
 
 const project = (slug) => projects.find((entry) => entry.slug === slug);
 const withLightbox = (ui) => render(<HomeLightboxProvider>{ui}</HomeLightboxProvider>);
@@ -28,16 +28,15 @@ const fixture = {
 };
 
 describe('gallery (fixture data)', () => {
-  test('starts on the logo and requests no screenshot until a tab is chosen', () => {
+  test('opens on the first screenshot, never the logo, and requests no other screenshot', () => {
     withLightbox(<ProjectGallery project={fixture} />);
     const group = screen.getByRole('group', { name: 'Fixture gallery' });
-    expect(within(group).getAllByRole('button').map((button) => button.textContent)).toEqual(['Logo', 'One', 'Two', 'Three']);
-    expect(within(group).getByRole('button', { name: 'Logo' })).toHaveAttribute('aria-pressed', 'true');
-
-    const logo = screen.getByRole('img', { name: 'Fixture logo' });
-    expect(logo).toHaveAttribute('loading', 'lazy');
-    expect(logo).toHaveAttribute('width', '780');
-    expect(remoteImages()).toHaveLength(0);
+    expect(within(group).getAllByRole('button').map((button) => button.textContent)).toEqual(['One', 'Two', 'Three']);
+    expect(within(group).getByRole('button', { name: 'One' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('img', { name: 'Fixture logo' })).not.toBeInTheDocument();
+    expect(remoteImages()).toHaveLength(1);
+    expect(remoteImages()[0].getAttribute('src')).toMatch(/\/docs\/images\/one\.png$/);
+    expect(remoteImages()[0]).toHaveAttribute('loading', 'lazy');
   });
 
   test('each tab shows its own screenshot at its own intrinsic size, one image at a time', () => {
@@ -65,9 +64,9 @@ describe('gallery (fixture data)', () => {
 
   test('tabs are reachable and operable from the keyboard', () => {
     withLightbox(<ProjectGallery project={fixture} />);
-    // Logo tab, then the screenshot tabs; the logo slide itself is not focusable.
+    // The open screenshot (an image-viewer trigger), then the tabs.
     userEvent.tab();
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Logo' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open image: Fixture one' }));
     userEvent.tab();
     userEvent.tab();
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Two' }));
@@ -108,8 +107,6 @@ describe('gallery (fixture data)', () => {
     expect(placeholder).toHaveTextContent('Preview unavailable');
     expect(screen.queryByRole('button', { name: /Open image/ })).not.toBeInTheDocument();
     // The other tabs still work.
-    fireEvent.click(screen.getByRole('button', { name: 'Logo' }));
-    expect(screen.getByRole('img', { name: 'Fixture logo' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Three' }));
     expect(screen.getByRole('button', { name: 'Open image: Fixture three' })).toBeInTheDocument();
   });
@@ -124,8 +121,8 @@ describe('gallery (fixture data)', () => {
     expect(within(dialog).getByRole('img', { name: 'Second fixture screen' })).toBeInTheDocument();
   });
 
-  test('without a logo a project shows its first screenshot alone; with only a logo, the logo', () => {
-    const { unmount } = withLightbox(<ProjectVisual project={{ ...fixture, logo: undefined }} />);
+  test('a single screenshot shows alone; with no screenshots, the logo', () => {
+    const { unmount } = withLightbox(<ProjectVisual project={{ ...fixture, screenshots: fixture.screenshots.slice(0, 1) }} />);
     expect(screen.queryByRole('group')).not.toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'First fixture screen' })).toHaveAttribute('width', '1200');
     unmount();
@@ -137,32 +134,34 @@ describe('gallery (fixture data)', () => {
 });
 
 describe('gallery (real project data)', () => {
-  test('rendered Flipper dimensions come from its metadata', () => {
-    const flipper = project('flipper');
-    withLightbox(<ProjectGallery project={flipper} />);
-    const group = screen.getByRole('group', { name: 'Flipper gallery' });
-    fireEvent.click(within(group).getByRole('button', { name: flipper.screenshots[1].label }));
-    const shot = screen.getByRole('img', { name: flipper.screenshots[1].alt });
-    expect(shot).toHaveAttribute('src', flipper.screenshots[1].src);
-    expect(shot).toHaveAttribute('width', String(flipper.screenshots[1].width));
-    expect(shot).toHaveAttribute('height', String(flipper.screenshots[1].height));
+  test('rendered DashPilot dimensions come from its metadata', () => {
+    const dashpilot = project('dashpilot');
+    withLightbox(<ProjectGallery project={dashpilot} />);
+    const group = screen.getByRole('group', { name: 'DashPilot gallery' });
+    fireEvent.click(within(group).getByRole('button', { name: dashpilot.screenshots[1].label }));
+    const shot = screen.getByRole('img', { name: dashpilot.screenshots[1].alt });
+    expect(shot).toHaveAttribute('src', dashpilot.screenshots[1].src);
+    expect(shot).toHaveAttribute('width', String(dashpilot.screenshots[1].width));
+    expect(shot).toHaveAttribute('height', String(dashpilot.screenshots[1].height));
   });
 
-  const galleries = featuredProjects.filter((entry) => entry.logo && entry.screenshots?.length);
+  const galleries = featuredProjects.filter((entry) => entry.video || entry.screenshots?.length > 1);
 
   test.each(galleries.map((entry) => [entry.name, entry]))('every %s tab renders its screenshot at its recorded size', (_, entry) => {
     withLightbox(<ProjectGallery project={entry} />);
     const group = screen.getByRole('group', { name: `${entry.name} gallery` });
     expect(within(group).getAllByRole('button').map((button) => button.textContent)).toEqual([
-      ...(entry.video ? ['Video'] : []), 'Logo', ...entry.screenshots.map((shot) => shot.label),
+      ...(entry.video ? ['Video'] : []), ...entry.screenshots.map((shot) => shot.label),
     ]);
     entry.screenshots.forEach((shot) => {
       expect(Number.isInteger(shot.width) && shot.width > 0, `${shot.label} width`).toBe(true);
       expect(Number.isInteger(shot.height) && shot.height > 0, `${shot.label} height`).toBe(true);
-      expect(isPinnedGithubAsset(shot.src), shot.src).toBe(true);
+      // Public repositories: pinned CDN URLs; local captures: bundled derivatives.
+      if (shot.src) expect(isPinnedGithubAsset(shot.src), shot.src).toBe(true);
+      else expect(imageSource(shot), shot.local).toBeTruthy();
       fireEvent.click(within(group).getByRole('button', { name: shot.label }));
       const image = screen.getByRole('img', { name: shot.alt });
-      expect(image).toHaveAttribute('src', shot.src);
+      expect(image).toHaveAttribute('src', imageSource(shot));
       expect(image).toHaveAttribute('width', String(shot.width));
       expect(image).toHaveAttribute('height', String(shot.height));
       expect(image).toHaveAttribute('loading', 'lazy');
@@ -201,7 +200,7 @@ describe('project video (fixture data)', () => {
   test('opens on the video tab, showing only a lazy poster: no video element, no video request', () => {
     withLightbox(<ProjectGallery project={videoFixture} />);
     const group = screen.getByRole('group', { name: 'Fixture gallery' });
-    expect(within(group).getAllByRole('button').map((button) => button.textContent)).toEqual(['Video', 'Logo', 'One', 'Two', 'Three']);
+    expect(within(group).getAllByRole('button').map((button) => button.textContent)).toEqual(['Video', 'One', 'Two', 'Three']);
     expect(within(group).getByRole('button', { name: 'Video' })).toHaveAttribute('aria-pressed', 'true');
     expect(document.querySelector('video')).toBeNull();
 
@@ -269,7 +268,6 @@ test('the Ordixa case file leads with its launch video, release link, and honest
   const card = screen.getByRole('heading', { level: 3, name: 'Ordixa' }).closest('article');
   const ordixa = project('ordixa');
   expect(card).toHaveAttribute('id', 'project-ordixa');
-  expect(card.className).toMatch(/flagship-project/);
   expect(within(card).getByRole('button', { name: 'Play Ordixa v2.0.0 launch video (0:23, with sound)' })).toBeInTheDocument();
   expect(card.querySelector('video')).toBeNull();
   expect(card).toHaveTextContent(/fictional demo data/);
@@ -289,11 +287,41 @@ test('every rendered external link opens safely in a new tab', () => {
   withLightbox(<><FeaturedProjects /><MoreProjects /></>);
   fireEvent.click(screen.getByRole('button', { name: 'View more projects' }));
   const external = screen.getAllByRole('link').filter((link) => link.getAttribute('href').startsWith('http'));
-  // Every project has at least one repository or live link.
-  expect(external.length).toBeGreaterThanOrEqual(featuredProjects.length + projects.filter((entry) => !entry.featured && !entry.hidden).length);
+  // Every project except a link-less private one has a repository or live link.
+  expect(external.length).toBeGreaterThanOrEqual(projects.filter((entry) => !entry.hidden && (entry.links.github || entry.links.live)).length);
   external.forEach((link) => {
     expect(link.getAttribute('href')).toMatch(/^https:\/\//);
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', expect.stringContaining('noreferrer'));
   });
+});
+
+test('private projects render without a repository link or an empty action row', () => {
+  withLightbox(<><FeaturedProjects /><MoreProjects /></>);
+  fireEvent.click(screen.getByRole('button', { name: 'View more projects' }));
+  const devpulse = screen.getByRole('heading', { level: 3, name: 'DevPulse' }).closest('article');
+  expect(within(devpulse).queryAllByRole('link')).toHaveLength(0);
+  expect(devpulse).toHaveTextContent('Private repository');
+  const storefront = screen.getByRole('heading', { level: 3, name: '585Dashcam585' }).closest('article');
+  expect(within(storefront).getAllByRole('link').map((link) => link.getAttribute('href')).filter((href) => href.includes('github.com'))).toEqual([]);
+  expect(document.body.innerHTML).not.toMatch(/github\.com\/quangshuynh\/(devpulse|585dashcam585|585photo585)/i);
+});
+
+test('More projects filter by category without losing a project', () => {
+  withLightbox(<MoreProjects />);
+  const filters = screen.getByRole('group', { name: 'Filter projects by category' });
+  expect(within(filters).getByRole('button', { name: /^All/ })).toHaveAttribute('aria-pressed', 'true');
+  const more = projects.filter((entry) => !entry.featured && !entry.hidden);
+  let total = 0;
+  for (const category of [...new Set(more.map((entry) => entry.category))]) {
+    fireEvent.click(within(filters).getAllByRole('button').find((button) => button.textContent.startsWith(category)));
+    const expected = more.filter((entry) => entry.category === category).map((entry) => entry.name);
+    expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual(expected);
+    // A category shows whole, so the collapse toggle steps aside.
+    expect(screen.queryByRole('button', { name: 'View more projects' })).not.toBeInTheDocument();
+    total += expected.length;
+  }
+  expect(total).toBe(more.length);
+  fireEvent.click(within(filters).getByRole('button', { name: /^All/ }));
+  expect(screen.getByRole('button', { name: 'View more projects' })).toBeInTheDocument();
 });

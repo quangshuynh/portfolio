@@ -28,6 +28,18 @@ const localImages = [
   // Opened full size in the image viewer, so these keep every pixel.
   ['src/assets/585dashcam585/585dashcam585-storefront.png', '585dashcam585-storefront', null, 'lossless'],
   ['src/assets/585photo585-portfolio.png', '585photo585-portfolio', null, 'lossless'],
+  // Captures the portfolio took itself (QuangEdit in this repository, live-site
+  // captures, fixture-data screenshots of private DevPulse, a drawn diagram).
+  // Photographic captures are lossy; flat UI and the diagram stay lossless.
+  ['src/assets/projects/quangedit-adjust.png', 'quangedit-adjust', null, 'lossy'],
+  ['src/assets/projects/quangedit-layers.png', 'quangedit-layers', null, 'lossy'],
+  ['src/assets/projects/quangedit-mobile.png', 'quangedit-mobile', null, 'lossy'],
+  ['src/assets/projects/homemade-kitchen.png', 'homemade-kitchen', null, 'lossy'],
+  ['src/assets/projects/chessed-review.png', 'chessed-review', null, 'lossless'],
+  ['src/assets/projects/devpulse-overview.png', 'devpulse-overview', null, 'lossless'],
+  ['src/assets/projects/devpulse-trends.png', 'devpulse-trends', null, 'lossless'],
+  ['src/assets/projects/devpulse-repo-detail.png', 'devpulse-repo-detail', null, 'lossless'],
+  ['src/assets/projects/hymical-forms-architecture.png', 'hymical-forms-architecture', null, 'lossless'],
 ];
 
 const projectLogos = projects

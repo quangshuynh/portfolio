@@ -1,13 +1,14 @@
 import React from 'react';
 
-// Regrouped from the existing toolkit by discipline; no new skills are claimed.
+// Each item is used in a project or role shown on this page (see projects.mjs
+// and the experience section); nothing is listed from coursework alone.
 const groups = [
-  { title: 'Backend', note: 'APIs, services, persistence', items: ['FastAPI', 'SQLAlchemy', 'REST APIs'] },
-  { title: 'Native', note: 'Apple platforms & desktop', items: ['SwiftUI', 'SwiftData', 'AppKit', '.NET / WPF'] },
-  { title: 'Frontend', note: 'Web delivery', items: ['React', 'Next.js'] },
-  { title: 'Data', note: 'Storage & analysis', items: ['PostgreSQL', 'SQL Server', 'SQLite', 'pandas'] },
-  { title: 'Infrastructure & tooling', note: 'Delivery, automation & reliability', items: ['Git', 'Docker', 'GitHub Actions', 'GitLab', 'Linux', 'Cloudflare Workers', 'pytest', 'Ruff', 'Boomi'] },
-  { title: 'Languages', note: 'Day to day', items: ['Python', 'Swift', 'TypeScript', 'JavaScript', 'C#', 'Java', 'SQL', 'C'] },
+  { title: 'Backend', note: 'APIs, services, persistence', items: ['FastAPI', 'SQLAlchemy', 'Alembic', 'REST APIs', 'Webhooks', 'Transactional outbox'] },
+  { title: 'Native', note: 'Apple platforms, mobile & desktop', items: ['SwiftUI', 'SwiftData', 'AppKit', 'ScreenCaptureKit', 'Flutter', '.NET / WPF'] },
+  { title: 'Web', note: 'Product & browser engineering', items: ['React', 'Next.js', 'Vite', 'WebGL', 'WebAssembly', 'Web Workers'] },
+  { title: 'Data', note: 'Storage & analysis', items: ['PostgreSQL', 'SQL Server', 'SQLite', 'Supabase', 'pandas'] },
+  { title: 'Infrastructure & tooling', note: 'Delivery, automation & reliability', items: ['Git', 'Docker', 'GitHub Actions', 'GitLab', 'Linux', 'Cloudflare Workers', 'Vercel', 'pytest', 'Swift Testing', 'Playwright', 'Ruff', 'Boomi'] },
+  { title: 'Languages', note: 'Day to day', items: ['Python', 'Swift', 'TypeScript', 'JavaScript', 'C#', 'SQL', 'Dart', 'Java', 'C'] },
 ];
 
 /**

@@ -2,8 +2,9 @@
 // CI) with no network access; `npm run check:assets` reuses it before probing
 // the remote URLs. Returns a list of human-readable problems (empty when valid).
 import { parsePinnedGithubAsset, repositories } from './githubAssets.mjs';
+import { PROJECT_CATEGORIES } from './projects.mjs';
 
-const LINK_HOSTS = /^https:\/\/([\w-]+\.)*(github\.com|github\.io|vercel\.app|585dashcam585\.com|585photo585\.com)(\/|$)/;
+const LINK_HOSTS = /^https:\/\/([\w-]+\.)*(github\.com|github\.io|vercel\.app|585dashcam585\.com|585photo585\.com|quanghuynh\.com)(\/|$)/;
 const REPOSITORY_URL = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)$/;
 // A video is a GitHub release attachment at a fixed tag (never /releases/latest/).
 const RELEASE_VIDEO = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/releases\/download\/([\w.-]+)\/[\w.-]+\.(mp4|webm)$/;
@@ -42,6 +43,7 @@ export function validateProjects(projects, { optimizedFiles, derivativeSizes } =
     }
     if (project.slug && !/^[a-z0-9-]+$/.test(project.slug)) fail('slug must be lowercase letters, digits, and hyphens');
     if (project.hidden !== undefined && typeof project.hidden !== 'boolean') fail('hidden must be true or false');
+    if (project.private !== undefined && typeof project.private !== 'boolean') fail('private must be true or false');
     if (blank(project.summary)) fail('missing summary');
     if (!Array.isArray(project.technologies) || project.technologies.length === 0) fail('needs at least one technology');
     else if (new Set(project.technologies).size !== project.technologies.length) fail('duplicate technology tags');
@@ -55,12 +57,19 @@ export function validateProjects(projects, { optimizedFiles, derivativeSizes } =
       if (blank(project.label)) fail('featured project needs a label');
       if (blank(project.takeaway)) fail('featured project needs a takeaway');
       if (!Array.isArray(project.highlights) || project.highlights.length < 2) fail('featured project needs at least two highlights');
-    } else if (blank(project.detail)) {
-      fail('needs a detail line');
+      // Facts are scanned at a glance on the card, so they stay few and short.
+      if (!Array.isArray(project.facts) || project.facts.length < 2 || project.facts.length > 4) fail('featured project needs two to four facts');
+      else if (project.facts.some((fact) => blank(fact) || fact.length > 40)) fail('facts must be non-empty and at most 40 characters');
+    } else {
+      if (blank(project.detail)) fail('needs a detail line');
+      if (!PROJECT_CATEGORIES.includes(project.category)) fail(`category must be one of: ${PROJECT_CATEGORIES.join(', ')}`);
     }
 
     const links = project.links ?? {};
-    if (!links.github && !links.live) fail('needs a repository or live link');
+    // A private project may have no public link at all; its card simply has no actions.
+    if (!links.github && !links.live && !project.private) fail('needs a repository or live link');
+    if (project.private && links.github) fail('private projects must not link their repository');
+    if (project.private && (project.logo?.source || project.screenshots?.some((shot) => shot.src))) fail('private projects use local images only');
     for (const [key, url] of Object.entries(links)) {
       if (key === 'liveLabel') continue;
       if (!LINK_HOSTS.test(url)) fail(`${key} link is not an https URL on an expected host: ${url}`);
@@ -114,7 +123,8 @@ export function validateProjects(projects, { optimizedFiles, derivativeSizes } =
     }
 
     const shots = project.screenshots ?? [];
-    const gallery = project.featured && project.logo && shots.length > 0;
+    // Featured galleries show tabs for a video and/or several screenshots.
+    const gallery = project.featured && (Boolean(project.video) || shots.length > 1);
     const perProject = { alt: new Set(), label: new Set() };
     shots.forEach((shot, index) => {
       const label = `screenshot ${index + 1}`;

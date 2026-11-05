@@ -1,7 +1,7 @@
-import React, { useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
 import PersonalityButton from '../ui/personalityButton';
-import { moreProjects as projects } from '../../data/projects.mjs';
+import { moreProjects as projects, PROJECT_CATEGORIES } from '../../data/projects.mjs';
 import { optimizedImage, ProjectScreenshot } from './projectMedia';
 
 /**
@@ -11,6 +11,7 @@ import { optimizedImage, ProjectScreenshot } from './projectMedia';
  */
 function ProjectLinks({ project }) {
   const { github, live, liveLabel } = project.links;
+  if (!github && !live) return <p className="more-links more-links--private">Private repository</p>;
   return (
     <div className="more-links">
       {github && <a className="text-link" href={github} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} repository`}>Repository <FaGithub aria-hidden="true" /></a>}
@@ -23,13 +24,52 @@ function ProjectLinks({ project }) {
  * renders the additional project collection
  * :returns: additional projects section markup
  */
+// Collapsed, the "All" view shows two rows of the three-column grid.
+export const COLLAPSED_COUNT = 6;
+const categories = PROJECT_CATEGORIES.filter((category) => projects.some((project) => project.category === category));
+
+/**
+ * renders a More project's preview: its first screenshot (opening every
+ * screenshot in the viewer), else its logo on a quiet panel
+ * :param project: project entry
+ * :returns: preview markup, or null with neither
+ */
+function ProjectPreview({ project }) {
+  if (project.screenshots?.length) {
+    return <div className="more-card__media"><ProjectScreenshot project={project} index={0} imageClassName="more-card-preview" /></div>;
+  }
+  if (!project.logo) return null;
+  return (
+    <div className="more-card__media more-card__media--logo">
+      <img src={optimizedImage(project.logo.file)} alt={project.logo.alt} loading="lazy" decoding="async" />
+    </div>
+  );
+}
+
 function MoreProjects() {
   const [showAllProjects, setShowAllProjects] = useState(false);
+  const [filter, setFilter] = useState('All');
   const collapsedScrollY = useRef(null);
   const pendingScrollY = useRef(null);
   const toggleButton = useRef(null);
   const grid = useRef(null);
-  const visibleProjects = showAllProjects ? projects : projects.slice(0, 3);
+  const filtered = filter === 'All' ? projects : projects.filter((project) => project.category === filter);
+  // A category is short enough to show whole; only "All" collapses.
+  const collapsible = filter === 'All' && projects.length > COLLAPSED_COUNT;
+  const visibleProjects = collapsible && !showAllProjects ? projects.slice(0, COLLAPSED_COUNT) : filtered;
+
+  // A deep link to a project hidden by the collapsed view opens the full list.
+  useEffect(() => {
+    const reveal = () => {
+      if (projects.slice(COLLAPSED_COUNT).some((project) => window.location.hash === `#project-${project.slug}`)) {
+        setFilter('All');
+        setShowAllProjects(true);
+      }
+    };
+    reveal();
+    window.addEventListener('hashchange', reveal);
+    return () => window.removeEventListener('hashchange', reveal);
+  }, []);
 
   useLayoutEffect(() => {
     if (pendingScrollY.current === null) return;
@@ -42,7 +82,7 @@ function MoreProjects() {
     // never drags the page. Expanding lands on the first newly shown project;
     // collapsing returns to the toggle (otherwise focus would fall to <body>).
     const target = showAllProjects
-      ? grid.current?.querySelector('article:nth-child(4) h3')
+      ? grid.current?.querySelector(`article:nth-child(${COLLAPSED_COUNT + 1}) h3`)
       : toggleButton.current;
     target?.focus({ preventScroll: true });
   }, [showAllProjects]);
@@ -65,31 +105,36 @@ function MoreProjects() {
           <div><p className="eyebrow">Additional work</p><h2 id="more-projects-title">More projects</h2></div>
           <p>Additional projects spanning system design, developer tooling, automation, native applications, and product engineering.</p>
         </div>
-        <div className="more-grid ledger" id="more-projects-grid" ref={grid}>
-          {visibleProjects.map((project, index) => (
-            <article className={`more-card ledger-row${project.logo ? ' has-logo' : ''}`} key={project.slug} data-reveal style={{ '--reveal-delay': `${(index % 3) * 70}ms` }}>
-              <div className="ledger-row__id">
-                <span className="ledger-row__index mono" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
-                {project.logo && (
-                  <img
-                    className={`more-card-logo${project.logo.className ? ` ${project.logo.className}` : ''}`}
-                    src={optimizedImage(project.logo.file)}
-                    width="44"
-                    height="44"
-                    alt={project.logo.alt}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                )}
-              </div>
-              <div className="ledger-row__main">
-                <h3 tabIndex={-1}>{project.name}</h3>
-                {project.tagline && <p className="ledger-row__tagline">{project.tagline}</p>}
-                <p>{project.summary}</p>
-                <p className="more-highlight">{project.detail}</p>
-              </div>
-              <div className="ledger-row__side">
-                {project.screenshots?.length > 0 && <ProjectScreenshot project={project} index={0} imageClassName="more-card-preview" />}
+        <div className="project-filters" role="group" aria-label="Filter projects by category" data-reveal>
+          {['All', ...categories].map((category) => {
+            const count = category === 'All' ? projects.length : projects.filter((project) => project.category === category).length;
+            return (
+              <button key={category} type="button" aria-pressed={filter === category} aria-controls="more-projects-grid" onClick={() => setFilter(category)}>
+                {category} <span className="project-filters__count" aria-hidden="true">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="visually-hidden" role="status" aria-live="polite">{filter === 'All' ? '' : `${filtered.length} ${filter} projects shown`}</p>
+        <div className="more-grid" id="more-projects-grid" ref={grid}>
+          {visibleProjects.map((project) => (
+            // Same anchor as a featured case file, so links to a demoted project keep working.
+            <article className="more-card" id={`project-${project.slug}`} key={project.slug} aria-labelledby={`more-${project.slug}-title`}>
+              <ProjectPreview project={project} />
+              <div className="more-card__body">
+                <div className="more-card__head">
+                  {project.logo && project.screenshots?.length > 0 && (
+                    <img className={`more-card-logo${project.logo.className ? ` ${project.logo.className}` : ''}`} src={optimizedImage(project.logo.file)} width="28" height="28" alt="" loading="lazy" decoding="async" />
+                  )}
+                  <p className="more-card__category">{project.category}</p>
+                </div>
+                <h3 id={`more-${project.slug}-title`} tabIndex={-1}>{project.name}</h3>
+                {project.tagline && <p className="more-card__tagline">{project.tagline}</p>}
+                <p className="more-card__summary">{project.summary}</p>
+                <details className="more-card__detail">
+                  <summary>How it’s built</summary>
+                  <p className="more-highlight">{project.detail}</p>
+                </details>
                 <ul className="tag-list" aria-label={`${project.name} technologies`}>
                   {project.technologies.map((item) => <li key={item}>{item}</li>)}
                 </ul>
@@ -98,7 +143,7 @@ function MoreProjects() {
             </article>
           ))}
         </div>
-        {projects.length > 3 && (
+        {collapsible && (
           <div className="more-toggle">
             <PersonalityButton
               secondary

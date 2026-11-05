@@ -27,20 +27,20 @@ test('every featured project exposes the parts the phone layout reorders', () =>
   const articles = document.querySelectorAll('.featured-project');
   expect(articles).toHaveLength(featuredProjects.length);
   articles.forEach((article) => {
-    ['.case-file__index', 'h3', '.case-file__meta > div:first-child .project-number', '.case-file__visual', '.project-purpose', '.project-takeaway', '.project-details__toggle', '.project-highlights', '.case-file__meta .project-stack', '.project-actions']
+    ['.case-file__head', '.case-file__index', '.project-number', 'h3', '.case-file__visual', '.project-purpose', '.project-facts', '.project-takeaway', '.project-details__toggle', '.project-highlights', '.project-stack', '.project-actions']
       .forEach((selector) => expect(article.querySelector(selector), selector).not.toBeNull());
   });
 });
 
-test('phones order projects as title, type, screenshot, purpose, takeaway, details, stack, actions', () => {
+test('phones order projects as head, title, visual, purpose, facts, takeaway, details, stack, actions', () => {
   const phone = mediaBlock(sectionsCss, '(max-width: 760px)');
-  expect(phone).toMatch(/\.featured-project \.case-file__rail,\s*\.featured-project \.case-file__meta,\s*\.featured-project \.project-copy \{ display: contents; \}/);
+  expect(phone).toMatch(/\.featured-project \.project-copy \{ display: contents; \}/);
   const order = [
-    '.featured-project .case-file__index',
+    '.featured-project .case-file__head',
     '.featured-project .project-copy h3',
-    '.featured-project .case-file__meta > div:first-child',
     '.featured-project .case-file__visual',
     '.featured-project .project-purpose',
+    '.featured-project .project-facts',
     '.featured-project .project-takeaway',
     '.featured-project .project-details',
     '.featured-project .project-stack',
@@ -48,8 +48,19 @@ test('phones order projects as title, type, screenshot, purpose, takeaway, detai
   ].map((selector) => flexOrder(phone, selector));
   expect(order).toEqual([...order].sort((first, second) => first - second));
   expect(new Set(order).size).toBe(order.length);
-  // Desktop composition keeps the rail/visual/copy grid areas.
+  // Desktop composition keeps the visual/copy grid areas.
   expect(sectionsCss.slice(0, sectionsCss.indexOf('/* ============ responsive'))).not.toMatch(/display: contents/);
+});
+
+test('each case file shows its facts at a glance and its logo only as decoration', () => {
+  render(<FeaturedProjects />);
+  for (const project of featuredProjects) {
+    const article = screen.getByRole('article', { name: project.name });
+    expect(within(article).getByRole('list', { name: `${project.name} at a glance` }).querySelectorAll('li')).toHaveLength(project.facts.length);
+    const logo = article.querySelector('.case-file__logo');
+    if (project.logo) expect(logo).toHaveAttribute('alt', '');
+    else expect(logo).toBeNull();
+  }
 });
 
 test('phone modal galleries use two columns of 3:4 portrait and 4:3 landscape cells', () => {
@@ -70,9 +81,9 @@ test('featured cards cannot be widened past the column by their gallery tabs', (
 test('gallery tab sets are named groups of toggle buttons', () => {
   const { getAllByRole } = render(<FeaturedProjects />);
   const groups = getAllByRole('group', { name: /gallery$/ });
-  // A gallery needs a logo and at least one screenshot; others show a single visual.
+  // A gallery needs a video or several screenshots; others show a single visual.
   expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual(
-    featuredProjects.filter((project) => project.logo && project.screenshots?.length).map((project) => `${project.name} gallery`),
+    featuredProjects.filter((project) => project.video || project.screenshots?.length > 1).map((project) => `${project.name} gallery`),
   );
   groups.forEach((group) => {
     const pressed = [...group.querySelectorAll('button')].filter((button) => button.getAttribute('aria-pressed') === 'true');
@@ -90,7 +101,9 @@ test('projects render in data order and each pairs its purpose with an engineeri
   );
   articles.forEach((article) => {
     const purpose = article.querySelector('.project-purpose');
-    expect(purpose.nextElementSibling).toHaveClass('project-takeaway');
+    // Purpose, then the at-a-glance facts, then the takeaway.
+    expect(purpose.nextElementSibling).toHaveClass('project-facts');
+    expect(purpose.nextElementSibling.nextElementSibling).toHaveClass('project-takeaway');
   });
 });
 

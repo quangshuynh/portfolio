@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FaExternalLinkAlt, FaGithub } from 'react-icons/fa';
 import PersonalityButton from '../ui/personalityButton';
 import { featuredProjects as projects } from '../../data/projects.mjs';
-import { ProjectVisual } from './projectMedia';
+import { optimizedImage, ProjectVisual } from './projectMedia';
 
 /**
  * renders a featured project's code, demo, release, and documentation links
@@ -10,12 +10,14 @@ import { ProjectVisual } from './projectMedia';
  * :returns: action buttons markup
  */
 function ProjectActions({ project }) {
-  const { github, live, documentation, release } = project.links;
+  // A private project with no public link renders no empty action row.
+  if (!Object.keys(project.links).some((key) => key !== 'liveLabel')) return null;
+  const { github, live, liveLabel, documentation, release } = project.links;
   return (
     <div className="project-actions">
       {live && !github && <PersonalityButton href={live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live site`}>Live Site <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
       {github && <PersonalityButton href={github} target="_blank" rel="noreferrer" aria-label={`View ${project.name} code`}>View code <FaGithub aria-hidden="true" /></PersonalityButton>}
-      {live && github && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-live`} href={live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} live demo`}>Live demo <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
+      {live && github && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-live`} href={live} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} ${(liveLabel || 'live demo').toLowerCase()}`}>{liveLabel || 'Live demo'} <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
       {release && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-release`} href={release} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} release notes`}>Release notes <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
       {documentation && <PersonalityButton secondary personality="auto" personalityKey={`${project.name}-documentation`} href={documentation} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} documentation`}>Documentation <FaExternalLinkAlt aria-hidden="true" /></PersonalityButton>}
     </div>
@@ -79,33 +81,40 @@ function FeaturedProjects() {
               key={project.name}
               id={`project-${project.slug}`}
               aria-labelledby={`project-${project.slug}-title`}
-              className={`featured-project case-file${index === 0 ? ' flagship-project case-file--wide' : ''}${index % 2 === 0 ? '' : ' case-file--flip'}`}
+              className={`featured-project case-file${index === 0 ? ' case-file--lead' : ''}${index % 2 === 0 ? '' : ' case-file--flip'}`}
             >
-              <div className="case-file__rail" data-reveal>
-                <span className="case-file__index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
-                <dl className="case-file__meta">
-                  <div><dt>Type</dt><dd className="project-number">{project.label}</dd></div>
-                  <div className="project-stack">
-                    <dt>Stack</dt>
-                    <dd>
-                      <ul className="tech-tags" aria-label={`${project.name} technologies`}>
-                        {project.technologies.map((item) => <li key={item}>{item}</li>)}
-                      </ul>
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-              <div className="case-file__visual viewfinder" data-reveal style={{ '--reveal-delay': '80ms' }}>
+              <div className="case-file__visual viewfinder" data-reveal>
                 <ProjectVisual project={project} />
               </div>
-              <div className="project-copy" data-reveal style={{ '--reveal-delay': '140ms' }}>
+              <div className="project-copy" data-reveal style={{ '--reveal-delay': '100ms' }}>
+                <div className="case-file__head">
+                  <span className="case-file__index mono" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+                  {project.logo && (
+                    <img
+                      className="case-file__logo"
+                      src={optimizedImage(project.logo.file)}
+                      width="40"
+                      height="40"
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  )}
+                  <p className="project-number">{project.label}</p>
+                </div>
                 {/* Self-linking title: gives each project a shareable /#project-… URL. */}
                 <h3 id={`project-${project.slug}-title`}>
                   <a className="project-permalink" href={`#project-${project.slug}`}>{project.name}</a>
                 </h3>
                 <p className="project-purpose">{project.summary}</p>
+                <ul className="project-facts" aria-label={`${project.name} at a glance`}>
+                  {project.facts.map((fact) => <li key={fact}>{fact}</li>)}
+                </ul>
                 <p className="project-takeaway"><span className="project-takeaway__label">Takeaway</span> {project.takeaway}</p>
                 <ProjectDetails project={project} />
+                <ul className="tag-list project-stack" aria-label={`${project.name} technologies`}>
+                  {project.technologies.map((item) => <li key={item}>{item}</li>)}
+                </ul>
                 <ProjectActions project={project} />
               </div>
             </article>
