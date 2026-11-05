@@ -25,13 +25,20 @@ or update a project.
 | `logo` | both | `{ file, source?, width?, height?, alt, className?, trim? }` |
 | `screenshots[]` | both | `{ src \| local, width, height, alt, caption, label? }` |
 | `video` | Featured | `{ src, page, poster, width, height, duration, title, caption }`; see [Project videos](#project-videos) |
-| `tallScreenshots` | Featured | caps portrait or tall captures at 420px |
+| `tallScreenshots` | Featured | caps portrait captures at 440px and frames them like a device |
+| `facts` | Featured | two to four verifiable facts, at most 40 characters each, shown as chips |
+| `category` | More | one of `PROJECT_CATEGORIES` in `projects.mjs`; drives the filter chips |
+| `private` | both | private repository: no `github` link, local images only, links optional (a card with none says "Private repository") |
 
-A featured project with a logo and screenshots gets a tabbed gallery: a Logo tab
-followed by one tab per screenshot (`label`). A project with a `video` gets a
-Video tab first, and the gallery opens on it. Without a logo, its first
-screenshot is shown alone; with only a logo, the logo. In More projects, the first screenshot is the
-preview, and clicking it opens every screenshot in the image viewer.
+A featured project with a video or several screenshots gets a tabbed gallery
+that opens on the product: the Video tab when there is one, otherwise the first
+screenshot (one tab per screenshot, `label`). The logo is a small mark in the
+card's head line, never a gallery slide. One screenshot is shown alone; a
+project with no screenshots shows its logo. In More projects, the first
+screenshot is the card preview (else the logo on a quiet panel), and clicking it
+opens every screenshot in the image viewer. Every card, featured or not, keeps
+the `#project-<slug>` anchor; a link to a More project hidden by the collapsed
+view expands the list.
 
 The file is plain data with no asset imports, so Node scripts
 (`prepare:images`, `check:assets`) can read it too.
@@ -42,7 +49,8 @@ The file is plain data with no asset imports, so Node scripts
 | --- | --- | --- |
 | Screenshots of public projects | `cdn.jsdelivr.net/gh/OWNER/REPO@SHA/path` | The repository is the source of truth; no copy lives here |
 | Logos (all projects) | `src/assets/optimized/*.webp`, bundled | Shown at 44px or 260px. The originals are 250 KB to 1.4 MB |
-| Private projects (585Dashcam585, 585photo585) | `src/assets`, through `prepare:images` | Private repositories have no public raw URLs |
+| Private projects (585Dashcam585, 585photo585, DevPulse) | `src/assets`, through `prepare:images` | Private repositories have no public raw URLs. DevPulse uses only its synthetic fixture captures |
+| Captures taken for the portfolio (QuangEdit, Chessed, Homemade, the Hymical Forms diagram) | `src/assets/projects`, through `prepare:images` | QuangEdit lives in this repository; Chessed and Homemade have no screenshots in their repositories, so these are captures of their live sites; the diagram is drawn from the hymical/forms source. Move to `githubAsset()` once a repository commits its own screenshots |
 | Video posters | `cdn.jsdelivr.net/gh/OWNER/REPO@SHA/path`, like screenshots | Committed to the project repository |
 | Videos (Ordixa launch video) | `github.com/OWNER/REPO/releases/download/TAG/FILE` | Release attachment, not committed; jsDelivr cannot serve it |
 

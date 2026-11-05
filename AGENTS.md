@@ -12,7 +12,7 @@ read it before changing projects or project assets.
 | `src/data/projects.mjs` | Single source of truth for homepage projects. Plain data, no asset imports (Node scripts read it). Array order is display order. |
 | `src/data/githubAssets.mjs` | One commit pin per public project repository; `githubAsset(key, path)` builds pinned jsDelivr URLs. |
 | `src/data/validateProjects.mjs` | Deterministic metadata checks, run by `npm test` and `check:assets`. |
-| `src/components/sections/projectMedia.jsx` | Logo/screenshot gallery; `homeLightbox.jsx` is the image trigger, fallback, and viewer. |
+| `src/components/sections/projectMedia.jsx` | Video/screenshot gallery (opens on the product, never the logo); `homeLightbox.jsx` is the image trigger, fallback, and viewer. |
 | `scripts/asset-refresh.mjs` | Logic for `npm run assets:refresh` (CLI: `refresh-project-assets.mjs`). |
 | `scripts/check-project-assets.mjs` | `npm run check:assets`: validation plus network probe of every remote image. |
 | `scripts/photography-responsive.mjs` | Build-time 1600 px photography derivative (from the viewer file, cached in `node_modules/.cache`); `npm run measure:photography` measures page, viewer and editor loading. |
@@ -49,6 +49,9 @@ read it before changing projects or project assets.
   honestly (Ordixa: fictional demo data, never the old "Business Data
   Automation" name), and keep "DashPilot" until its repository ships the
   Worklane rebrand. Tests enforce these.
+- Featured `facts` must be verifiable from the repository (tests, releases,
+  CI, deployment); More entries need a `category`. Private projects
+  (`private: true`) never link or name a private repository URL.
 - Never delete, archive, or modify the project repositories themselves.
 - Every screenshot needs real `width`/`height`, specific `alt` text, and a
   `caption`; featured gallery screenshots also need a short unique `label`.
