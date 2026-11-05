@@ -48,7 +48,7 @@ export const ownerOf = (target) => (target?.kind === 'layer' && target.layer.typ
  * :param layerSource: async (layer, { width, height }) → RGBA8 of an image layer's source as it is
  *   shown (decoded, developed, its settings), about that size
  * :param locals, onApplyLocals, onSelectLocal, target, onApplyMask, onPreviewMask, onSelectComponent, newId
- * :param onApplyLayerMask: (layerId, mask) sets an image layer's mask (one without a mask yet);
+ * :param onApplyLayerMask: (layerId, mask or (current mask | null) → mask) sets an image layer's mask;
  *   `onLayerMask(layerId)` then opens it for editing
  */
 export default function useSelections({ photo, ready, viewProxy, adjustments, lut, renderInWorker, layerSource = null, locals, onApplyLocals, onSelectLocal, target, onApplyMask, onPreviewMask, onSelectComponent, newId, onApplyLayerMask = null, onLayerMask = null }) {
@@ -157,10 +157,9 @@ export default function useSelections({ photo, ready, viewProxy, adjustments, lu
     const selection = component(id, kind, done.result, { op });
     if (!selection) { setStatus({ kind, error: 'The selection is too large to keep with this photo. Remove another selection first.' }); return; }
     if (layer) {
-      // The layer chosen when this started, whichever layer is selected now.
-      const mask = layer.mask && !replace ? addSelection(layer.mask, selection) : replaceWithSelection(layer.mask ?? createMask('layer'), selection);
-      if (mask === layer.mask) return;
-      onApplyLayerMask?.(layer.id, mask);
+      // The layer chosen when this started, whichever layer is selected now, with its mask as it
+      // is now (it may have been edited while the models ran).
+      onApplyLayerMask?.(layer.id, (current) => (current && !replace ? addSelection(current, selection) : replaceWithSelection(current ?? createMask('layer'), selection)));
       onLayerMask?.(layer.id);
       onSelectComponent(id);
       return;

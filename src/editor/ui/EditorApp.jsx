@@ -880,9 +880,13 @@ function EditorWorkspace({ host }) {
     setMaskComponent(null);
   }, [applyMask]);
   // An image layer's mask set directly (a selection made for it before it had one, Interval 24.1).
+  // `mask` may be a function of the layer's current mask (a selection arriving after edits).
   const applyLayerMask = useCallback((layerId, mask) => {
     const present = activePhoto(stateRef.current)?.history.present;
-    if (present?.layers.some(({ id }) => id === layerId)) dispatch({ type: 'applySettings', patch: { layers: updateLayer(present.layers, layerId, { mask }) } });
+    const layer = present?.layers.find(({ id }) => id === layerId);
+    if (!layer) return;
+    const next = typeof mask === 'function' ? mask(layer.mask ?? null) : mask;
+    if (next !== layer.mask) dispatch({ type: 'applySettings', patch: { layers: updateLayer(present.layers, layerId, { mask: next }) } });
   }, []);
   const openLayerMask = useCallback((layerId) => {
     setActiveLayer(layerId);
