@@ -1,0 +1,212 @@
+{
+  "type": "quanghuynh.photo-editor.edits",
+  "version": 17,
+  "savedAt": "2026-11-05T11:07:06.127Z",
+  "exportSettings": {
+    "format": "jpeg",
+    "quality": 0.92,
+    "resize": {
+      "mode": "original",
+      "longEdge": 3840,
+      "maxWidth": 3840,
+      "maxHeight": 3840
+    },
+    "suffix": "-quangedit",
+    "includeWatermark": true
+  },
+  "photos": [
+    {
+      "source": {
+        "name": "photo.png",
+        "size": 1000,
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "format": "png",
+        "width": 96,
+        "height": 64,
+        "orientation": 1
+      },
+      "adjustments": {
+        "exposure": 0.1,
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "temperature": 0,
+        "tint": 0,
+        "vibrance": 0,
+        "saturation": 0,
+        "geometry": {
+          "angle": 3
+        },
+        "layers": [
+          {
+            "id": "img1",
+            "type": "image",
+            "name": "Over",
+            "visible": true,
+            "locked": false,
+            "opacity": 0.85,
+            "blend": "multiply",
+            "source": {
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "name": "a.png",
+              "size": 100,
+              "format": "png",
+              "width": 48,
+              "height": 32
+            },
+            "x": 0.4,
+            "y": 0.5,
+            "width": 0.9,
+            "height": 0.6,
+            "rotation": 15,
+            "flipH": false,
+            "flipV": false,
+            "settings": {},
+            "mask": {
+              "space": "layer",
+              "base": "all",
+              "enabled": true,
+              "invert": false,
+              "opacity": 1,
+              "components": [
+                {
+                  "id": "b1",
+                  "type": "brush",
+                  "name": "",
+                  "enabled": true,
+                  "op": "add",
+                  "invert": false,
+                  "opacity": 1,
+                  "strokes": [
+                    {
+                      "mode": "erase",
+                      "radius": 0.1,
+                      "hardness": 0.5,
+                      "opacity": 1,
+                      "points": [
+                        [
+                          0.2,
+                          0.3,
+                          1
+                        ],
+                        [
+                          0.6,
+                          0.5,
+                          1
+                        ]
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "adj1",
+            "type": "adjustment",
+            "name": "Clip",
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blend": "normal",
+            "settings": {
+              "exposure": -0.6,
+              "saturation": 30
+            },
+            "clip": true
+          },
+          {
+            "id": "img2",
+            "type": "image",
+            "name": "",
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blend": "normal",
+            "source": {
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "name": "b.png",
+              "size": 100,
+              "format": "png",
+              "width": 48,
+              "height": 32
+            },
+            "x": 0.6,
+            "y": 0.4,
+            "width": 0.5,
+            "height": 0.4,
+            "rotation": 0,
+            "flipH": true,
+            "flipV": false,
+            "settings": {},
+            "parent": "grp"
+          },
+          {
+            "id": "adj2",
+            "type": "adjustment",
+            "name": "",
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blend": "normal",
+            "settings": {
+              "contrast": 25,
+              "temperature": -15
+            },
+            "mask": {
+              "space": "canvas",
+              "base": "none",
+              "enabled": true,
+              "invert": false,
+              "opacity": 1,
+              "components": [
+                {
+                  "id": "sel",
+                  "type": "selection",
+                  "name": "",
+                  "enabled": true,
+                  "op": "add",
+                  "invert": false,
+                  "opacity": 1,
+                  "kind": "sky",
+                  "version": "fixture/1",
+                  "width": 24,
+                  "height": 16,
+                  "data": "DP8CgAoADP8CgAoADP8CgAoADP8CgAoADP8CgAoADP8CgAoADP8CgAoADP8CgAoADP8CgAoADP8CgAoADP8CgAoADP8CgAoADP8CgAoADP8CgAoADP8CgAoADP8CgAoA",
+                  "confidence": 0.8,
+                  "shift": 0,
+                  "feather": 0.3
+                }
+              ]
+            },
+            "parent": "grp"
+          },
+          {
+            "id": "grp",
+            "type": "group",
+            "name": "G",
+            "visible": true,
+            "locked": false,
+            "opacity": 0.7,
+            "blend": "screen"
+          },
+          {
+            "id": "adj3",
+            "type": "adjustment",
+            "name": "",
+            "visible": true,
+            "locked": false,
+            "opacity": 1,
+            "blend": "soft-light",
+            "settings": {
+              "exposure": 0.3
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
+
