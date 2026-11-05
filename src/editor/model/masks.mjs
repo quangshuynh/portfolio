@@ -31,10 +31,11 @@
 // The grid is stored rather than regenerated, so a saved edit renders the same in any browser.
 // `shift` (−1–1) moves its edge out or in, `feather` (0–1) softens it. Local adjustments
 // (image space) and, since Interval 24, canvas-space layer masks (adjustment, text and group
-// layers) hold them; a layer mask evaluates its selections in the photo's image space too, so
-// they follow the photo through Crop & Transform. Image layer masks ('layer' space) cannot: a
-// selection of the photo says nothing about another image. They are specific to one photo and
-// never synced to others.
+// layers) hold them; a canvas mask evaluates its selections in the photo's image space too, so
+// they follow the photo through Crop & Transform. Since Interval 24.1 (document version 18) an
+// image layer's mask ('layer' space) holds selections of that layer's own source: the grid
+// spans the source as decoded (orientation applied), which is exactly the layer's box, so it
+// follows every move, scale, rotation and flip of the layer without being analysed again.
 //
 // A local adjustment: { id, name, enabled, amount, mask, settings }. `settings` are Light,
 // Color, HSL and Detail values (relative to neutral, like a photo's); `amount` (0–1) scales how
@@ -215,8 +216,6 @@ export function normalizeMask(input, space, budget = { points: MASK_LIMITS.photo
   const seen = new Set();
   const components = [];
   for (const entry of (Array.isArray(input.components) ? input.components : []).slice(0, MASK_LIMITS.components * 2)) {
-    // Selections are in the photo's own space: an image layer's box cannot hold them.
-    if (entry?.type === 'selection' && space === 'layer') continue; // eslint-disable-line no-continue
     const component = normalizeComponent(entry, budget);
     if (!component || seen.has(component.id)) continue; // eslint-disable-line no-continue
     seen.add(component.id);
@@ -297,6 +296,19 @@ export function addComponent(mask, component) {
   if (mask.components.length >= MASK_LIMITS.components || mask.components.some(({ id }) => id === component.id)) return mask;
   return normalizeMask({ ...mask, components: [...mask.components, component] }, mask.space) ?? mask;
 }
+
+/**
+ * Adds a selection: to a mask that still reveals everything (a new layer mask: base 'all', no
+ * components, not inverted) an added selection would change nothing, so the mask then starts from
+ * nothing and shows only the selection. Any other mask gets it as addComponent does.
+ */
+export function addSelection(mask, component) {
+  const revealsAll = mask.base === 'all' && !mask.invert && !mask.components.length;
+  return addComponent(revealsAll && component.op !== 'subtract' ? { ...mask, base: 'none' } : mask, component);
+}
+
+/** A mask holding only `component` (a selection replacing whatever the mask held), keeping the mask's own settings. */
+export const replaceWithSelection = (mask, component) => addComponent({ ...mask, base: 'none', invert: false, components: [] }, component);
 
 export function updateComponent(mask, id, patch) {
   return normalizeMask({ ...mask, components: mask.components.map((c) => (c.id === id ? { ...c, ...patch, id, type: c.type } : c)) }, mask.space) ?? mask;

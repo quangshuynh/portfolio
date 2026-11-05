@@ -40,7 +40,10 @@ export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // `parent`), clipping (`clip`) and selection components in canvas-space layer masks
 // (model/layers.mjs, model/layerTree.mjs); version 16 files read unchanged (no groups, no clips)
 // and render exactly as before. Version 16 editors refuse version 17 files rather than flatten them.
-export const DOCUMENT_VERSION = 17;
+// Version 18 added selection components in image layer masks (a selection of the layer's own
+// source) and Detail settings on adjustment layers; version 17 files read unchanged and render
+// as before, and version 17 editors refuse version 18 files rather than drop those parts.
+export const DOCUMENT_VERSION = 18;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).
