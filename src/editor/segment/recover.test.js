@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { RECOVER_VERSION, recoverWindow, strokeChunks, strokePixels, strokeRegion } from './recover.mjs';
+import { RECOVER_VERSION, colourClusters, recoverWindow, strokeChunks, strokePixels, strokeRegion } from './recover.mjs';
 import { refineSelection, tileMapCode } from './refine.mjs';
 import { encodeCodes } from './analysis.mjs';
 import { refinedMask, refinementsOf } from './refineClient.mjs';
@@ -65,6 +65,16 @@ describe('recoverWindow', () => {
     const { coverage } = recoverWindow(baseOf(), planes(img), W, H, region, length);
     expect(coverage[60 * W + 122]).toBeGreaterThan(0.3);
     expect(coverage[60 * W + 122]).toBeLessThan(0.7);
+  });
+  it('copes with surroundings too scattered to form a cluster (no background: nothing added)', () => {
+    const scattered = Array.from({ length: 8 }, (_, i) => [i / 8, (i * 3) % 8 / 8, (i * 5) % 8 / 8]);
+    expect(colourClusters(scattered).length).toBeLessThanOrEqual(4);
+    const s = stroke([[120.5, 100], [120.5, 25]], 8);
+    const { region, length } = strokeRegion(s, 0, 0, W, H);
+    // a ring of only a few background pixels: the stroke fills the window
+    const base = baseOf();
+    const tiny = recoverWindow(base, planes(scene()), W, H, Uint8Array.from(region, (v, i) => (v || base[i] < 0.5 ? 1 : 0)), length);
+    expect(tiny.added).toBe(0);
   });
   it('cuts long strokes into bounded windows', () => {
     const pieces = strokeChunks({ r: 5, points: [[0, 0], [300, 0], [600, 0], [900, 10], [1400, 10]] }, 512);

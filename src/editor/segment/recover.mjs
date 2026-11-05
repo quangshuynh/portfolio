@@ -139,6 +139,7 @@ export function recoverWindow(base, rgb, w, h, region, length) {
       }
       if (samples.length < 8) continue; // eslint-disable-line no-continue
       const clusters = colourClusters(samples);
+      if (!clusters.length) continue; // eslint-disable-line no-continue
       for (let y = by; y < by1; y += 1) {
         for (let x = bx; x < bx1; x += 1) {
           const i = y * w + x;
@@ -154,15 +155,30 @@ export function recoverWindow(base, rgb, w, h, region, length) {
       }
     }
   }
+  // The part's colour: the clear outliers near a pixel, else those of the whole stroke (an antenna
+  // crossing a dark window keeps the colour found where it crosses the sky).
   const core = Float32Array.from(z, (v) => (v > HI ? 1 : 0));
   const wF = tri(core); const mF = weighted(core);
+  const whole = [0, 0, 0]; let cores = 0;
+  for (let i = 0; i < n; i += 1) if (core[i]) { cores += 1; for (let c = 0; c < 3; c += 1) whole[c] += rgb[c][i]; }
   const alpha = new Float32Array(n);
+  if (!cores) return { coverage: Float32Array.from(base), added: 0 };
+  for (let c = 0; c < 3; c += 1) whole[c] /= cores;
   for (let i = 0; i < n; i += 1) {
-    if (!z[i] || wF[i] < 1e-4) continue; // eslint-disable-line no-continue
-    let num = 0; let den = 0;
-    for (let c = 0; c < 3; c += 1) { const d = mF[c][i] / wF[i] - B[c][i]; num += (rgb[c][i] - B[c][i]) * d; den += d * d; }
+    if (!region[i] || base[i] >= 0.5 || !z[i]) continue; // eslint-disable-line no-continue
+    const local = wF[i] > 0.002;
+    const F = [0, 1, 2].map((c) => (local ? mF[c][i] / wF[i] : whole[c]));
+    let num = 0; let den = 0; let dF = 0; let dB = 0;
+    for (let c = 0; c < 3; c += 1) {
+      const d = F[c] - B[c][i];
+      num += (rgb[c][i] - B[c][i]) * d; den += d * d;
+      dF += (rgb[c][i] - F[c]) ** 2; dB += (rgb[c][i] - B[c][i]) ** 2;
+    }
     if (den < 1e-6) continue; // eslint-disable-line no-continue
-    alpha[i] = Math.min(1, Math.max(0, num / den)) * sstep(LO, HI, z[i]);
+    // Structure: closer to the part's colour than to the nearest background colour, and clearly
+    // unlike that background (in its own spread, or by an absolute step for flat backgrounds).
+    const evidence = Math.max(sstep(LO, HI, z[i]), sstep(0.04, 0.1, Math.sqrt(dB)));
+    alpha[i] = dF < dB ? Math.min(1, Math.max(0, num / den)) * evidence : 0;
   }
   // Parts (8-connected, coverage ≥ 0.5): kept when touching the selection or spanning the stroke.
   const fgNear = grow01(Uint8Array.from(base, (v) => (v >= 0.5 ? 1 : 0)), w, h, 2);
