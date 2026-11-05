@@ -9,7 +9,7 @@ import {
   photographSrcSet as srcSet,
   sortPhotographs,
 } from '../../data/photographs';
-import { appHref, navigate, photographyHref } from '../../util/navigation';
+import { appHref, currentLocation, navigate, navigateBack, photographyHref } from '../../util/navigation';
 import PhotographyLightbox, { formatCameraName } from '../photography/photographyLightbox';
 import SiteNav from '../sections/siteNav';
 import Footer from '../sections/footer';
@@ -221,13 +221,18 @@ export default function PhotographyPage({ selectedPhotograph, invalidPhotoId = f
     return sortPhotographs(photographs);
   }, [collectionPhotographs, selectedPhotograph, viewerContext]);
 
-  const navigateToPhotograph = useCallback((photograph) => navigate(hrefFor(photograph)), [hrefFor]);
-  const closePhotograph = useCallback(() => navigate(hrefFor(null)), [hrefFor]);
+  // One history entry per viewing: opening pushes it, steps replace it, closing goes Back to the
+  // gallery (Forward reopens the photograph left). A step requested after closing (a swipe still
+  // settling) is dropped, so it can never reopen the viewer.
+  const navigateToPhotograph = useCallback((photograph) => {
+    if (currentLocation().hash) navigate(hrefFor(photograph), { replace: true, keepState: true });
+  }, [hrefFor]);
+  const closePhotograph = useCallback(() => navigateBack(hrefFor(null)), [hrefFor]);
   const openPhotograph = useCallback((event, context) => {
     event.preventDefault();
     viewerTrigger.current = event.currentTarget;
     setViewerContext(context);
-    navigate(event.currentTarget.href);
+    navigate(event.currentTarget.href, { returnable: true });
   }, []);
 
   useEffect(() => {

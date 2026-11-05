@@ -94,9 +94,13 @@ try {
   await settle();
   assert.equal(await evaluate('scrollY'), position, 'Close preserves the gallery position');
   assert.equal(await evaluate('document.activeElement.closest("[data-photo-slug]")?.dataset.photoSlug'), '_DSC0023');
-  await evaluate('history.back()');
-  await waitFor(viewerReady);
+  // One entry per viewing: closing went Back to the gallery, so Forward reopens the photograph
+  // left and Back closes it again.
+  await waitFor("location.hash === ''");
   await evaluate('history.forward()');
+  await waitFor(viewerReady);
+  assert.equal(await evaluate('location.hash'), '#_DSC0023', 'Forward reopens the photograph left');
+  await evaluate('history.back()');
   await waitFor(`!(${viewerReady})`);
   await settle();
   assert.equal(await evaluate('scrollY'), position, 'Back/Forward close preserves the gallery position');

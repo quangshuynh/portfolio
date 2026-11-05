@@ -260,16 +260,40 @@ within noise; blank frames swing ±10 points between rounds of one build. The re
 is gallery downloads already started before opening (2.6–3.1 MB arrive while the viewer is open
 on a CDP-throttled desktop), which only fewer simultaneous gallery requests could reduce. Thirty
 sessions (`MEASURE_SCENARIOS=sessions`): Chromium heap after GC 4–5.5 MB, flat after session 10,
-DOM nodes and listeners flat; no viewer images left in any engine. WebKit refuses more than 100
-`history.pushState` calls per 10 s, after which in-viewer navigation and closing stop working
-(main too; a held arrow key can reach it).
+DOM nodes and listeners flat; no viewer images left in any engine.
+
+**History (Interval 23.5, `src/util/navigation.js`).** WebKit throws a `SecurityError` past 100
+`pushState`/`replaceState` calls per 10 s (measured: the 101st). Every viewer step used to push, so
+a held arrow key reached that limit in about a second. Chromium and Firefox cap session history at
+50 entries, so one session also pushed out older ones. Now:
+
+| Action | History |
+| --- | --- |
+| Open from the gallery | one pushed entry (its state has `returnTo`, the gallery URL) |
+| Previous/next, keys, swipes | replace that entry; a step requested after closing is dropped |
+| Close (button, Escape) | the browser's Back to the gallery, so Forward reopens the photo left; a direct link (nothing beneath) replaces its entry with the gallery |
+| Browser Back/Forward | closes/reopens; discards any pending write |
+| Refresh, share | the URL is the photo shown (at most 250 ms behind during a burst) |
+
+The app shows the requested location at once. Writes follow a budget (20 at once, then 4 per
+second: at most 60 in any 10 s), so a burst coalesces into one trailing write of the latest URL.
+A refused write is retried each second (one `console.warn` in development). A write requested
+during a close's Back waits for it. A page being hidden writes at once. Closing never waits for a
+write. `check:photography:viewer` counts every write in all five runs (hundreds of held-key, click
+and swipe steps, immediate closes, Back mid-burst, reload): busiest 10 s 51–59 writes, none
+refused. A reload takes the URL of that instant, so a reload within 250 ms of a held key can
+open a photo a few steps earlier.
 
 **Physical iPhone (pending).** Not run: no device access. On the deployed commit, note iOS and
 Safari versions and the network, then check: first gallery load and fast scrolling; open a frame
 before the archive finishes loading; ten rapid swipes; pinch to 400% and pan; double tap;
 portrait/landscape rotation while zoomed; toolbar collapse/expand; close returns to the same frame;
 thirty open/close cycles; background Safari for a minute and resume; open after other heavy tabs
-(memory pressure).
+(memory pressure). History (Interval 23.5, iPhone 16e): hold a hardware-keyboard arrow or swipe
+through 50+ photos, then Close: it closes at once and the address bar shows the gallery; Forward
+reopens the last photo, Back closes it; Share right after swiping gives the photo shown; the
+edge-swipe Back gesture closes the viewer; open a shared link in a new tab, step, close, then Back
+leaves the site.
 
 **Zoom gestures** (`photographyLightbox.jsx`, tested in `photographyGestures.test.jsx`): the
 image area has `touch-action: none`, so the viewer handles them itself. Two fingers zoom
