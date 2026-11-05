@@ -1382,7 +1382,12 @@ budget, keys, preview fallback vs exact export). `check:editor:masks` and `check
 (Chromium, WebKit), `check:editor:mobile` and `check:cms:editor` (Chromium, WebKit) pass; genuine
 RAW layers (ARW, CR2, CR3, RAF, NEF, DNG) are refined from their development as before (recovery
 uses the same guide; no RAW stroke was run in a browser). An HDR exported to a file and imported as a
-layer is an ordinary image. No physical iPhone was available: the checklist above applies, plus a
+layer is an ordinary image. `check:editor:recover` (Chromium, the harbour ORF as a layer): a stroke
+over the mast Subject left out recovers it (6 274 canvas px changed, none outside the stroke; one
+dark sliver beside its foot is wrong); a second stroke and an Edge change before the first result,
+undo and redo, tool and layer switching and a cancelled export leave the same result; a fresh
+session's export of the saved file is identical (no stale map); a version 19 file renders
+identically in this editor and in main. No physical iPhone was available: the checklist above applies, plus a
 Recover detail stroke with a finger at 200 % (no stroke from a pinch).
 
 **Colour decontamination** (replacing edge colours by the subject's) was measured and not added: on
