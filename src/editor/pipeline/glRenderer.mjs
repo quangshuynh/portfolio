@@ -39,7 +39,7 @@ function opaqueRgba({ kind, data }) {
 // Texture units: the photo, the curve table, the 3D LUT, a RAW photo, a merged HDR, the glow map, soft focus,
 // and for layer passes the layer (or adjusted composite) and the composite so far.
 const UNIT = { source: 0, curves: 1, lut: 2, raw: 3, hdr: 4, glow: 5, diffuse: 6, layer: 7, backdrop: 8, mask: 9 };
-const COMPOSITE_UNIFORMS = ['uBackdrop', 'uLayer', 'uAdjust', 'uMatrix', 'uOutputSize', 'uScale', 'uOpaque', 'uOpacity', 'uMode', 'uMask', 'uMasked'];
+const COMPOSITE_UNIFORMS = ['uBackdrop', 'uLayer', 'uAdjust', 'uMatrix', 'uOutputSize', 'uScale', 'uOpaque', 'uOpacity', 'uMode', 'uMask', 'uMasked', 'uMerge', 'uClip'];
 
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 // Frames kept between composites (the photo's own frame and one adjustment pass's output).
@@ -470,7 +470,15 @@ export class GlRenderer {
     // A stroke started before a warm-up finished: its frames are drawn here, whole.
     this.abandonWarm();
     this.warmedTargets = false;
-    const targets = this.ensureTargets(width, height, layers.some(({ kind }) => kind === 'adjust') ? 3 : 2);
+    // Groups (composite.mjs 'begin'/'end'): each open group holds a target, besides the ping-pong
+    // pair and the adjustment scratch (targets[2]).
+    let depth = 0;
+    let deepest = 0;
+    for (const { kind } of layers) {
+      if (kind === 'begin') deepest = Math.max(deepest, (depth += 1));
+      if (kind === 'end') depth -= 1;
+    }
+    const targets = this.ensureTargets(width, height, deepest ? 3 + deepest : layers.some(({ kind }) => kind === 'adjust') ? 3 : 2);
     gl.viewport(0, 0, width, height);
     // Keys of cacheable frames; null once a frame depends on something not keyed.
     let key = baseKey && !rendered ? `${this.stateKey()}|${baseKey}` : null;
@@ -485,13 +493,33 @@ export class GlRenderer {
       else this.draw(params);
       current = targets[0];
     }
-    // The ping-pong targets: never the one being read.
-    const writable = () => (current === targets[0] ? targets[1] : targets[0]);
+    // A free target: never the one being read, the adjustment scratch or one an open group holds.
+    const stack = [];
+    const writable = () => targets.find((target, i) => i !== 2 && target !== current && !stack.some((entry) => entry.target === target || entry.from === target));
     const used = new Set();
     const usedMasks = new Set();
     for (const pass of layers) {
       let layerTexture;
-      if (pass.kind === 'adjust') {
+      let backdrop = current;
+      let merge = 0;
+      if (pass.kind === 'begin') {
+        // Kept frames depend only on the photo and the first adjustment over it.
+        key = null;
+        if (!pass.isolate) { stack.push({ from: current, target: current }); continue; } // eslint-disable-line no-continue
+        stack.push({ target: current, from: null });
+        current = writable();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, current.framebuffer);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        continue; // eslint-disable-line no-continue
+      }
+      if (pass.kind === 'end') {
+        const entry = stack.pop();
+        // Isolated: the group's target over the one below; pass-through: the drawn result faded back toward its start.
+        layerTexture = current.texture;
+        backdrop = entry.from ?? entry.target;
+        merge = entry.from ? 2 : 1;
+      } else if (pass.kind === 'adjust') {
         const adjustKey = key && pass.adjustments ? `${key}>${JSON.stringify(pass.adjustments)}|${pass.lut?.sha256 ?? ''}` : null;
         const input = current;
         const drawPass = () => this.draw(pass.params, input.texture, true);
@@ -508,7 +536,8 @@ export class GlRenderer {
         layerTexture = this.layerTexture(pass);
         used.add(pass.key);
       }
-      const next = writable();
+      // After a pop, the group's own target is free again, but it is read by this draw.
+      const next = targets.find((target, i) => i !== 2 && target !== current && target !== backdrop && !stack.some((entry) => entry.target === target || entry.from === target));
       // Painting one local adjustment over kept frames: the target still holds the last frame,
       // which differs only where the mask changed since then, so only that box is composited
       // (each pixel reads its own texels: the result equals a full draw). Interval 22.9.
@@ -532,12 +561,14 @@ export class GlRenderer {
       gl.useProgram(c.program);
       const u = c.uniforms;
       gl.activeTexture(gl.TEXTURE0 + UNIT.backdrop);
-      gl.bindTexture(gl.TEXTURE_2D, current.texture);
+      gl.bindTexture(gl.TEXTURE_2D, backdrop.texture);
       gl.uniform1i(u.uBackdrop, UNIT.backdrop);
       gl.activeTexture(gl.TEXTURE0 + UNIT.layer);
       gl.bindTexture(gl.TEXTURE_2D, layerTexture);
       gl.uniform1i(u.uLayer, UNIT.layer);
       gl.uniform1i(u.uAdjust, pass.kind === 'adjust' ? 1 : 0);
+      gl.uniform1i(u.uMerge, merge);
+      gl.uniform1i(u.uClip, pass.clip ? 1 : 0);
       gl.uniformMatrix3fv(u.uMatrix, true, new Float32Array(pass.matrix ?? IDENTITY));
       gl.uniform2f(u.uOutputSize, width, height);
       gl.uniform1f(u.uScale, pass.scale ?? 1);

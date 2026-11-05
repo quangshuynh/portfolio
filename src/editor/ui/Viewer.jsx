@@ -11,11 +11,11 @@ import { previewEdgeLimit } from '../io/files.mjs';
 import { RAW_STAGES } from '../raw/rawTrace.mjs';
 import InspectView from './InspectView';
 import LayerHandles from './LayerHandles';
-import { visibleLayers } from '../model/layers.mjs';
-import { adjustmentParams, adjustmentPass, compositeImageSync, localPasses, rasterPass } from '../pipeline/composite.mjs';
+import { layerProgram } from '../model/layerTree.mjs';
+import { adjustmentParams, adjustmentPass, compositeImageSync, groupPass, localPasses, rasterPass } from '../pipeline/composite.mjs';
 import { layerMatrix, offsetMatrix } from '../pipeline/layerTransform.mjs';
 import { maskActive, maskHasComponents, splitLocalSettings, visibleLocals } from '../model/masks.mjs';
-import { canvasMaskMap, imageMaskMap, layerMaskMap, maskMapKey, rasterizeMask } from '../pipeline/mask.mjs';
+import { canvasMaskMap, imageMaskMap, layerMaskMap, maskMapKey, maskUsesImage, rasterizeMask } from '../pipeline/mask.mjs';
 import { createLocalPreview, renderDetailFrame } from '../pipeline/localPreview.mjs';
 import MaskTool from './MaskTool';
 import { rasterizeTextLayer } from '../text/textRender.mjs';
@@ -133,7 +133,7 @@ export function ownerMaskMap(owner, out, plan, native) {
     const box = { width: owner.layer.source.width, height: owner.layer.source.height };
     return layerMaskMap(layerMatrix(owner.layer, out, box), box);
   }
-  return canvasMaskMap(out);
+  return canvasMaskMap(out, imageMaskMap(plan, out, native));
 }
 
 /** The CPU rendering of a base frame with the layer passes composited over it (no-WebGL2 preview). */
@@ -591,9 +591,9 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
     const keepMasks = () => { for (const key of masksRef.current.keys()) if (!maskKeys.has(key)) masksRef.current.delete(key); };
     // The overlay's coverage, kept while it is shown.
     const overlay = overlayMask ? maskCoverage(overlayMask.mask, ownerMaskMap(overlayMask.owner, out, plan, native), out, maskKeys) : null;
-    const shown = showLayers ? visibleLayers(adjustments.layers) : [];
+    const program = showLayers ? layerProgram(adjustments.layers) : [];
     const locals = showLayers ? visibleLocals(adjustments.local) : [];
-    if (!shown.length && !locals.length) { keepMasks(); return overlay ? { cpu: [], gpu: [], loading: 0, overlay } : null; }
+    if (!program.length && !locals.length) { keepMasks(); return overlay ? { cpu: [], gpu: [], loading: 0, overlay } : null; }
     const cpu = [];
     const gpu = [];
     const keys = new Set();
@@ -608,9 +608,21 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
       }
     }
     const layerMask = (layer, map) => (maskActive(layer.mask) ? maskCoverage(layer.mask, map, out, maskKeys) : null);
-    for (const layer of shown) {
+    // Canvas-space masks evaluate their selections in the photo's own space (only those masks
+    // depend on the geometry, so others keep their coverage when it changes).
+    const plainMap = canvasMaskMap(out);
+    const photoMap = canvasMaskMap(out, imageMaskMap(plan, out, native));
+    const canvasMap = (mask) => (maskUsesImage(mask) ? photoMap : plainMap);
+    for (const step of program) {
+      if (step.op !== 'layer') {
+        const pass = groupPass(step, step.owner ? layerMask(step.owner, canvasMap(step.owner.mask)) : null);
+        cpu.push(pass);
+        gpu.push(pass);
+        continue; // eslint-disable-line no-continue
+      }
+      const { layer } = step;
       if (layer.type === 'adjustment') {
-        const pass = adjustmentPass(layer, lutFor(layer.settings), layerMask(layer, canvasMaskMap(out)));
+        const pass = adjustmentPass(layer, lutFor(layer.settings), layerMask(layer, canvasMap(layer.mask)));
         if (layer.settings.lut && !pass.lut) continue; // eslint-disable-line no-continue
         cpu.push(pass);
         gpu.push({ ...pass, params: adjustmentParams(pass) });
@@ -631,7 +643,7 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
         if (!raster) { loading += 1; continue; } // eslint-disable-line no-continue
         matrix = layerMatrix(layer, out, raster);
       }
-      const pass = rasterPass(layer, raster, matrix, out, layerMask(layer, layer.type === 'image' ? layerMaskMap(matrix, raster) : canvasMaskMap(out)));
+      const pass = rasterPass(layer, raster, matrix, out, layerMask(layer, layer.type === 'image' ? layerMaskMap(matrix, raster) : canvasMap(layer.mask)));
       if (!pass.bounds) continue; // eslint-disable-line no-continue
       cpu.push(pass);
       gpu.push({ ...pass, key: `${layer.id}:${raster.width}x${raster.height}` });

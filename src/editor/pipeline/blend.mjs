@@ -168,6 +168,33 @@ export function mixPixel(out, o, adjusted, i, opacity) {
   }
 }
 
+/**
+ * A pass-through group's opacity and mask, in place: `out` (the group's children drawn over the
+ * backdrop) moved back toward `from` (the backdrop before the group) to `t` of the way, in
+ * premultiplied colour so semi-transparent pixels keep their colour: t = 1 leaves `out`, t = 0
+ * restores `from`.
+ */
+export function fadePixel(out, o, from, i, t) {
+  if (t >= 1) return;
+  if (t <= 0) { for (let c = 0; c < 4; c += 1) out[o + c] = from[i + c]; return; }
+  const af = from[i + 3] / 255;
+  const ac = out[o + 3] / 255;
+  const a = af + t * (ac - af);
+  if (a <= 0) { out[o] = 0; out[o + 1] = 0; out[o + 2] = 0; out[o + 3] = 0; return; }
+  for (let c = 0; c < 3; c += 1) {
+    const pf = af * (from[i + c] / 255);
+    out[o + c] = code8((pf + t * (ac * (out[o + c] / 255) - pf)) / a);
+  }
+  out[o + 3] = code8(a);
+}
+
+/**
+ * A clipped layer's pixel, composited atop its base (in place): the colour moves toward
+ * B(Cb, Cs) by the layer's alpha; the base's alpha is kept, so the layer shows only where the
+ * base does and its soft edges stay the base's. The same arithmetic as an adjustment layer's.
+ */
+export const atopPixel = (code, out, o, src, i, alpha) => adjustPixel(code, out, o, src, i, alpha);
+
 export function adjustPixel(code, out, o, adjusted, i, opacity) {
   if (opacity <= 0) return;
   const br = out[o] / 255;

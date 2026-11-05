@@ -10,7 +10,7 @@ import { BLEND_MODES, createAdjustmentLayer, normalizeLayer } from '../model/lay
 import { GlRenderer, createEditorContext } from '../pipeline/glRenderer.mjs';
 import { renderRgba8 } from '../pipeline/cpuRenderer.mjs';
 import { deriveParams } from '../pipeline/spec.mjs';
-import { adjustmentParams, adjustmentPass, compositeImageSync, rasterPass } from '../pipeline/composite.mjs';
+import { adjustmentParams, adjustmentPass, compositeImageSync, groupPass, rasterPass } from '../pipeline/composite.mjs';
 import { layerMatrix, offsetMatrix } from '../pipeline/layerTransform.mjs';
 import { normalizeAdjustments } from '../model/adjustments.mjs';
 import { lookLut } from './lutFixtures.mjs';
@@ -91,6 +91,33 @@ function cases() {
   const plan = geometryPlan(normalizeGeometry({ angle: 9, crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 }, perspective: { vertical: 15, horizontal: 0 } }), native);
   const local = { id: 'L', amount: 0.8, settings: { exposure: 0.8, temperature: -30, blueSaturation: -60 }, mask: normalizeMask({ components: [createLinear('sky', { x0: 0.5, y0: 0.1, x1: 0.5, y1: 0.6 }), createRadial('r', { x: 0.7, y: 0.6, rx: 0.2, ry: 0.15 })] }, 'image') };
   out.push({ name: 'adjust local (image space under geometry)', passes: localPasses(local, withRaster(local.mask, imageMaskMap(plan, canvas, native)), native, splitLocalSettings(local.settings)) });
+  // Groups and clipping (Interval 24): isolated targets, atop compositing, pass-through fades.
+  const base = imageLayer({ blend: 'normal', opacity: 1, rotation: 8 });
+  const clipped = imageLayer({ blend: 'multiply', opacity: 0.9, rotation: -20, x: 0.55, clip: true });
+  const clipRun = (alpha) => ({
+    name: `clip run (atop image + adjustment, base screen 0.7)${alpha ? ' over transparency' : ''}`,
+    alpha,
+    passes: [
+      groupPass({ op: 'begin', id: 'clip', isolate: true }),
+      rasterPass(base, r, layerMatrix(base, canvas, r), canvas),
+      rasterPass(clipped, r, layerMatrix(clipped, canvas, r), canvas),
+      adjustmentPass({ ...createAdjustmentLayer('A', { exposure: 0.8, saturation: -40 }), blend: 'soft-light', opacity: 0.8 }),
+      groupPass({ op: 'end', id: 'clip', isolate: true, blend: 'screen', opacity: 0.7 }),
+    ],
+  });
+  out.push(clipRun(false), clipRun(true));
+  out.push({
+    name: 'nested groups (isolated multiply > pass-through masked)',
+    passes: [
+      groupPass({ op: 'begin', id: 'outer', isolate: true }),
+      rasterPass(below, r, layerMatrix(below, canvas, r), canvas),
+      groupPass({ op: 'begin', id: 'inner', isolate: false }),
+      adjustmentPass({ ...createAdjustmentLayer('A', { exposure: -1, temperature: 40 }), opacity: 1 }),
+      rasterPass(above, r, layerMatrix(above, canvas, r), canvas),
+      groupPass({ op: 'end', id: 'inner', isolate: false, blend: 'normal', opacity: 0.5 }, withRaster(canvasMask, canvasMaskMap(canvas))),
+      groupPass({ op: 'end', id: 'outer', isolate: true, blend: 'multiply', opacity: 0.8 }),
+    ],
+  });
   return out;
 }
 

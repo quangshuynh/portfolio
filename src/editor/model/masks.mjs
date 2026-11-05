@@ -29,8 +29,12 @@
 // the photo's 'image' space, 8-bit, run-length coded and base64 (`data`), with the `kind`, the
 // algorithm `version` that made it, its `confidence` and, for an object, the tapped `points`.
 // The grid is stored rather than regenerated, so a saved edit renders the same in any browser.
-// `shift` (−1–1) moves its edge out or in, `feather` (0–1) softens it. Only local adjustments
-// (image space) hold them; they are specific to one photo and never synced to others.
+// `shift` (−1–1) moves its edge out or in, `feather` (0–1) softens it. Local adjustments
+// (image space) and, since Interval 24, canvas-space layer masks (adjustment, text and group
+// layers) hold them; a layer mask evaluates its selections in the photo's image space too, so
+// they follow the photo through Crop & Transform. Image layer masks ('layer' space) cannot: a
+// selection of the photo says nothing about another image. They are specific to one photo and
+// never synced to others.
 //
 // A local adjustment: { id, name, enabled, amount, mask, settings }. `settings` are Light,
 // Color, HSL and Detail values (relative to neutral, like a photo's); `amount` (0–1) scales how
@@ -211,8 +215,8 @@ export function normalizeMask(input, space, budget = { points: MASK_LIMITS.photo
   const seen = new Set();
   const components = [];
   for (const entry of (Array.isArray(input.components) ? input.components : []).slice(0, MASK_LIMITS.components * 2)) {
-    // Selections are in the photo's own space: only local adjustments (image space) hold them.
-    if (entry?.type === 'selection' && space !== 'image') continue; // eslint-disable-line no-continue
+    // Selections are in the photo's own space: an image layer's box cannot hold them.
+    if (entry?.type === 'selection' && space === 'layer') continue; // eslint-disable-line no-continue
     const component = normalizeComponent(entry, budget);
     if (!component || seen.has(component.id)) continue; // eslint-disable-line no-continue
     seen.add(component.id);

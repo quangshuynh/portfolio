@@ -12,16 +12,21 @@
 // neighbouring rows: the page computes the guide once, then the bands (each with its halo of
 // unchanged backdrop rows) run on the same workers, and a band's result is written back only
 // once no band still to be sent reads its rows. Phones run them on the page, band by band.
+//
+// Groups and clipping (model/layerTree.mjs): an isolated group or clip run draws on a canvas of
+// its own (one more canvas-sized buffer per open group, at most LAYER_LIMITS.depth + 1), a
+// pass-through group with an opacity or mask keeps a copy of the canvas as it was; at its end the
+// group is merged band by band, on the workers too (composite.endRows).
 
 import { createWorkerClient, WorkerCancelled } from './workerClient.mjs';
 import {
-  COMPOSITE_BAND_ROWS, adjustmentPass, compositeImage, detailPassOptions, detailWriter, localPasses, passTouchesRows, prepareDetailPass, rasterPass,
+  COMPOSITE_BAND_ROWS, adjustmentPass, compositeImage, compositeStack, detailPassOptions, detailWriter, endRows, groupPass, localPasses, passTouchesRows, prepareDetailPass, rasterPass,
 } from '../pipeline/composite.mjs';
 import { layerMatrix, offsetMatrix } from '../pipeline/layerTransform.mjs';
 import { sourceRows } from '../pipeline/warp.mjs';
-import { visibleLayers } from '../model/layers.mjs';
+import { layerProgram } from '../model/layerTree.mjs';
 import { maskActive, splitLocalSettings, visibleLocals } from '../model/masks.mjs';
-import { canvasMaskMap, layerMaskMap } from '../pipeline/mask.mjs';
+import { canvasMaskMap, layerMaskMap, maskUsesImage } from '../pipeline/mask.mjs';
 
 const spawnRenderWorker = () => new Worker(new URL('./imageWorker.mjs', import.meta.url), { type: 'module' });
 const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -32,19 +37,25 @@ const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
  *   with the layer's settings) at the size it needs
  * :param rasterizeText: (layer, size) => text sprite ({ x, y, width, height, data }) or null
  * :param lutFor: settings => LUT data or null
+ * :param imageMap: size => the photo's own mask map (selections in canvas-space masks), or null
  */
-export async function preparePass(layer, size, { loadRaster, rasterizeText, lutFor }) {
+export async function preparePass(layer, size, { loadRaster, rasterizeText, lutFor, imageMap = null }) {
   const mask = maskActive(layer.mask) ? layer.mask : null;
-  if (layer.type === 'adjustment') return adjustmentPass(layer, lutFor(layer.settings), mask && { def: mask, map: canvasMaskMap(size) });
+  if (layer.type === 'adjustment') return adjustmentPass(layer, lutFor(layer.settings), mask && { def: mask, map: canvasMap(mask, size, imageMap) });
   if (layer.type === 'text') {
     const sprite = rasterizeText(layer, size);
-    return sprite ? rasterPass(layer, sprite, offsetMatrix(sprite.x, sprite.y), size, mask && { def: mask, map: canvasMaskMap(size) }) : null;
+    return sprite ? rasterPass(layer, sprite, offsetMatrix(sprite.x, sprite.y), size, mask && { def: mask, map: canvasMap(mask, size, imageMap) }) : null;
   }
   const raster = await loadRaster(layer, size);
   const matrix = layerMatrix(layer, size, raster);
   const pass = rasterPass(layer, raster, matrix, size, mask && { def: mask, map: layerMaskMap(matrix, raster) });
   return pass.bounds ? pass : null;
 }
+
+const canvasMap = (mask, size, imageMap) => canvasMaskMap(size, maskUsesImage(mask) && imageMap ? imageMap(size) : null);
+
+/** The pass of a group step (begin, or end with its group's mask). */
+export const prepareGroupPass = (step, size, imageMap = null) => groupPass(step, step.owner ? { def: step.owner.mask, map: canvasMap(step.owner.mask, size, imageMap) } : null);
 
 /**
  * The passes of a photo's local adjustments at an export of `size`.
@@ -53,6 +64,25 @@ export async function preparePass(layer, size, { loadRaster, rasterizeText, lutF
  */
 export const prepareLocalPasses = (locals, size, { imageMap, native }) => visibleLocals(locals)
   .flatMap((local) => localPasses(local, { def: local.mask, map: imageMap(size) }, native, splitLocalSettings(local.settings)));
+
+/** A group's end on `clients` render workers, band by band: `rows` receives the result, `inner` is the group's canvas or copy. */
+async function endInBands({ rows, inner }, width, height, pass, clients, signal) {
+  const bands = [];
+  for (let row = 0; row < height; row += COMPOSITE_BAND_ROWS) bands.push(row);
+  const lane = async (client) => {
+    while (bands.length) {
+      if (signal.cancelled) throw new WorkerCancelled();
+      const row = bands.shift();
+      const end = Math.min(height, row + COMPOSITE_BAND_ROWS);
+      const band = rows.slice(row * width * 4, end * width * 4);
+      const from = inner.slice(row * width * 4, end * width * 4);
+      const result = await client.call('endRows', { pass, rows: band, inner: from, width, y0: row, y1: end }, { transfer: [band.buffer, from.buffer] });
+      if (signal.cancelled) throw new WorkerCancelled();
+      rows.set(result, row * width * 4);
+    }
+  };
+  await Promise.all(clients.map(lane));
+}
 
 /** One pass on `clients` render workers, band by band. */
 async function passInBands(image, pass, clients, signal) {
@@ -128,23 +158,40 @@ async function detailInBands(image, pass, clients, signal) {
  */
 export async function composeLayers(context, layers, { size, loadRaster, rasterizeText, lutFor, local = [], imageMap = null, native = size, workers = 0, spawn = spawnRenderWorker, signal = { cancelled: false }, onProgress = () => {} }) {
   const locals = imageMap ? prepareLocalPasses(local, size, { imageMap, native }) : [];
-  const shown = [...locals.map((pass) => ({ pass })), ...visibleLayers(layers).map((layer) => ({ layer }))];
+  const shown = [...locals.map((pass) => ({ pass })), ...layerProgram(layers).map((step) => (step.op === 'layer' ? { layer: step.layer } : { step }))];
   if (!shown.length) return;
   const image = context.getImageData(0, 0, size.width, size.height);
+  const stack = compositeStack(image);
   const clients = [];
   try {
     for (let i = 0; i < workers; i += 1) clients.push(createWorkerClient(spawn()));
     for (const [index, entry] of shown.entries()) {
       if (signal.cancelled) throw new WorkerCancelled();
       onProgress({ stage: 'compositing', fraction: index / shown.length, layer: index + 1, layers: shown.length });
-      let pass = entry.pass ?? await preparePass(entry.layer, size, { loadRaster, rasterizeText, lutFor });
+      let pass = entry.pass ?? (entry.step ? prepareGroupPass(entry.step, size, imageMap) : await preparePass(entry.layer, size, { loadRaster, rasterizeText, lutFor, imageMap }));
       if (!pass) continue; // eslint-disable-line no-continue
+      if (pass.kind === 'begin') { stack.begin(pass); continue; } // eslint-disable-line no-continue
+      if (pass.kind === 'end') {
+        const ended = stack.end();
+        if (clients.length) await endInBands(ended, size.width, size.height, pass, clients, signal);
+        else {
+          for (let row = 0; row < size.height; row += COMPOSITE_BAND_ROWS) {
+            if (signal.cancelled) throw new WorkerCancelled();
+            const last = Math.min(size.height, row + COMPOSITE_BAND_ROWS);
+            const at = [row * size.width * 4, last * size.width * 4];
+            endRows(ended.rows.subarray(...at), ended.inner.subarray(...at), size.width, row, last, pass);
+            await nextTick(); // eslint-disable-line no-await-in-loop
+          }
+        }
+        continue; // eslint-disable-line no-continue
+      }
+      const target = stack.current;
       if (clients.length && pass.kind === 'detail') {
-        await detailInBands(image, pass, clients, signal);
+        await detailInBands(target, pass, clients, signal);
       } else if (clients.length) {
-        await passInBands(image, pass, clients, signal);
+        await passInBands(target, pass, clients, signal);
       } else {
-        await compositeImage(image, [pass], { cancelled: () => signal.cancelled, onBand: nextTick });
+        await compositeImage(target, [pass], { cancelled: () => signal.cancelled, onBand: nextTick });
       }
       pass = null;
     }

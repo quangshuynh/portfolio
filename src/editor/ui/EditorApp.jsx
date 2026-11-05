@@ -31,7 +31,8 @@ import { loadTextFonts } from '../text/fonts.mjs';
 import { rasterizeTextLayer } from '../text/textRender.mjs';
 import { WATERMARK_DEFAULTS, normalizeWatermark, watermarkActive } from '../watermark/watermark.mjs';
 import { applyWatermark, loadWatermarkFonts } from '../watermark/watermarkRender.mjs';
-import { createImageLayer, createAdjustmentLayer, insertLayer, layerAdjustments, layerDevelopment, layerLabel, settingsNeutral, updateLayer, visibleLayers } from '../model/layers.mjs';
+import { createImageLayer, createAdjustmentLayer, layerAdjustments, layerDevelopment, layerLabel, settingsNeutral, updateLayer } from '../model/layers.mjs';
+import { drawnLayers, insertAbove } from '../model/layerTree.mjs';
 import { rasterSize } from '../pipeline/layerTransform.mjs';
 import { composeLayers } from '../io/composeLayers.mjs';
 import { visibleLocals } from '../model/masks.mjs';
@@ -901,12 +902,12 @@ function EditorWorkspace({ host }) {
     ? { width: maskTarget.layer.source.width, height: maskTarget.layer.source.height }
     : maskTarget?.kind === 'local' ? { width: photo.width, height: photo.height } : canvasSize;
 
-  const insertAboveActive = useCallback((layer, message) => {
+  // A new layer goes directly above the selected one's unit, in its group (layerTree.insertAbove).
+  const insertAboveActive = useCallback((layer, message, options = {}) => {
     const target = activePhoto(stateRef.current);
     if (target?.status !== 'ready') return false;
     const { layers } = target.history.present;
-    const at = layers.findIndex(({ id }) => id === activeLayer);
-    const next = insertLayer(layers, layer, at === -1 ? layers.length - 1 : at);
+    const next = insertAbove(layers, layer, layers.some(({ id }) => id === activeLayer) ? activeLayer : null, options);
     if (next === layers) { setLayerMessage(message); return false; }
     dispatch({ type: 'applySettings', patch: { layers: next } });
     setActiveLayer(layer.id);
@@ -937,8 +938,10 @@ function EditorWorkspace({ host }) {
       setTextFocus((count) => count + 1);
     }
   }, [insertAboveActive, transformMode, narrow]);
-  const addAdjustmentLayer = useCallback(() => {
-    insertAboveActive(createAdjustmentLayer(newLayerId('adjust')), 'A photo can hold up to 12 adjustment layers and 40 layers in all.');
+  // `options`: { clip } clips it to the selected layer's base; { mask } starts it with a mask (a saved selection).
+  const addAdjustmentLayer = useCallback((options = {}) => {
+    const layer = { ...createAdjustmentLayer(newLayerId('adjust')), ...(options.mask ? { mask: options.mask } : {}), ...(options.name ? { name: options.name } : {}) };
+    insertAboveActive(layer, 'A photo can hold up to 12 adjustment layers and 40 layers in all.', { clip: Boolean(options.clip) });
   }, [insertAboveActive]);
   const selectLayer = useCallback((id) => {
     setActiveLayer(id);
@@ -1039,7 +1042,7 @@ function EditorWorkspace({ host }) {
     const values = target.history.present;
     if (unsupportedFormats.includes(settings.format)) return `This browser cannot encode ${FORMATS[settings.format].label}.`;
     if (values.lut && !lutsRef.current.has(values.lut.sha256)) return `Import the LUT "${values.lut.name}" again, or remove it, before exporting.`;
-    for (const layer of visibleLayers(values.layers)) {
+    for (const layer of drawnLayers(values.layers)) {
       if (layer.type === 'image' && !sourceFor(layer.source.sha256)) return `The layer "${layerLabel(layer)}" needs its file ${layer.source.name || ''} (Layers: Reconnect file), or hide or delete it, before exporting.`;
       if (layer.settings?.lut && !lutsRef.current.has(layer.settings.lut.sha256)) return `Import the LUT "${layer.settings.lut.name}" of the layer "${layerLabel(layer)}" again before exporting.`;
     }
@@ -1076,7 +1079,7 @@ function EditorWorkspace({ host }) {
     const native = { width: target.width, height: target.height };
     const watermark = settings.includeWatermark !== false && watermarkActive(values.watermark) ? values.watermark : null;
     let watermarked = null;
-    const compose = visibleLayers(values.layers).length || visibleLocals(values.local).length || watermark ? async (context, { size, signal, onProgress: progress }) => {
+    const compose = drawnLayers(values.layers).length || visibleLocals(values.local).length || watermark ? async (context, { size, signal, onProgress: progress }) => {
       if (values.layers.some((layer) => layer.type === 'text' && layer.visible !== false)) await loadTextFonts();
       const merged = { get cancelled() { return layerCancel.cancelled || Boolean(signal?.cancelled); } };
       if (watermark) await loadWatermarkFonts();

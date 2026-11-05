@@ -16,7 +16,7 @@ import { LutError, MAX_CUBE_BYTES, parseCube } from '../pipeline/lut.mjs';
 import { contentHash } from './hash.mjs';
 import { renderRegion, warpedRegionSource } from '../pipeline/detailRegion.mjs';
 import { decodeSize, geometryPlan, normalizeGeometry } from '../pipeline/geometry.mjs';
-import { adjustRows, adjustmentParams, compositeRasterRows, detailBandRows, prepareDetailPass } from '../pipeline/composite.mjs';
+import { adjustRows, adjustmentParams, compositeRasterRows, detailBandRows, endRows, prepareDetailPass } from '../pipeline/composite.mjs';
 import { renderDetailFrame } from '../pipeline/localPreview.mjs';
 import { applyRetouch, applyRetouchToContext } from '../pipeline/retouch.mjs';
 
@@ -251,6 +251,12 @@ export const handlers = {
   async localDetailFrame({ image, pass }) {
     const data = renderDetailFrame(image, pass);
     return { result: data, transfer: [data.buffer] };
+  },
+
+  /** A group's end over one band (composite.endRows). */
+  async endRows({ pass, rows, inner, width, y0, y1 }) {
+    endRows(rows, inner, width, y0, y1, pass);
+    return { result: rows, transfer: [rows.buffer] };
   },
 
   async compositeRows({ pass, raster = null, rows, width, y0, y1 }) {
