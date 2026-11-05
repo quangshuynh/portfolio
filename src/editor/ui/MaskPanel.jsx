@@ -33,7 +33,7 @@ const newComponent = (type, id) => (type === 'brush' ? createBrush(id) : type ==
  */
 export default function MaskPanel({ compact = false, onClose,
   disabled, locals, layer, target, space, selectedId, onSelect, onSelectLocal, onSelectLayerMask, tool, onTool, brush, onBrush, overlay, onOverlay,
-  onApplyLocals, onApplyMask, onPreviewMask, onCommit, newId, onEditSettings, selection = null, savedSelections = [], refinement = null,
+  onApplyLocals, onApplyMask, onPreviewMask, onCommit, newId, onEditSettings, selection = null, savedSelections = [], refinement = null, recoverBrush = null,
 }) {
   const [open, setOpen] = useState(true);
   const [renaming, setRenaming] = useState(false);
@@ -384,8 +384,8 @@ export default function MaskPanel({ compact = false, onClose,
                       recover={{
                         active: tool === 'recover',
                         onToggle: () => onTool(tool === 'recover' ? null : 'recover'),
-                        radius: brush.radius,
-                        onRadius: (radius) => onBrush({ ...brush, radius }),
+                        radius: recoverBrush?.radius ?? brush.radius,
+                        onRadius: (radius) => (recoverBrush ? recoverBrush.onRadius(radius) : onBrush({ ...brush, radius })),
                         onUndo: () => setMask(removeRecoverStrokes(mask, component.id)),
                         onClear: () => setMask(removeRecoverStrokes(mask, component.id, true)),
                       }}
@@ -461,7 +461,7 @@ function RefineControls({ component, status, disabled, onPatch, recover }) {
       {recover.active && (
         <OpacityRange label="Recover brush size" value={Math.min(1, recover.radius / MASK_LIMITS.recoverRadius)} disabled={false} onPreview={(v) => recover.onRadius(Math.max(0.002, v * MASK_LIMITS.recoverRadius))} onApply={(v) => recover.onRadius(Math.max(0.002, v * MASK_LIMITS.recoverRadius))} onCommit={() => {}} />
       )}
-      {recover.active && <p className="pe-note">Paint a little wider than the part, over all of it. Only what stands out from the stroke&apos;s surroundings and joins the selection is added; for a whole part (a wing, a mirror) use Object.</p>}
+      {recover.active && <p className="pe-note">Paint over all of the part with a brush a few times wider than it ([ and ] change the size). Only what stands out from the stroke&apos;s surroundings and joins the selection is added; for a whole part (a wing, a mirror) use Object.</p>}
       {strokes > 0 && empty > 0 && <p className="pe-note" role="status" data-recover="empty">{empty === 1 ? 'One stroke' : `${empty} strokes`} found nothing distinct from the surroundings: use the Add brush there.</p>}
     </div>
   );

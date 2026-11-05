@@ -35,7 +35,7 @@ import { createImageLayer, createAdjustmentLayer, layerAdjustments, layerDevelop
 import { adjustmentScope, drawnLayers, insertAbove } from '../model/layerTree.mjs';
 import { rasterSize } from '../pipeline/layerTransform.mjs';
 import { composeLayers } from '../io/composeLayers.mjs';
-import { componentLabel, createMask, visibleLocals } from '../model/masks.mjs';
+import { componentLabel, createMask, MASK_LIMITS, visibleLocals } from '../model/masks.mjs';
 import { canvasMaskMap, imageMaskMap, maskMap, maskUsesImage, rasterizeMask } from '../pipeline/mask.mjs';
 import { createRasterCache } from './layerRasters.mjs';
 import LayersPanel, { newLayerId } from './LayersPanel';
@@ -284,6 +284,8 @@ function EditorWorkspace({ host }) {
   const [maskComponent, setMaskComponent] = useState(null);
   const [maskTool, setMaskTool] = useState(null);
   const [brush, setBrush] = useState(DEFAULT_BRUSH);
+  // Recover Detail has its own, smaller brush: a few times wider than a thin part (docs/photography-editor.md).
+  const [recoverRadius, setRecoverRadius] = useState(0.012);
   const [maskOverlay, setMaskOverlay] = useState(DEFAULT_OVERLAY);
   const [freeResize, setFreeResize] = useState(false);
   // Retouch: the tool on the photo, its brush, the clone source (one photo's, never carried to
@@ -1657,7 +1659,8 @@ function EditorWorkspace({ host }) {
     if (key === 'm') chooseMaskTool(maskTool ? null : 'brush');
     else if (key === 'o') setMaskOverlay((value) => ({ ...value, show: !value.show }));
     else if (key === 'x' && maskTool === 'brush') setBrush((value) => ({ ...value, mode: value.mode === 'erase' ? 'add' : 'erase' }));
-    else if ((key === '[' || key === ']') && (maskTool === 'brush' || maskTool === 'recover')) setBrush((value) => ({ ...value, radius: Math.min(0.5, Math.max(0.002, value.radius * (key === ']' ? 1.2 : 1 / 1.2))) }));
+    else if ((key === '[' || key === ']') && maskTool === 'brush') setBrush((value) => ({ ...value, radius: Math.min(0.5, Math.max(0.002, value.radius * (key === ']' ? 1.2 : 1 / 1.2))) }));
+    else if ((key === '[' || key === ']') && maskTool === 'recover') setRecoverRadius((value) => Math.min(MASK_LIMITS.recoverRadius, Math.max(0.002, value * (key === ']' ? 1.2 : 1 / 1.2))));
     else if (key === 'escape' && maskTool) chooseMaskTool(null);
     else return false;
     return true;
@@ -1989,7 +1992,7 @@ function EditorWorkspace({ host }) {
             interactive: Boolean(maskTool),
             overlay: maskOverlay,
             tool: maskTool,
-            brush,
+            brush: maskTool === 'recover' ? { ...brush, radius: recoverRadius } : brush,
             selectedId: maskComponent,
             newId: newLayerId,
             onSelect: setMaskComponent,
@@ -2207,6 +2210,7 @@ function EditorWorkspace({ host }) {
             onTool={chooseMaskTool}
             brush={brush}
             onBrush={setBrush}
+            recoverBrush={{ radius: recoverRadius, onRadius: setRecoverRadius }}
             overlay={maskOverlay}
             onOverlay={setMaskOverlay}
             onApplyLocals={(local, coalesceKey = null) => dispatch({ type: 'applySettings', patch: { local }, coalesceKey })}
