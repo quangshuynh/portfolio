@@ -11,6 +11,7 @@ import { downloadBytes } from '../segment/models.mjs';
 import { addSelection, createLocalAdjustment, createMask, createSelection, MASK_LIMITS, replaceWithSelection, updateComponent } from '../model/masks.mjs';
 import { neutralGeometry } from '../pipeline/geometry.mjs';
 import { flattenForAnalysis, layerAnalysisKey, limitToSourceAlpha } from '../segment/layerSource.mjs';
+import { newRefine } from '../segment/refineClient.mjs';
 
 const LABELS = { sky: 'sky', subject: 'subject', background: 'background', object: 'object' };
 const DRAFT_ID = 'object-draft';
@@ -141,7 +142,7 @@ export default function useSelections({ photo, ready, viewProxy, adjustments, lu
     const now = ownerOf(targetRef.current);
     return expected.kind === now.kind && (expected.kind !== 'layer' || expected.layer.id === now.layer.id);
   };
-  const component = (id, kind, result, patch = {}) => createSelection(id, { kind, version: result.version, width: result.width, height: result.height, data: result.data, confidence: result.confidence }, { ...(kind === 'background' ? { invert: true } : {}), ...patch });
+  const component = (id, kind, result, patch = {}) => createSelection(id, { kind, version: result.version, width: result.width, height: result.height, data: result.data, confidence: result.confidence }, { refine: newRefine(), ...(kind === 'background' ? { invert: true } : {}), ...patch });
 
   /**
    * Sky, Subject or Background: `mode` 'new' makes a local adjustment holding the selection;
