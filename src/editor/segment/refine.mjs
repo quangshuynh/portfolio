@@ -22,6 +22,7 @@
 // never depends on the order of computation); everything else is exactly 0 or 1. The result is a
 // sparse tile map of 8-bit codes, sampled like the grid (segment/selectionMask.mjs).
 import { boxMean } from './analysis.mjs';
+import { recoverHalo, recoverWindow, strokeChunks, strokePixels, strokeRegion } from './recover.mjs';
 
 export const REFINE_VERSION = 'contour-colour/1';
 /** Longest edge refinement runs at (24 MP sensors are refined at their own size). */
@@ -262,7 +263,7 @@ const toCodes = (a, w, x0, y0, tw, th) => {
  * :param hooks: { onProgress(fraction), cancelled() }
  * :returns: a tile map at the guide's size
  */
-export function refineSelection(grid, guide, { radius = 0, shift = 0, feather = 0 } = {}, { onProgress = () => {}, cancelled = () => false } = {}) {
+export function refineSelection(grid, guide, { radius = 0, shift = 0, feather = 0, recover = null } = {}, { onProgress = () => {}, cancelled = () => false } = {}) {
   const { width: W, height: H, data } = guide;
   const scale = W / grid.width;
   const k = Math.max(1, scale / 1.5);
@@ -320,7 +321,10 @@ export function refineSelection(grid, guide, { radius = 0, shift = 0, feather = 
     tiles.set(t, toCodes(refined, w, tx * TILE - wx0, ty * TILE - wy0, tw, th));
     if (done % 8 === 0) onProgress(((done + 1) / work.length) * later);
   }
+  // Recover Detail strokes (segment/recover.mjs), over the refined coverage, before Edge and Feather.
+  const recovered = recover?.length ? recoverStrokes(tiles, cols, guide, recover, opaque, cancelled) : null;
   let map = pack(W, H, tiles);
+  if (recovered) map.recovered = recovered;
   if (!shiftReach && !fr) { onProgress(1); return map; }
   // Edge and Feather, at this resolution, on the tiles they can reach.
   const h2 = (shiftReach ? shiftReach + Math.max(1, shiftReach >> 1) : 0) + 3 * fr + 1;
@@ -346,8 +350,54 @@ export function refineSelection(grid, guide, { radius = 0, shift = 0, feather = 
     if (done % 8 === 0) onProgress(0.5 + ((done + 1) / todo.length) * 0.5);
   }
   map = pack(W, H, next);
+  if (recovered) map.recovered = recovered;
   onProgress(1);
   return map;
+}
+
+/** Applies Recover Detail strokes (mask-space strokes) to unpacked tiles in place; px each added, per stroke. */
+function recoverStrokes(tiles, cols, guide, strokes, opaque, cancelled) {
+  const { width: W, height: H, data } = guide;
+  const code = (x, y) => { const v = tiles.get(((y / TILE) | 0) * cols + ((x / TILE) | 0)); return typeof v === 'number' ? v : v[(y % TILE) * TILE + (x % TILE)]; };
+  const set = (x, y, c) => {
+    const t = ((y / TILE) | 0) * cols + ((x / TILE) | 0);
+    let v = tiles.get(t);
+    if (typeof v === 'number') { if (v === c) return; v = new Uint8Array(TILE * TILE).fill(v); tiles.set(t, v); }
+    v[(y % TILE) * TILE + (x % TILE)] = c;
+  };
+  return strokes.map((stroke) => {
+    let added = 0;
+    for (const chunk of strokeChunks(strokePixels(stroke, W, H))) {
+      if (cancelled()) throw new Error('cancelled');
+      const halo = recoverHalo(chunk.r);
+      const xs = chunk.points.map((p) => p[0]); const ys = chunk.points.map((p) => p[1]);
+      const x0 = Math.max(0, Math.floor(Math.min(...xs) - halo)); const y0 = Math.max(0, Math.floor(Math.min(...ys) - halo));
+      const x1 = Math.min(W, Math.ceil(Math.max(...xs) + halo)); const y1 = Math.min(H, Math.ceil(Math.max(...ys) + halo));
+      const w = x1 - x0; const h = y1 - y0;
+      if (w <= 0 || h <= 0) continue; // eslint-disable-line no-continue
+      const base = new Float32Array(w * h);
+      const rgb = [new Float32Array(w * h), new Float32Array(w * h), new Float32Array(w * h)];
+      for (let y = 0; y < h; y += 1) {
+        for (let x = 0; x < w; x += 1) {
+          const i = y * w + x; const s = ((y0 + y) * W + x0 + x) * 4; const a = data[s + 3] / 255;
+          base[i] = code(x0 + x, y0 + y) / 255;
+          for (let c = 0; c < 3; c += 1) rgb[c][i] = (data[s + c] * a + 128 * (1 - a)) / 255;
+        }
+      }
+      const { region, length } = strokeRegion(chunk, x0, y0, w, h);
+      const found = recoverWindow(base, rgb, w, h, region, length);
+      added += found.added;
+      for (let y = 0; y < h; y += 1) {
+        for (let x = 0; x < w; x += 1) {
+          const i = y * w + x;
+          if (found.coverage[i] <= base[i]) continue; // eslint-disable-line no-continue
+          const a = opaque ? 1 : data[((y0 + y) * W + x0 + x) * 4 + 3] / 255;
+          set(x0 + x, y0 + y, Math.round(clamp01(Math.max(base[i], found.coverage[i] * a)) * 255));
+        }
+      }
+    }
+    return { added };
+  });
 }
 
 /** Bilinear coverage (0–1) of a tile map at refinement-pixel coordinates (gx, gy), pixel centres at +0.5. */

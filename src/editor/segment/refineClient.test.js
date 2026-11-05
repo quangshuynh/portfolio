@@ -38,7 +38,7 @@ describe('document and schema', () => {
     const photo = { id: 'p', name: 'p.jpg', size: 100, sha256: 'a'.repeat(64), format: 'jpeg', width: W, height: H, adjustments: { ...neutralAdjustments(), local: [local] } };
     const text = serializeEditDocument(createEditDocument([photo]));
     expect(JSON.parse(text).version).toBe(DOCUMENT_VERSION);
-    expect(DOCUMENT_VERSION).toBe(19);
+    expect(DOCUMENT_VERSION).toBe(20);
     const back = parseEditDocument(text).photos[0].adjustments.local[0].mask.components[0];
     expect(back.refine).toEqual({ version: REFINE_VERSION, radius: 0.378 });
   });

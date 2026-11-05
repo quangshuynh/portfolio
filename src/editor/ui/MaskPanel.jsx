@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import {
   MASK_LIMITS, addComponent, cleanMaskName, clearStrokes, componentLabel, createBrush, createLinear, createLocalAdjustment, createMask, createRadial,
-  duplicateComponent, linearCentre, linearFromCentre, removeComponent, updateComponent,
+  duplicateComponent, linearCentre, linearFromCentre, removeComponent, removeRecoverStrokes, updateComponent,
 } from '../model/masks.mjs';
 import { layerLabel } from '../model/layers.mjs';
 import { NumberField, OpacityRange } from './LayersPanel';
@@ -33,7 +33,7 @@ const newComponent = (type, id) => (type === 'brush' ? createBrush(id) : type ==
  */
 export default function MaskPanel({ compact = false, onClose,
   disabled, locals, layer, target, space, selectedId, onSelect, onSelectLocal, onSelectLayerMask, tool, onTool, brush, onBrush, overlay, onOverlay,
-  onApplyLocals, onApplyMask, onPreviewMask, onCommit, newId, onEditSettings, selection = null, savedSelections = [], refinement = null,
+  onApplyLocals, onApplyMask, onPreviewMask, onCommit, newId, onEditSettings, selection = null, savedSelections = [], refinement = null, recoverBrush = null,
 }) {
   const [open, setOpen] = useState(true);
   const [renaming, setRenaming] = useState(false);
@@ -380,7 +380,16 @@ export default function MaskPanel({ compact = false, onClose,
                       {component.confidence < (WARN_BELOW[component.kind] ?? 0.6) ? '. The outline may miss parts or include others: check it with the overlay and correct it with a brush or Subtract.' : ''}
                     </p>
                     <NumberField label="Edge" unit="−100 contracts, +100 expands" value={Math.round(component.shift * 100)} min={-100} max={100} step={5} disabled={edit} onApply={(v) => patchComponent({ shift: v / 100 }, 'shift')} />
-                    <RefineControls component={component} status={refinement?.(component) ?? { state: 'off' }} disabled={edit} onPatch={patchComponent} />
+                    <RefineControls component={component} status={refinement?.(component) ?? { state: 'off' }} disabled={edit} onPatch={patchComponent}
+                      recover={{
+                        active: tool === 'recover',
+                        onToggle: () => onTool(tool === 'recover' ? null : 'recover'),
+                        radius: recoverBrush?.radius ?? brush.radius,
+                        onRadius: (radius) => (recoverBrush ? recoverBrush.onRadius(radius) : onBrush({ ...brush, radius })),
+                        onUndo: () => setMask(removeRecoverStrokes(mask, component.id)),
+                        onClear: () => setMask(removeRecoverStrokes(mask, component.id, true)),
+                      }}
+                    />
                   </>
                 )}
                 {component.type !== 'brush' && (
@@ -431,9 +440,11 @@ const REFINE_STATUS = {
  * Refine edge (Interval 24.2): on or off, which is also the before/after comparison. A wider band
  * (refine.radius) measured no consistent gain (docs/photography-editor.md), so it is not offered.
  */
-function RefineControls({ component, status, disabled, onPatch }) {
+function RefineControls({ component, status, disabled, onPatch, recover }) {
   const on = Boolean(component.refine);
   const text = status.message ?? REFINE_STATUS[status.state] ?? null;
+  const strokes = component.recover?.strokes.length ?? 0;
+  const empty = status.state === 'done' ? (status.recovered ?? []).filter((r) => !r.added).length : 0;
   return (
     <div className="pe-masks__refine" role="group" aria-label="Edge refinement">
       <label className="pe-field pe-field--check" title="Refines the outline against the image's own pixels at full resolution. Turn it off to compare.">
@@ -441,6 +452,17 @@ function RefineControls({ component, status, disabled, onPatch }) {
         <span>Refine edge</span>
       </label>
       {on && text && <p className="pe-note" role="status" data-refine={status.state}>{text}</p>}
+      {/* Recover Detail (Interval 24.3): paint over a thin part the selection missed. */}
+      <div className="pe-masks__tools">
+        <button type="button" className="pe-button" aria-pressed={recover.active} disabled={disabled || !on} onClick={recover.onToggle} title={on ? 'Paint over a thin part the selection missed (an antenna, a strut, a stalk); it is found in the original pixels under the stroke' : 'Turn on Refine edge to recover detail'}>Recover detail</button>
+        {strokes > 0 && <button type="button" className="pe-text-button" disabled={disabled} onClick={recover.onUndo}>Undo last stroke</button>}
+        {strokes > 0 && <button type="button" className="pe-text-button" disabled={disabled} onClick={recover.onClear}>Clear recovered detail</button>}
+      </div>
+      {recover.active && (
+        <OpacityRange label="Recover brush size" value={Math.min(1, recover.radius / MASK_LIMITS.recoverRadius)} disabled={false} onPreview={(v) => recover.onRadius(Math.max(0.002, v * MASK_LIMITS.recoverRadius))} onApply={(v) => recover.onRadius(Math.max(0.002, v * MASK_LIMITS.recoverRadius))} onCommit={() => {}} />
+      )}
+      {recover.active && <p className="pe-note">Paint over all of the part with a brush a few times wider than it ([ and ] change the size). Only what stands out from the stroke&apos;s surroundings and joins the selection is added; for a whole part (a wing, a mirror) use Object.</p>}
+      {strokes > 0 && empty > 0 && <p className="pe-note" role="status" data-recover="empty">{empty === 1 ? 'One stroke' : `${empty} strokes`} found nothing distinct from the surroundings: use the Add brush there.</p>}
     </div>
   );
 }

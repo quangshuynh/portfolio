@@ -67,6 +67,9 @@ export const MASK_LIMITS = Object.freeze({
   selectionChars: 400_000,
   photoSelectionChars: 1_000_000,
   selectionPoints: 16,
+  // Recover Detail strokes on one selection, and their largest radius (short edges).
+  recoverStrokes: 100,
+  recoverRadius: 0.1,
 });
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -149,6 +152,19 @@ function normalizeStroke(input, budget) {
   return stroke;
 }
 
+const versionText = (v) => (typeof v === 'string' && /^[\w.+/-]{1,40}$/.test(v) ? v : 'unknown');
+
+/** A selection's Recover Detail strokes ({ recover: { version, strokes } }, or nothing). Their points count in the photo's budget. */
+function normalizeRecover(input, budget) {
+  if (!isObject(input) || !Array.isArray(input.strokes)) return {};
+  const strokes = [];
+  for (const entry of input.strokes.slice(0, MASK_LIMITS.recoverStrokes)) {
+    const stroke = normalizeStroke(entry, budget);
+    if (stroke) strokes.push(stroke.radius > MASK_LIMITS.recoverRadius ? { ...stroke, radius: MASK_LIMITS.recoverRadius } : stroke);
+  }
+  return strokes.length ? { recover: { version: versionText(input.version), strokes } } : {};
+}
+
 /** One component from untrusted input, or null. */
 export function normalizeComponent(input, budget = { points: MASK_LIMITS.photoPoints }) {
   if (!isObject(input) || !validId(input.id) || !COMPONENT_TYPES.includes(input.type)) return null;
@@ -191,6 +207,7 @@ export function normalizeComponent(input, budget = { points: MASK_LIMITS.photoPo
           radius: round(unit(input.refine.radius, 0), 3),
         },
       } : {}),
+      ...normalizeRecover(input.recover, budget),
     };
   }
   if (input.type === 'radial') {
@@ -331,6 +348,15 @@ export function duplicateComponent(mask, id, newId) {
     : original.type === 'radial' ? { x: original.x + 0.03, y: original.y + 0.03 } : {};
   const copy = { ...original, ...nudge, id: newId, name: original.name ? cleanMaskName(`${original.name} copy`) : '' };
   return normalizeMask({ ...mask, components: [...mask.components.slice(0, index + 1), copy, ...mask.components.slice(index + 1)] }, mask.space) ?? mask;
+}
+
+/** Appends a Recover Detail stroke to selection `id` (`version`: the recovery algorithm). */
+export function appendRecoverStroke(mask, id, stroke, version) {
+  return normalizeMask({ ...mask, components: mask.components.map((c) => (c.id === id && c.type === 'selection' ? { ...c, recover: { version: c.recover?.version ?? version, strokes: [...(c.recover?.strokes ?? []), stroke] } } : c)) }, mask.space) ?? mask;
+}
+/** Removes the last Recover Detail stroke of selection `id` (all of them with `all`). */
+export function removeRecoverStrokes(mask, id, all = false) {
+  return normalizeMask({ ...mask, components: mask.components.map((c) => (c.id === id && c.type === 'selection' && c.recover ? { ...c, recover: all ? null : { ...c.recover, strokes: c.recover.strokes.slice(0, -1) } } : c)) }, mask.space) ?? mask;
 }
 
 /** Appends a stroke to brush component `id` (dropped when the photo's point budget is used up). */

@@ -290,7 +290,7 @@ describe('treatments', () => {
     await save(id, documentFor(source, { layers, watermark }));
     let { json } = await describe_(id);
     const saved = json.treatment.document.photos[0].adjustments.layers;
-    expect(json.treatment.document.version).toBe(19);
+    expect(json.treatment.document.version).toBe(20);
     expect(saved.map((l) => [l.id, l.type, l.parent ?? null, Boolean(l.clip)])).toEqual([['txt', 'text', 'g', false], ['adj', 'adjustment', 'g', true], ['g', 'group', null, false], ['sky', 'adjustment', null, false]]);
     expect(saved[3].mask.components[0]).toMatchObject({ type: 'selection', kind: 'sky', data: 'AAA=', refine: { version: 'contour-colour/1', radius: 0.25 } });
     await render(id, await photograph({ width: 3000, height: 2000 }));

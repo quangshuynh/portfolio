@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { invert3, project } from '../pipeline/geometry.mjs';
-import { addComponent, appendStroke, componentLabel, createBrush, createLinear, createRadial, updateComponent } from '../model/masks.mjs';
+import { addComponent, appendRecoverStroke, appendStroke, componentLabel, createBrush, createLinear, createRadial, MASK_LIMITS, updateComponent } from '../model/masks.mjs';
+import { RECOVER_VERSION } from '../segment/recover.mjs';
 
 const MOVE_STEP = 0.002;
 const MOVE_STEP_LARGE = 0.02;
@@ -89,17 +90,24 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
       document.removeEventListener('visibilitychange', hidden);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // A Recover Detail stroke changes nothing until it is computed: while painting only its outline
+  // is redrawn (the mask's own preview would re-rasterise the whole mask at every move).
+  const [, redraw] = useState(0);
   const preview = (next) => {
     dragRef.current.latest = next;
     cancelAnimationFrame(frameRef.current);
-    frameRef.current = requestAnimationFrame(() => onPreview(next));
+    frameRef.current = requestAnimationFrame(() => (tool === 'recover' ? redraw((n) => n + 1) : onPreview(next)));
   };
 
   const selected = mask.components.find((c) => c.id === selectedId) ?? null;
 
+  // Recover Detail (Interval 24.3): strokes go to the selected selection (refined), never to a brush.
+  const recovering = tool === 'recover';
+  const append = (base, id, stroke) => (recovering ? appendRecoverStroke(base, id, stroke, RECOVER_VERSION) : appendStroke(base, id, stroke));
   const startPaint = (event, point) => {
     let base = mask;
-    let id = selected?.type === 'brush' ? selected.id : null;
+    if (recovering && !(selected?.type === 'selection' && selected.refine)) return false;
+    let id = recovering ? selected.id : selected?.type === 'brush' ? selected.id : null;
     if (!id) {
       id = newId('brush');
       base = addComponent(mask, createBrush(id));
@@ -108,12 +116,14 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     }
     const p = brush.pressure && event.pointerType === 'pen' && event.pressure > 0 ? event.pressure : 1;
     const { u, v } = toSpace(point.x, point.y);
-    const stroke = { mode: event.altKey ? (brush.mode === 'erase' ? 'add' : 'erase') : brush.mode, radius: brush.radius, hardness: brush.hardness, opacity: brush.opacity, points: [[u, v, p]] };
+    const stroke = recovering
+      ? { mode: 'add', radius: Math.min(brush.radius, MASK_LIMITS.recoverRadius), hardness: 1, opacity: 1, points: [[u, v, 1]] }
+      : { mode: event.altKey ? (brush.mode === 'erase' ? 'add' : 'erase') : brush.mode, radius: brush.radius, hardness: brush.hardness, opacity: brush.opacity, points: [[u, v, p]] };
     dragRef.current = { kind: 'paint', pointer: event.pointerId, origin: mask, base, id, stroke, last: point, latest: null };
     // The first point is shown at once (moves are coalesced to one preview per frame).
-    const first = appendStroke(base, id, stroke);
+    const first = append(base, id, stroke);
     dragRef.current.latest = first;
-    onPreview(first);
+    if (recovering) redraw((n) => n + 1); else onPreview(first);
     return true;
   };
   const extendPaint = (event, drag) => {
@@ -130,7 +140,7 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
       drag.last = point;
       added = true;
     }
-    if (added) preview(appendStroke(drag.base, drag.id, drag.stroke));
+    if (added) preview(append(drag.base, drag.id, drag.stroke));
   };
 
   const startCreate = (event, point) => {
@@ -206,12 +216,12 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
     try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* a synthetic pointer */ }
     const point = local(event);
     if (tool === 'object') dragRef.current = { kind: 'tap', pointer: event.pointerId, origin: mask, start: point, alt: event.altKey, latest: null };
-    else if (tool === 'brush') startPaint(event, point);
+    else if (tool === 'brush' || recovering) startPaint(event, point);
     else startCreate(event, point);
   };
   const onPointerMove = (event) => {
     const point = local(event);
-    if (tool === 'brush') moveCursor(event, point);
+    if (tool === 'brush' || recovering) moveCursor(event, point);
     const drag = dragRef.current;
     if (!drag || drag.pointer !== event.pointerId) return;
     if (event.pointerType !== 'touch') event.stopPropagation();
@@ -376,7 +386,15 @@ export default function MaskTool({ mask, map, box, output, tool, brush, selected
         const p = toStage(u, v);
         return <span key={`${i}-${u}-${v}`} className="pe-masktool__point" data-label={label ? 'include' : 'exclude'} style={{ left: p.x, top: p.y }} aria-hidden="true" />;
       })}
-      {tool === 'brush' && (
+      {recovering && selected?.type === 'selection' && (
+        // The selection's Recover Detail strokes (and the one being painted): where detail is looked for.
+        <svg className="pe-masktool__recover" aria-hidden="true">
+          {[...(selected.recover?.strokes ?? []), ...(dragRef.current?.kind === 'paint' ? [dragRef.current.stroke] : [])].map((s, i) => (
+            <polyline key={i} points={s.points.map(([u, v]) => { const p = toStage(u, v); return `${p.x.toFixed(1)},${p.y.toFixed(1)}`; }).join(' ')} strokeWidth={(2 * s.radius * short) / spacePerStage} />
+          ))}
+        </svg>
+      )}
+      {(tool === 'brush' || recovering) && (
         // Positioned by moveCursor; React sets only its size, so a re-render never moves it.
         <div ref={cursorRef} className="pe-masktool__cursor" aria-hidden="true" hidden data-mode={brush.mode}>
           <span className="pe-masktool__ring" style={{ width: 2 * cursorRadius, height: 2 * cursorRadius, left: -cursorRadius, top: -cursorRadius }} />

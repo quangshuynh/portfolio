@@ -47,7 +47,10 @@ export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // version and edge radius; the grid is unchanged, the refined edge is recomputed from the image);
 // version 18 files read unchanged and render exactly as before (no selection is refined), and
 // version 18 editors refuse version 19 files rather than show unrefined edges.
-export const DOCUMENT_VERSION = 19;
+// Version 20 added Recover Detail strokes on selections (`recover`: algorithm version and the
+// strokes, in the mask's space, like brush strokes); version 19 files read and render unchanged,
+// and version 19 editors refuse version 20 files rather than drop recovered parts.
+export const DOCUMENT_VERSION = 20;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).

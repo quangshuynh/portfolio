@@ -1317,7 +1317,90 @@ toggle Refine edge, brush Add/Subtract at 200 % (no stroke from a pinch), move a
 refinement and return (it refines again); repeat the selection and export three times without a
 tab reload.
 
-## Retouch (Remove, Spot Heal and Clone Stamp)
+### Recover Detail (Interval 24.3)
+
+Edge refinement cannot add what the 1024 px grid misses entirely (an antenna, a wing strut, a
+mirror stalk). **Recover detail** (a selected selection's settings, with Refine edge on) is a brush:
+paint over the missing part, a little wider than it; it is looked for in the original pixels under
+the stroke (`segment/recover.mjs`, `recover/1`), in the same worker pass and map as the refinement,
+before Edge and Feather:
+
+- The background is the ring of pixels just outside the stroke (not selected), as up to four
+  colour clusters per 32 px block. The part's colour is that of the clear outliers near a pixel
+  (else of the whole stroke). A pixel is structure when it is closer to the part's colour than to
+  its nearest background cluster and clearly unlike that cluster; its coverage is its position
+  between the two colours (simple matting), so thin parts and edges get partial coverage.
+- Only parts joining the selection, or spanning half the stroke, are kept; small enclosed holes (a
+  highlight on a wing) are filled; nothing is ever added outside a stroke.
+- Where the part does not stand out from its surroundings, nothing is added and the panel says
+  which strokes found nothing: the Add brush is the fallback. **Undo last stroke** and **Clear
+  recovered detail** remove strokes; undo/redo, Subtract and Erase work as before.
+
+Strokes are stored on the selection (`recover: { version, strokes }`, the brush stroke format in
+the mask's space, so they follow layer transforms and count in the photo's point budget; radius at
+most 10 % of the short edge); edit documents are version 20 (version 19 files read and render
+unchanged, version 19 editors refuse version 20). While a new stroke is computed, the preview keeps
+the selection's previous refined map; exports wait for the exact one. Long strokes are processed in
+512 px pieces, each in its own window.
+
+**Measured** (`scripts/refine-bench/recover.mjs`, the four synthetic 24 MP scenes of Edge refinement:
+antenna, wing and two struts the grid misses; the same strokes for every method):
+
+| Scene | Add brush: recovered / px added wrongly | Recover detail | Automatic (outline band, no strokes) |
+| --- | --- | --- | --- |
+| Car over stone | 0.99 / 48 939 | 0.79 / 197 | 0.003 / 727 |
+| Dark car at night | 0.87 / 48 912 | 0.68 / 16 | 0.03 / 792 |
+| Light car over trees | 0.99 / 48 781 | 0.59 / 205 | 0.003 / 174 |
+| Motion-blurred car | 0.95 / 55 758 | 0.93 / 1 008 | 0.01 / 545 |
+
+Automatic recovery (the same detection along the whole outline) found almost none of the missing
+parts and added more wrong pixels than right ones (a part is far from the outline, or looks like
+background beside it), so it is not offered. Rejected on the way: one mean and spread for the
+background (a sky, a white trim and a brown wall around a stroke made a black antenna look like
+background), a threshold on distance in units of the background's spread instead of the nearest-
+colour decision (recall 0.59–0.86; and an antenna over a dark window was lost), growing from
+recovered parts into anything unlike the background (leaked into the road on a real photo).
+
+**Brush size matters.** Recover detail has its own brush (1.2 % of the short edge by default, [ and ]
+change it): the ring must be the part's immediate surroundings. With the Add brush's default (6 %)
+over a 3 px antenna on a house facade, background the ring never saw (a patch of siding) was added
+beside it. A 3 px antenna drawn over the 350Z layer's facade at four positions, each painted five
+times ±3 px off: with brushes of 0.8–2 % it was recovered in 51 of 60 strokes (69–103 % of its
+pixel count at 0.8–1.2 %; up to 118 % at 2 %, its soft edge and a few pixels beside it); where it crosses a dark window it can be lost (a few strokes
+found nothing: reported, Add brush). Two failure modes remain: a dark line crossing the stroke and
+joining the part (a gutter's shadow line behind the antenna) is added within the brush width, as a
+small cross (Subtract or Erase it); a part wider than the stroke spills into its surroundings, which
+then count as background, leaving notches in it (paint over all of it). **Real photos** (no reviewed references: judged on crops). The Emira's missing black mirror: only its darkest parts (its shell
+reflects a sky as grey as the road). The Huracán's missing rear wing: almost nothing (wider than
+the brush; the ring falls on the wing itself). Whole parts are better selected with **Object** (a
+tap); Recover detail is for thin ones. No portraits, fur or fences with references were available.
+
+**Checks (24.3).** `recover.test.js` (a thin part joined to the selection, nothing outside strokes,
+detached background parts dropped, low contrast adds nothing, partial coverage, transparency,
+Edge/Feather after recovery, determinism, scattered surroundings, bounded windows, v20 strokes and
+budget, keys, preview fallback vs exact export). `check:editor:masks` and `check:editor:selection`
+(Chromium, WebKit), `check:editor:mobile` and `check:cms:editor` (Chromium, WebKit) pass; genuine
+RAW layers (ARW, CR2, CR3, RAF, NEF, DNG) are refined from their development as before (recovery
+uses the same guide; no RAW stroke was run in a browser). An HDR exported to a file and imported as a
+layer is an ordinary image. `check:editor:recover` (Chromium, the harbour ORF as a layer): a stroke
+over the mast Subject left out recovers it (6 274 canvas px changed, none outside the stroke; one
+dark sliver beside its foot is wrong); a second stroke and an Edge change before the first result,
+undo and redo, tool and layer switching and a cancelled export leave the same result; a fresh
+session's export of the saved file is identical (no stale map); a version 19 file renders
+identically in this editor and in main. No physical iPhone was available: the checklist above applies, plus a
+Recover detail stroke with a finger at 200 % (no stroke from a pinch).
+
+**Colour decontamination** (replacing edge colours by the subject's) was measured and not added: on
+the synthetic scenes the halo over white or black (mean 8-bit error in the edge band) was 66–79 with
+the refined alpha, 1–2 with the exact alpha, and changed by under 1.2 with decontaminated colours.
+Halos come from coverage, not from background colour in the edge pixels.
+
+**Cost.** Recover detail adds 0.35–0.6 s to a 24 MP refinement for four strokes (Node, one thread),
+15–51 MB of working memory beyond the decoded image, a few hundred bytes per stroke in the edit.
+Browsers (`check:editor:layer-masks`, a Recover detail stroke over that antenna): 349–411 of its
+≈ 470 px recovered; painting 0.2–1.1 s (only the stroke's outline is drawn while painting), the
+result 1.1–1.5 s later (Chromium, Firefox); the PNG export equals the Node reference with the stroke
+applied in Chromium, Firefox, WebKit, iPhone 13 and Pixel 7 emulation and without WebGL2 (iPhone: 461 px).
 
 `model/retouch.mjs` (data), `pipeline/retouch.mjs` (rendering), `ui/RetouchTool.jsx` (on the
 photo), `ui/RetouchPanel.jsx`. Edit document v12 adds `adjustments.retouch`; v11 and older read
@@ -1898,6 +1981,8 @@ Settings never change the text or typography.
   `sharpening`, `luminanceNoise`, `colorNoise`; older files open with Detail neutral.
 - Version 4 added merged HDR sources (see [Merge HDR](#merge-hdr)) and the HDR tone
   controls `hdrHighlights`, `hdrShadows`.
+- Version 20 added `recover` (Recover Detail strokes) on selections (see
+  [Recover Detail](#recover-detail-interval-243)); version 19 files read and render unchanged.
 - Version 19 added `refine` on selections (see [Edge refinement](#edge-refinement-interval-242)); version 18
   files read and render unchanged (not refined). Version 18 added selections in image layer masks
   and Detail settings on adjustment layers.
