@@ -11,11 +11,12 @@
 // - undo/redo, save and reopen keep every part; the original files are unchanged;
 // - timings and (Windows) peak browser memory of exports with and without the Detail layer.
 // Usage: npm run check:editor:layer-masks (LAYER_MASK_RUNS=chromium,firefox,webkit,iphone,pixel,cpu;
-// LAYER_MASK_SKIP_BUILD=1 reuses dist/; LAYER_MASK_RAW=<file> also masks a genuine RAW layer in Chromium)
+// LAYER_MASK_SKIP_BUILD=1 reuses dist/; LAYER_MASK_SAVE=<dir> keeps the export and preview; LAYER_MASK_RAW_DIR=<dir> also masks each genuine RAW file
+// there as an image layer in Chromium, then exports the composite)
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -298,10 +299,15 @@ async function check(run, files) {
     result.step = 'PNG export equals the Node reference';
     await settled();
     // The preview as shown (overlays and handles hidden), for the preview/export comparison.
-    await page.addStyleTag({ content: '.pe-mask-overlay, .pe-textbox, .pe-masktool, .pe-layer-handles { visibility: hidden !important; }' });
+    await page.addStyleTag({ content: '.pe-mask-overlay, .pe-watermark-overlay, .pe-textbox, .pe-masktool, .pe-layer-handles { visibility: hidden !important; }' });
     const shot = await sharp(await page.locator('.pe-canvas-host').screenshot()).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     const full = await exportPng();
     timings.exportMs = full.ms;
+    // LAYER_MASK_SAVE=<dir>: the export and the preview, for looking at the edges.
+    if (process.env.LAYER_MASK_SAVE) {
+      await sharp(Buffer.from(full.image.data), { raw: { width: full.image.width, height: full.image.height, channels: 4 } }).png().toFile(path.join(process.env.LAYER_MASK_SAVE, `export-${run.id}.png`));
+      await sharp(shot.data, { raw: { width: shot.info.width, height: shot.info.height, channels: 4 } }).png().toFile(path.join(process.env.LAYER_MASK_SAVE, `preview-${run.id}.png`));
+    }
     result.exportPeakMb = full.peakMb;
     const finalValues = await saved();
     const expected = reference(files.background, finalValues, { [files.hashes.car]: files.car });
@@ -311,12 +317,31 @@ async function check(run, files) {
     assert.deepEqual(Array.from(full.image.data.slice(0, 4)), Array.from(files.background.data.slice(0, 4)));
 
     result.step = 'preview matches the export';
-    const small = await sharp(Buffer.from(full.image.data), { raw: { width: full.image.width, height: full.image.height, channels: 4 } }).resize(shot.info.width, shot.info.height, { fit: 'fill' }).raw().toBuffer();
-    const diffs = [];
-    for (let i = 0; i < small.length; i += 4) diffs.push((Math.abs(small[i] - shot.data[i]) + Math.abs(small[i + 1] - shot.data[i + 1]) + Math.abs(small[i + 2] - shot.data[i + 2])) / 3);
-    diffs.sort((a, b) => a - b);
-    result.previewVsExport = { size: `${shot.info.width}×${shot.info.height}`, mean: +(diffs.reduce((s, d) => s + d, 0) / diffs.length).toFixed(2), p99: +diffs[Math.floor(diffs.length * 0.99)].toFixed(1) };
-    assert.ok(result.previewVsExport.mean < 3 && result.previewVsExport.p99 < 25, `preview differs from the export ${JSON.stringify(result.previewVsExport)}`);
+    // Both at half the shown size (sub-pixel placement of the displayed canvas, at fractional
+    // device pixel ratios, otherwise dominates), without a 2-pixel border and the corner where a
+    // preview watermark may be drawn. The car layer's box is compared with the rest of the frame:
+    // the layers must match as well as the photo itself does.
+    const cw = Math.round(shot.info.width / 2);
+    const ch = Math.round(shot.info.height / 2);
+    const half = (input, raw) => sharp(input, raw ? { raw } : undefined).resize(cw, ch, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+    const shown = await half(shot.data, { width: shot.info.width, height: shot.info.height, channels: 4 });
+    const exported = await half(Buffer.from(full.image.data), { width: full.image.width, height: full.image.height, channels: 4 });
+    const corners = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([u, v]) => forward(finalValues.layers[0], canvas, u, v));
+    const box = { x0: Math.min(...corners.map(([x]) => x)) * cw, x1: Math.max(...corners.map(([x]) => x)) * cw, y0: Math.min(...corners.map(([, y]) => y)) * ch, y1: Math.max(...corners.map(([, y]) => y)) * ch };
+    const layerDiffs = [];
+    const otherDiffs = [];
+    for (let y = 2; y < ch - 2; y += 1) {
+      for (let x = 2; x < cw - 2; x += 1) {
+        if (x > cw * 0.82 && y > ch * 0.84) continue; // eslint-disable-line no-continue
+        const i = (y * cw + x) * 3;
+        const d = (Math.abs(shown[i] - exported[i]) + Math.abs(shown[i + 1] - exported[i + 1]) + Math.abs(shown[i + 2] - exported[i + 2])) / 3;
+        (x >= box.x0 && x < box.x1 && y >= box.y0 && y < box.y1 ? layerDiffs : otherDiffs).push(d);
+      }
+    }
+    const stats = (values) => { const sorted = [...values].sort((a, b) => a - b); return { mean: +(sorted.reduce((a, b) => a + b, 0) / sorted.length).toFixed(2), p99: +sorted[Math.floor(sorted.length * 0.99)].toFixed(1) }; };
+    result.previewVsExport = { size: `${cw}×${ch}`, layer: stats(layerDiffs), photo: stats(otherDiffs) };
+    const { layer: ld, photo: pd } = result.previewVsExport;
+    assert.ok(ld.mean < 3 && ld.mean <= pd.mean + 1.5 && ld.p99 <= pd.p99 + 10, `preview differs from the export ${JSON.stringify(result.previewVsExport)}`);
 
     result.step = 'export without the Detail layer (timing and memory baseline)';
     await tool('layers');
@@ -325,6 +350,7 @@ async function check(run, files) {
     const flat = await exportPng();
     timings.exportWithoutDetailMs = flat.ms;
     result.exportWithoutDetailPeakMb = flat.peakMb;
+    await tool('layers');
     await page.locator('.pe-layer[data-clip] button[aria-label^="Show"]').click();
     await savedWhen((v) => v.layers[1].visible !== false, 'detail layer shown');
 
@@ -364,8 +390,8 @@ async function check(run, files) {
   return result;
 }
 
-// LAYER_MASK_RAW: a genuine RAW file added as an image layer in Chromium: Mask from Subject analyses
-// its development (LibRaw, Camera Natural), not an embedded preview.
+// LAYER_MASK_RAW_DIR: genuine RAW files, each added as an image layer in Chromium: Mask from Subject
+// analyses its development (LibRaw, Camera Natural), not an embedded preview; then a PNG export.
 async function checkRaw(file, files) {
   const context = await chromium.launchPersistentContext(mkdtempSync(path.join(work, 'raw-')), { viewport: { width: 1440, height: 900 } });
   const page = context.pages()[0] ?? await context.newPage();
@@ -386,6 +412,13 @@ async function checkRaw(file, files) {
     const got = await poll(read, (r) => r.mask?.components?.length || /No subject|ran out|could not/i.test(r.message ?? ''), 'RAW subject', 400_000);
     const c = got.mask?.components?.[0];
     Object.assign(row, c ? { kind: c.kind, confidence: c.confidence, grid: `${c.width}×${c.height}`, ms: Date.now() - t0 } : { found: false, message: got.message });
+    if (c) {
+      const t1 = Date.now();
+      await page.check('input[name=pe-format][value=png]');
+      const [download] = await Promise.all([page.waitForEvent('download', { timeout: 900_000 }), page.click('.pe-export-button')]);
+      const meta = await sharp(await download.path()).metadata();
+      row.export = { size: `${meta.width}×${meta.height}`, ms: Date.now() - t1 };
+    }
   } catch (error) {
     row.error = error.message;
   } finally {
@@ -405,10 +438,13 @@ async function main() {
       if (!result.ok) failed += 1;
       console.log(`${result.ok ? 'ok  ' : 'FAIL'} ${JSON.stringify(result)}`);
     }
-    if (process.env.LAYER_MASK_RAW) {
-      const row = await checkRaw(process.env.LAYER_MASK_RAW, files);
-      console.log(`raw  ${JSON.stringify(row)}`);
-      if (row.error) failed += 1;
+    if (process.env.LAYER_MASK_RAW_DIR) {
+      const dir = process.env.LAYER_MASK_RAW_DIR;
+      for (const name of readdirSync(dir).filter((n) => /\.(arw|nef|cr2|cr3|raf|dng|orf|rw2|pef|nrw|srw)$/i.test(n)).sort()) {
+        const row = await checkRaw(path.join(dir, name), files); // eslint-disable-line no-await-in-loop
+        console.log(`raw  ${JSON.stringify(row)}`);
+        if (row.error) failed += 1;
+      }
     }
   } finally {
     await server.close();
