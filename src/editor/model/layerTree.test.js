@@ -38,7 +38,7 @@ describe('version 16 documents', () => {
     const first = parseEditDocument(fixture('edits-v16.json'));
     const saved = JSON.parse(serializeEditDocument(createEditDocument(first.photos.map((p) => ({ ...p.source, adjustments: p.adjustments })), first.exportSettings)));
     expect(saved.version).toBe(DOCUMENT_VERSION);
-    expect(DOCUMENT_VERSION).toBe(18);
+    expect(DOCUMENT_VERSION).toBe(19);
     expect(parseEditDocument(JSON.stringify(saved)).photos.map((p) => p.adjustments)).toEqual(first.photos.map((p) => p.adjustments));
   });
 });

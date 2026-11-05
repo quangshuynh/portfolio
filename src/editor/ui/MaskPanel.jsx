@@ -6,6 +6,7 @@ import {
 import { layerLabel } from '../model/layers.mjs';
 import { NumberField, OpacityRange } from './LayersPanel';
 import { WARN_BELOW } from '../segment/models.mjs';
+import { newRefine } from '../segment/refineClient.mjs';
 
 const TOOLS = [['brush', 'Brush'], ['linear', 'Linear'], ['radial', 'Radial']];
 const TYPE_LABEL = { brush: 'Brush', linear: 'Linear', radial: 'Radial' };
@@ -32,7 +33,7 @@ const newComponent = (type, id) => (type === 'brush' ? createBrush(id) : type ==
  */
 export default function MaskPanel({ compact = false, onClose,
   disabled, locals, layer, target, space, selectedId, onSelect, onSelectLocal, onSelectLayerMask, tool, onTool, brush, onBrush, overlay, onOverlay,
-  onApplyLocals, onApplyMask, onPreviewMask, onCommit, newId, onEditSettings, selection = null, savedSelections = [],
+  onApplyLocals, onApplyMask, onPreviewMask, onCommit, newId, onEditSettings, selection = null, savedSelections = [], refinement = null,
 }) {
   const [open, setOpen] = useState(true);
   const [renaming, setRenaming] = useState(false);
@@ -379,6 +380,7 @@ export default function MaskPanel({ compact = false, onClose,
                       {component.confidence < (WARN_BELOW[component.kind] ?? 0.6) ? '. The outline may miss parts or include others: check it with the overlay and correct it with a brush or Subtract.' : ''}
                     </p>
                     <NumberField label="Edge" unit="−100 contracts, +100 expands" value={Math.round(component.shift * 100)} min={-100} max={100} step={5} disabled={edit} onApply={(v) => patchComponent({ shift: v / 100 }, 'shift')} />
+                    <RefineControls component={component} status={refinement?.(component) ?? { state: 'off' }} disabled={edit} onPatch={patchComponent} />
                   </>
                 )}
                 {component.type !== 'brush' && (
@@ -417,5 +419,28 @@ export default function MaskPanel({ compact = false, onClose,
         )}
       </div>
     </section>
+  );
+}
+
+const REFINE_STATUS = {
+  pending: 'Refining the edge against the full-resolution image… (the preview shows the unrefined edge meanwhile)',
+  done: 'Edge refined against the full-resolution image.',
+};
+
+/**
+ * Refine edge (Interval 24.2): on or off, which is also the before/after comparison. A wider band
+ * (refine.radius) measured no consistent gain (docs/photography-editor.md), so it is not offered.
+ */
+function RefineControls({ component, status, disabled, onPatch }) {
+  const on = Boolean(component.refine);
+  const text = status.message ?? REFINE_STATUS[status.state] ?? null;
+  return (
+    <div className="pe-masks__refine" role="group" aria-label="Edge refinement">
+      <label className="pe-field pe-field--check" title="Refines the outline against the image's own pixels at full resolution. Turn it off to compare.">
+        <input type="checkbox" checked={on} disabled={disabled} onChange={(event) => onPatch({ refine: event.target.checked ? newRefine() : null }, 'refine')} />
+        <span>Refine edge</span>
+      </label>
+      {on && text && <p className="pe-note" role="status" data-refine={status.state}>{text}</p>}
+    </div>
   );
 }

@@ -52,6 +52,9 @@ import ExportPanel from './ExportPanel';
 import HdrMergeDialog from './HdrMergeDialog';
 import PhotoThumb from './PhotoThumb';
 import RecipeDialog from './RecipeDialog';
+import { createRefiner, layerOwnerKey, maskOwner, photoOwnerKey, refinedMapsOf, refinedMask, refinedValues, refinementsOf } from '../segment/refineClient.mjs';
+import { REFINE_VERSION } from '../segment/refine.mjs';
+import { refinedMap, refinementKey, setRefinedBudget } from '../segment/selectionMask.mjs';
 import Viewer from './Viewer';
 import useFullscreen from '../../components/utilities/useFullscreen';
 import useEditorViewport from './useEditorViewport';
@@ -799,6 +802,53 @@ function EditorWorkspace({ host }) {
     }
   }, [sourceFor, raws]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Edge refinement (Interval 24.2, segment/refineClient.mjs): refined selections are computed
+  // from the original file of the image they describe, in a worker, after edits settle; until a
+  // map is ready the preview shows the selection's grid. Exports wait for every map they need.
+  const [refineTick, setRefineTick] = useState(0);
+  const refinerRef = useRef(null);
+  const refiner = useCallback(() => {
+    refinerRef.current ??= createRefiner({
+      createClient: () => createImageWorker(),
+      developRaw: (source, size) => raws().run('develop', { file: source.file, raw: source.raw, width: size.width, height: size.height }).promise,
+      onChange: () => setRefineTick((n) => n + 1),
+    });
+    return refinerRef.current;
+  }, [raws]);
+  useEffect(() => {
+    if (constrainedDevice()) setRefinedBudget(48 * 1024 * 1024);
+    return () => refinerRef.current?.dispose();
+  }, []);
+  /** The source of a refinement's owner image: an image layer's file, else the photo's (`target`). */
+  const refineSourceOf = useCallback((target) => (request) => {
+    if (request.layer) {
+      const source = sourceFor(request.layer.source.sha256);
+      return source ? { file: source.file, header: source.header, raw: source.raw ?? null, width: request.layer.source.width, height: request.layer.source.height } : null;
+    }
+    const resource = resources.current.get(target.id);
+    return resource?.file && resource.header ? { file: resource.file, header: resource.header, raw: resource.raw ?? null, width: target.width, height: target.height } : null;
+  }, [sourceFor]);
+  const photoKey = ready ? photoOwnerKey(resources.current.get(photo.id)) : null;
+  const refinements = useMemo(() => (ready ? refinementsOf(adjustments, photoKey) : []), [ready, adjustments, photoKey]);
+  useEffect(() => {
+    refiner().cancelExcept(new Set(refinements.map((r) => r.key)));
+    if (!refinements.length) return undefined;
+    // After edits settle (an Edge or Feather drag changes the map's key at every step).
+    const timer = setTimeout(() => { refiner().ensure(refinements, refineSourceOf(photo)).catch(() => {}); }, 300);
+    return () => clearTimeout(timer);
+  }, [refinements]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shownAdjustments = useMemo(() => refinedValues(viewAdjustments, photoKey), [viewAdjustments, photoKey, refineTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** A selection component's refinement, for the Masks panel: { state: 'off' | 'pending' | 'done' | 'failed' | 'unavailable', message? }. */
+  const refinementOf = useCallback((component, ownerKey) => {
+    if (component?.type !== 'selection' || !component.refine) return { state: 'off' };
+    if (!ownerKey) return { state: 'unavailable', message: photo?.hdr ? 'Edges of selections on a merged HDR photo are not refined (it has no original file to refine against).' : 'The file of this image is not loaded.' };
+    if (component.refine.version !== REFINE_VERSION) return { state: 'unavailable', message: `This selection was refined by a newer editor (${component.refine.version}); it is shown unrefined.` };
+    const key = refinementKey(ownerKey, component);
+    if (refinedMap(key)) return { state: 'done' };
+    const failure = refinerRef.current?.failure(key);
+    return failure ? { state: 'failed', message: failure } : { state: 'pending' };
+  }, [photo?.hdr, refineTick]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // The canvas: the photo's output frame at full size (its own Crop & Transform).
   const canvasSize = useMemo(() => {
     if (!ready) return null;
@@ -833,6 +883,7 @@ function EditorWorkspace({ host }) {
   const maskLayer = ready && activeLayer ? adjustments.layers.find((layer) => layer.id === activeLayer) ?? null : null;
   const maskTarget = targetLocal ? { kind: 'local', local: targetLocal } : layerMaskOn && maskLayer?.mask ? { kind: 'layer', layer: maskLayer } : null;
   const maskTargetRef = useRef(maskTarget);
+  const maskOwnerKey = !maskTarget ? null : maskTarget.kind === 'local' ? photoKey : maskOwner(maskTarget.layer.mask, maskTarget.layer, photoKey);
   maskTargetRef.current = maskTarget;
   useEffect(() => { if (!maskTarget) setMaskTool(null); }, [Boolean(maskTarget)]); // eslint-disable-line react-hooks/exhaustive-deps
   // `mask` (null removes a layer's mask) as a settings patch of the active photo.
@@ -1145,17 +1196,34 @@ function EditorWorkspace({ host }) {
       if (values.layers.some((layer) => layer.type === 'text' && layer.visible !== false)) await loadTextFonts();
       const merged = { get cancelled() { return layerCancel.cancelled || Boolean(signal?.cancelled); } };
       if (watermark) await loadWatermarkFonts();
-      await composeLayers(context, values.layers, {
+      // Refined selections: every map is computed (or reused) before compositing; an export never
+      // falls back to an unrefined edge without saying so.
+      const ownerKey = photoOwnerKey(resource);
+      const needed = refinementsOf(values, ownerKey);
+      if (needed.length) {
+        progress?.({ stage: 'refining', fraction: 0 });
+        try {
+          await refiner().ensure(needed, refineSourceOf(target));
+        } catch (error) {
+          if (merged.cancelled) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
+          throw Object.assign(new Error(`A selection's edge could not be refined (${error.message}). Turn off Refine edge on it, or try again.`), { code: 'refine' });
+        }
+      }
+      const composed = refinedValues(values, ownerKey);
+      const refined = refinedMapsOf(composed);
+      if (refined.length < needed.length) throw Object.assign(new Error('Refined selections were released before the export used them (too little memory). Try again.'), { code: 'refine' });
+      await composeLayers(context, composed.layers, {
         size,
         loadRaster: (layer, canvasSize) => exportLayerRaster(layer, canvasSize, merged),
         rasterizeText: rasterizeTextLayer,
         lutFor: (layerSettings) => (layerSettings?.lut ? lutsRef.current.get(layerSettings.lut.sha256) ?? null : null),
-        local: values.local,
+        local: composed.local,
         imageMap: (canvas) => imageMaskMap(exportGeometry(values.geometry, native, { mode: 'original' }).plan, canvas, native),
         native: exportGeometry(values.geometry, native, { mode: 'original' }).output,
         workers: detailWorkerCount(),
         signal: merged,
         onProgress: progress,
+        refined,
       });
       if (watermark) {
         if (merged.cancelled) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
@@ -1887,7 +1955,7 @@ function EditorWorkspace({ host }) {
         <h2 className="visually-hidden">Preview</h2>
         <Viewer
           photo={photo}
-          adjustments={viewAdjustments}
+          adjustments={shownAdjustments}
           lut={lutFor(viewAdjustments)}
           previewing={presetPreview && ready ? presetPreview.name : null}
           compare={compare}
@@ -1914,7 +1982,7 @@ function EditorWorkspace({ host }) {
           } : null}
           maskTool={maskTarget && !transformMode ? {
             owner: maskTarget.kind === 'local' ? { kind: 'local', id: maskTarget.local.id } : { kind: 'layer', layer: maskTarget.layer },
-            mask: maskTarget.kind === 'local' ? maskTarget.local.mask : maskTarget.layer.mask,
+            mask: refinedMask(maskTarget.kind === 'local' ? maskTarget.local.mask : maskTarget.layer.mask, maskOwnerKey),
             editable: !(maskTarget.kind === 'layer' && maskTarget.layer.locked),
             interactive: Boolean(maskTool),
             overlay: maskOverlay,
@@ -2147,6 +2215,7 @@ function EditorWorkspace({ host }) {
             onEditSettings={() => { setMobilePanel('adjust'); setMobileTool('light'); }}
             selection={ready ? selections : null}
             savedSelections={savedSelections}
+            refinement={(component) => refinementOf(component, maskOwnerKey)}
           />
           <AdjustPanel
             mobileSection={narrow ? mobileTool : undefined}

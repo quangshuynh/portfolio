@@ -158,10 +158,11 @@ async function detailInBands(image, pass, clients, signal) {
 /**
  * Applies the photo's local adjustments and composites `layers` over the rendered background in
  * `context` (a 2D canvas context of the export size), in place.
- * :param options: { size, loadRaster, rasterizeText, lutFor, workers, spawn, signal, onProgress }
+ * :param options: { size, loadRaster, rasterizeText, lutFor, workers, spawn, signal, onProgress, refined }
+ *   (refined: [{ key, map }] tile maps the masks' refined selections sample, already registered on the page)
  *   and for local adjustments { local, imageMap, native } (see prepareLocalPasses)
  */
-export async function composeLayers(context, layers, { size, loadRaster, rasterizeText, lutFor, local = [], imageMap = null, native = size, workers = 0, spawn = spawnRenderWorker, signal = { cancelled: false }, onProgress = () => {} }) {
+export async function composeLayers(context, layers, { size, loadRaster, rasterizeText, lutFor, local = [], imageMap = null, native = size, workers = 0, spawn = spawnRenderWorker, signal = { cancelled: false }, onProgress = () => {}, refined = [] }) {
   const locals = imageMap ? prepareLocalPasses(local, size, { imageMap, native }) : [];
   const shown = [...locals.map((pass) => ({ pass })), ...layerProgram(layers).map((step) => (step.op === 'layer' ? { layer: step.layer } : { step }))];
   if (!shown.length) return;
@@ -170,6 +171,8 @@ export async function composeLayers(context, layers, { size, loadRaster, rasteri
   const clients = [];
   try {
     for (let i = 0; i < workers; i += 1) clients.push(createWorkerClient(spawn()));
+    // Refined selections (segment/selectionMask.mjs) the masks sample: registered on each render worker.
+    if (refined.length) await Promise.all(clients.map((client) => Promise.all(refined.map(({ key, map }) => client.call('registerRefined', { key, map })))));
     for (const [index, entry] of shown.entries()) {
       if (signal.cancelled) throw new WorkerCancelled();
       onProgress({ stage: 'compositing', fraction: index / shown.length, layer: index + 1, layers: shown.length });

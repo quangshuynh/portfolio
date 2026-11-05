@@ -43,7 +43,11 @@ export const DOCUMENT_TYPE = 'quanghuynh.photo-editor.edits';
 // Version 18 added selection components in image layer masks (a selection of the layer's own
 // source) and Detail settings on adjustment layers; version 17 files read unchanged and render
 // as before, and version 17 editors refuse version 18 files rather than drop those parts.
-export const DOCUMENT_VERSION = 18;
+// Version 19 added edge refinement of selections (`refine` on a selection component: algorithm
+// version and edge radius; the grid is unchanged, the refined edge is recomputed from the image);
+// version 18 files read unchanged and render exactly as before (no selection is refined), and
+// version 18 editors refuse version 19 files rather than show unrefined edges.
+export const DOCUMENT_VERSION = 19;
 // The default suffix before Interval 5; saved settings that still have it get the new one.
 const LEGACY_DEFAULT_SUFFIX = '-edited';
 // Room for 500 photos with every control and curve point set (about 1.2 MB).

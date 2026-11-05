@@ -12,7 +12,7 @@ const workerCanvas = () => {
   }
 };
 const canDecode = workerCanvas() && typeof createImageBitmap === 'function';
-const NEEDS_CANVAS = new Set(['inspect', 'decode', 'export', 'regionSource']);
+const NEEDS_CANVAS = new Set(['inspect', 'decode', 'export', 'regionSource', 'refineSelections']);
 
 self.addEventListener('message', async ({ data: { id, type, payload } }) => {
   const progress = (value) => self.postMessage({ id, progress: value });

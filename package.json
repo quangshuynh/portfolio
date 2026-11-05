@@ -58,7 +58,8 @@
     "check:editor:selection": "node scripts/check-editor-selection.mjs",
     "check:editor:layer-masks": "node scripts/check-editor-layer-masks.mjs",
     "bench:selection": "node scripts/bench-selection.mjs",
-    "selection:references": "node scripts/selection-references.mjs"
+    "selection:references": "node scripts/selection-references.mjs",
+    "bench:refine": "node --max-old-space-size=16000 scripts/refine-bench/score.mjs"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",

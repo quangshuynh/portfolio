@@ -19,6 +19,9 @@ import { decodeSize, geometryPlan, normalizeGeometry } from '../pipeline/geometr
 import { adjustRows, adjustmentParams, compositeRasterRows, detailBandRows, endRows, prepareDetailPass } from '../pipeline/composite.mjs';
 import { renderDetailFrame } from '../pipeline/localPreview.mjs';
 import { applyRetouch, applyRetouchToContext } from '../pipeline/retouch.mjs';
+import { refineSelection, tileMapTransfer } from '../segment/refine.mjs';
+import { registerRefined } from '../segment/selectionMask.mjs';
+import { decodeCodes } from '../segment/analysis.mjs';
 
 export const EXPORT_BAND_ROWS = 256;
 
@@ -251,6 +254,38 @@ export const handlers = {
   async localDetailFrame({ image, pass }) {
     const data = renderDetailFrame(image, pass);
     return { result: data, transfer: [data.buffer] };
+  },
+
+  /** Registers a refined selection's tile map in this worker (io/composeLayers.mjs). */
+  async registerRefined({ key, map }) {
+    registerRefined(key, map);
+    return { result: true };
+  },
+
+  /**
+   * Refines selections against their owner's image (segment/refine.mjs): the guide is the file
+   * decoded at `size`, or `source` (a RAW development, rendered here with `raw` and neutral
+   * settings, or an RGBA8 image). Returns one tile map per item; the guide never leaves.
+   * :param items: [{ key, width, height, data (the stored grid), options: { radius, shift, feather } }]
+   */
+  async refineSelections({ file = null, header = null, source = null, raw = null, size, items }, progress = () => {}, signal = null) {
+    let guide = source;
+    if (!guide) guide = await decodeToRgba(file, header, size);
+    else if (!(guide.data instanceof Uint8ClampedArray || guide.data instanceof Uint8Array)) {
+      guide = { width: guide.width, height: guide.height, data: renderImage(guide, deriveParams(normalizeAdjustments({}), { raw })) };
+    }
+    if (guide.width !== size.width || guide.height !== size.height) throw new Error(`The image decoded at ${guide.width}×${guide.height} instead of ${size.width}×${size.height}.`);
+    const maps = [];
+    for (const [k, item] of items.entries()) {
+      const codes = decodeCodes(item.data, item.width * item.height);
+      if (!codes) throw new Error('A selection could not be read.');
+      const map = refineSelection({ width: item.width, height: item.height, codes }, guide, item.options, {
+        onProgress: (fraction) => progress({ stage: 'refine', fraction: (k + fraction) / items.length }),
+        cancelled: () => Boolean(signal?.cancelled),
+      });
+      maps.push({ key: item.key, map });
+    }
+    return { result: maps, transfer: maps.flatMap(({ map }) => tileMapTransfer(map)) };
   },
 
   /** A group's end over one band (composite.endRows). */

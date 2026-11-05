@@ -38,6 +38,8 @@ import { adjustmentLayerPass, compositeImageSync, groupPass, rasterPass } from '
 import { layerMatrix, rasterSize } from '../src/editor/pipeline/layerTransform.mjs';
 import { canvasMaskMap, layerMaskMap } from '../src/editor/pipeline/mask.mjs';
 import { openEditorTool } from './editor-mobile-controls.mjs';
+import { REFINE_VERSION, refineSelection, refineSize } from '../src/editor/segment/refine.mjs';
+import { registerRefined } from '../src/editor/segment/selectionMask.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const work = mkdtempSync(path.join(tmpdir(), 'editor-layer-masks-'));
@@ -127,9 +129,24 @@ function reference(base, adjustments, rasters) {
     assert.deepEqual(rasterSize(layer, out), { width: raster.width, height: raster.height }, 'the layer would be resampled by the browser');
     assert.ok(settingsNeutral(layer.settings));
     const matrix = layerMatrix(layer, out, raster);
-    return rasterPass(layer, raster, matrix, out, mask && { def: mask, map: layerMaskMap(matrix, raster) });
+    return rasterPass(layer, raster, matrix, out, mask && { def: refinedReference(mask, raster), map: layerMaskMap(matrix, raster) });
   });
   return compositeImageSync(out, passes);
+}
+
+/** Refined selections of a layer mask (Interval 24.2), from the layer's source as decoded here (its refinement size). */
+function refinedReference(mask, source) {
+  return {
+    ...mask,
+    components: mask.components.map((c, k) => {
+      if (c.type !== 'selection' || c.refine?.version !== REFINE_VERSION) return c;
+      const size = refineSize(source.width, source.height);
+      assert.deepEqual(size, { width: source.width, height: source.height }, 'the source is refined at its own size');
+      const key = `reference|${k}|${c.data.length}|${c.shift}|${c.feather}|${c.refine.radius}`;
+      registerRefined(key, refineSelection({ width: c.width, height: c.height, codes: decodeCodes(c.data, c.width * c.height) }, source, { radius: c.refine.radius, shift: c.shift, feather: c.feather }));
+      return { ...c, refinedKey: key };
+    }),
+  };
 }
 
 function compare(expected, actual) {
@@ -245,6 +262,18 @@ async function check(run, files) {
     await setNumber(/^Edge/, -20);
     await setNumber('Feather value (%)', 25);
     await savedWhen((v) => v.layers[0].mask.components[0].shift === -0.2 && v.layers[0].mask.components[0].feather === 0.25, 'edge refined');
+
+    result.step = 'Refine edge: on by default, computed from the full-resolution source, can be turned off and on';
+    assert.deepEqual((await saved()).layers[0].mask.components[0].refine, { version: REFINE_VERSION, radius: 0 });
+    t0 = Date.now();
+    const refinedNote = page.locator('[data-refine=done]');
+    await refinedNote.waitFor({ timeout: 300_000 });
+    timings.refineMs = Date.now() - t0;
+    await page.getByRole('checkbox', { name: 'Refine edge' }).uncheck();
+    await savedWhen((v) => !v.layers[0].mask.components[0].refine, 'refine off');
+    await page.getByRole('checkbox', { name: 'Refine edge' }).check();
+    await savedWhen((v) => v.layers[0].mask.components[0].refine?.version === REFINE_VERSION, 'refine on');
+    await refinedNote.waitFor({ timeout: 300_000 });
 
     result.step = 'move, scale and rotate: no new analysis, mask data unchanged';
     await tool('layers');
@@ -366,7 +395,8 @@ async function check(run, files) {
     const text = readFileSync(await edits.path(), 'utf8');
     const document = JSON.parse(text);
     assert.equal(document.version, DOCUMENT_VERSION);
-    assert.equal(DOCUMENT_VERSION, 18);
+    assert.equal(DOCUMENT_VERSION, 19);
+    assert.ok(document.photos[0].adjustments.layers[0].mask.components.every((c) => c.refine && !("refinedKey" in c)), "refine settings saved, no derived data");
     const before = document.photos[0].adjustments.layers;
     result.savedKb = Math.round(text.length / 1024);
     await page.evaluate(() => localStorage.clear());
@@ -423,7 +453,7 @@ async function checkRaw(file, files) {
       await page.check('input[name=pe-format][value=png]');
       const [download] = await Promise.all([page.waitForEvent('download', { timeout: 900_000 }), page.click('.pe-export-button')]);
       const meta = await sharp(await download.path()).metadata();
-      row.export = { size: `${meta.width}×${meta.height}`, ms: Date.now() - t1 };
+      row.export = { size: `${meta.width}×${meta.height}`, ms: Date.now() - t1, refined: c.refine?.version ?? null };
     }
   } catch (error) {
     row.error = error.message;
