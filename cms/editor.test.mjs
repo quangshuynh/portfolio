@@ -276,6 +276,34 @@ describe('treatments', () => {
     expect(json.treatment.approved.document.photos[0].adjustments.retouch[2].source).toEqual(retouch[2].source);
   });
 
+  test('groups, clipping and a selection layer mask (Interval 24) are kept with the treatment; a changed clip is a new draft, the approved version untouched', async () => {
+    const { id } = await uploadDraft();
+    const source = (await describe_(id)).json.sources[0];
+    const watermark = { ...WATERMARK_DEFAULTS };
+    const sky = { id: 's1', type: 'selection', kind: 'sky', version: 't/1', width: 4, height: 2, data: 'AAA=', confidence: 0.9 };
+    const layers = [
+      { id: 'txt', type: 'text', text: 'North', parent: 'g' },
+      { id: 'adj', type: 'adjustment', settings: { exposure: -0.5 }, parent: 'g', clip: true },
+      { id: 'g', type: 'group', name: 'Title', blend: 'multiply', opacity: 0.7 },
+      { id: 'sky', type: 'adjustment', settings: { temperature: -20 }, mask: { base: 'none', components: [sky] } },
+    ];
+    await save(id, documentFor(source, { layers, watermark }));
+    let { json } = await describe_(id);
+    const saved = json.treatment.document.photos[0].adjustments.layers;
+    expect(json.treatment.document.version).toBe(17);
+    expect(saved.map((l) => [l.id, l.type, l.parent ?? null, Boolean(l.clip)])).toEqual([['txt', 'text', 'g', false], ['adj', 'adjustment', 'g', true], ['g', 'group', null, false], ['sky', 'adjustment', null, false]]);
+    expect(saved[3].mask.components[0]).toMatchObject({ type: 'selection', kind: 'sky', data: 'AAA=' });
+    await render(id, await photograph({ width: 3000, height: 2000 }));
+    const approved = (await review(id, 'approve')).json.treatment;
+    // Releasing the clip changes the photograph: a draft whose render is stale; the approved one stands.
+    await save(id, documentFor(source, { layers: [layers[0], { ...layers[1], clip: false }, layers[2], layers[3]], watermark }));
+    ({ json } = await describe_(id));
+    expect(json.treatment.status).toBe('draft');
+    expect(watermarkStatus(json.treatment)).toBe('needs-regeneration');
+    expect(json.treatment.approved.documentHash).toBe(approved.approved.documentHash);
+    expect(json.treatment.approved.document.photos[0].adjustments.layers[1].clip).toBe(true);
+  });
+
   test('a treatment without an approval discards to nothing', async () => {
     const { id } = await uploadDraft();
     await save(id, documentFor((await describe_(id)).json.sources[0], { exposure: 0.2 }));
