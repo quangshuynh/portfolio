@@ -6,7 +6,8 @@
 // square and panoramic), a pinch and pan use the whole viewport within bounds, double tap and reset
 // work, rotation refits, previous/next and swipes work (a zoomed drag only pans), the page behind
 // never scrolls and closing restores it; pinch and pan change nothing in the DOM but the image;
-// opening while archive frames are still downloading leaves them alone and closing restores the scroll.
+// opening while archive frames are still downloading leaves them alone and closing restores the scroll;
+// hundreds of rapid steps stay within the history write budget and the viewer always closes.
 // Gestures are synthesised pointer events; emulation is evidence, not a physical-device test.
 // Usage: npm run check:photography:viewer  (VIEWER_ENGINES=webkit-iphone,... to narrow; SHOTS_DIR saves screenshots)
 import assert from 'node:assert/strict';
@@ -203,6 +204,157 @@ async function checkOpenDuringGalleryLoad(browser, options, run) {
   }
 }
 
+// History under rapid navigation (Interval 23.5). WebKit refuses more than 100 pushState/
+// replaceState calls per 10 s; the viewer keeps one entry per viewing and writes within a budget.
+// Every write is counted: none refused, at most 60 in any 10 s, the URL ends on the photograph
+// shown, Back/Forward/reload/close behave, and closing always works.
+const captionBySlug = new Map([...published.values()].map(({ slug: key, caption }) => [key, caption]));
+async function checkHistoryStress(browser, options, run) {
+  const context = await browser.newContext(options);
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    // Synthesised pointers have no real pointer to capture.
+    for (const name of ['setPointerCapture', 'releasePointerCapture']) {
+      const original = Element.prototype[name];
+      Element.prototype[name] = function capture(...args) { try { return original.apply(this, args); } catch { return undefined; } };
+    }
+    // Kept across reloads and direct-link visits, so the 10 s budget covers the whole run.
+    const log = (key, value) => sessionStorage.setItem(key, JSON.stringify([...JSON.parse(sessionStorage.getItem(key) ?? '[]'), value]));
+    for (const name of ['pushState', 'replaceState']) {
+      const original = History.prototype[name];
+      History.prototype[name] = function write(...args) {
+        try {
+          const result = original.apply(this, args);
+          log('check:writes', Date.now());
+          return result;
+        } catch (error) {
+          log('check:refused', `${error.name}: ${error.message}`);
+          throw error;
+        }
+      };
+    }
+  });
+  const viewer = '.photography-lightbox';
+  const shownCaption = () => page.evaluate((selector) => document.querySelector(selector)?.getAttribute('aria-label')?.replace(/^Photography viewer: /, '') ?? null, viewer);
+  // The address bar catches up with the photograph shown (a trailing write within the budget).
+  const consistent = async (label) => {
+    await page.waitForFunction(([selector, captions]) => {
+      const shown = document.querySelector(selector)?.getAttribute('aria-label')?.replace(/^Photography viewer: /, '');
+      const slugOf = decodeURIComponent(location.hash.slice(1));
+      return shown ? new Map(captions).get(slugOf) === shown : !location.hash;
+    }, [viewer, [...captionBySlug]], { timeout: 3_000 }).catch(async () => {
+      throw new Error(`${run.name}: ${label}: URL ${await page.evaluate(() => location.hash)} does not match ${await shownCaption()}`);
+    });
+  };
+  const closedAndUnlocked = async (label) => {
+    await page.waitForFunction(() => !document.querySelector('.photography-lightbox') && document.body.style.position !== 'fixed' && !document.querySelector('.photography-page')?.hasAttribute('inert'), null, { timeout: 1_000 })
+      .catch(() => { throw new Error(`${run.name}: ${label}: the viewer did not close within 1 s`); });
+  };
+  const swipe = async (dx) => {
+    const box = await page.locator('.photography-lightbox-image-wrap').boundingBox();
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await touch(page, [['pointerdown', 40, x, y], ['pointermove', 40, x + dx / 2, y + 2], ['pointermove', 40, x + dx, y + 2], ['pointerup', 40, x + dx, y + 2]]);
+  };
+  const hold = async (key, repeats) => {
+    for (let k = 0; k < repeats; k += 1) await page.keyboard.down(key);
+    await page.keyboard.up(key);
+  };
+  let phase = 'open';
+  try {
+    await page.goto(`http://localhost:${PORT}/photography/`);
+    await page.waitForSelector('[data-photo-slug] a');
+    await page.waitForTimeout(300);
+    const link = (n) => page.locator('[data-photo-slug] a').nth(n);
+    await link(3).click();
+    await page.waitForSelector(viewer);
+    const entries = await page.evaluate(() => history.length);
+    const started = Date.now();
+
+    phase = 'rapid navigation';
+    // Held keys both ways, rapid clicks and swipes: several hundred steps.
+    await hold('ArrowRight', 150);
+    await hold('ArrowLeft', 100);
+    await hold('ArrowRight', 60);
+    // Rapid clicks on whichever control is enabled (a held key may have reached either end).
+    for (let k = 0; k < 25; k += 1) {
+      const previous = page.locator('[aria-label="Previous photograph"]');
+      await ((await previous.isEnabled()) ? previous : page.locator('[aria-label="Next photograph"]')).click();
+    }
+    for (let k = 0; k < 8; k += 1) { await swipe(k % 2 ? 220 : -220); await page.waitForTimeout(40); }
+    await page.waitForTimeout(600); // the last swipe settles onto its photograph
+    const elapsed = Date.now() - started;
+    await consistent('after rapid navigation');
+    assert.equal(await page.evaluate(() => history.length), entries, `${run.name}: rapid navigation adds no history entries`);
+    const shown = await shownCaption();
+    await page.getByRole('button', { name: 'Close photograph' }).click();
+    await closedAndUnlocked('close after rapid navigation');
+    await consistent('after close');
+    phase = 'Forward/Back';
+    // Forward reopens the photograph left; Back closes it again.
+    await page.goForward();
+    await page.waitForFunction((caption) => document.querySelector('.photography-lightbox')?.getAttribute('aria-label')?.endsWith(caption), shown, { timeout: 3_000 })
+      .catch(async () => { throw new Error(`${run.name}: Forward reopens ${shown}, got ${await shownCaption()} at ${await page.evaluate(() => location.hash)}`); });
+    await page.goBack();
+    await closedAndUnlocked('Back');
+    await consistent('after Back');
+
+    phase = 'immediate closes';
+    // Rapid navigation then an immediate close, ten times.
+    for (let session = 0; session < 10; session += 1) {
+      await link(5 + session).click();
+      await page.waitForSelector(viewer);
+      await hold('ArrowRight', 30);
+      await page.keyboard.press('Escape');
+      await closedAndUnlocked(`immediate close ${session + 1}`);
+    }
+    await page.waitForTimeout(1_500);
+    assert.equal(await page.locator(viewer).count(), 0, `${run.name}: nothing pending reopens a closed viewer`);
+    await consistent('after immediate closes');
+
+    phase = 'Back during navigation';
+    // Browser Back during active navigation closes the viewer for good.
+    await link(4).click();
+    await page.waitForSelector(viewer);
+    await hold('ArrowRight', 40);
+    await page.goBack();
+    await closedAndUnlocked('Back during navigation');
+    await page.waitForTimeout(1_500);
+    assert.equal(await page.locator(viewer).count(), 0, `${run.name}: a pending write after Back does not reopen the viewer`);
+    await consistent('after Back during navigation');
+
+    phase = 'direct link and reload';
+    // A direct link stepped quickly, then reloaded, opens on the photograph shown. A reload takes
+    // the URL of that moment, so it waits for the trailing write (at most 250 ms behind).
+    await page.goto(`http://localhost:${PORT}/photography/#${encodeURIComponent(slug(landscape))}`);
+    await page.waitForSelector(viewer);
+    await hold('ArrowLeft', 40);
+    await consistent('before reload');
+    const beforeReload = await shownCaption();
+    const urlBefore = await page.evaluate(() => `${location.href} len=${history.length} state=${JSON.stringify(history.state)}`);
+    await page.reload();
+    await page.waitForSelector(viewer);
+    const urlAfter = await page.evaluate(() => `${location.href} len=${history.length} state=${JSON.stringify(history.state)}`);
+    assert.equal(await shownCaption(), beforeReload, `${run.name}: reload keeps the photograph shown (${urlBefore} -> ${urlAfter})`);
+    await page.getByRole('button', { name: 'Close photograph' }).click();
+    await closedAndUnlocked('direct-link close');
+    await consistent('after direct-link close');
+
+    const { writes, refused } = await page.evaluate(() => ({ writes: JSON.parse(sessionStorage.getItem('check:writes') ?? '[]'), refused: JSON.parse(sessionStorage.getItem('check:refused') ?? '[]') }));
+    const busiest = Math.max(...writes.map((at) => writes.filter((other) => other >= at && other < at + 10_000).length));
+    assert.deepEqual(refused, [], `${run.name}: no history write refused`);
+    assert.ok(busiest <= 60, `${run.name}: at most 60 history writes in any 10 s (${busiest})`);
+    assert.deepEqual(errors, [], `${run.name}: no page errors during history stress`);
+    console.log(`    history stress: ${writes.length} writes (most in 10 s: ${busiest}), rapid phase ${elapsed} ms, 0 refused`);
+  } catch (error) {
+    throw new Error(`history stress, ${phase}: ${error.message.split(/\r?\n/)[0]}`);
+  } finally {
+    await context.close();
+  }
+}
+
 async function runEngine(run, fixtures) {
   const browser = await run.type.launch();
   const options = run.device ? { ...devices[run.device] } : { viewport: { width: 1440, height: 900 } };
@@ -349,6 +501,7 @@ async function runEngine(run, fixtures) {
     await page.waitForTimeout(200);
     assert.ok(scrolled > 0 && near(await page.evaluate(() => window.scrollY), scrolled, 2), `${run.name}: closing restores the gallery scroll (${scrolled})`);
     await checkOpenDuringGalleryLoad(browser, options, run);
+    await checkHistoryStress(browser, options, run);
     assert.deepEqual(errors, [], `${run.name}: no page errors`);
     console.log(`ok  ${run.name}`);
   } finally {
@@ -362,7 +515,7 @@ const fixtures = { '2000x2000': await synthetic(2000, 2000), '2400x800': await s
 let failed = false;
 try {
   for (const run of RUNS) {
-    try { await runEngine(run, fixtures); } catch (error) { failed = true; console.error(`FAIL ${run.name}: ${error.message}`); }
+    try { await runEngine(run, fixtures); } catch (error) { failed = true; console.error(`FAIL ${run.name}: ${error.message}`, error.stack?.split(/\r?\n/).find((line) => line.includes('check-photography-viewer')) ?? ''); }
   }
 } finally {
   await server.close();
