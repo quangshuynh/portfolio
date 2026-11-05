@@ -6,7 +6,7 @@ import { describe, expect, test } from 'vitest';
 import { createAdjustmentLayer, normalizeLayers } from '../model/layers.mjs';
 import { layerProgram } from '../model/layerTree.mjs';
 import { createLinear, createRadial, normalizeMask } from '../model/masks.mjs';
-import { adjustmentLayerPass, adjustmentParams, compositeImage, compositeImageSync, detailPassOptions, groupPass, prepareDetailPass, rasterPass } from './composite.mjs';
+import { adjustmentLayerPass, adjustmentParams, compositeImage, compositeImageSync, contentBox, detailBandRows, detailPassOptions, groupPass, prepareDetailPass, rasterPass } from './composite.mjs';
 import { prepareRender, renderRgba8 } from './cpuRenderer.mjs';
 import { createLocalPreview, renderDetailFrame } from './localPreview.mjs';
 import { offsetMatrix } from './layerTransform.mjs';
@@ -146,6 +146,25 @@ describe('adjustment layer Detail passes', () => {
     }
     // Outside the base nothing is drawn (the white below stays white).
     expect(Array.from(out.data.slice(0, 4))).toEqual([255, 255, 255, 255]);
+  });
+
+  test('on a transparent canvas only the visible content is filtered; the result does not change', () => {
+    const canvas = { width: W, height: H, data: new Uint8ClampedArray(W * H * 4) };
+    for (let y = 20; y < 30; y += 1) for (let x = 5; x < 15; x += 1) canvas.data.set([...photo().data.slice((y * W + x) * 4, (y * W + x) * 4 + 3), 255], (y * W + x) * 4);
+    expect(contentBox(canvas)).toEqual({ x0: 5, y0: 20, x1: 15, y1: 30 });
+    expect(contentBox({ width: 2, height: 2, data: new Uint8ClampedArray(16) })).toEqual({ x0: 0, y0: 0, x1: 0, y1: 0 });
+    const pass = adjustmentLayerPass(layer({ clarity: 80, sharpening: 80 }), null, null, native);
+    const options = detailPassOptions(canvas, pass);
+    expect(options.content).toEqual({ x0: 5, y0: 20, x1: 15, y1: 30 });
+    const context = prepareDetailPass(pass, options);
+    expect(detailBandRows(canvas, context, pass, 0, 16)).toBeNull();
+    // Unlimited reference: the whole frame filtered (the preview's path), mixed in full.
+    const whole = renderDetailFrame(copy(canvas), pass);
+    const limited = compositeImageSync(copy(canvas), [pass]);
+    for (let p = 0; p < W * H; p += 1) {
+      if (!canvas.data[p * 4 + 3]) { expect(limited.data[p * 4 + 3]).toBe(0); continue; } // eslint-disable-line no-continue
+      expect(Array.from(limited.data.slice(p * 4, p * 4 + 4))).toEqual(Array.from(whole.slice(p * 4, p * 4 + 4)));
+    }
   });
 
   test('inside an isolated group it filters only the group, over a pass-through group the whole composite', () => {

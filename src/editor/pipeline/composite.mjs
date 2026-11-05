@@ -310,12 +310,36 @@ export function detailPassOptions(image, pass) {
   const prepared = deriveParams(pass.adjustments);
   // The guide never reads the colour of empty pixels (detailRenderer.fillTransparentGuide).
   const guide = prepareDetailRender(prepared, { width, height, nativeWidth: pass.native.width, nativeHeight: pass.native.height, guideImage: fillTransparentGuide(guideSource(plain)) }).guide;
-  return { width, height, nativeWidth: pass.native.width, nativeHeight: pass.native.height, guide, transparent: rowsHaveAlpha(plain, 0, height) };
+  const transparent = rowsHaveAlpha(plain, 0, height);
+  return { width, height, nativeWidth: pass.native.width, nativeHeight: pass.native.height, guide, transparent, content: transparent ? contentBox(plain) : null };
 }
+
+/**
+ * The box of a canvas's pixels that are not fully transparent ({ x0, y0, x1, y1 }, exclusive).
+ * A Detail pass on a transparent canvas (an isolated group, a clip run) renders only there: what it
+ * would write elsewhere has no alpha and never shows, and its neighbourhoods are alpha-weighted, so
+ * the visible result is the same.
+ */
+export function contentBox({ width, height, data }) {
+  let x0 = width; let x1 = 0; let y0 = height; let y1 = 0;
+  for (let y = 0; y < height; y += 1) {
+    let first = -1; let lastX = -1;
+    for (let x = 0, i = y * width * 4 + 3; x < width; x += 1, i += 4) if (data[i]) { if (first < 0) first = x; lastX = x; }
+    if (first < 0) continue; // eslint-disable-line no-continue
+    if (y < y0) y0 = y;
+    y1 = y + 1;
+    if (first < x0) x0 = first;
+    if (lastX + 1 > x1) x1 = lastX + 1;
+  }
+  return y1 > y0 ? { x0, y0, x1, y1 } : { x0: 0, y0: 0, x1: 0, y1: 0 };
+}
+
+/** Whether a Detail pass's content (contentBox, in its render context) reaches rows [row, last). */
+export const detailContentTouches = (context, row, last) => !context.content || (context.content.x1 > context.content.x0 && context.content.y0 < last && context.content.y1 > row);
 
 /** A Detail pass's render context; an adjustment layer's colour settings are prepared with it. */
 export function prepareDetailPass(pass, options) {
-  const context = prepareDetailRender(deriveParams(pass.adjustments), options);
+  const context = { ...prepareDetailRender(deriveParams(pass.adjustments), options), content: options.content ?? null };
   return pass.color ? { ...context, color: prepareRender(adjustmentParams(pass.color)) } : context;
 }
 
@@ -332,8 +356,11 @@ export function detailBandRows(image, context, pass, row, last) {
   const { width } = image;
   const top = image.y0 ?? 0;
   const mask = passMask(pass, width, row, last);
-  const box = mask ? maskBox(mask, width) : { x0: 0, x1: width, y0: 0, y1: last - row };
-  if (!box) return null;
+  let box = mask ? maskBox(mask, width) : { x0: 0, x1: width, y0: 0, y1: last - row };
+  // On a transparent canvas only its visible content is rendered (contentBox).
+  const { content } = context;
+  if (box && content) box = { x0: Math.max(box.x0, content.x0), x1: Math.min(box.x1, content.x1), y0: Math.max(box.y0, content.y0 - row), y1: Math.min(box.y1, content.y1 - row) };
+  if (!box || box.x1 <= box.x0 || box.y1 <= box.y0) return null;
   const w = box.x1 - box.x0;
   const rendered = new Uint8ClampedArray((box.y1 - box.y0) * w * 4);
   renderDetailRows(image, context, row + box.y0, row + box.y1, rendered, { columns: [box.x0, box.x1] });
@@ -374,7 +401,7 @@ function* detailBands(canvas, pass, bandRows) {
   const writer = detailWriter(data, width, context.halo);
   for (let row = 0; row < height; row += bandRows) {
     const last = Math.min(height, row + bandRows);
-    if (passTouchesRows(pass, image, row, last)) writer.add(row, last, detailBandRows(image, context, pass, row, last));
+    if (passTouchesRows(pass, image, row, last) && detailContentTouches(context, row, last)) writer.add(row, last, detailBandRows(image, context, pass, row, last));
     // The next band reads the backdrop from `last − halo`: rows above that are final.
     writer.flush(last - context.halo);
     yield last / height;

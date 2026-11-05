@@ -20,7 +20,7 @@
 
 import { createWorkerClient, WorkerCancelled } from './workerClient.mjs';
 import {
-  COMPOSITE_BAND_ROWS, adjustmentLayerPass, compositeImage, compositeStack, detailPassOptions, detailWriter, endRows, groupPass, localPasses, passTouchesRows, prepareDetailPass, rasterPass,
+  COMPOSITE_BAND_ROWS, adjustmentLayerPass, compositeImage, compositeStack, detailContentTouches, detailPassOptions, detailWriter, endRows, groupPass, localPasses, passTouchesRows, prepareDetailPass, rasterPass,
 } from '../pipeline/composite.mjs';
 import { layerMatrix, offsetMatrix } from '../pipeline/layerTransform.mjs';
 import { sourceRows } from '../pipeline/warp.mjs';
@@ -117,15 +117,19 @@ async function passInBands(image, pass, clients, signal) {
   await Promise.all(clients.map(lane));
 }
 
-/** A local adjustment's Detail pass on `clients` render workers (see the comment at the top). */
+/** A Detail pass (local adjustment or adjustment layer) on `clients` render workers (see the comment at the top). */
 async function detailInBands(image, pass, clients, signal) {
   const { width, height, data } = image;
-  // Bands outside the mask's bounds are not sent (found first, so the workers get the bounds too).
-  const bands = [];
-  for (let row = 0; row < height; row += COMPOSITE_BAND_ROWS) if (passTouchesRows(pass, image, row, Math.min(height, row + COMPOSITE_BAND_ROWS))) bands.push(row);
-  if (!bands.length) return;
+  // Bands outside the mask's bounds are not sent (found first, so the workers get the bounds
+  // too), nor bands without visible content on a transparent canvas.
+  const masked = [];
+  for (let row = 0; row < height; row += COMPOSITE_BAND_ROWS) if (passTouchesRows(pass, image, row, Math.min(height, row + COMPOSITE_BAND_ROWS))) masked.push(row);
+  if (!masked.length) return;
   const options = detailPassOptions(image, pass);
-  const { halo } = prepareDetailPass(pass, options);
+  const context = prepareDetailPass(pass, options);
+  const { halo } = context;
+  const bands = masked.filter((row) => detailContentTouches(context, row, Math.min(height, row + COMPOSITE_BAND_ROWS)));
+  if (!bands.length) return;
   const job = `${Date.now()}-${Math.random()}`;
   await Promise.all(clients.map((client) => client.call('localDetailBegin', { job, pass, options })));
   const writer = detailWriter(data, width, halo);
