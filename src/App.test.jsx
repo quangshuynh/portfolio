@@ -115,52 +115,15 @@ describe('portfolio homepage', () => {
   test('project galleries can switch views', async () => {
     await renderApp();
 
-    const flipperGallery = within(
-      screen.getByLabelText(
-        'Flipper gallery',
-      ),
-    );
+    const gallery = within(screen.getByLabelText('DashPilot gallery'));
+    // Galleries open on the product, not the logo.
+    expect(gallery.queryByRole('button', { name: 'Logo' })).not.toBeInTheDocument();
+    expect(gallery.getByRole('button', { name: 'Work' })).toHaveAttribute('aria-pressed', 'true');
 
-    expect(
-      flipperGallery.getByRole(
-        'button',
-        {
-          name: 'Logo',
-        },
-      ),
-    ).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-
-    fireEvent.click(
-      flipperGallery.getByRole(
-        'button',
-        {
-          name: 'Dashboard',
-        },
-      ),
-    );
-
-    expect(
-      flipperGallery.getByRole(
-        'button',
-        {
-          name: 'Dashboard',
-        },
-      ),
-    ).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-
-    expect(
-      screen.getByRole('img', {
-        name: /Flipper dashboard/i,
-      }),
-    ).toBeInTheDocument();
+    fireEvent.click(gallery.getByRole('button', { name: 'Insights' }));
+    expect(gallery.getByRole('button', { name: 'Insights' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('img', { name: /DashPilot Insights bar chart/i })).toBeInTheDocument();
   });
-
 
   test('theme toggle switches between dark and light modes', async () => {
     await renderApp();

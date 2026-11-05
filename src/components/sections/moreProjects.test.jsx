@@ -1,27 +1,27 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { moreProjects } from '../../data/projects.mjs';
-import MoreProjects from './moreProjects';
+import MoreProjects, { COLLAPSED_COUNT } from './moreProjects';
 
 test('expanding moves focus to the first newly shown project; collapsing returns it to the toggle', () => {
   render(<MoreProjects />);
   const toggle = screen.getByRole('button', { name: 'View more projects' });
-  expect(screen.getAllByRole('article')).toHaveLength(3);
+  expect(screen.getAllByRole('article')).toHaveLength(COLLAPSED_COUNT);
 
   toggle.focus();
   fireEvent.click(toggle);
   expect(screen.getAllByRole('article')).toHaveLength(moreProjects.length);
   expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  expect(document.activeElement).toBe(screen.getByRole('heading', { level: 3, name: moreProjects[3].name }));
+  expect(document.activeElement).toBe(screen.getByRole('heading', { level: 3, name: moreProjects[COLLAPSED_COUNT].name }));
 
   fireEvent.click(screen.getByRole('button', { name: 'Show fewer projects' }));
-  expect(screen.getAllByRole('article')).toHaveLength(3);
+  expect(screen.getAllByRole('article')).toHaveLength(COLLAPSED_COUNT);
   expect(document.activeElement).toBe(screen.getByRole('button', { name: 'View more projects' }));
 });
 
 test('collapsing while focus is inside a project being hidden returns focus to the toggle', () => {
   render(<MoreProjects />);
   fireEvent.click(screen.getByRole('button', { name: 'View more projects' }));
-  const last = moreProjects.slice(3).findLast((project) => project.links.github);
+  const last = moreProjects.slice(COLLAPSED_COUNT).findLast((project) => project.links.github);
   const hiddenLink = screen.getByRole('link', { name: `Open ${last.name} repository` });
   hiddenLink.focus();
   // A click that does not move focus first (Safari does not focus buttons on click).
