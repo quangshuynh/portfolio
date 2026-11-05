@@ -395,7 +395,7 @@ async function check(run, files) {
     const text = readFileSync(await edits.path(), 'utf8');
     const document = JSON.parse(text);
     assert.equal(document.version, DOCUMENT_VERSION);
-    assert.equal(DOCUMENT_VERSION, 19);
+    assert.equal(DOCUMENT_VERSION, 20);
     assert.ok(document.photos[0].adjustments.layers[0].mask.components.every((c) => c.refine && !("refinedKey" in c)), "refine settings saved, no derived data");
     const before = document.photos[0].adjustments.layers;
     result.savedKb = Math.round(text.length / 1024);

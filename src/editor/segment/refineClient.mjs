@@ -3,7 +3,8 @@
 // at most one full-size guide is held), and render copies of an edit whose refined selections
 // carry the key of their registered map (segment/selectionMask.mjs). Nothing here is saved.
 import { REFINE_VERSION, refineSize } from './refine.mjs';
-import { refinedMap, refinedState, refinementKey, registerRefined } from './selectionMask.mjs';
+import { RECOVER_VERSION } from './recover.mjs';
+import { refinedMap, refinedState, refinementKey, registerRefined, textHash } from './selectionMask.mjs';
 
 /** The refinement settings a new selection gets (refined by default; Refine edge turns it off). */
 export const newRefine = () => ({ version: REFINE_VERSION, radius: 0 });
@@ -39,47 +40,59 @@ export function refinementsOf(values, photoKey) {
 }
 
 const annotatedMasks = new WeakMap();
-/** A render copy of `mask` whose refined selections carry their registered map's key (the same object while nothing changed). */
-export function refinedMask(mask, ownerKey) {
+// The last map shown for a selection (owner, id, grid): while a changed one (a new Recover Detail
+// stroke, an Edge or Feather change) is computed, the preview keeps showing it instead of the grid.
+const lastShown = new Map();
+/**
+ * A render copy of `mask` whose refined selections carry their registered map's key (the same
+ * object while nothing changed). `exact` (exports): only the map of the selection as it is now.
+ */
+export function refinedMask(mask, ownerKey, { exact = false } = {}) {
   if (!ownerKey || !mask?.components?.some(refinable)) return mask;
   const state = refinedState();
   const hit = annotatedMasks.get(mask);
-  if (hit && hit.state === state && hit.ownerKey === ownerKey) return hit.out;
+  if (hit && hit.state === state && hit.ownerKey === ownerKey && hit.exact === exact) return hit.out;
   let changed = false;
   const components = mask.components.map((c) => {
     const key = refinable(c) ? refinementKey(ownerKey, c) : null;
-    if (!key || !refinedMap(key)) return c;
+    if (!key) return c;
+    const slot = `${ownerKey}|${c.id}|${textHash(c.data)}`;
+    let use = refinedMap(key) ? key : null;
+    if (use) lastShown.set(slot, key);
+    else if (!exact && lastShown.has(slot) && refinedMap(lastShown.get(slot))) use = lastShown.get(slot);
+    if (!use) return c;
     changed = true;
-    return { ...c, refinedKey: key };
+    return { ...c, refinedKey: use };
   });
+  while (lastShown.size > 64) lastShown.delete(lastShown.keys().next().value);
   const out = changed ? { ...mask, components } : mask;
-  annotatedMasks.set(mask, { state, ownerKey, out });
+  annotatedMasks.set(mask, { state, ownerKey, exact, out });
   return out;
 }
 
 const annotatedValues = new WeakMap();
 /** A render copy of an edit (`values`) with refinedMask on every mask (the same object while nothing changed). */
-export function refinedValues(values, photoKey) {
+export function refinedValues(values, photoKey, { exact = false } = {}) {
   if (!values) return values;
   const state = refinedState();
   const hit = annotatedValues.get(values);
-  if (hit && hit.state === state && hit.photoKey === photoKey) return hit.out;
+  if (hit && hit.state === state && hit.photoKey === photoKey && hit.exact === exact) return hit.out;
   let changed = false;
   const local = (values.local ?? []).map((item) => {
-    const mask = refinedMask(item.mask, photoKey);
+    const mask = refinedMask(item.mask, photoKey, { exact });
     if (mask === item.mask) return item;
     changed = true;
     return { ...item, mask };
   });
   const layers = (values.layers ?? []).map((layer) => {
     if (!layer.mask) return layer;
-    const mask = refinedMask(layer.mask, maskOwner(layer.mask, layer, photoKey));
+    const mask = refinedMask(layer.mask, maskOwner(layer.mask, layer, photoKey), { exact });
     if (mask === layer.mask) return layer;
     changed = true;
     return { ...layer, mask };
   });
   const out = changed ? { ...values, local, layers } : values;
-  annotatedValues.set(values, { state, photoKey, out });
+  annotatedValues.set(values, { state, photoKey, exact, out });
   return out;
 }
 
@@ -115,7 +128,7 @@ export function createRefiner({ createClient, developRaw, onChange = () => {} })
       if (!todo.length || job.cancelled) return;
       running.add(job);
       const size = refineSize(source.width, source.height);
-      const items = todo.map(({ key, component: c }) => ({ key, width: c.width, height: c.height, data: c.data, options: { radius: c.refine.radius, shift: c.shift, feather: c.feather } }));
+      const items = todo.map(({ key, component: c }) => ({ key, width: c.width, height: c.height, data: c.data, options: { radius: c.refine.radius, shift: c.shift, feather: c.feather, recover: c.recover?.version === RECOVER_VERSION ? c.recover.strokes : null } }));
       try {
         job.client = createClient();
         let payload = { file: source.file, header: source.header, size, items };

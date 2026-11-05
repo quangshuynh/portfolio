@@ -31,7 +31,7 @@ export function textHash(text) {
  * refined map depends on. Null when the component is not refined.
  */
 export const refinementKey = (ownerKey, c) => (c?.type === 'selection' && c.refine
-  ? `${ownerKey}|${textHash(c.data)}|${c.width}x${c.height}|${c.refine.version}|${c.refine.radius}|${c.shift}|${c.feather}`
+  ? `${ownerKey}|${textHash(c.data)}|${c.width}x${c.height}|${c.refine.version}|${c.refine.radius}|${c.shift}|${c.feather}${c.recover ? `|${c.recover.version}:${textHash(JSON.stringify(c.recover.strokes))}` : ''}`
   : null);
 
 /** Registers a refined tile map; the least recently registered leave past the byte budget. */
