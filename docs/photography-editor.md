@@ -1302,6 +1302,20 @@ equal to the page). `check:editor:layer-masks` refines the car layer's Subject a
 selections and requires the PNG export to equal a Node reference that refines them too: bit-exact
 in Chromium, Firefox, WebKit, iPhone 13 and Pixel 7 emulation and without WebGL2 (the refinement is
 deterministic across engines); preview vs export mean difference 0 (no WebGL2: 0.24).
+`check:editor:selection` (Chromium, WebKit, iPhone 13) and `check:cms:editor` (Chromium, WebKit) pass
+with refinement on. Genuine RAW layers (`LAYER_MASK_RAW_DIR`, Chromium) refined and exported from
+their development: Sony A7 III ARW, Canon CR2 (2) and CR3 (2), Fujifilm RAF (2), Nikon Z6 NEF and
+NRW (2), Olympus ORF, Pentax PEF, Panasonic RW2 (2), DNG (4). Not refined: the OM-1 ORF (no subject
+found, a landscape) and three high-efficiency NEFs (refused on import since Interval 21). A merged
+HDR exported to a file and imported as an image layer is an ordinary image (refined); a merged HDR
+photo's own selections are not.
+
+**Physical iPhone (not tested; emulation is WebKit on Windows).** On an iPhone 16e in Safari:
+import a 24 MP JPEG, add a car photo as an image layer, Mask from Subject, wait for "Edge refined",
+toggle Refine edge, brush Add/Subtract at 200 % (no stroke from a pinch), move and rotate the layer
+(no new "Refining"), add a clipped Detail adjustment, export a PNG; background Safari during
+refinement and return (it refines again); repeat the selection and export three times without a
+tab reload.
 
 ## Retouch (Remove, Spot Heal and Clone Stamp)
 
