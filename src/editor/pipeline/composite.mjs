@@ -20,6 +20,13 @@
 // the whole canvas's coverage codes); its coverage scales the pass's alpha (raster) or opacity
 // (adjustment, Detail) per pixel. A mask is evaluated per pixel too.
 //
+// Groups and clipping (model/layerTree.mjs): a 'begin' pass starts a new target, an 'end' pass
+// finishes it. Isolated: the target is a transparent canvas, composited at the end over the one
+// below with the group's blend mode, opacity and mask. Pass-through: the passes go on drawing on
+// the same canvas, and at the end it is faded back toward a copy taken at 'begin' by the opacity
+// and mask (blend.fadePixel). A raster pass with `clip` is composited atop (blend.atopPixel).
+// Every one of these is per pixel, so bands need no overlap here either.
+//
 // Raster and adjustment passes are per pixel (resampling reads the layer's own raster, never the
 // canvas), so bands and export tiles never need overlap and the result does not depend on where
 // a band starts. A Detail pass reads neighbours: it runs over the whole canvas, band by band,
@@ -32,7 +39,7 @@ import { maskBounds, maskRows } from './mask.mjs';
 import { guideSource, prepareDetailRender, renderDetailRows, rowsHaveAlpha } from './detailRenderer.mjs';
 import { deriveParams } from './spec.mjs';
 import { warpRows, hasAlpha } from './warp.mjs';
-import { BLEND_CODES, adjustPixel, compositePixel, mixPixel } from './blend.mjs';
+import { BLEND_CODES, adjustPixel, atopPixel, compositePixel, fadePixel, mixPixel } from './blend.mjs';
 import { matrixScale, rasterBounds } from './layerTransform.mjs';
 import { layerAdjustments } from '../model/layers.mjs';
 
@@ -65,6 +72,8 @@ export function rasterPass(layer, raster, matrix, canvas, mask = null) {
     mode: BLEND_CODES[layer.blend] ?? 0,
     bounds: rasterBounds(matrix, raster, canvas),
     mask,
+    // Clipped to its base (layerTree.mjs): drawn atop the base's isolated canvas.
+    clip: layer.clip === true,
   };
 }
 
@@ -79,6 +88,56 @@ export function adjustmentPass(layer, lut = null, mask = null) {
     mode: BLEND_CODES[layer.blend] ?? 0,
     mask,
   };
+}
+
+/** A program step's group pass: 'begin', or 'end' with its blend mode, opacity and mask (as other passes). */
+export function groupPass(step, mask = null) {
+  if (step.op === 'begin') return { kind: 'begin', id: step.id, isolate: step.isolate };
+  return { kind: 'end', id: step.id, isolate: step.isolate, opacity: step.opacity, mode: BLEND_CODES[step.blend] ?? 0, mask };
+}
+
+/**
+ * Finishes a group over rows [y0, y1) (any whole rows of the canvas): isolated, `inner` (the
+ * group's target) is composited over `rows` (the target below); pass-through, `rows` (drawn on)
+ * is faded back toward `inner` (the copy taken at 'begin').
+ */
+export function endRows(rows, inner, canvasWidth, y0, y1, pass) {
+  const mask = passMask(pass, canvasWidth, y0, y1);
+  const n = canvasWidth * (y1 - y0);
+  for (let p = 0; p < n; p += 1) {
+    const t = mask ? pass.opacity * (mask[p] / 255) : pass.opacity;
+    const o = p * 4;
+    if (pass.isolate) compositePixel(pass.mode, rows, o, inner, o, (inner[o + 3] / 255) * t);
+    else fadePixel(rows, o, inner, o, t);
+  }
+  return rows;
+}
+
+/**
+ * Targets of a group program over a canvas `image`: begin() and end() keep the stack, `current`
+ * is the canvas the next pass draws on (`image` itself outside groups).
+ */
+export function compositeStack(image) {
+  const { width, height } = image;
+  const stack = [];
+  const state = {
+    current: image,
+    depth: () => stack.length,
+    begin(pass) {
+      if (pass.isolate) {
+        stack.push({ target: state.current, inner: null });
+        state.current = { width, height, data: new Uint8ClampedArray(width * height * 4) };
+      } else stack.push({ target: state.current, inner: state.current.data.slice() });
+    },
+    /** Pops the group: { rows, inner } for endRows (rows: the target receiving the result). */
+    end() {
+      const { target, inner } = stack.pop();
+      const result = inner ? { rows: state.current.data, inner } : { rows: target.data, inner: state.current.data };
+      state.current = target;
+      return result;
+    },
+  };
+  return state;
 }
 
 /**
@@ -150,6 +209,7 @@ export function compositeRasterRows(rows, canvasWidth, y0, y1, pass) {
   const sampled = new Uint8ClampedArray(width * (bottom - top) * 4);
   warpRows(pass.raster, m, width, top, bottom, sampled, { opaque: pass.opaque, x0: bounds.x });
   const mask = passMask(pass, canvasWidth, top, bottom, bounds.x, width);
+  const draw = pass.clip ? atopPixel : compositePixel;
   for (let y = top; y < bottom; y += 1) {
     for (let x = bounds.x; x < bounds.x + width; x += 1) {
       const coverage = rasterCoverage(m, rw, rh, scale, x, y);
@@ -157,7 +217,7 @@ export function compositeRasterRows(rows, canvasWidth, y0, y1, pass) {
       const p = (y - top) * width + x - bounds.x;
       const i = p * 4;
       const masked = mask ? opacity * (mask[p] / 255) : opacity;
-      compositePixel(mode, rows, ((y - y0) * canvasWidth + x) * 4, sampled, i, (sampled[i + 3] / 255) * coverage * masked);
+      draw(mode, rows, ((y - y0) * canvasWidth + x) * 4, sampled, i, (sampled[i + 3] / 255) * coverage * masked);
     }
   }
   return rows;
@@ -304,14 +364,18 @@ export async function detailImage(image, pass, { bandRows = COMPOSITE_BAND_ROWS,
  * in place and in bands (tests, the no-WebGL2 preview and exports without band workers).
  * :param options: { bandRows, onBand(fraction) } onBand may return a promise (to yield)
  */
-export async function compositeImage(image, passes, { bandRows = COMPOSITE_BAND_ROWS, onBand, cancelled } = {}) {
-  const { width, height, data } = image;
+export async function compositeImage(image, passes, { bandRows = COMPOSITE_BAND_ROWS, onBand, cancelled, stack = compositeStack(image) } = {}) {
+  const { width, height } = image;
   let done = 0;
   const total = passes.length * height;
   for (const pass of passes) {
+    if (pass.kind === 'begin') { stack.begin(pass); done += height; continue; } // eslint-disable-line no-continue
+    let ended = null;
+    if (pass.kind === 'end') ended = stack.end();
+    const target = stack.current;
     if (pass.kind === 'detail') {
       const start = done;
-      await detailImage(image, pass, { bandRows, cancelled, onBand: (fraction) => onBand?.((start + fraction * height) / total) });
+      await detailImage(target, pass, { bandRows, cancelled, onBand: (fraction) => onBand?.((start + fraction * height) / total) });
       done += height;
       continue; // eslint-disable-line no-continue
     }
@@ -319,9 +383,12 @@ export async function compositeImage(image, passes, { bandRows = COMPOSITE_BAND_
     for (let row = 0; row < height; row += bandRows) {
       if (cancelled?.()) throw Object.assign(new Error('Cancelled.'), { code: 'cancelled' });
       const last = Math.min(height, row + bandRows);
-      const rows = data.subarray(row * width * 4, last * width * 4);
-      if (pass.kind === 'adjust') { if (passTouchesRows(pass, image, row, last)) adjustRows(rows, pass, prepared, { width, y0: row }); }
-      else compositeRasterRows(rows, width, row, last, pass);
+      if (ended) endRows(ended.rows.subarray(row * width * 4, last * width * 4), ended.inner.subarray(row * width * 4, last * width * 4), width, row, last, pass);
+      else {
+        const rows = target.data.subarray(row * width * 4, last * width * 4);
+        if (pass.kind === 'adjust') { if (passTouchesRows(pass, target, row, last)) adjustRows(rows, pass, prepared, { width, y0: row }); }
+        else compositeRasterRows(rows, width, row, last, pass);
+      }
       done += last - row;
       await onBand?.(done / total);
     }
@@ -329,15 +396,23 @@ export async function compositeImage(image, passes, { bandRows = COMPOSITE_BAND_
   return image;
 }
 
-/** Synchronous whole-image composite (Node tests and parity references). */
+/** Synchronous whole-image composite (Node tests, parity references and the CPU preview). */
 export function compositeImageSync(image, passes) {
-  const { width, height, data } = image;
+  const { width, height } = image;
+  const stack = compositeStack(image);
   for (const pass of passes) {
+    if (pass.kind === 'begin') { stack.begin(pass); continue; } // eslint-disable-line no-continue
+    if (pass.kind === 'end') {
+      const { rows, inner } = stack.end();
+      endRows(rows, inner, width, 0, height, pass);
+      continue; // eslint-disable-line no-continue
+    }
+    const target = stack.current;
     if (pass.kind === 'detail') {
-      const bands = detailBands(image, pass, COMPOSITE_BAND_ROWS);
+      const bands = detailBands(target, pass, COMPOSITE_BAND_ROWS);
       while (!bands.next().done);
-    } else if (pass.kind === 'adjust') adjustRows(data, pass, prepareRender(adjustmentParams(pass)), { width, y0: 0 });
-    else compositeRasterRows(data, width, 0, height, pass);
+    } else if (pass.kind === 'adjust') adjustRows(target.data, pass, prepareRender(adjustmentParams(pass)), { width, y0: 0 });
+    else compositeRasterRows(target.data, width, 0, height, pass);
   }
   return image;
 }

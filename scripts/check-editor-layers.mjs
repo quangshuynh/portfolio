@@ -6,6 +6,8 @@
 // PNG exports equal to the Node reference (composite.mjs over the photo's reference render), text
 // placement, a reload that restores the stack and asks for the missing layer file, reconnection
 // (and refusal of a different file), a batch ZIP with a layered photo, phone layout, timings.
+// Groups and clipping (Interval 24): a clipped adjustment and a Screen group made from the panel
+// (button and Ctrl+G) export equal to the Node reference, then are taken apart again.
 // Desktop runs export a 24 MP layered JPEG (browser memory sampled on Windows). With
 // LAYER_FIXTURE_DIR (genuine Sony .ARW and .JPG files) Chromium and Firefox composite JPEG over
 // RAW, RAW over RAW and text over RAW, and Chromium text and a JPEG over a merged RAW HDR.
@@ -26,8 +28,9 @@ import { deriveParams } from '../src/editor/pipeline/spec.mjs';
 import { finishRows, warpImage, warpSpec } from '../src/editor/pipeline/warp.mjs';
 import { exportGeometry } from '../src/editor/io/files.mjs';
 import { normalizeAdjustments } from '../src/editor/model/adjustments.mjs';
-import { layerAdjustments, settingsNeutral, visibleLayers } from '../src/editor/model/layers.mjs';
-import { adjustmentPass, compositeImageSync, rasterPass } from '../src/editor/pipeline/composite.mjs';
+import { layerAdjustments, settingsNeutral } from '../src/editor/model/layers.mjs';
+import { layerProgram } from '../src/editor/model/layerTree.mjs';
+import { adjustmentPass, compositeImageSync, groupPass, rasterPass } from '../src/editor/pipeline/composite.mjs';
 import { layerMatrix, rasterSize } from '../src/editor/pipeline/layerTransform.mjs';
 import { readZip } from '../src/editor/dev/zipVerify.mjs';
 import { openEditorTool } from './editor-mobile-controls.mjs';
@@ -164,7 +167,12 @@ function reference(base, adjustments, rasters) {
   const data = renderAnyImage(warped, deriveParams(values), { nativeWidth: sizes.plan.native.width, nativeHeight: sizes.plan.native.height });
   finishRows(spec, data, 0, spec.height, false);
   const out = { width: spec.width, height: spec.height, data };
-  const passes = visibleLayers(values.layers).map((layer) => {
+  const passes = layerProgram(values.layers).map((step) => {
+    if (step.op !== 'layer') {
+      assert.ok(!step.owner, 'reference exports need group masks off');
+      return groupPass(step);
+    }
+    const { layer } = step;
     if (layer.type === 'adjustment') return adjustmentPass(layer);
     assert.notEqual(layer.type, 'text', 'reference exports need text hidden');
     const raster = rasters[layer.source.sha256];
@@ -352,6 +360,40 @@ async function runOne(run, files) {
       await tool('layers');
       await page.locator('.pe-layer[data-type=adjustment] .pe-layer__name').press('Alt+ArrowDown');
       await savedWhen('layers-base.png', (v) => v.layers?.[0]?.type === 'adjustment', 'adjustment back below');
+    });
+    await step('clipped adjustment and a Screen group: PNG export equals the Node reference; taken apart again', async () => {
+      await tool('layers');
+      await page.locator('.pe-layer[data-type=image] .pe-layer__name').click();
+      await props().locator('button', { hasText: 'Add clipped adjustment' }).click();
+      await page.locator('.pe-layer[data-clip] .pe-layer__name').waitFor();
+      if (run.device) await page.locator('.pe-layers__props button', { hasText: 'Edit adjustment settings' }).click();
+      await page.waitForSelector('.pe-adjust-target');
+      await setValue('Exposure', '-1.5');
+      await tool('layers');
+      await page.locator('.pe-layer[data-type=image] .pe-layer__name').press('Control+g');
+      await page.locator('.pe-layer[data-type=group]').waitFor();
+      await page.locator('.pe-layer[data-type=group] .pe-layer__name').click();
+      await props().locator('label:has-text("Blend mode") select').selectOption('screen');
+      await page.getByRole('spinbutton', { name: 'Opacity value (%)' }).fill('70');
+      const values = await savedWhen('layers-base.png', (v) => v.layers?.some((l) => l.type === 'group' && l.blend === 'screen' && l.opacity === 0.7)
+        && v.layers.some((l) => l.clip && l.settings?.exposure === -1.5), 'group and clip');
+      assert.deepEqual(values.layers.map((l) => [l.type, l.parent ?? null, Boolean(l.clip)]).slice(1), [['image', values.layers[3].id, false], ['adjustment', values.layers[3].id, true], ['group', null, false]]);
+      await layersReady();
+      const exported = await readPng(await exportFile('png'));
+      const diff = compare(reference(files.base, values, rasters), exported.data);
+      result.groupExportVsReference = diff;
+      assert.ok(diff.ok, `group export differs from the reference: ${JSON.stringify(diff)}`);
+      // The clip changes the image only: the export differs from the plain one, but not outside the image layer.
+      let changed = 0;
+      for (let i = 0; i < exported.data.length; i += 4) if (exported.data[i] !== plainExport.data[i]) changed += 1;
+      assert.ok(changed > 1000, 'the group changed nothing');
+      await tool('layers');
+      await page.locator('.pe-layer[data-type=group] .pe-layer__name').click();
+      await props().locator('button', { hasText: 'Ungroup' }).click();
+      await page.locator('.pe-layer[data-clip] .pe-layer__name').click();
+      await props().locator('button', { hasText: 'Delete…' }).click();
+      await props().locator('button', { hasText: 'Delete layer' }).click();
+      await savedWhen('layers-base.png', (v) => v.layers.length === 2 && v.layers.every((l) => l.type !== 'group' && !l.clip && !l.parent), 'taken apart');
     });
     await step('text layer: placed where its fields say, other pixels untouched', async () => {
       await tool('layers');

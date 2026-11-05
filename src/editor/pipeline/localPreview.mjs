@@ -5,7 +5,7 @@
 // reports the box a move changed (mask.mjs `change`), only that box is mixed again. Every pixel
 // goes through the arithmetic of composite.compositeImageSync, so the frame is identical to it.
 import { mixPixel } from './blend.mjs';
-import { COMPOSITE_BAND_ROWS, adjustRows, adjustmentParams, compositeRasterRows, detailPassOptions, prepareDetailPass } from './composite.mjs';
+import { COMPOSITE_BAND_ROWS, adjustRows, adjustmentParams, compositeRasterRows, compositeStack, detailPassOptions, endRows, prepareDetailPass } from './composite.mjs';
 import { prepareRender } from './cpuRenderer.mjs';
 import { renderDetailRows } from './detailRenderer.mjs';
 
@@ -35,7 +35,8 @@ const maskKey = (pass) => (pass.mask ? `${pass.mask.key ?? ''}#${pass.mask.raste
 const drawnKey = (pass) => {
   if (pass.kind === 'detail') return `${filterKey(pass)}|${pass.opacity}`;
   if (pass.kind === 'adjust') return `a|${JSON.stringify(pass.adjustments)}|${pass.lut?.sha256 ?? ''}|${pass.opacity}|${pass.mode}`;
-  return `r|${idOf(pass.raster)}|${JSON.stringify([pass.matrix, pass.opacity, pass.mode, pass.bounds, pass.scale, pass.opaque])}`;
+  if (pass.kind === 'begin' || pass.kind === 'end') return `g|${pass.kind}|${pass.isolate}|${pass.opacity ?? ''}|${pass.mode ?? ''}`;
+  return `r|${idOf(pass.raster)}|${JSON.stringify([pass.matrix, pass.opacity, pass.mode, pass.bounds, pass.scale, pass.opaque, pass.clip])}`;
 };
 const passKey = (pass) => `${drawnKey(pass)}|${maskKey(pass)}`;
 
@@ -128,7 +129,8 @@ export function createLocalPreview({ renderDetail, onReady = () => {}, keep = 2 
         const change = raster?.change;
         const before = last.passes[j]?.mask?.raster?.change;
         const onlyMask = changed.length > 0 && changed.every((k) => passes[k].mask?.raster === raster && drawnKey(passes[k]) === drawnKey(last.passes[k]));
-        if (onlyMask && passes[j].kind === 'detail' && last.backdrops.has(j) && passes.slice(j + 1).every(({ kind }) => kind !== 'detail')
+        // Groups need whole canvases: a box update covers only per-pixel passes on one canvas.
+        if (onlyMask && passes[j].kind === 'detail' && last.backdrops.has(j) && passes.slice(j + 1).every(({ kind }) => kind !== 'detail' && kind !== 'begin' && kind !== 'end')
           && change && before && change.from !== null && change.key === before.key && change.from === before.version) {
           const { dirty } = change;
           const backdrop = last.backdrops.get(j);
@@ -148,8 +150,11 @@ export function createLocalPreview({ renderDetail, onReady = () => {}, keep = 2 
       const data = last?.image.width === width && last.image.height === height ? last.image.data : new Uint8ClampedArray(width * height * 4);
       data.set(base.data);
       const backdrops = new Map();
+      const stack = compositeStack({ width, height, data });
       passes.forEach((pass, j) => {
-        if (pass.kind !== 'detail') { applyRows(data, pass, width, 0, height); return; }
+        if (pass.kind === 'begin') { stack.begin(pass); return; }
+        if (pass.kind === 'end') { const { rows, inner } = stack.end(); endRows(rows, inner, width, 0, height, pass); return; }
+        if (pass.kind !== 'detail') { applyRows(stack.current.data, pass, width, 0, height); return; }
         const detailed = ready(j);
         if (!detailed) { if (!defer) request(`${backdropKeys[j]}|${filterKey(pass)}`, { width, height, data }, pass); return; }
         // The backdrop is kept for the box updates (the base itself for a first pass), for two Detail passes at most.

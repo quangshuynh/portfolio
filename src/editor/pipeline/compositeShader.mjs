@@ -6,6 +6,11 @@
 // so every pass starts from the same 8-bit values on both. A masked pass also reads its mask's
 // coverage codes (an R8 texture, row 0 = top, computed by pipeline/mask.mjs), which scale the
 // layer's alpha or the adjustment's opacity as composite.mjs does.
+//
+// Groups and clipping (composite.endRows, blend.fadePixel, blend.atopPixel): `uMerge` 1 composites
+// an isolated group's target (uLayer, canvas-aligned) over the target below (uBackdrop); 2 fades a
+// pass-through group's result (uLayer) back toward the copy taken at its start (uBackdrop);
+// `uClip` composites a raster atop its base.
 
 import { POSITION_GRID, ROUNDING_BIAS } from './warp.mjs';
 
@@ -27,6 +32,8 @@ uniform float uOpacity;
 uniform int uMode;
 uniform sampler2D uMask;
 uniform bool uMasked;
+uniform int uMerge;
+uniform bool uClip;
 out vec4 outColor;
 
 const float POSITION_GRID = ${f(POSITION_GRID)};
@@ -132,6 +139,27 @@ void main() {
   vec4 backdrop = codes(texelFetch(uBackdrop, at, 0)) / 255.0;
   float masked = uOpacity;
   if (uMasked) masked = uOpacity * (codes(texelFetch(uMask, ivec2(at.x, int(uOutputSize.y) - 1 - at.y), 0)).r / 255.0);
+  if (uMerge == 1) {
+    vec4 inner = codes(texelFetch(uLayer, at, 0));
+    float alpha = inner.a / 255.0 * masked;
+    if (alpha <= 0.0) { outColor = backdrop; return; }
+    vec3 cs = inner.rgb / 255.0;
+    vec3 mixed = blendRgb(backdrop.rgb, cs);
+    float ao = alpha + backdrop.a * (1.0 - alpha);
+    float keep = backdrop.a * (1.0 - alpha);
+    outColor = stored((alpha * ((1.0 - backdrop.a) * cs + backdrop.a * mixed) + keep * backdrop.rgb) / ao, ao);
+    return;
+  }
+  if (uMerge == 2) {
+    vec4 drawn = codes(texelFetch(uLayer, at, 0)) / 255.0;
+    if (masked >= 1.0) { outColor = drawn; return; }
+    if (masked <= 0.0) { outColor = backdrop; return; }
+    float a = backdrop.a + masked * (drawn.a - backdrop.a);
+    if (a <= 0.0) { outColor = vec4(0.0); return; }
+    vec3 from = backdrop.a * backdrop.rgb;
+    outColor = stored((from + masked * (drawn.a * drawn.rgb - from)) / a, a);
+    return;
+  }
   if (uAdjust) {
     if (masked <= 0.0) { outColor = backdrop; return; }
     vec3 adjusted = codes(texelFetch(uLayer, at, 0)).rgb / 255.0;
@@ -150,6 +178,7 @@ void main() {
   if (alpha <= 0.0) { outColor = backdrop; return; }
   vec3 cs = source.rgb / 255.0;
   vec3 mixed = blendRgb(backdrop.rgb, cs);
+  if (uClip) { outColor = stored(backdrop.rgb + alpha * (mixed - backdrop.rgb), backdrop.a); return; }
   float ao = alpha + backdrop.a * (1.0 - alpha);
   float keep = backdrop.a * (1.0 - alpha);
   outColor = stored((alpha * ((1.0 - backdrop.a) * cs + backdrop.a * mixed) + keep * backdrop.rgb) / ao, ao);

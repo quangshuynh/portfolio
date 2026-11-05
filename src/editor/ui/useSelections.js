@@ -97,6 +97,10 @@ export default function useSelections({ photo, ready, viewProxy, adjustments, lu
 
   const cancel = useCallback(() => { jobRef.current += 1; runnerRef.current?.cancel(); setStatus(null); }, []);
 
+  // The mask selections are added to: a local adjustment's, or a canvas-space layer mask (Interval 24:
+  // evaluated in the photo's own space, as a local's). Select Object stays with local adjustments,
+  // whose mask is in the space its taps are given in.
+  const targetMask = target?.kind === 'local' ? target.local.mask : target?.kind === 'layer' && target.layer.mask?.space === 'canvas' ? target.layer.mask : null;
   const component = (id, kind, result, patch = {}) => createSelection(id, { kind, version: result.version, width: result.width, height: result.height, data: result.data, confidence: result.confidence }, { ...(kind === 'background' ? { invert: true } : {}), ...patch });
 
   /**
@@ -115,13 +119,13 @@ export default function useSelections({ photo, ready, viewProxy, adjustments, lu
       const localId = newId('local');
       onApplyLocals([...locals, createLocalAdjustment(localId, { name: kind[0].toUpperCase() + kind.slice(1), mask: { ...createMask('image'), components: [selection] } })]);
       onSelectLocal(localId, id);
-    } else if (target?.kind === 'local') {
-      const next = addComponent(target.local.mask, selection);
-      if (next === target.local.mask) return;
+    } else if (targetMask) {
+      const next = addComponent(targetMask, selection);
+      if (next === targetMask) return;
       onApplyMask(next);
       onSelectComponent(id);
     }
-  }, [run, newId, locals, onApplyLocals, onSelectLocal, target, onApplyMask, onSelectComponent]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [run, newId, locals, onApplyLocals, onSelectLocal, targetMask, onApplyMask, onSelectComponent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Subject or Background: the next of the other distinct answers the models found (wrapping to
@@ -129,7 +133,7 @@ export default function useSelections({ photo, ready, viewProxy, adjustments, lu
    * remembered for this session only; the saved selection is just its grid.
    */
   const nextCandidate = useCallback(async (c) => {
-    if (target?.kind !== 'local') return;
+    if (!targetMask) return;
     const known = candidatesRef.current.get(c.id) ?? { candidate: 0, candidates: Infinity };
     const wanted = known.candidate + 1 < known.candidates ? known.candidate + 1 : 0;
     const done = await run(c.kind, { candidate: wanted });
@@ -140,22 +144,22 @@ export default function useSelections({ photo, ready, viewProxy, adjustments, lu
       setStatus({ kind: c.kind, note: 'The models found no other candidate. Use Select Object, or refine this one with Add and Subtract.' });
       return;
     }
-    onApplyMask(updateComponent(target.local.mask, c.id, { version: result.version, width: result.width, height: result.height, data: result.data, confidence: result.confidence }));
+    onApplyMask(updateComponent(targetMask, c.id, { version: result.version, width: result.width, height: result.height, data: result.data, confidence: result.confidence }));
     if (!result.note) setStatus({ kind: c.kind, note: `Candidate ${(result.candidate ?? 0) + 1} of ${result.candidates}.` });
-  }, [target, run, onApplyMask]);
+  }, [targetMask, run, onApplyMask]);
 
   /** Select again with the same kind (and an object's points), keeping its edge settings. */
   const regenerate = useCallback(async (c) => {
-    if (target?.kind !== 'local') return;
+    if (!targetMask) return;
     const { image } = await analysisImage().catch(() => ({ image: null }));
     if (!image) return;
     const points = c.points?.map(([u, v, label]) => [u * image.width, v * image.height, label]);
     const done = await run(c.kind, c.kind === 'object' ? { points } : {});
     if (!done?.result.found) return;
     if (done.result.candidates !== undefined) candidatesRef.current.set(c.id, { candidate: 0, candidates: done.result.candidates });
-    const next = updateComponent(target.local.mask, c.id, { version: done.result.version, width: done.result.width, height: done.result.height, data: done.result.data, confidence: done.result.confidence });
+    const next = updateComponent(targetMask, c.id, { version: done.result.version, width: done.result.width, height: done.result.height, data: done.result.data, confidence: done.result.confidence });
     onApplyMask(next);
-  }, [target, analysisImage, run, onApplyMask]);
+  }, [targetMask, analysisImage, run, onApplyMask]);
 
   // Select Object: taps (in the mask's space, 0–1) add points; each shows the candidate at once.
   const objectRun = useCallback(async (points, candidate = null) => {

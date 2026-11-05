@@ -21,8 +21,19 @@
 // still be reordered and duplicated (the copy is unlocked).
 //
 // A layer may have a `mask` (model/masks.mjs): image layers in their own box ('layer' space,
-// so the mask moves with them), text and adjustment layers on the canvas. The key is absent
-// when a layer has no mask, as in version 9 documents.
+// so the mask moves with them), text, adjustment and group layers on the canvas. The key is
+// absent when a layer has no mask, as in version 9 documents.
+//
+// Groups and clipping (Interval 24, document version 17; model/layerTree.mjs renders them):
+// - A group is a layer of type 'group' (name, visibility, lock, opacity, mask, blend mode or
+//   'pass-through'); a layer inside it names it in `parent`. The list stays flat: a group's
+//   descendants lie directly below its own entry, children bottom first, and groups nest at most
+//   LAYER_LIMITS.depth deep. normalizeLayers repairs any other order or reference (a missing,
+//   non-group or circular parent puts the layer at the top level) without dropping layers.
+// - `clip: true` clips a layer to its base: the nearest unclipped layer below it with the same
+//   parent. Image, text and group layers can be bases; adjustment layers cannot, and groups are
+//   never clipped themselves. A clip without a valid base is removed.
+// Both keys are absent when unused, so version 16 stacks normalise to exactly what they were.
 
 import { DEFAULT_OUTLINE, DEFAULT_SHADOW, TEXT_LIMITS, normalizeTextOverlay } from './overlays.mjs';
 import { ADJUSTMENTS, groupIsNeutral, normalizeAdjustments } from './adjustments.mjs';
@@ -34,7 +45,7 @@ import { DEFAULT_RAW_PROFILE, LEGACY_RAW_PROFILE, NATURAL_VERSION, RAW_PROFILE_I
 /** The space of a layer type's mask. */
 export const layerMaskSpace = (type) => (type === 'image' ? 'layer' : 'canvas');
 
-export const LAYER_TYPES = Object.freeze(['image', 'text', 'adjustment']);
+export const LAYER_TYPES = Object.freeze(['image', 'text', 'adjustment', 'group']);
 
 /** Blend modes (W3C Compositing and Blending Level 1), in menu order. */
 export const BLEND_MODES = Object.freeze([
@@ -56,12 +67,17 @@ export const BLEND_MODES = Object.freeze([
   { id: 'luminosity', label: 'Luminosity' },
 ].map(Object.freeze));
 const BLEND_IDS = new Set(BLEND_MODES.map(({ id }) => id));
+/** A group's own mode: its children act on what lies below it, as if not grouped (model/layerTree.mjs). */
+export const PASS_THROUGH = 'pass-through';
 
 export const LAYER_LIMITS = Object.freeze({
   layers: 40,
   image: 8,
   adjustment: 12,
   text: TEXT_LIMITS.objects,
+  group: 12,
+  // Groups inside groups: a group may sit inside at most depth − 1 others.
+  depth: 3,
   name: 60,
   // An image layer's box, in canvas short edges.
   size: Object.freeze([0.01, 20]),
@@ -167,6 +183,7 @@ export function layerDevelopment(layer) {
 }
 
 function common(input) {
+  const group = input.type === 'group';
   return {
     id: input.id,
     type: input.type,
@@ -174,16 +191,25 @@ function common(input) {
     visible: input.visible !== false,
     locked: input.locked === true,
     opacity: round(number(input.opacity, [0, 1], 1), 3),
-    blend: BLEND_IDS.has(input.blend) ? input.blend : 'normal',
+    blend: BLEND_IDS.has(input.blend) || (group && input.blend === PASS_THROUGH) ? input.blend : group ? PASS_THROUGH : 'normal',
   };
 }
 
+// Tree keys, kept only when used (normalizeLayers checks them against the whole stack).
+const treeKeys = (input, type) => ({
+  ...(validId(input.parent) && input.parent !== input.id ? { parent: input.parent } : {}),
+  ...(input.clip === true && type !== 'group' ? { clip: true } : {}),
+});
+
 /** One layer from untrusted input, or null when it is not a valid layer. Values are clamped. */
 export function normalizeLayer(input, budget = { points: MASK_LIMITS.photoPoints }) {
-  const layer = normalizeLayerFields(input);
-  if (!layer || !isObject(input.mask)) return layer;
-  const mask = normalizeMask(input.mask, layerMaskSpace(layer.type), budget);
-  return mask ? { ...layer, mask } : layer;
+  const fields = normalizeLayerFields(input);
+  if (!fields) return null;
+  const tree = treeKeys(input, fields.type);
+  if (!isObject(input.mask)) return { ...fields, ...tree };
+  const mask = normalizeMask(input.mask, layerMaskSpace(fields.type), budget);
+  // The mask keeps its place before the tree keys, as in version 16 stacks.
+  return mask ? { ...fields, mask, ...tree } : { ...fields, ...tree };
 }
 
 function normalizeLayerFields(input) {
@@ -195,6 +221,7 @@ function normalizeLayerFields(input) {
     return { ...common(input), ...fields, type: 'text', flipH: input.flipH === true, flipV: input.flipV === true };
   }
   if (input.type === 'adjustment') return { ...common(input), settings: normalizeLayerSettings(input.settings) };
+  if (input.type === 'group') return common(input);
   const source = normalizeSource(input.source);
   if (!source) return null;
   const rawProfile = normalizeLayerRawProfile(input.rawProfile, source.format);
@@ -224,7 +251,7 @@ export const textLayerFromOverlay = (overlay) => (isObject(overlay) && (overlay.
 export function normalizeLayers(input, legacyOverlays = undefined, budget = { points: MASK_LIMITS.photoPoints }) {
   const list = Array.isArray(input) ? input : Array.isArray(legacyOverlays) ? legacyOverlays.map(textLayerFromOverlay) : [];
   const seen = new Set();
-  const counts = { image: 0, text: 0, adjustment: 0 };
+  const counts = { image: 0, text: 0, adjustment: 0, group: 0 };
   const out = [];
   for (const entry of list.slice(0, LAYER_LIMITS.layers * 2)) {
     const layer = normalizeLayer(entry, budget);
@@ -234,7 +261,66 @@ export function normalizeLayers(input, legacyOverlays = undefined, budget = { po
     out.push(layer);
     if (out.length === LAYER_LIMITS.layers) break;
   }
-  return out;
+  return repairLayerTree(out);
+}
+
+const without = (layer, key) => {
+  const { [key]: dropped, ...rest } = layer; // eslint-disable-line no-unused-vars
+  return rest;
+};
+
+/**
+ * The stack with valid tree keys in tree order (see the comment at the top): parents that are
+ * missing, not groups or circular are removed, groups nested too deep move up, descendants are
+ * gathered below their group (siblings keep their order; a group sits where its entry was) and
+ * clips without a valid base are removed. A valid stack is returned as it is.
+ */
+export function repairLayerTree(input) {
+  if (!input.some((layer) => layer.parent || layer.clip)) return input;
+  let ids = new Map(input.map((layer) => [layer.id, layer]));
+  let layers = input.map((layer) => (layer.parent && ids.get(layer.parent)?.type !== 'group' ? without(layer, 'parent') : layer));
+  ids = new Map(layers.map((layer) => [layer.id, layer]));
+  // Circular parents: a layer whose walk up meets itself leaves its parent.
+  layers = layers.map((layer) => {
+    const visited = new Set([layer.id]);
+    for (let at = ids.get(layer.parent); at; at = ids.get(at.parent)) {
+      if (visited.has(at.id)) return without(layer, 'parent');
+      visited.add(at.id);
+    }
+    return layer;
+  });
+  ids = new Map(layers.map((layer) => [layer.id, layer]));
+  // Groups nested deeper than allowed move to their grandparent until they fit.
+  const depth = (layer) => { let d = 0; for (let at = ids.get(layer.parent); at; at = ids.get(at.parent)) d += 1; return d; };
+  for (let pass = 0; pass < LAYER_LIMITS.layers; pass += 1) {
+    const deep = layers.findIndex((layer) => layer.type === 'group' && depth(layer) >= LAYER_LIMITS.depth);
+    if (deep === -1) break;
+    const grand = ids.get(ids.get(layers[deep].parent).parent);
+    layers[deep] = grand ? { ...layers[deep], parent: grand.id } : without(layers[deep], 'parent');
+    ids = new Map(layers.map((layer) => [layer.id, layer]));
+  }
+  // Tree order: each group's children (bottom first, in list order) directly below its entry.
+  const children = new Map();
+  layers.forEach((layer) => {
+    const key = layer.parent ?? null;
+    if (!children.has(key)) children.set(key, []);
+    children.get(key).push(layer);
+  });
+  const ordered = [];
+  const emit = (key) => (children.get(key) ?? []).forEach((layer) => {
+    if (layer.type === 'group') emit(layer.id);
+    ordered.push(layer);
+  });
+  emit(null);
+  // Clips: the nearest unclipped sibling below must be an image, text or group layer.
+  const base = new Map();
+  const result = ordered.map((layer) => {
+    const key = layer.parent ?? null;
+    if (!layer.clip) { base.set(key, layer); return layer; }
+    const below = base.get(key);
+    return below && below.type !== 'adjustment' ? layer : without(layer, 'clip');
+  });
+  return result.length === input.length && result.every((layer, i) => layer === input[i]) ? input : result;
 }
 
 /** Saved form: settings compacted, text fields as in Interval 11. */
@@ -253,6 +339,7 @@ export function layerLabel(layer) {
   if (layer.name) return layer.name;
   if (layer.type === 'text') return (layer.text.split('\n')[0] || 'Empty text').slice(0, 40);
   if (layer.type === 'image') return layer.source.name || 'Image';
+  if (layer.type === 'group') return 'Group';
   return 'Adjustment';
 }
 
@@ -303,10 +390,13 @@ export function moveLayer(layers, id, to) {
   return next;
 }
 
-/** Layers that change pixels: visible, opaque enough, with something to draw. */
-export const visibleLayers = (layers) => layers.filter((layer) => layer.visible && layer.opacity > 0
+/** Whether a layer itself draws something (groups around it and its clipping base aside; groups draw through their children). */
+export const layerDraws = (layer) => layer.type !== 'group' && layer.visible && layer.opacity > 0
   && (layer.type !== 'text' || layer.text.trim() !== '')
-  && (layer.type !== 'adjustment' || !settingsNeutral(layer.settings)));
+  && (layer.type !== 'adjustment' || !settingsNeutral(layer.settings));
+
+/** Layers that draw on their own, ignoring groups and clipping (layerTree.drawnLayers: what is actually drawn). */
+export const visibleLayers = (layers) => layers.filter(layerDraws);
 
 /**
  * A new image layer for `source` ({ sha256, name, size, format, width, height }) fitted
@@ -330,6 +420,7 @@ export function createImageLayer(id, source, canvas, fit = 0.6) {
 }
 
 export const createAdjustmentLayer = (id, settings = {}) => normalizeLayer({ id, type: 'adjustment', name: '', settings });
+export const createGroupLayer = (id, patch = {}) => normalizeLayer({ id, type: 'group', name: '', ...patch });
 
 /** An image layer's transform reset: its source proportions, fitted inside the canvas, centred, unrotated. */
 export function resetImageTransform(layer, canvas) {

@@ -177,7 +177,7 @@ describe('selection masks', () => {
   const grid = half(W, H, 20);
   const selection = (patch = {}) => createSelection('s1', result(grid, W, H), patch);
 
-  test('a selection normalises from untrusted input, within its limits, only in image space', () => {
+  test('a selection normalises from untrusted input, within its limits, in image and canvas space (Interval 24), never in a layer box', () => {
     expect(selection()).toMatchObject({ type: 'selection', kind: 'sky', width: W, height: H, shift: 0, feather: 0, confidence: 0.9 });
     expect(createSelection('s', { ...result(grid, W, H), kind: 'face' })).toBeNull();
     expect(createSelection('s', { ...result(grid, W, H), data: '<svg>' })).toBeNull();
@@ -186,8 +186,10 @@ describe('selection masks', () => {
     const mask = normalizeMask({ components: [selection()] }, 'image');
     expect(maskHasComponents(mask)).toBe(true);
     expect(selectionChars(mask)).toBe(selection().data.length);
-    expect(normalizeMask({ components: [selection()] }, 'canvas').components).toEqual([]);
-    expect(normalizeLayer({ id: 'a', type: 'adjustment', settings: { exposure: 1 }, mask: { components: [selection()] } }).mask?.components ?? []).toEqual([]);
+    // Layer masks on the canvas evaluate selections in the photo's space (mask.componentMap); an image layer's box cannot.
+    expect(normalizeMask({ components: [selection()] }, 'canvas').components).toHaveLength(1);
+    expect(normalizeMask({ components: [selection()] }, 'layer').components).toEqual([]);
+    expect(normalizeLayer({ id: 'a', type: 'adjustment', settings: { exposure: 1 }, mask: { components: [selection()] } }).mask.components).toHaveLength(1);
     // The photo's budget: selections beyond it are dropped.
     const big = { ...result(grid, W, H), data: encodeCodes(Uint8Array.from({ length: 300_000 }, (_, i) => i % 251)) };
     const adjustments = normalizeAdjustments({ local: [0, 1, 2, 3].map((i) => ({ id: `l${i}`, settings: { exposure: 1 }, mask: { components: [{ id: 'c', type: 'selection', ...big, width: 600, height: 500 }] } })) });

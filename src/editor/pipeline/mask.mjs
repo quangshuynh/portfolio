@@ -29,13 +29,21 @@ export const pressureRadius = (radius, p) => radius * (0.2 + 0.8 * p);
 export function maskMap(matrix, width, height) {
   return { matrix: [...matrix], width, height, scale: matrixScale(matrix) };
 }
-/** The composition's own space at a canvas of `canvas` size. */
-export const canvasMaskMap = (canvas) => maskMap(IDENTITY3, canvas.width, canvas.height);
+/**
+ * The composition's own space at a canvas of `canvas` size. `image` (imageMaskMap at the same
+ * canvas) is where a layer mask's selection components are evaluated: they cover the photo's
+ * content through its Crop & Transform, as in a local adjustment. Without it they cover nothing.
+ */
+export const canvasMaskMap = (canvas, image = null) => ({ ...maskMap(IDENTITY3, canvas.width, canvas.height), ...(image ? { image } : {}) });
+/** Whether a canvas or layer mask holds selections, which need the photo's map (canvasMaskMap's `image`). */
+export const maskUsesImage = (mask) => Boolean(mask && mask.space !== 'image' && mask.components.some((c) => c.type === 'selection'));
+/** The map a component is evaluated in: selections in the photo's own space (`map.image` outside 'image' masks), others in the mask's. */
+export const componentMap = (mask, component, map) => (component.type === 'selection' && mask.space !== 'image' ? map.image ?? null : map);
 /** The photo before Crop & Transform: `plan` = geometryPlan(geometry, native), canvas = render size. */
 export const imageMaskMap = (plan, canvas, native) => maskMap(plan.toSource(canvas, native), native.width, native.height);
 /** An image layer's box: `matrix` = layerMatrix(layer, canvas, raster). */
 export const layerMaskMap = (matrix, raster) => maskMap(matrix, raster.width, raster.height);
-export const maskMapKey = (map) => `${map.width}x${map.height}|${map.matrix.map((v) => v.toPrecision(12)).join(',')}`;
+export const maskMapKey = (map) => `${map.width}x${map.height}|${map.matrix.map((v) => v.toPrecision(12)).join(',')}${map.image ? `|${maskMapKey(map.image)}` : ''}`;
 
 /** Falloff of a normalised distance q (1 at the edge) for a soft edge `edge` wide (fraction of the radius). */
 function falloff(q, edge) {
@@ -349,7 +357,7 @@ function cachedMaskRows(mask, map, width, y0, y1, x0, out, cache) {
     }
   } else {
     const inverse = invert3(map.matrix);
-    const covs = active.map((c) => (c.type === 'brush' ? brushCoverage(c, map, inverse, region, n, cache) : componentCoverage(c, map, region)));
+    const covs = active.map((c) => (c.type === 'brush' ? brushCoverage(c, map, inverse, region, n, cache) : componentCoverage(c, componentMap(mask, c, map), region)));
     entry = { shape, ids: active.map(({ id }) => id), covs, strokes: new Map(active.filter(({ type }) => type === 'brush').map((c) => [c.id, c.strokes.slice()])), codes: new Uint8ClampedArray(n), version: (entry?.version ?? 0) + 1 };
     cache.delete(key);
     cache.set(key, entry);
@@ -386,8 +394,9 @@ function cachedMaskRows(mask, map, width, y0, y1, x0, out, cache) {
 
 /** A linear or radial component's coverage over the region, before invert and opacity. */
 function componentCoverage(component, map, region) {
-  const m = map.matrix;
   const cov = new Float32Array((region.x1 - region.x0) * (region.y1 - region.y0));
+  if (!map) return cov;
+  const m = map.matrix;
   const radial = component.type === 'radial' ? prepareRadial(component, map) : null;
   const selection = component.type === 'selection' ? prepareSelection(component) : null;
   if (component.type === 'selection' && !selection) return cov;
@@ -415,8 +424,7 @@ export function maskRows(mask, map, width, y0, y1, { x0 = 0, out = new Uint8Clam
   const n = width * Math.max(0, y1 - y0);
   const region = { x0, y0, x1: x0 + width, y1 };
   const acc = new Float32Array(n).fill(mask.base === 'all' ? 1 : 0);
-  const m = map.matrix;
-  const inverse = invert3(m);
+  const inverse = invert3(map.matrix);
   for (const component of mask.components) {
     if (!component.enabled || component.opacity <= 0) continue; // eslint-disable-line no-continue
     const subtract = component.op === 'subtract';
@@ -431,8 +439,10 @@ export function maskRows(mask, map, width, y0, y1, { x0 = 0, out = new Uint8Clam
       continue; // eslint-disable-line no-continue
     }
     const radial = component.type === 'radial' ? prepareRadial(component, map) : null;
-    const selection = component.type === 'selection' ? prepareSelection(component) : null;
+    const own = componentMap(mask, component, map);
+    const selection = component.type === 'selection' && own ? prepareSelection(component) : null;
     if (component.type === 'selection' && !selection && !invert) continue; // eslint-disable-line no-continue
+    const m = (own ?? map).matrix;
     let i = 0;
     for (let y = y0; y < y1; y += 1) {
       const cy = y + 0.5;
@@ -441,7 +451,7 @@ export function maskRows(mask, map, width, y0, y1, { x0 = 0, out = new Uint8Clam
         const w = m[6] * cx + m[7] * cy + m[8];
         const sx = (m[0] * cx + m[1] * cy + m[2]) / w;
         const sy = (m[3] * cx + m[4] * cy + m[5]) / w;
-        const raw = radial ? radialAt(radial, sx, sy) : component.type === 'selection' ? (selection ? selectionAt(selection, map, sx, sy) : 0) : linearAt(component, map, sx, sy);
+        const raw = radial ? radialAt(radial, sx, sy) : component.type === 'selection' ? (selection ? selectionAt(selection, own, sx, sy) : 0) : linearAt(component, map, sx, sy);
         const c = (invert ? 1 - raw : raw) * opacity;
         acc[i] = subtract ? acc[i] * (1 - c) : acc[i] + c - acc[i] * c;
       }
@@ -481,9 +491,12 @@ export function maskBounds(mask, map, size) {
         add({ x0: Math.min(...pts.map(([x]) => x)) - r, y0: Math.min(...pts.map(([, y]) => y)) - r, x1: Math.max(...pts.map(([x]) => x)) + r, y1: Math.max(...pts.map(([, y]) => y)) + r });
       }
     } else if (c.type === 'selection') {
-      const prep = prepareSelection(c);
-      const spaceBox = prep && selectionSpaceBox(prep, map);
-      if (spaceBox) add(spaceBox);
+      const own = componentMap(mask, c, map);
+      const prep = own && prepareSelection(c);
+      const spaceBox = prep && selectionSpaceBox(prep, own);
+      if (!spaceBox) continue; // eslint-disable-line no-continue
+      const b = canvasBox(invert3(own.matrix), spaceBox, region);
+      if (b.x1 > b.x0 && b.y1 > b.y0) box = union(box, b);
     } else if (c.type === 'radial') {
       const r = prepareRadial(c, map);
       const ex = Math.hypot(r.rx * r.cos, r.ry * r.sin);

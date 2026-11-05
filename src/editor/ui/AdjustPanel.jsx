@@ -100,7 +100,7 @@ export default function AdjustPanel({ mobileSection, onMobileSectionChange, adju
           Reset all
         </button>
       </div>
-      {layer && !layer.local && <p className="pe-note pe-note--layer">These settings apply to the selected layer only{layer.adjustment ? ' and change everything below it' : ''}. Select Background in Layers to edit the photo.</p>}
+      {layer && !layer.local && <p className="pe-note pe-note--layer">These settings apply to the selected layer only{layer.adjustment ? (layer.scope ? ` and change ${layer.scope}` : ' and change everything below it') : ''}. Select Background in Layers to edit the photo.</p>}
       {layer?.local && <p className="pe-note pe-note--layer">These settings apply through the selected mask only, on top of the photo&apos;s own settings. Select it again in Masks to edit the photo.</p>}
       {!layer && section('geometry', 'Crop & Transform', geometry
         ? <GeometryPanel geometry={adjustments.geometry} disabled={disabled} {...geometry} />
