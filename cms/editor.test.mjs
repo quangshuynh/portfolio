@@ -290,7 +290,7 @@ describe('treatments', () => {
     await save(id, documentFor(source, { layers, watermark }));
     let { json } = await describe_(id);
     const saved = json.treatment.document.photos[0].adjustments.layers;
-    expect(json.treatment.document.version).toBe(17);
+    expect(json.treatment.document.version).toBe(18);
     expect(saved.map((l) => [l.id, l.type, l.parent ?? null, Boolean(l.clip)])).toEqual([['txt', 'text', 'g', false], ['adj', 'adjustment', 'g', true], ['g', 'group', null, false], ['sky', 'adjustment', null, false]]);
     expect(saved[3].mask.components[0]).toMatchObject({ type: 'selection', kind: 'sky', data: 'AAA=' });
     await render(id, await photograph({ width: 3000, height: 2000 }));
@@ -302,6 +302,29 @@ describe('treatments', () => {
     expect(watermarkStatus(json.treatment)).toBe('needs-regeneration');
     expect(json.treatment.approved.documentHash).toBe(approved.approved.documentHash);
     expect(json.treatment.approved.document.photos[0].adjustments.layers[1].clip).toBe(true);
+  });
+
+  test('an image layer mask with a selection of its own source and a Detail adjustment layer (Interval 24.1) persist; a change is a new draft', async () => {
+    const { id } = await uploadDraft();
+    const source = (await describe_(id)).json.sources[0];
+    const watermark = { ...WATERMARK_DEFAULTS };
+    const subject = { id: 's1', type: 'selection', kind: 'subject', version: 't/1', width: 4, height: 2, data: 'AAA=', confidence: 0.7, shift: -0.2, feather: 0.3 };
+    const image = { id: 'car', type: 'image', source: { sha256: 'd'.repeat(64), name: 'car.jpg', size: 10, format: 'jpeg', width: 400, height: 200 }, x: 0.4, y: 0.6, width: 0.8, height: 0.4, rotation: 12, mask: { base: 'none', components: [subject] } };
+    const detail = { id: 'sharp', type: 'adjustment', clip: true, settings: { clarity: 30, sharpening: 40, exposure: 0.2 } };
+    await save(id, documentFor(source, { layers: [image, detail], watermark }));
+    let { json } = await describe_(id);
+    const saved = json.treatment.document.photos[0].adjustments.layers;
+    expect(saved[0].mask).toMatchObject({ space: 'layer', base: 'none' });
+    expect(saved[0].mask.components[0]).toMatchObject({ type: 'selection', kind: 'subject', data: 'AAA=', shift: -0.2, feather: 0.3 });
+    expect(saved[1]).toMatchObject({ clip: true, settings: { clarity: 30, sharpening: 40, exposure: 0.2 } });
+    await render(id, await photograph({ width: 3000, height: 2000 }));
+    const approved = (await review(id, 'approve')).json.treatment;
+    await save(id, documentFor(source, { layers: [image, { ...detail, settings: { ...detail.settings, sharpening: 80 } }], watermark }));
+    ({ json } = await describe_(id));
+    expect(json.treatment.status).toBe('draft');
+    expect(watermarkStatus(json.treatment)).toBe('needs-regeneration');
+    expect(json.treatment.approved.documentHash).toBe(approved.approved.documentHash);
+    expect(json.treatment.approved.document.photos[0].adjustments.layers[1].settings.sharpening).toBe(40);
   });
 
   test('a treatment without an approval discards to nothing', async () => {

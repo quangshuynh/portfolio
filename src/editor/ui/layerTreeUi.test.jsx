@@ -182,8 +182,25 @@ describe('Masks panel: selections in a layer mask', () => {
     expect(mask.components.at(-1)).toMatchObject({ id: 'selection-new', type: 'selection', kind: 'sky', data: 'AAA=' });
   });
 
-  test('an image layer\'s mask explains why it cannot hold a selection', () => {
-    panel(normalizeLayers([{ ...createImageLayer('img', source, canvas), mask: createMask('layer') }])[0], vi.fn(), []);
-    expect(screen.getByText(/image layer's mask cannot hold them/)).toBeInTheDocument();
+  test('an image layer\'s mask selects on the layer\'s own image (Interval 24.1); photo selections are not offered', () => {
+    const select = vi.fn();
+    const selection = { status: null, select, downloadBytes: () => 0, candidateOf: () => null, object: { draft: null, exclude: false, setExclude: () => {} } };
+    const layer = normalizeLayers([{ ...createImageLayer('img', source, canvas), mask: createMask('layer') }])[0];
+    const saved = [{ id: 'local:l:s', label: 'Sky · Sky', mask: { ...createMask('canvas', 'none'), components: [createSelection('s', result)] } }];
+    const onTool = vi.fn();
+    render(
+      <MaskPanel disabled={false} locals={[]} layer={layer} target={{ kind: 'layer', layer }} space={source} selectedId={null} onSelect={() => {}} onSelectLocal={() => {}} onSelectLayerMask={() => {}}
+        tool={null} onTool={onTool} brush={{ radius: 0.05, hardness: 0.5, opacity: 1, mode: 'add' }} onBrush={() => {}} overlay={{ show: false, view: 'overlay', color: '#ff3b30' }} onOverlay={() => {}}
+        onApplyLocals={() => {}} onApplyMask={() => {}} onPreviewMask={() => {}} onCommit={() => {}} newId={(prefix) => `${prefix}-new`} onEditSettings={() => {}} selection={selection} savedSelections={saved} />,
+    );
+    expect(screen.getByText(/analyse this layer's own image/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '+ Subject' }));
+    expect(select).toHaveBeenLastCalledWith('subject', { mode: 'add' });
+    const replace = screen.getByRole('group', { name: /Replace the mask of/ });
+    fireEvent.click(within(replace).getByRole('button', { name: 'Sky' }));
+    expect(select).toHaveBeenLastCalledWith('sky', { layer, replace: true });
+    fireEvent.click(within(screen.getByRole('group', { name: 'Tool on the photo' })).getByRole('button', { name: 'Object' }));
+    expect(onTool).toHaveBeenLastCalledWith('object');
+    expect(screen.queryByRole('combobox', { name: 'Copy a saved selection into this mask' })).toBeNull();
   });
 });

@@ -97,8 +97,10 @@ export function NumberField({ label, value, min, max, step, unit, disabled, onAp
  *   onReconnect(layer), busy }
  * :param onAddAdjustment: ({ clip, mask, name }) adds an adjustment layer above the selected one
  * :param onEditMask: (layer) opens its mask for editing (Masks panel)
+ * :param selection: useSelections() or null; `onMaskFromSelection(layer, kind)` masks an image
+ *   layer with Select Subject, Sky, Background (replacing its mask) or starts Select Object on it
  */
-export default function LayersPanel({ compact = false, onClose, layers, activeId, disabled, canvas, sources, onSelect, onApply, onPreview, onCommit, onAddText, onAddAdjustment, onEditSettings, onEditMask = () => {}, maskEditing = null, tool, onTool, freeResize, onFreeResize }) {
+export default function LayersPanel({ compact = false, onClose, layers, activeId, disabled, canvas, sources, onSelect, onApply, onPreview, onCommit, onAddText, onAddAdjustment, onEditSettings, onEditMask = () => {}, maskEditing = null, tool, onTool, freeResize, onFreeResize, selection = null, onMaskFromSelection = null }) {
   const [open, setOpen] = useState(true);
   const [confirming, setConfirming] = useState(null);
   const [renaming, setRenaming] = useState(null);
@@ -492,6 +494,26 @@ export default function LayersPanel({ compact = false, onClose, layers, activeId
                   Reset transform
                 </button>
               </div>
+            )}
+            {active.type === 'image' && selection && onMaskFromSelection && (
+              <div className="pe-layers__actions" role="group" aria-label={`Mask “${layerLabel(active)}” from a selection of its own image`}>
+                <span className="pe-masks__label">Mask from</span>
+                {[['subject', 'Subject'], ['sky', 'Sky'], ['background', 'Background'], ['object', 'Object']].map(([kind, label]) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    className="pe-text-button"
+                    disabled={disabled || locked || Boolean(selection.status?.busy)}
+                    title={kind === 'object' ? 'Tap the object on this layer' : `Select the ${kind} of this layer automatically, on this device${active.mask ? ' (replaces its mask)' : ''}`}
+                    onClick={() => onMaskFromSelection(active, kind)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {active.type === 'image' && selection?.status && (
+              <p className="pe-note" role="status">{selection.status.text}</p>
             )}
             {active.type !== 'group' && (
               <button type="button" className="pe-text-button" disabled={disabled} onClick={() => onEditSettings(active)}>

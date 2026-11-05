@@ -65,9 +65,12 @@ export default function MaskPanel({ compact = false, onClose,
   const short = Math.min(space?.width ?? 1, space?.height ?? 1);
   const busy = Boolean(selection?.status?.busy);
   const local = target?.kind === 'local';
-  // Selections cover the photo: local adjustments and canvas-space layer masks (adjustment, text and
-  // group layers) can hold them; an image layer's mask is in its own box (Interval 24).
-  const selectable = local || (target?.kind === 'layer' && mask?.space === 'canvas');
+  // Every mask can hold selections: of the photo (local adjustments and canvas-space layer masks),
+  // or of an image layer's own source (its mask, Interval 24.1). Saved selections are of the photo,
+  // so only masks over the photo can copy them; Select Object needs the analysed image's space.
+  const selectable = local || target?.kind === 'layer';
+  const imageLayerMask = target?.kind === 'layer' && mask?.space === 'layer';
+  const photoSpace = local || mask?.space === 'canvas';
   const copySelection = (id) => {
     const chosen = savedSelections.find((entry) => entry.id === id);
     if (!chosen) return;
@@ -167,6 +170,14 @@ export default function MaskPanel({ compact = false, onClose,
               <button type="button" className="pe-button" disabled={disabled || layer.locked} onClick={() => { onApplyMask(createMask(layer.type === 'image' ? 'layer' : 'canvas')); onSelectLayerMask(true); }}>
                 Add mask to “{layerLabel(layer)}”
               </button>
+            )}
+            {layer.type === 'image' && selection && (
+              <div className="pe-masks__add" role="group" aria-label={layer.mask ? `Replace the mask of “${layerLabel(layer)}” with a selection` : `Mask “${layerLabel(layer)}” with a selection`}>
+                <span className="pe-masks__label">{layer.mask ? 'Replace mask with' : 'Mask from'}</span>
+                {SELECTS.map(([kind, label]) => (
+                  <button key={kind} type="button" className="pe-text-button" title={`${selectTitle(kind)}, from this layer's own image`} disabled={disabled || layer.locked || busy} onClick={() => selection.select(kind, { layer, replace: true })}>{label}</button>
+                ))}
+              </div>
             )}
           </div>
         )}
@@ -279,7 +290,7 @@ export default function MaskPanel({ compact = false, onClose,
               {selection && selectable && SELECTS.map(([kind, label]) => (
                 <button key={kind} type="button" className="pe-text-button" title={selectTitle(kind)} disabled={edit || busy || mask.components.length >= MASK_LIMITS.components} onClick={() => selection.select(kind, { mode: 'add' })}>+ {label}</button>
               ))}
-              {selectable && savedSelections.length > 0 && (
+              {photoSpace && savedSelections.length > 0 && (
                 <label className="pe-layers__photo">
                   <span className="visually-hidden">Copy a saved selection into this mask</span>
                   <select value="" disabled={edit || mask.components.length >= MASK_LIMITS.components} onChange={(event) => copySelection(event.target.value)}>
@@ -289,17 +300,17 @@ export default function MaskPanel({ compact = false, onClose,
                 </label>
               )}
             </div>
-            {target.kind === 'layer' && !selectable && <p className="pe-note">Sky, Subject and Object selections cover the photo, so an image layer's mask cannot hold them; use a brush or gradient, or clip an adjustment layer with a selection to it.</p>}
+            {imageLayerMask && selection && <p className="pe-note">Sky, Subject, Background and Object analyse this layer&apos;s own image, and the mask follows the layer when it is moved, scaled, rotated or flipped.</p>}
 
             <div className="pe-masks__tools" role="group" aria-label="Tool on the photo">
               {TOOLS.map(([type, label]) => (
                 <button key={type} type="button" className="pe-button" aria-pressed={tool === type} disabled={edit} onClick={() => onTool(tool === type ? null : type)}>{label}</button>
               ))}
-              {selection && local && <button type="button" className="pe-button" aria-pressed={tool === 'object'} title={selectTitle('object')} disabled={edit} onClick={() => onTool(tool === 'object' ? null : 'object')}>Object</button>}
+              {selection && (local || imageLayerMask) && <button type="button" className="pe-button" aria-pressed={tool === 'object'} title={selectTitle('object')} disabled={edit} onClick={() => onTool(tool === 'object' ? null : 'object')}>Object</button>}
             </div>
             {tool === 'object' && selection && (
               <div className="pe-masks__brush" role="group" aria-label="Select Object">
-                <p className="pe-note">{draft?.points.length ? 'Tap more of the object to include it, or switch to Exclude and tap what should not be selected.' : 'Tap the object to select on the photo.'}</p>
+                <p className="pe-note">{draft?.points.length ? 'Tap more of the object to include it, or switch to Exclude and tap what should not be selected.' : imageLayerMask ? 'Tap the object on this layer.' : 'Tap the object to select on the photo.'}</p>
                 <div className="pe-masks__tools">
                   <button type="button" className="pe-button" aria-pressed={!selection.object.exclude} onClick={() => selection.object.setExclude(false)}>Include</button>
                   <button type="button" className="pe-button" aria-pressed={selection.object.exclude} onClick={() => selection.object.setExclude(true)} title="Exclude (or hold Alt while tapping)">Exclude</button>
@@ -348,6 +359,18 @@ export default function MaskPanel({ compact = false, onClose,
                     <span>{component.type === 'radial' ? 'Outside' : 'Invert'}</span>
                   </label>
                 </div>
+                <label className="pe-field">
+                  <span>Name</span>
+                  <input
+                    key={component.id}
+                    defaultValue={component.name}
+                    placeholder={componentLabel({ ...component, name: '' }, mask.components.indexOf(component))}
+                    maxLength={MASK_LIMITS.name}
+                    disabled={edit}
+                    onBlur={(event) => { const name = cleanMaskName(event.target.value); if (name !== component.name) patchComponent({ name }); }}
+                    onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+                  />
+                </label>
                 <OpacityRange value={component.opacity} disabled={edit} onPreview={(v) => onPreviewMask(updateComponent(mask, component.id, { opacity: v }))} onApply={(v) => patchComponent({ opacity: v }, 'opacity')} onCommit={onCommit} />
                 {component.type === 'selection' && (
                   <>
