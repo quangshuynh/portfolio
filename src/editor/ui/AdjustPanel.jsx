@@ -110,10 +110,10 @@ export default function AdjustPanel({ mobileSection, onMobileSectionChange, adju
       {section('light', 'Light', rows('light'))}
       {section('color', 'Color', rows('color'))}
       {section('hsl', 'HSL', <HslPanel adjustments={adjustments} disabled={disabled} dispatch={dispatch} />)}
-      {(!layer || layer.local) && section('detail', 'Detail', (
+      {(!layer || layer.local || layer.adjustment) && section('detail', 'Detail', (
         <>
           {rows('detail')}
-          <p className="pe-note">Rendered on the CPU, so the preview follows after a moment. Sharpening and noise reduction act on full-resolution pixels: the preview shows them as a downscaled export would.</p>
+          <p className="pe-note">Rendered on the CPU, so the preview follows after a moment. Sharpening and noise reduction act on full-resolution pixels: the preview shows them as a downscaled export would.{layer?.adjustment ? ' On an adjustment layer they filter the composite below it, through its mask and clipping.' : ''}</p>
         </>
       ))}
       {!layer?.local && (

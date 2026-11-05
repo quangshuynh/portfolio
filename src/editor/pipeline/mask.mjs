@@ -14,7 +14,8 @@
 // space pixels per canvas pixel), so it is antialiased at every render size.
 //
 // Selections (Interval 23, segment/selectionMask.mjs) are a coverage grid in the photo's space,
-// sampled bilinearly like any other shape; one that cannot be decoded covers nothing.
+// sampled bilinearly like any other shape; one that cannot be decoded covers nothing. In an image
+// layer's mask (Interval 24.1) the grid is in the layer's own space, evaluated through its map.
 
 import { IDENTITY3, invert3, project } from './geometry.mjs';
 import { matrixScale } from './layerTransform.mjs';
@@ -35,10 +36,13 @@ export function maskMap(matrix, width, height) {
  * content through its Crop & Transform, as in a local adjustment. Without it they cover nothing.
  */
 export const canvasMaskMap = (canvas, image = null) => ({ ...maskMap(IDENTITY3, canvas.width, canvas.height), ...(image ? { image } : {}) });
-/** Whether a canvas or layer mask holds selections, which need the photo's map (canvasMaskMap's `image`). */
-export const maskUsesImage = (mask) => Boolean(mask && mask.space !== 'image' && mask.components.some((c) => c.type === 'selection'));
-/** The map a component is evaluated in: selections in the photo's own space (`map.image` outside 'image' masks), others in the mask's. */
-export const componentMap = (mask, component, map) => (component.type === 'selection' && mask.space !== 'image' ? map.image ?? null : map);
+/** Whether a canvas mask holds selections, which need the photo's map (canvasMaskMap's `image`). */
+export const maskUsesImage = (mask) => Boolean(mask && mask.space === 'canvas' && mask.components.some((c) => c.type === 'selection'));
+/**
+ * The map a component is evaluated in: a canvas mask's selections in the photo's own space
+ * (`map.image`); everything else, an image layer's selections of its own source included, in the mask's.
+ */
+export const componentMap = (mask, component, map) => (component.type === 'selection' && mask.space === 'canvas' ? map.image ?? null : map);
 /** The photo before Crop & Transform: `plan` = geometryPlan(geometry, native), canvas = render size. */
 export const imageMaskMap = (plan, canvas, native) => maskMap(plan.toSource(canvas, native), native.width, native.height);
 /** An image layer's box: `matrix` = layerMatrix(layer, canvas, raster). */

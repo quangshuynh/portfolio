@@ -4,9 +4,8 @@
 // while a brush paints, each move only mixes it again through the new mask. When the mask cache
 // reports the box a move changed (mask.mjs `change`), only that box is mixed again. Every pixel
 // goes through the arithmetic of composite.compositeImageSync, so the frame is identical to it.
-import { mixPixel } from './blend.mjs';
-import { COMPOSITE_BAND_ROWS, adjustRows, adjustmentParams, compositeRasterRows, compositeStack, detailPassOptions, endRows, prepareDetailPass } from './composite.mjs';
-import { prepareRender } from './cpuRenderer.mjs';
+import { COMPOSITE_BAND_ROWS, adjustRows, adjustmentParams, compositeRasterRows, compositeStack, detailPassOptions, endRows, mixDetailPixel, prepareDetailPass } from './composite.mjs';
+import { prepareRender, renderRgba8 } from './cpuRenderer.mjs';
 import { renderDetailRows } from './detailRenderer.mjs';
 
 /**
@@ -22,6 +21,8 @@ export function renderDetailFrame(image, pass) {
     const last = Math.min(height, row + COMPOSITE_BAND_ROWS);
     renderDetailRows(plain, context, row, last, out.subarray(row * width * 4, last * width * 4));
   }
+  // An adjustment layer's colour settings, on the filtered pixels (as detailBandRows applies them).
+  if (context.color) renderRgba8(out, context.color, { target: out });
   return out;
 }
 
@@ -29,11 +30,11 @@ export function renderDetailFrame(image, pass) {
 const ids = new WeakMap();
 let nextId = 1;
 const idOf = (object) => { if (!ids.has(object)) ids.set(object, nextId++); return ids.get(object); };
-const filterKey = (pass) => (pass.kind === 'detail' ? `d|${JSON.stringify(pass.adjustments)}|${pass.native.width}x${pass.native.height}` : '');
+const filterKey = (pass) => (pass.kind === 'detail' ? `d|${JSON.stringify(pass.adjustments)}|${pass.native.width}x${pass.native.height}${pass.color ? `|${JSON.stringify(pass.color.adjustments)}|${pass.color.lut?.sha256 ?? ''}` : ''}` : '');
 const maskKey = (pass) => (pass.mask ? `${pass.mask.key ?? ''}#${pass.mask.raster ? idOf(pass.mask.raster) : ''}` : '');
 // A pass without its mask.
 const drawnKey = (pass) => {
-  if (pass.kind === 'detail') return `${filterKey(pass)}|${pass.opacity}`;
+  if (pass.kind === 'detail') return `${filterKey(pass)}|${pass.opacity}|${pass.mode ?? 0}`;
   if (pass.kind === 'adjust') return `a|${JSON.stringify(pass.adjustments)}|${pass.lut?.sha256 ?? ''}|${pass.opacity}|${pass.mode}`;
   if (pass.kind === 'begin' || pass.kind === 'end') return `g|${pass.kind}|${pass.isolate}|${pass.opacity ?? ''}|${pass.mode ?? ''}`;
   return `r|${idOf(pass.raster)}|${JSON.stringify([pass.matrix, pass.opacity, pass.mode, pass.bounds, pass.scale, pass.opaque, pass.clip])}`;
@@ -48,7 +49,7 @@ function mixDetail(out, detailed, pass, width, { x0, y0, x1, y1 }) {
   for (let y = y0; y < y1; y += 1) {
     for (let p = y * width + x0, end = y * width + x1; p < end; p += 1) {
       const opacity = codes ? opacities[codes[p]] : pass.opacity;
-      if (opacity > 0) mixPixel(out, p * 4, detailed, p * 4, opacity);
+      if (opacity > 0) mixDetailPixel(pass, out, p * 4, detailed, p * 4, opacity);
     }
   }
 }
@@ -70,6 +71,9 @@ function applyRows(out, pass, width, y0, y1) {
 export function createLocalPreview({ renderDetail, onReady = () => {}, keep = 2 }) {
   const filtered = new Map();
   const pending = new Map();
+  // Filtered frames the last composition needs: never dropped for another, so a stack with more
+  // Detail passes than `keep` does not filter them again in turn.
+  let wantedNow = new Set();
   let last = null;
   let generation = 0;
 
@@ -81,7 +85,10 @@ export function createLocalPreview({ renderDetail, onReady = () => {}, keep = 2 
       if (pending.get(key) !== token) return;
       pending.delete(key);
       filtered.set(key, data);
-      while (filtered.size > keep) filtered.delete(filtered.keys().next().value);
+      for (const old of [...filtered.keys()]) {
+        if (filtered.size <= Math.max(keep, wantedNow.size)) break;
+        if (!wantedNow.has(old) && old !== key) filtered.delete(old);
+      }
       onReady();
     }, (error) => {
       if (pending.get(key) === token) pending.delete(key);
@@ -105,6 +112,7 @@ export function createLocalPreview({ renderDetail, onReady = () => {}, keep = 2 
       let chain = `${idOf(base)}|${width}x${height}`;
       for (const key of keys) { backdropKeys.push(chain); chain += `>${key}`; }
       const wanted = new Set(passes.map((pass, j) => (pass.kind === 'detail' ? `${backdropKeys[j]}|${filterKey(pass)}` : null)).filter(Boolean));
+      wantedNow = wanted;
       // Requests nobody needs any more cannot deliver.
       for (const key of pending.keys()) if (!wanted.has(key)) pending.delete(key);
       const ready = (j) => filtered.get(`${backdropKeys[j]}|${filterKey(passes[j])}`);
@@ -151,20 +159,30 @@ export function createLocalPreview({ renderDetail, onReady = () => {}, keep = 2 
       data.set(base.data);
       const backdrops = new Map();
       const stack = compositeStack({ width, height, data });
+      // A Detail pass is filtered from its backdrop only once every Detail pass before it is
+      // drawn: its result is kept by the backdrop's key, which names those passes as drawn.
+      let partial = false;
       passes.forEach((pass, j) => {
         if (pass.kind === 'begin') { stack.begin(pass); return; }
         if (pass.kind === 'end') { const { rows, inner } = stack.end(); endRows(rows, inner, width, 0, height, pass); return; }
-        if (pass.kind !== 'detail') { applyRows(stack.current.data, pass, width, 0, height); return; }
+        // Inside a group the pass filters and draws on the group's canvas (an isolated group's own).
+        const target = stack.current.data;
+        if (pass.kind !== 'detail') { applyRows(target, pass, width, 0, height); return; }
         const detailed = ready(j);
-        if (!detailed) { if (!defer) request(`${backdropKeys[j]}|${filterKey(pass)}`, { width, height, data }, pass); return; }
-        // The backdrop is kept for the box updates (the base itself for a first pass), for two Detail passes at most.
+        if (!detailed) {
+          if (!defer && !partial) request(`${backdropKeys[j]}|${filterKey(pass)}`, { width, height, data: target }, pass);
+          partial = true;
+          return;
+        }
+        // The backdrop is kept for the box updates (the base itself for a first pass), for two
+        // Detail passes at most, and only outside groups (a box update draws on the canvas itself).
         if (j === 0) backdrops.set(j, base.data);
-        else if (backdrops.size < 2) {
+        else if (backdrops.size < 2 && !stack.depth()) {
           const kept = last?.backdrops.get(j);
           backdrops.set(j, kept && kept !== last.base.data && kept.length === data.length ? kept : new Uint8ClampedArray(data.length));
           backdrops.get(j).set(data);
         }
-        mixDetail(data, detailed, pass, width, { x0: 0, y0: 0, x1: width, y1: height });
+        mixDetail(target, detailed, pass, width, { x0: 0, y0: 0, x1: width, y1: height });
       });
       last = { base, keys, passes, applied, complete, backdrops, image: { width, height, data } };
       return { image: last.image, dirty: null, complete };

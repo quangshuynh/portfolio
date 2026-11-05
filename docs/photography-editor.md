@@ -82,6 +82,7 @@ screen recording or saved edit JSON if shareable; never private originals.
 | `src/editor/model/masks.mjs`, `pipeline/mask.mjs` | Masks and local adjustments (Interval 13): schema, limits, editing helpers; per-pixel coverage and mask maps. UI `ui/MaskPanel.jsx`, `ui/MaskTool.jsx`; passes in `composite.mjs` (`localPasses`, `passMask`, Detail passes). |
 | `src/editor/segment/` | Intelligent selections (Interval 23): models, worker, analysis and refinement, selection grids; UI `ui/useSelections.js`. See [Intelligent selections](#intelligent-selections). |
 | `scripts/check-editor-masks.mjs` | `npm run check:editor:masks`: masked-pass parity, the Masks panel and on-photo tools, PNG exports against the Node reference (with geometry and masked layers), save and reopen, phones, CPU preview, 24 MP; genuine ARW and merged HDR with `MASK_FIXTURE_DIR`. |
+| `scripts/check-editor-layer-masks.mjs` | `npm run check:editor:layer-masks`: the subject-extraction workflow on an image layer (selection of its own image, refinement, transforms, Object tap, clipped Detail adjustment), PNG export against the Node reference, preview vs export, save and reopen; genuine RAW layers with `LAYER_MASK_RAW_DIR`. |
 | `scripts/check-editor-layers.mjs` | `npm run check:editor:layers`: GPU/CPU and canvas parity of every blend mode, the Layers panel flow, PNG exports against the Node reference, text placement, reload and reconnect, batch ZIP, phones, CPU preview, 24 MP; genuine JPEG/RAW layers over RAW and over merged HDR with `LAYER_FIXTURE_DIR`. |
 | `scripts/check-editor-creative.mjs` | `npm run check:editor:creative`: looks and effects, PNG exports against the Node reference, text placement in preview and exports, paste and ZIP, phones, CPU preview, 24 MP; genuine ARW and merged HDR with `CREATIVE_FIXTURE_DIR`. |
 | `scripts/check-editor-geometry.mjs` | `npm run check:editor:geometry`: crop tool (pointer, touch, keyboard), PNG exports against the Node reference, batch resize, 24 MP timing; genuine ARW and merged HDR with `GEOMETRY_FIXTURE_DIR`. |
@@ -939,19 +940,19 @@ Blending stays sRGB-encoded 8-bit W3C (see above); every isolated level is one m
 RGBA8 buffer while it is drawn (preview: one framebuffer per open group; exports and the CPU
 preview: one canvas each). Layer masks on the canvas (adjustment, text, group) may hold selection
 components, evaluated in the photo's own space through its Crop & Transform like a local
-adjustment's; image layer masks cannot (a selection of the photo says nothing about another
-image), and Select Object stays with local adjustments. Selection data counts toward the photo's
-1 M-character selection budget, shared by local adjustments and layer masks.
+adjustment's; image layer masks hold selections of the layer's own image (Interval 24.1, below).
+Selection data counts toward the photo's 1 M-character selection budget, shared by local
+adjustments and layer masks.
 
-Not in this interval: Detail-based settings (Texture, Clarity, Dehaze, Sharpening, noise
-reduction) on adjustment layers (they need neighbouring pixels; local adjustments keep them),
-running selections on an image layer's own content, per-layer fill opacity, knockout, and group
-blend modes inside clip runs other than the base's. Layers from other cameras keep their own
+Not in this interval: per-layer fill opacity, knockout, and group blend modes inside clip runs
+other than the base's. Layers from other cameras keep their own
 dimensions, orientation (applied on decode) and RAW profile; everything is composited in sRGB at
 the canvas's size.
 
 **Documents.** Version 17 adds `type: 'group'`, a layer's `parent`, `clip` and selections in
-canvas layer masks; the keys are absent when unused. Version 16 documents read and render exactly
+canvas layer masks; the keys are absent when unused. Version 18 (Interval 24.1) adds selections in
+image layer masks and Detail keys on adjustment layers; version 17 files read unchanged, version 17
+editors refuse version 18 files. Version 16 documents read and render exactly
 as before (`fixtures/edits-v16.json`, written by the Interval 23.5 editor, 298d719); version 16
 editors refuse version 17 files rather than flatten them. CMS treatments store the same document.
 
@@ -995,6 +996,91 @@ composites at the preview size (drag frame 90 ms at 600×400). The RAW layer pre
 the RAW queue (one decoder at a time), so a RAW layer appears after its half-size decode.
 Repeated project switching with layers was not measured separately; the raster cache is bounded
 (8 rasters, 384 MB) and cleared when the workspace empties. No physical iPhone was tested.
+
+### Image layer masks and Detail adjustment layers (Interval 24.1)
+
+**Selections on an image layer.** With an image layer selected, **Mask from Subject / Sky /
+Background / Object** (Layers panel) and **+ Subject / Sky / Background**, **Object** and **Replace
+mask with** (Masks panel, editing that layer's mask) analyse the layer's own image: its source
+decoded with its orientation (a RAW layer developed by LibRaw in its profile, never an embedded
+preview), with the layer's colour settings, at analysis size (`segment/layerSource.mjs`); never the
+composite below and never canvas pixels after the transform. The grid spans the whole source,
+which is exactly the layer's box ('layer' mask space), so moving, scaling (also non-uniformly),
+rotating or flipping the layer, or cropping the photo, moves the mask with it without another
+analysis and without re-rasterising it; it is resampled once per render from the stored grid.
+Object taps are mapped through the layer's matrix to the source point under the pointer (exact at
+any zoom and pan; tested with rotation, flips and non-uniform scale). Transparent sources are
+analysed over mid grey and the coverage is multiplied by the source's alpha, so empty pixels are
+never selected (Background, an inverted subject, still covers them, but there the layer shows
+nothing). A selection added to a new mask (which shows everything) starts the mask from nothing;
+**Replace mask with** keeps the mask's density and on/off. Refinement is the existing mask
+tooling: Add/Subtract, Invert, Edge (contract/expand), Feather, Density, brush, mask on/off,
+component rename, Remove layer mask. A result that arrives after another layer was selected is
+dropped, never applied to it. Layer selections are of that layer's file, so syncing layers to
+another photo keeps them correct.
+
+**Detail on adjustment layers.** Texture, Clarity, Dehaze, Sharpening and luminance/colour noise
+reduction on an adjustment layer filter the composite at the layer's place (an isolated group's or
+clip run's own canvas when inside one) with the Detail renderer's neighbourhoods, then apply the
+layer's colour settings to the filtered pixels, and mix the result back once through the layer's
+blend mode, opacity and mask (`composite.adjustmentLayerPass`): the same as one combined effect at
+any opacity. Radii are in full-resolution canvas pixels, as for local adjustments. Neighbourhoods
+are alpha-weighted and the Clarity/Dehaze guide fills empty cells from the visible colours around
+them (`detailRenderer.fillTransparentGuide`; before, a flat colour next to transparency brightened
+by up to 12 codes at its edge), so clipped or grouped Detail has no fringe. On a transparent canvas
+only the box of visible pixels is filtered. A stack with Detail is previewed on the CPU (the
+existing Detail preview); bands carry a halo, so exports are seam-free and equal on the page and
+the band workers. Image layers still carry colour settings only.
+
+Fixes made on the way (they also affect local adjustments): a Detail pass inside a group drew on
+the main canvas in the CPU preview, and a second Detail pass could be filtered from a backdrop
+without the first.
+
+**Accuracy and cost.** Unit tests (`pipeline/detailLayers.test.js`, `layerMaskGeometry.test.js`,
+`segment/layerSource.test.js`): Detail then colour equals the independent one-step reference
+exactly at partial opacity and in blend modes; masked results unchanged outside the mask; band
+sizes 5 and 16 equal to the whole image; band workers equal to the page; preview composition with
+four Detail layers in groups equal to the export; source → layer → canvas for seven placements on
+two canvas sizes and two raster sizes; tap round trips at two zooms; preview vs evaluated masks
+identical. `npm run check:editor:layer-masks` runs the whole workflow (a 6 MP background, a car
+photo as a layer, Mask from Subject, Edge −20 and Feather 25, moved and rotated, Select Object by a
+tap on the rotated layer, a clipped adjustment with Exposure, Temperature, Clarity and Sharpening,
+undo/redo, PNG export, save and reopen). CPU cost at 6 MP (`node scripts/bench-layer-detail.mjs`,
+one thread, i7-9700; the Interval 24 composition rebuilt): 4.1 s flat (+80 MB), 5.2 s as a clip
+run in nested groups (+126 MB), 5.7 s with Detail over the whole canvas, 5.5 s with a selection-
+masked image layer and a clipped Detail layer (+123 MB).
+
+**Browser measurements** (`check:editor:layer-masks`; Windows i7-9700, headless Playwright,
+SwiftShader WebGL, whole-browser peak memory; 6 MP background, 1100×1650 car layer). In every
+environment the PNG export equals the Node reference on every pixel, Mask from Subject covers the
+car (1.0) and not the sky (0.0), the Object tap lands within 0.003 of the source point under it on
+the rotated layer, and save/reopen restores the stack exactly.
+
+| | Subject on the layer | Object tap | Export with / without the Detail layer | Peak memory with / without |
+| --- | --- | --- | --- | --- |
+| Chromium | 11.4 s | 0.8 s | 5.6 / 2.5 s | 1499 / 1456 MB |
+| Firefox | 93 s | 4.3 s | 2.1 / 1.8 s | 1952 / 1922 MB |
+| WebKit | 16.6 s | 1.3 s | 2.8 / 2.1 s | 2091 / 2046 MB |
+| iPhone 13 emulation (WebKit) | 15.5 s | 1.2 s | 2.7 / 2.2 s | 1904 / 1794 MB |
+| Pixel 7 emulation (Chromium) | 12.5 s | 3.5 s | 5.1 / 2.5 s | 1487 / 1387 MB |
+| Chromium without WebGL2 | 9.1 s | 0.9 s | 1.9 / 1.7 s | 1484 / 1400 MB |
+
+The preview read from the renderer (`window.__photoEditorPreview`; Playwright's WebKit can
+screenshot stale WebGL frames) equals the export once both are halved (3000×2000 preview, all
+WebGL2 runs); the CPU preview (2048 px) is within a mean of 0.24 codes (p99 2). A transform alone runs no analysis and leaves the mask data unchanged. Genuine RAW layers
+(Chromium, `LAYER_MASK_RAW_DIR`): Sony A7 III ARW, Nikon Z6 NEF, Canon 5D Mark IV CR2, Canon EOS R
+CR3, Fujifilm X-T4 RAF and iPhone 12 Pro DNG were each masked by Subject on their LibRaw
+development (confidence 0.84–1.0, 14.6–21.1 s) and exported at 3000×2000 (5.7–8.2 s). Merged HDR
+photos cannot be image layers, so masks on HDR-derived layers were not tested. Phones are
+emulated, not physical devices.
+
+Difficult layers, judged visually (Chromium, published photos as layers): a car behind a chain-link
+fence keeps the fence in its mask (it is in front of the car; confidence 0.63 and 0.87), a car
+cut by the frame keeps the straight frame edge, a gull in surf and a car on a transparent cut-out
+are isolated cleanly, windows keep the source's own pixels and shadows under cars are left out; a
+bird in bare branches gets "nothing stands out" (Select Object or the brush instead). Fine hair
+and fur were not in the test set. Extraction is never perfect: the outline is at analysis
+resolution (1024 px long edge), refined with Edge, Feather and the brush.
 
 ## Intelligent selections
 

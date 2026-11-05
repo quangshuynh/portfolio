@@ -621,8 +621,8 @@ function EditorWorkspace({ host }) {
   }, [exporting]);
   // A local Detail pass over a whole preview frame, in a worker of its own so brush moves never
   // wait behind it; only the settings travel (the mask is applied on the page).
-  const renderLocalDetail = useCallback((image, { kind, adjustments: values, native }) => worker('local')
-    .call('localDetailFrame', { image, pass: { kind, adjustments: values, native } }, { transfer: [image.data.buffer] }), [worker]);
+  const renderLocalDetail = useCallback((image, { kind, adjustments: values, native, color = null }) => worker('local')
+    .call('localDetailFrame', { image, pass: { kind, adjustments: values, native, color } }, { transfer: [image.data.buffer] }), [worker]);
   const onEngine = useCallback((info) => setEngine(info), []);
 
 
@@ -879,7 +879,22 @@ function EditorWorkspace({ host }) {
     applyMask({ ...mask, components: mask.components.filter((c) => c.id !== id) });
     setMaskComponent(null);
   }, [applyMask]);
-  // Select Sky, Subject, Background and Object (Interval 23).
+  // An image layer's mask set directly (a selection made for it before it had one, Interval 24.1).
+  // `mask` may be a function of the layer's current mask (a selection arriving after edits).
+  const applyLayerMask = useCallback((layerId, mask) => {
+    const present = activePhoto(stateRef.current)?.history.present;
+    const layer = present?.layers.find(({ id }) => id === layerId);
+    if (!layer) return;
+    const next = typeof mask === 'function' ? mask(layer.mask ?? null) : mask;
+    if (next !== layer.mask) dispatch({ type: 'applySettings', patch: { layers: updateLayer(present.layers, layerId, { mask: next }) } });
+  }, []);
+  const openLayerMask = useCallback((layerId) => {
+    setActiveLayer(layerId);
+    setActiveLocal(null);
+    setLayerMaskOn(true);
+    setLayerToolOn(false);
+  }, []);
+  // Select Sky, Subject, Background and Object (Interval 23); on an image layer's own source (Interval 24.1).
   const selections = useSelections({
     photo,
     ready,
@@ -887,6 +902,9 @@ function EditorWorkspace({ host }) {
     adjustments,
     lut: ready ? lutFor(adjustments) : null,
     renderInWorker,
+    layerSource: loadLayerRaster,
+    onApplyLayerMask: applyLayerMask,
+    onLayerMask: openLayerMask,
     locals: ready ? adjustments.local : [],
     onApplyLocals: (local) => dispatch({ type: 'applySettings', patch: { local } }),
     onSelectLocal: selectLocal,
@@ -1753,7 +1771,7 @@ function EditorWorkspace({ host }) {
     ['hsl', 'HSL'], ['curves', 'Tone Curve'], ['creative', 'Creative'], ['text', 'Text'],
     ['lut', 'LUT'], ['presets', 'Presets'], ['recipes', 'Recipes'],
     ...(photo?.raw ? [['raw', 'RAW']] : []), ...(photo?.hdr ? [['hdr', 'HDR']] : []),
-  ].filter(([id]) => !targetLocal && !targetLayer || ['layers', 'masks', 'retouch', 'light', 'color', 'hsl', ...(targetLocal ? ['detail'] : ['curves', 'lut', 'creative', 'presets'])].includes(id));
+  ].filter(([id]) => !targetLocal && !targetLayer || ['layers', 'masks', 'retouch', 'light', 'color', 'hsl', ...(targetLocal ? ['detail'] : ['curves', 'lut', 'creative', 'presets']), ...(targetLayer?.type === 'adjustment' ? ['detail'] : [])].includes(id));
 
   return (
     <div ref={rootRef} className="pe" data-fullscreen={fullscreen.mode ?? undefined} data-engine={engine?.kind} data-mobile-panel={mobilePanel} data-mobile-tool={mobileTool || undefined} data-ready={ready || undefined} data-empty={!state.photos.length || undefined} data-menu={mobileMenu || undefined} data-dragging={dragDepth > 0 || undefined} {...dragHandlers}>
@@ -1908,7 +1926,7 @@ function EditorWorkspace({ host }) {
             onPreview: (mask) => previewMask(mask),
             onCommit: (mask, coalesceKey = null) => applyMask(mask, coalesceKey),
             onRemove: removeMaskComponent,
-            onPick: maskTool === 'object' && maskTarget.kind === 'local' ? selections.object.tap : null,
+            onPick: maskTool === 'object' && (maskTarget.kind === 'local' || maskTarget.layer.type === 'image') ? selections.object.tap : null,
             points: maskTool === 'object' ? selections.object.draft?.points ?? null : null,
           } : null}
           onCancelFill={(ids) => applyRetouch(adjustments.retouch.filter((op) => !ids.includes(op.id)))}
@@ -2053,6 +2071,17 @@ function EditorWorkspace({ host }) {
             onCommit={() => dispatch({ type: 'commitAdjustment' })}
             onAddText={addTextLayer}
             onAddAdjustment={addAdjustmentLayer}
+            selection={ready ? selections : null}
+            onMaskFromSelection={(layer, kind) => {
+              if (activeLayer !== layer.id) selectLayer(layer.id);
+              if (narrow) { setMobilePanel('adjust'); setMobileTool('masks'); }
+              if (kind !== 'object') { selections.select(kind, { layer, replace: true }); return; }
+              // Object: tap on the layer; a new mask shows the whole layer until an object is added.
+              if (!layer.mask) applyLayerMask(layer.id, createMask('layer'));
+              openLayerMask(layer.id);
+              setMaskComponent(null);
+              chooseMaskTool('object');
+            }}
             maskEditing={maskTarget?.kind === 'layer' ? maskTarget.layer.id : null}
             onEditMask={(layer) => {
               if (activeLayer !== layer.id) selectLayer(layer.id);

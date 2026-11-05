@@ -8,7 +8,7 @@
 // On desktops each pass is split into 256-row bands on a small pool of render workers (a band
 // carries its canvas rows and only the raster rows it reads); phones run the passes on the page,
 // yielding between bands. Every band is computed by composite.mjs from the same numbers, so the
-// result is the same bit for bit either way (tested). Detail passes of local adjustments read
+// result is the same bit for bit either way (tested). Detail passes (local adjustments, adjustment layers) read
 // neighbouring rows: the page computes the guide once, then the bands (each with its halo of
 // unchanged backdrop rows) run on the same workers, and a band's result is written back only
 // once no band still to be sent reads its rows. Phones run them on the page, band by band.
@@ -20,7 +20,7 @@
 
 import { createWorkerClient, WorkerCancelled } from './workerClient.mjs';
 import {
-  COMPOSITE_BAND_ROWS, adjustmentPass, compositeImage, compositeStack, detailPassOptions, detailWriter, endRows, groupPass, localPasses, passTouchesRows, prepareDetailPass, rasterPass,
+  COMPOSITE_BAND_ROWS, adjustmentLayerPass, compositeImage, compositeStack, detailContentTouches, detailPassOptions, detailWriter, endRows, groupPass, localPasses, passTouchesRows, prepareDetailPass, rasterPass,
 } from '../pipeline/composite.mjs';
 import { layerMatrix, offsetMatrix } from '../pipeline/layerTransform.mjs';
 import { sourceRows } from '../pipeline/warp.mjs';
@@ -38,10 +38,11 @@ const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0));
  * :param rasterizeText: (layer, size) => text sprite ({ x, y, width, height, data }) or null
  * :param lutFor: settings => LUT data or null
  * :param imageMap: size => the photo's own mask map (selections in canvas-space masks), or null
+ * :param native: the canvas at full resolution (an adjustment layer's Detail radii)
  */
-export async function preparePass(layer, size, { loadRaster, rasterizeText, lutFor, imageMap = null }) {
+export async function preparePass(layer, size, { loadRaster, rasterizeText, lutFor, imageMap = null, native = size }) {
   const mask = maskActive(layer.mask) ? layer.mask : null;
-  if (layer.type === 'adjustment') return adjustmentPass(layer, lutFor(layer.settings), mask && { def: mask, map: canvasMap(mask, size, imageMap) });
+  if (layer.type === 'adjustment') return adjustmentLayerPass(layer, lutFor(layer.settings), mask && { def: mask, map: canvasMap(mask, size, imageMap) }, native);
   if (layer.type === 'text') {
     const sprite = rasterizeText(layer, size);
     return sprite ? rasterPass(layer, sprite, offsetMatrix(sprite.x, sprite.y), size, mask && { def: mask, map: canvasMap(mask, size, imageMap) }) : null;
@@ -116,15 +117,19 @@ async function passInBands(image, pass, clients, signal) {
   await Promise.all(clients.map(lane));
 }
 
-/** A local adjustment's Detail pass on `clients` render workers (see the comment at the top). */
+/** A Detail pass (local adjustment or adjustment layer) on `clients` render workers (see the comment at the top). */
 async function detailInBands(image, pass, clients, signal) {
   const { width, height, data } = image;
-  // Bands outside the mask's bounds are not sent (found first, so the workers get the bounds too).
-  const bands = [];
-  for (let row = 0; row < height; row += COMPOSITE_BAND_ROWS) if (passTouchesRows(pass, image, row, Math.min(height, row + COMPOSITE_BAND_ROWS))) bands.push(row);
-  if (!bands.length) return;
+  // Bands outside the mask's bounds are not sent (found first, so the workers get the bounds
+  // too), nor bands without visible content on a transparent canvas.
+  const masked = [];
+  for (let row = 0; row < height; row += COMPOSITE_BAND_ROWS) if (passTouchesRows(pass, image, row, Math.min(height, row + COMPOSITE_BAND_ROWS))) masked.push(row);
+  if (!masked.length) return;
   const options = detailPassOptions(image, pass);
-  const { halo } = prepareDetailPass(pass, options);
+  const context = prepareDetailPass(pass, options);
+  const { halo } = context;
+  const bands = masked.filter((row) => detailContentTouches(context, row, Math.min(height, row + COMPOSITE_BAND_ROWS)));
+  if (!bands.length) return;
   const job = `${Date.now()}-${Math.random()}`;
   await Promise.all(clients.map((client) => client.call('localDetailBegin', { job, pass, options })));
   const writer = detailWriter(data, width, halo);
@@ -168,7 +173,7 @@ export async function composeLayers(context, layers, { size, loadRaster, rasteri
     for (const [index, entry] of shown.entries()) {
       if (signal.cancelled) throw new WorkerCancelled();
       onProgress({ stage: 'compositing', fraction: index / shown.length, layer: index + 1, layers: shown.length });
-      let pass = entry.pass ?? (entry.step ? prepareGroupPass(entry.step, size, imageMap) : await preparePass(entry.layer, size, { loadRaster, rasterizeText, lutFor, imageMap }));
+      let pass = entry.pass ?? (entry.step ? prepareGroupPass(entry.step, size, imageMap) : await preparePass(entry.layer, size, { loadRaster, rasterizeText, lutFor, imageMap, native }));
       if (!pass) continue; // eslint-disable-line no-continue
       if (pass.kind === 'begin') { stack.begin(pass); continue; } // eslint-disable-line no-continue
       if (pass.kind === 'end') {

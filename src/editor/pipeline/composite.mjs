@@ -12,9 +12,12 @@
 //   (8-bit result), then mixed back by the blend mode and opacity; alpha is unchanged. Layers
 //   above are not affected, because they are composited afterwards.
 //
-// - Detail pass (a local adjustment's Texture, Clarity, Dehaze, Sharpening, noise reduction):
-//   the backdrop rendered by the Detail renderer (detailRenderer.mjs) with only those settings,
-//   its guide computed from the whole backdrop, then mixed back like an adjustment pass. CPU only.
+// - Detail pass (a local adjustment's or an adjustment layer's Texture, Clarity, Dehaze,
+//   Sharpening, noise reduction): the backdrop rendered by the Detail renderer
+//   (detailRenderer.mjs) with only those settings, its guide computed from the whole backdrop
+//   (blurs weighted by alpha where it is transparent, so nothing bleeds in from empty pixels);
+//   an adjustment layer's colour settings (`color`) are then applied to the filtered pixels, and
+//   the result is mixed back once with the pass's blend mode, opacity and mask. CPU only.
 //
 // Masks (pipeline/mask.mjs): a pass may carry `mask` ({ def, map } and, in previews, `raster`,
 // the whole canvas's coverage codes); its coverage scales the pass's alpha (raster) or opacity
@@ -34,14 +37,14 @@
 // back only once no later band reads those rows), so it is seam-free too.
 
 import { prepareRender, renderRgba8 } from './cpuRenderer.mjs';
-import { normalizeAdjustments } from '../model/adjustments.mjs';
+import { groupIsNeutral, normalizeAdjustments } from '../model/adjustments.mjs';
 import { maskBounds, maskRows } from './mask.mjs';
-import { guideSource, prepareDetailRender, renderDetailRows, rowsHaveAlpha } from './detailRenderer.mjs';
+import { fillTransparentGuide, guideSource, prepareDetailRender, renderDetailRows, rowsHaveAlpha } from './detailRenderer.mjs';
 import { deriveParams } from './spec.mjs';
 import { warpRows, hasAlpha } from './warp.mjs';
 import { BLEND_CODES, adjustPixel, atopPixel, compositePixel, fadePixel, mixPixel } from './blend.mjs';
 import { matrixScale, rasterBounds } from './layerTransform.mjs';
-import { layerAdjustments } from '../model/layers.mjs';
+import { layerAdjustments, splitLayerSettings } from '../model/layers.mjs';
 
 export const COMPOSITE_BAND_ROWS = 256;
 
@@ -89,6 +92,30 @@ export function adjustmentPass(layer, lut = null, mask = null) {
     mask,
   };
 }
+
+/**
+ * An adjustment layer's pass: an adjustment pass, or with Detail settings a Detail pass that
+ * filters the composite below (radii in `native`, the canvas at full resolution, as a local
+ * adjustment's) and then applies the layer's colour settings, mixed back once: the result is the
+ * same as Detail and colour applied in one step, at any opacity and mask.
+ */
+export function adjustmentLayerPass(layer, lut = null, mask = null, native = null) {
+  const { detail, color } = splitLayerSettings(layer.settings);
+  if (!detail || !native) return adjustmentPass(layer, lut, mask);
+  const colour = layerAdjustments(color);
+  const neutral = groupsNeutral(colour);
+  return {
+    kind: 'detail',
+    id: layer.id,
+    adjustments: normalizeAdjustments(detail),
+    color: neutral ? null : { adjustments: colour, lut },
+    native: { width: native.width, height: native.height },
+    opacity: layer.opacity,
+    mode: BLEND_CODES[layer.blend] ?? 0,
+    mask,
+  };
+}
+const groupsNeutral = (values) => ['light', 'color', 'hsl', 'curves', 'lut', 'creative'].every((group) => groupIsNeutral(values, group));
 
 /** A program step's group pass: 'begin', or 'end' with its blend mode, opacity and mask (as other passes). */
 export function groupPass(step, mask = null) {
@@ -281,11 +308,43 @@ export function detailPassOptions(image, pass) {
   const { width, height, data } = image;
   const plain = { width, height, data };
   const prepared = deriveParams(pass.adjustments);
-  const guide = prepareDetailRender(prepared, { width, height, nativeWidth: pass.native.width, nativeHeight: pass.native.height, guideImage: guideSource(plain) }).guide;
-  return { width, height, nativeWidth: pass.native.width, nativeHeight: pass.native.height, guide, transparent: rowsHaveAlpha(plain, 0, height) };
+  // The guide never reads the colour of empty pixels (detailRenderer.fillTransparentGuide).
+  const guide = prepareDetailRender(prepared, { width, height, nativeWidth: pass.native.width, nativeHeight: pass.native.height, guideImage: fillTransparentGuide(guideSource(plain)) }).guide;
+  const transparent = rowsHaveAlpha(plain, 0, height);
+  return { width, height, nativeWidth: pass.native.width, nativeHeight: pass.native.height, guide, transparent, content: transparent ? contentBox(plain) : null };
 }
 
-export const prepareDetailPass = (pass, options) => prepareDetailRender(deriveParams(pass.adjustments), options);
+/**
+ * The box of a canvas's pixels that are not fully transparent ({ x0, y0, x1, y1 }, exclusive).
+ * A Detail pass on a transparent canvas (an isolated group, a clip run) renders only there: what it
+ * would write elsewhere has no alpha and never shows, and its neighbourhoods are alpha-weighted, so
+ * the visible result is the same.
+ */
+export function contentBox({ width, height, data }) {
+  let x0 = width; let x1 = 0; let y0 = height; let y1 = 0;
+  for (let y = 0; y < height; y += 1) {
+    let first = -1; let lastX = -1;
+    for (let x = 0, i = y * width * 4 + 3; x < width; x += 1, i += 4) if (data[i]) { if (first < 0) first = x; lastX = x; }
+    if (first < 0) continue; // eslint-disable-line no-continue
+    if (y < y0) y0 = y;
+    y1 = y + 1;
+    if (first < x0) x0 = first;
+    if (lastX + 1 > x1) x1 = lastX + 1;
+  }
+  return y1 > y0 ? { x0, y0, x1, y1 } : { x0: 0, y0: 0, x1: 0, y1: 0 };
+}
+
+/** Whether a Detail pass's content (contentBox, in its render context) reaches rows [row, last). */
+export const detailContentTouches = (context, row, last) => !context.content || (context.content.x1 > context.content.x0 && context.content.y0 < last && context.content.y1 > row);
+
+/** A Detail pass's render context; an adjustment layer's colour settings are prepared with it. */
+export function prepareDetailPass(pass, options) {
+  const context = { ...prepareDetailRender(deriveParams(pass.adjustments), options), content: options.content ?? null };
+  return pass.color ? { ...context, color: prepareRender(adjustmentParams(pass.color)) } : context;
+}
+
+/** Mixes a Detail pass's result into a pixel: Normal, or the pass's blend mode (adjustment layers). */
+export const mixDetailPixel = (pass, out, o, rendered, i, opacity) => (pass.mode ? adjustPixel(pass.mode, out, o, rendered, i, opacity) : mixPixel(out, o, rendered, i, opacity));
 
 /**
  * One band [row, last) of a Detail pass, mixed back through its mask: the band's new rows
@@ -297,16 +356,20 @@ export function detailBandRows(image, context, pass, row, last) {
   const { width } = image;
   const top = image.y0 ?? 0;
   const mask = passMask(pass, width, row, last);
-  const box = mask ? maskBox(mask, width) : { x0: 0, x1: width, y0: 0, y1: last - row };
-  if (!box) return null;
+  let box = mask ? maskBox(mask, width) : { x0: 0, x1: width, y0: 0, y1: last - row };
+  // On a transparent canvas only its visible content is rendered (contentBox).
+  const { content } = context;
+  if (box && content) box = { x0: Math.max(box.x0, content.x0), x1: Math.min(box.x1, content.x1), y0: Math.max(box.y0, content.y0 - row), y1: Math.min(box.y1, content.y1 - row) };
+  if (!box || box.x1 <= box.x0 || box.y1 <= box.y0) return null;
   const w = box.x1 - box.x0;
   const rendered = new Uint8ClampedArray((box.y1 - box.y0) * w * 4);
   renderDetailRows(image, context, row + box.y0, row + box.y1, rendered, { columns: [box.x0, box.x1] });
+  if (context.color) renderRgba8(rendered, context.color, { target: rendered });
   const rows = image.data.slice((row - top) * width * 4, (last - top) * width * 4);
   for (let y = box.y0; y < box.y1; y += 1) {
     for (let x = box.x0; x < box.x1; x += 1) {
       const p = y * width + x;
-      mixPixel(rows, p * 4, rendered, ((y - box.y0) * w + x - box.x0) * 4, mask ? pass.opacity * (mask[p] / 255) : pass.opacity);
+      mixDetailPixel(pass, rows, p * 4, rendered, ((y - box.y0) * w + x - box.x0) * 4, mask ? pass.opacity * (mask[p] / 255) : pass.opacity);
     }
   }
   return rows;
@@ -338,7 +401,7 @@ function* detailBands(canvas, pass, bandRows) {
   const writer = detailWriter(data, width, context.halo);
   for (let row = 0; row < height; row += bandRows) {
     const last = Math.min(height, row + bandRows);
-    if (passTouchesRows(pass, image, row, last)) writer.add(row, last, detailBandRows(image, context, pass, row, last));
+    if (passTouchesRows(pass, image, row, last) && detailContentTouches(context, row, last)) writer.add(row, last, detailBandRows(image, context, pass, row, last));
     // The next band reads the backdrop from `last − halo`: rows above that are final.
     writer.flush(last - context.halo);
     yield last / height;

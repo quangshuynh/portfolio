@@ -12,7 +12,7 @@ import { RAW_STAGES } from '../raw/rawTrace.mjs';
 import InspectView from './InspectView';
 import LayerHandles from './LayerHandles';
 import { layerProgram } from '../model/layerTree.mjs';
-import { adjustmentParams, adjustmentPass, compositeImageSync, groupPass, localPasses, rasterPass } from '../pipeline/composite.mjs';
+import { adjustmentLayerPass, adjustmentParams, compositeImageSync, groupPass, localPasses, rasterPass } from '../pipeline/composite.mjs';
 import { layerMatrix, offsetMatrix } from '../pipeline/layerTransform.mjs';
 import { maskActive, maskHasComponents, splitLocalSettings, visibleLocals } from '../model/masks.mjs';
 import { canvasMaskMap, imageMaskMap, layerMaskMap, maskMapKey, maskUsesImage, rasterizeMask } from '../pipeline/mask.mjs';
@@ -622,10 +622,11 @@ export default function Viewer({ photo, adjustments: settings, lut = null, previ
       }
       const { layer } = step;
       if (layer.type === 'adjustment') {
-        const pass = adjustmentPass(layer, lutFor(layer.settings), layerMask(layer, canvasMap(layer.mask)));
-        if (layer.settings.lut && !pass.lut) continue; // eslint-disable-line no-continue
+        // With Detail settings: a Detail pass (filtered on the CPU, so the whole frame then is).
+        const pass = adjustmentLayerPass(layer, lutFor(layer.settings), layerMask(layer, canvasMap(layer.mask)), plan.native);
+        if (layer.settings.lut && !(pass.lut ?? pass.color?.lut)) continue; // eslint-disable-line no-continue
         cpu.push(pass);
-        gpu.push({ ...pass, params: adjustmentParams(pass) });
+        gpu.push(pass.kind === 'adjust' ? { ...pass, params: adjustmentParams(pass) } : pass);
         continue; // eslint-disable-line no-continue
       }
       let raster;

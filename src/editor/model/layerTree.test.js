@@ -38,7 +38,7 @@ describe('version 16 documents', () => {
     const first = parseEditDocument(fixture('edits-v16.json'));
     const saved = JSON.parse(serializeEditDocument(createEditDocument(first.photos.map((p) => ({ ...p.source, adjustments: p.adjustments })), first.exportSettings)));
     expect(saved.version).toBe(DOCUMENT_VERSION);
-    expect(DOCUMENT_VERSION).toBe(17);
+    expect(DOCUMENT_VERSION).toBe(18);
     expect(parseEditDocument(JSON.stringify(saved)).photos.map((p) => p.adjustments)).toEqual(first.photos.map((p) => p.adjustments));
   });
 });
@@ -276,14 +276,15 @@ describe('editing the tree', () => {
 describe('selections in layer masks', () => {
   const result = { kind: 'sky', version: 't/1', width: 4, height: 2, data: 'AAA=', confidence: 0.9 };
 
-  test('adjustment, text and group masks keep selection components; image layer masks drop them', () => {
+  test('adjustment, text, group and (Interval 24.1) image layer masks keep selection components', () => {
     const selection = createSelection('s1', result);
     expect(selection).not.toBeNull();
     const mask = { ...createMask('canvas'), components: [selection] };
     const layers = norm([{ ...adjust('a'), mask }, { ...group('g'), mask }, { ...image('i'), mask: { ...createMask('layer'), components: [selection] } }]);
     expect(layers[0].mask.components[0]).toMatchObject({ type: 'selection', kind: 'sky' });
     expect(layers[1].mask.components).toHaveLength(1);
-    expect(layers[2].mask.components).toHaveLength(0);
+    expect(layers[2].mask.components).toHaveLength(1);
+    expect(layers[2].mask.space).toBe('layer');
   });
 
   test('selection data counts toward the photo budget across local adjustments and layer masks', () => {
