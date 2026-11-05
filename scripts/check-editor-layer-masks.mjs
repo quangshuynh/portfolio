@@ -38,8 +38,9 @@ import { adjustmentLayerPass, compositeImageSync, groupPass, rasterPass } from '
 import { layerMatrix, rasterSize } from '../src/editor/pipeline/layerTransform.mjs';
 import { canvasMaskMap, layerMaskMap } from '../src/editor/pipeline/mask.mjs';
 import { openEditorTool } from './editor-mobile-controls.mjs';
-import { REFINE_VERSION, refineSelection, refineSize } from '../src/editor/segment/refine.mjs';
+import { REFINE_VERSION, refineSelection, refineSize, tileMapCode } from '../src/editor/segment/refine.mjs';
 import { registerRefined } from '../src/editor/segment/selectionMask.mjs';
+import { RECOVER_VERSION } from '../src/editor/segment/recover.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const work = mkdtempSync(path.join(tmpdir(), 'editor-layer-masks-'));
@@ -142,8 +143,8 @@ function refinedReference(mask, source) {
       if (c.type !== 'selection' || c.refine?.version !== REFINE_VERSION) return c;
       const size = refineSize(source.width, source.height);
       assert.deepEqual(size, { width: source.width, height: source.height }, 'the source is refined at its own size');
-      const key = `reference|${k}|${c.data.length}|${c.shift}|${c.feather}|${c.refine.radius}`;
-      registerRefined(key, refineSelection({ width: c.width, height: c.height, codes: decodeCodes(c.data, c.width * c.height) }, source, { radius: c.refine.radius, shift: c.shift, feather: c.feather }));
+      const key = `reference|${k}|${c.data.length}|${c.shift}|${c.feather}|${c.refine.radius}|${JSON.stringify(c.recover ?? null)}`;
+      registerRefined(key, refineSelection({ width: c.width, height: c.height, codes: decodeCodes(c.data, c.width * c.height) }, source, { radius: c.refine.radius, shift: c.shift, feather: c.feather, recover: c.recover?.version === RECOVER_VERSION ? c.recover.strokes : null }));
       return { ...c, refinedKey: key };
     }),
   };
@@ -159,13 +160,18 @@ function compare(expected, actual) {
   return { max, count, alphaMismatches: alpha, ok: max === 0 && alpha === 0 };
 }
 
+// The antenna on the car layer (fractions of its source; the source is 1100 × 1650).
+const ANTENNA = { u: 0.62, v0: 0.395, v1: 0.3, height: 1650 };
+
 async function fixtures() {
   const generated = path.join(root, 'src/assets/photography/generated');
   // 6 MP background; the car layer 1100 px wide, kept at source size on the export canvas.
   const backgroundFile = path.join(work, 'shore-background.png');
   await sharp(path.join(generated, 'beach-cloud-bank-viewer.jpg')).resize(3000, 2000, { fit: 'fill' }).removeAlpha().png().toFile(backgroundFile);
   const carFile = path.join(work, 'car-layer.png');
-  await sharp(path.join(generated, 'nissan-350z-viewer.jpg')).resize(1100).removeAlpha().png().toFile(carFile);
+  // A thin dark antenna (3 px) rising from the roof: too thin for the 1024 px analysis, for Recover detail.
+  const antenna = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="${ANTENNA.height}"><line x1="${ANTENNA.u * 1100}" y1="${ANTENNA.v0 * ANTENNA.height}" x2="${ANTENNA.u * 1100 + 18}" y2="${ANTENNA.v1 * ANTENNA.height}" stroke="#141416" stroke-width="3"/></svg>`);
+  await sharp(path.join(generated, 'nissan-350z-viewer.jpg')).resize(1100).composite([{ input: antenna }]).removeAlpha().png().toFile(carFile);
   const read = async (file) => { const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true }); return { width: info.width, height: info.height, data: new Uint8ClampedArray(data) }; };
   return { backgroundFile, carFile, background: await read(backgroundFile), car: await read(carFile), hashes: { background: sha(backgroundFile), car: sha(carFile) } };
 }
@@ -253,6 +259,41 @@ async function check(run, files) {
     assert.equal(afterSubject.layers[0].mask.base, 'none');
     result.subject = { confidence: subject.confidence, grid: `${subject.width}×${subject.height}`, car: coverageIn(subject, [0.4, 0.45, 0.6, 0.58]), sky: coverageIn(subject, [0, 0, 1, 0.1]) };
     assert.ok(result.subject.car > 0.9 && result.subject.sky < 0.02, `subject on the layer ${JSON.stringify(result.subject)}`);
+
+    result.step = 'Recover detail: paint over the antenna the selection missed';
+    {
+      await tool('masks');
+      const first = page.locator('.pe-masks__list[aria-label="Mask components"] .pe-mask-row__name').first();
+      if (await first.getAttribute('aria-pressed') !== 'true') await first.click();
+      await page.locator('[data-refine=done]').waitFor({ timeout: 300_000 });
+      await page.getByRole('button', { name: 'Recover detail' }).click();
+      const layer = (await saved()).layers[0];
+      const canvasSize = { width: files.background.width, height: files.background.height };
+      const box = await host();
+      const at = ([u, v]) => [box.x + u * box.width, box.y + v * box.height];
+      const trail = Array.from({ length: 12 }, (_, i) => at(forward(layer, canvasSize, ANTENNA.u + (18 / 1100) * (i / 11) + 0.002, ANTENNA.v0 + 0.02 + (ANTENNA.v1 - ANTENNA.v0 - 0.03) * (i / 11))));
+      t0 = Date.now();
+      await page.mouse.move(...trail[0]);
+      await page.mouse.down();
+      for (const p of trail.slice(1)) await page.mouse.move(...p, { steps: 3 }); // eslint-disable-line no-await-in-loop
+      await page.mouse.up();
+      timings.recoverPaintMs = Date.now() - t0;
+      const withStroke = await savedWhen((v) => v.layers[0].mask.components[0].recover?.strokes.length === 1, 'recover stroke saved');
+      const t1 = Date.now();
+      await page.locator('[data-refine=done]').waitFor({ timeout: 300_000 });
+      timings.recoverMs = Date.now() - t1;
+      const c = withStroke.layers[0].mask.components[0];
+      assert.equal(c.recover.version, RECOVER_VERSION);
+      const before = refineSelection({ width: c.width, height: c.height, codes: decodeCodes(c.data, c.width * c.height) }, files.car, { radius: 0 });
+      const after = refineSelection({ width: c.width, height: c.height, codes: decodeCodes(c.data, c.width * c.height) }, files.car, { radius: 0, recover: c.recover.strokes });
+      let changed = 0;
+      for (let y = 0; y < files.car.height; y += 1) for (let x = 0; x < files.car.width; x += 1) if (tileMapCode(after, x, y) >= 128 && tileMapCode(before, x, y) < 128) changed += 1;
+      result.recover = { strokeRadius: c.recover.strokes[0].radius, added: after.recovered[0].added, changedPx: changed, from: c.recover.strokes[0].points[0].slice(0, 2), to: c.recover.strokes[0].points.at(-1).slice(0, 2) };
+      if (process.env.LAYER_MASK_SAVE) writeFileSync(path.join(process.env.LAYER_MASK_SAVE, `recover-${run.id}.json`), JSON.stringify(c));
+      assert.ok(after.recovered[0].added > 60, `antenna recovered ${JSON.stringify(result.recover)}`);
+      assert.equal(await page.locator('[data-recover=empty]').count(), 0, 'no "found nothing" note');
+      await page.getByRole('button', { name: 'Recover detail' }).click();
+    }
 
     result.step = 'refine edge and feather';
     await tool('masks');
