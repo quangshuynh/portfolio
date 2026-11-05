@@ -1217,6 +1217,92 @@ WebGL2) runs Cancel, Sky, a full-size export (darker inside, unchanged where the
 Background, Select again (identical grid), Next candidate and back, an Object tap, saving and reopening, and requires no
 request to leave the site.
 
+### Edge refinement (Interval 24.2)
+
+A selection's grid is 1024 px; on a 24 MP photo one cell is about 6 px, so its upscaled edge is a
+soft, stepped ramp of 10–20 px that also carries background texture (the analysis-size refinement
+above, magnified). **Refine edge** (on for every new selection, a checkbox in the selection's
+settings; turning it off is the before/after comparison) recomputes the edge from the original
+pixels of the image the selection describes: the photo's file (or an image layer's own file),
+decoded at its own size up to 6144 px on the long edge (RAW: developed with neutral settings, so
+later edits never invalidate it), never the models again (`segment/refine.mjs`, `contour-colour/1`):
+
+1. The grid's 0.5 contour is kept, sub-pixel, and its ramp narrowed to about 1.5 px.
+2. Within a band of about one grid cell around it, each pixel's coverage is estimated from its colour
+   against the inside and outside colours just beyond the band (simple matting), so the edge lands
+   on the photo's own edge and mixed pixels get partial coverage. It is trusted only where the
+   sides differ well beyond their own texture, both are sampled, an image edge is within reach, the
+   pixel is a mix of the two colours (a reflection or highlight is not), and less with distance
+   from the original contour. A guided filter smooths it; changes forming islands (a hole in a
+   panel, a speck outside) are undone.
+3. Edge and Feather apply afterwards at that resolution (Edge keeps a crisp ramp).
+
+Only 128 px tiles near the outline are computed, each from its own window, so the result does not
+depend on order or worker; the map holds 8-bit codes for those tiles (1–3 MB for a car at 24 MP).
+Nothing derived is saved: a selection stores `refine: { version, radius }` (radius 0; a wider band
+was measured and not offered, below), and edit documents are version 19. Version 18 files read
+unchanged and are not refined (previously approved CMS treatments therefore render exactly as
+approved until edited); version 18 editors refuse version 19 files.
+
+**Where it runs.** `segment/refineClient.mjs` keys each map by its owner file, grid and settings;
+one owner at a time is decoded and refined in a short-lived worker (Safari without worker canvas:
+on the page), after edits settle (300 ms). Maps are registered on the page (LRU, 96 MB, 48 MB on
+constrained devices); the preview shows the unrefined grid until its map is ready (the panel says
+so). An export waits for every map it needs, registers them on its render workers, and fails with
+a message rather than export an unrefined edge. Preview and export sample the same map, through the
+same mask maps as before (layer transforms, flips, Crop & Transform, clipping, groups, Detail and
+PNG alpha are unchanged). Select Object's draft is not refined until accepted. Merged HDR photos
+have no original file, so their own selections are not refined (the panel says so).
+
+**Choosing it.** Compared at full resolution with `npm run bench:refine` on 8 synthetic 6000 × 4000
+scenes with exact alpha (real photos as backgrounds and paint; antialiased glass, spoke holes,
+mirror stalk, 4 px antenna, wing struts, motion blur, defocus, branches, fur; the coarse grid from
+the real Select Object path, or from the exact alpha where SAM picked another object) and 6
+24 MP car photos with references made by SAM on native-resolution 1024 px windows along the outline
+and reviewed on overlays (model-assisted, so they favour SAM-like hard edges). Scores within two
+grid cells of the outline (where a refinement can act): mean |error| (SAD), coverage on background
+(leak) and missing on foreground, boundary F (2 px).
+
+| Tried | Result | Used |
+| --- | --- | --- |
+| Colour guided filter of the upscaled grid | SAD 0 to −6 %, boundary F +0.03–0.1, background texture copied into the mask | no |
+| Joint upsampling / sharpening alone | leak −50 %, but edges stay where the 1024 px grid put them | step 1 |
+| Colour model, box windows, unguarded | best synthetic scores; on real cars blocky chunks cut from a dark bumper on asphalt, tyre tread punched out, sky reflections removed | no |
+| Colour model with the guards above (final) | as below | yes |
+| Wider band (radius 0.5, 1) | motion blur SAD 0.167 → 0.159; branches 0.150 → 0.174, defocus and cars worse | not offered |
+
+| Same inputs, full resolution | Grid (24.1) | Refined |
+| --- | --- | --- |
+| Synthetic cars (building, dark on dark, reflective) SAD / leak / boundary F | 0.229 / 0.100 / 0.610 | 0.126 / 0.039 / 0.676 |
+| Motion blur, defocus SAD / boundary F | 0.193, 0.184 / 0.503, 0.523 | 0.167, 0.123 / 0.499, 0.587 |
+| Branches, fur (good grid) SAD / leak | 0.257, 0.294 / 0.119, 0.118 | 0.150, 0.256 / 0.051, 0.048 |
+| 6 car photos: boundary F | 0.18–0.37 | +0.016 to +0.057 on all 6 |
+| 6 car photos: SAD / leak | — | −7 to −24 % / −9 to −45 % |
+| Pixels > 6 px on the wrong side ("holes" in the band) | — | photos −4 to +5 % (5 of 6 worse); synthetic +1 to +11 % on 5 scenes, −33 % on 1 |
+
+Failures, reported: where the models' outline is wrong (a dark side window left out, a wing or
+roof louvres missed) the refined edge is the same wrong outline, only crisper; parts the grid misses
+entirely (antenna, wing struts, most spokes, fence wires: thin-structure recall unchanged, ≈ 0–0.35)
+are not recovered; fur and branch tips stay coarse; a motion-blurred edge is made no softer than
+the grid's. Glass and reflective panels are kept as the grid had them (never made transparent).
+Use Add/Subtract brushes for these; brushes are separate components and unaffected by refinement.
+14 inputs do not establish general reliability; no portraits were available.
+
+**Cost.** Node (i7 class, one thread): 0.9–2.6 s per 24 MP owner when quiet; about 65–70 MB of
+working memory beyond the 96 MB decoded guide; maps 1–3 MB each (three refined 24 MP layers: 6.8 MB).
+Browsers (`check:editor:layer-masks`, 1100 px layer): refined within 1–2 s after the Edge/Feather
+edits settle in Chromium and Pixel 7 emulation; exports unchanged in shape (the map is reused).
+A 24 MP owner's decode for refinement costs as much as decoding it for an export (≈ 96 MB, RAW:
+a full development), once per owner and settings.
+
+**Checks.** `refine.test.js` (offset edges land on the image edge, interiors exact, no holes,
+transparency, Edge/Feather, tiling independence, cancellation), `refineClient.test.js` (schema,
+keys, annotation identity, the worker job, failures, cancellation, banded export on fake workers
+equal to the page). `check:editor:layer-masks` refines the car layer's Subject and Object
+selections and requires the PNG export to equal a Node reference that refines them too: bit-exact
+in Chromium, Firefox, WebKit, iPhone 13 and Pixel 7 emulation and without WebGL2 (the refinement is
+deterministic across engines); preview vs export mean difference 0 (no WebGL2: 0.24).
+
 ## Retouch (Remove, Spot Heal and Clone Stamp)
 
 `model/retouch.mjs` (data), `pipeline/retouch.mjs` (rendering), `ui/RetouchTool.jsx` (on the
@@ -1798,6 +1884,9 @@ Settings never change the text or typography.
   `sharpening`, `luminanceNoise`, `colorNoise`; older files open with Detail neutral.
 - Version 4 added merged HDR sources (see [Merge HDR](#merge-hdr)) and the HDR tone
   controls `hdrHighlights`, `hdrShadows`.
+- Version 19 added `refine` on selections (see [Edge refinement](#edge-refinement-interval-242)); version 18
+  files read and render unchanged (not refined). Version 18 added selections in image layer masks
+  and Detail settings on adjustment layers.
 - Version 17 added layer groups (`type: 'group'`, a layer's `parent`), `clip` and selections in
   canvas layer masks (see [Groups and clipping](#groups-and-clipping-interval-24)); version 16 files
   read and render unchanged.
