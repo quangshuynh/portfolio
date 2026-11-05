@@ -139,13 +139,15 @@ test('opens a photograph, navigates to the next photograph, and closes', async (
     }),
   ).toBeInTheDocument();
 
+  const entries = window.history.length;
   fireEvent.click(
     screen.getByRole('button', { name: 'Close photograph' }),
   );
 
-  expect(window.location.hash).toBe('');
-
+  // The viewer closes at once; the address bar follows when the browser's Back arrives.
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  await waitFor(() => expect(window.location.hash).toBe(''));
+  expect(window.history.length).toBe(entries);
 });
 
 
@@ -274,65 +276,53 @@ test('invalid photograph hashes do not open the viewer', async () => {
 });
 
 
+// One history entry per viewing: steps replace it, so Back closes the viewer from any photograph
+// and Forward reopens the photograph that was left. Closing with the button is the same Back.
 test('Back and Forward restore photograph viewer state', async () => {
-  const orderedPhotographs = sortPhotographs(photographs);
-
-  const firstPhotograph = orderedPhotographs[0];
-  const secondPhotograph = orderedPhotographs[1];
+  const [firstPhotograph, secondPhotograph, thirdPhotograph] = sortPhotographs(photographs);
 
   render(<App />);
 
-  fireEvent.click(
-    await screen.findByRole('link', {
-      name: `Open photograph: ${firstPhotograph.caption}`,
-    }),
-  );
-
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Next photograph' }),
-  );
-
+  fireEvent.click(await screen.findByRole('link', { name: `Open photograph: ${firstPhotograph.caption}` }));
+  const entries = window.history.length;
+  fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
   expect(window.location.hash).toBe(`#${secondPhotograph.slug}`);
+  expect(window.history.length).toBe(entries);
 
-  await act(async () => {
-    window.history.back();
-  });
-
-  await waitFor(() => {
-    expect(window.location.hash).toBe(`#${firstPhotograph.slug}`);
-  });
-
-  expect(
-    screen.getByRole('dialog', {
-      name: new RegExp(firstPhotograph.caption, 'i'),
-    }),
-  ).toBeInTheDocument();
-
-  await act(async () => {
-    window.history.back();
-  });
-
-  await waitFor(() => {
-    expect(window.location.hash).toBe('');
-  });
-
+  await act(async () => { window.history.back(); });
+  await waitFor(() => expect(window.location.hash).toBe(''));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-  await act(async () => {
-    window.history.forward();
-  });
+  await act(async () => { window.history.forward(); });
+  await waitFor(() => expect(window.location.hash).toBe(`#${secondPhotograph.slug}`));
+  expect(screen.getByRole('dialog', { name: new RegExp(secondPhotograph.caption, 'i') })).toBeInTheDocument();
 
-  await waitFor(() => {
-    expect(window.location.hash).toBe(`#${firstPhotograph.slug}`);
-  });
-
-  expect(
-    screen.getByRole('dialog', {
-      name: new RegExp(firstPhotograph.caption, 'i'),
-    }),
-  ).toBeInTheDocument();
+  // Reopened by Forward, the viewer still steps in place and closes back to the gallery.
+  fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
+  expect(window.location.hash).toBe(`#${thirdPhotograph.slug}`);
+  fireEvent.click(screen.getByRole('button', { name: 'Close photograph' }));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  await waitFor(() => expect(window.location.hash).toBe(''));
+  await act(async () => { window.history.forward(); });
+  await waitFor(() => expect(window.location.hash).toBe(`#${thirdPhotograph.slug}`));
+  expect(window.history.length).toBe(entries);
 });
 
+// A direct link has no gallery entry beneath it: closing replaces the photo's entry with the
+// gallery instead of leaving the site.
+test('closing a directly linked photograph replaces its entry with the gallery', async () => {
+  const [, secondPhotograph, thirdPhotograph] = sortPhotographs(photographs);
+  window.history.replaceState(null, '', `/photography/#${secondPhotograph.slug}`);
+  const entries = window.history.length;
+  render(<App />);
+  await screen.findByRole('dialog', { name: new RegExp(secondPhotograph.caption, 'i') });
+  fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
+  expect(window.location.hash).toBe(`#${thirdPhotograph.slug}`);
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(`${window.location.pathname}${window.location.hash}`).toBe('/photography/');
+  expect(window.history.length).toBe(entries);
+});
 
 test('sorts photographs chronologically without mutating input', () => {
   const input = [
@@ -711,10 +701,10 @@ test('a collection is a shareable URL: direct links open it, filters push histor
   fireEvent.click(screen.getByRole('link', { name: `Open photograph: ${sortPhotographs(nature)[0].caption}` }));
   expect(window.location.search).toBe('?collection=nature');
   fireEvent.click(screen.getByRole('button', { name: 'Close photograph' }));
-  expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe('/photography/?collection=nature');
+  await waitFor(() => expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe('/photography/?collection=nature'));
 
   act(() => {
-    window.history.back();
+    window.history.forward();
   });
   await waitFor(() => expect(window.location.hash).toBe(`#${sortPhotographs(nature)[0].slug}`));
   act(() => {
@@ -748,35 +738,141 @@ test('the archive is laid out in justified rows: every photograph once, in order
   });
 });
 
-// WebKit throws a SecurityError past 100 history writes per 10 s (a held arrow key or
-// fast swiping reaches it). The viewer must keep stepping and closing; the URL catches up.
+// WebKit throws a SecurityError past 100 history writes per 10 s, Chromium ignores writes past
+// 200. Held keys and fast swiping must stay well below that, and the viewer must keep stepping
+// and closing even when the browser refuses every write.
+const refuse = () => {
+  throw new DOMException('Attempt to use history.pushState() more than 100 times per 10 seconds', 'SecurityError');
+};
+const countWrites = () => {
+  const writes = [];
+  for (const name of ['pushState', 'replaceState']) {
+    const original = window.history[name].bind(window.history);
+    vi.spyOn(window.history, name).mockImplementation((...args) => { writes.push({ name, at: Date.now() }); return original(...args); });
+  }
+  return writes;
+};
+const pause = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+test('hundreds of held-key steps stay within the history budget and the URL ends on the photograph shown', async () => {
+  const ordered = sortPhotographs(photographs);
+  render(<App />);
+  fireEvent.click(await screen.findByRole('link', { name: `Open photograph: ${ordered[0].caption}` }));
+  const entries = window.history.length;
+  const writes = countWrites();
+
+  // A held key repeats; the direction changes back and forth through the collection.
+  for (let step = 0; step < 400; step += 1) {
+    const key = Math.floor(step / 60) % 2 ? 'ArrowLeft' : 'ArrowRight';
+    fireEvent.keyDown(document, { key, repeat: step % 60 > 0 });
+  }
+  const shown = screen.getByRole('dialog').getAttribute('aria-label');
+  const photograph = ordered.find(({ caption }) => shown.endsWith(caption));
+  // At most 60 writes in any 10 s (WebKit refuses past 100), and far fewer than the steps.
+  const busiest = Math.max(...writes.map(({ at }) => writes.filter((write) => write.at >= at && write.at < at + 10_000).length));
+  expect(busiest).toBeLessThanOrEqual(60);
+  // The budget: 20 at once, then 4 a second (a slow run gets more refills, never more per 10 s).
+  const seconds = (writes.at(-1).at - writes[0].at) / 1000;
+  expect(writes.length).toBeLessThanOrEqual(20 + Math.ceil(seconds * 4) + 1);
+  expect(writes.every(({ name }) => name === 'replaceState')).toBe(true);
+  // The trailing write lands with the photograph shown, never an older one.
+  await waitFor(() => expect(window.location.hash).toBe(`#${photograph.slug}`), { timeout: 2000 });
+  expect(window.history.length).toBe(entries);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Close photograph' }));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  await waitFor(() => expect(window.location.hash).toBe(''));
+  await act(async () => { window.history.forward(); });
+  await waitFor(() => expect(screen.getByRole('dialog')).toHaveAttribute('aria-label', shown));
+}, 30000);
+
 test('the viewer still steps and closes when the browser refuses history writes', async () => {
-  const orderedPhotographs = sortPhotographs(photographs);
-  const [firstPhotograph, secondPhotograph] = orderedPhotographs;
+  const [firstPhotograph, , thirdPhotograph] = sortPhotographs(photographs);
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
   render(<App />);
-
   fireEvent.click(await screen.findByRole('link', { name: `Open photograph: ${firstPhotograph.caption}` }));
   expect(window.location.hash).toBe(`#${firstPhotograph.slug}`);
 
-  const refuse = () => {
-    throw new DOMException('Attempt to use history.pushState() more than 100 times per 10 seconds', 'SecurityError');
-  };
   const push = vi.spyOn(window.history, 'pushState').mockImplementation(refuse);
   const replace = vi.spyOn(window.history, 'replaceState').mockImplementation(refuse);
 
   fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
-  expect(screen.getByRole('dialog', { name: new RegExp(secondPhotograph.caption, 'i') })).toBeInTheDocument();
+  fireEvent.keyDown(document, { key: 'ArrowRight' });
+  expect(screen.getByRole('dialog', { name: new RegExp(thirdPhotograph.caption, 'i') })).toBeInTheDocument();
+  expect(window.location.hash).toBe(`#${firstPhotograph.slug}`);
+  // Observable in development, once, without interrupting the viewer.
+  expect(warn).toHaveBeenCalledTimes(1);
 
   fireEvent.keyDown(document, { key: 'Escape' });
-  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(document.querySelector('.photography-page')).not.toHaveAttribute('inert');
   await waitFor(() => expect(document.documentElement).not.toHaveClass('overlay-open'));
-  expect(window.location.hash).toBe(`#${firstPhotograph.slug}`);
+  // Closing needs no history write: it goes Back to the gallery entry.
+  await waitFor(() => expect(window.location.hash).toBe(''));
 
-  // Once the browser accepts writes again, the address bar shows the closed gallery.
   push.mockRestore();
   replace.mockRestore();
-  await waitFor(() => expect(window.location.hash).toBe(''), { timeout: 3000 });
+  await pause(1200);
+  expect(window.location.hash).toBe('');
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
+
+test('a viewer opened while the browser refuses every write still closes, and nothing is owed', async () => {
+  const [firstPhotograph, secondPhotograph] = sortPhotographs(photographs);
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  render(<App />);
+  const link = await screen.findByRole('link', { name: `Open photograph: ${firstPhotograph.caption}` });
+  const push = vi.spyOn(window.history, 'pushState').mockImplementation(refuse);
+  const replace = vi.spyOn(window.history, 'replaceState').mockImplementation(refuse);
+  const back = vi.spyOn(window.history, 'back');
+
+  fireEvent.click(link);
+  fireEvent.click(screen.getByRole('button', { name: 'Next photograph' }));
+  expect(screen.getByRole('dialog', { name: new RegExp(secondPhotograph.caption, 'i') })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Close photograph' }));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(back).not.toHaveBeenCalled();
+
+  push.mockRestore();
+  replace.mockRestore();
+  await pause(1200);
+  // The entry was never written, so no late write reopens the viewer.
+  expect(window.location.hash).toBe('');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('a step requested after the viewer closed (a swipe still settling) cannot reopen it', async () => {
+  const ordered = sortPhotographs(photographs);
+  render(<App />);
+  fireEvent.click(await screen.findByRole('link', { name: `Open photograph: ${ordered[0].caption}` }));
+  // The viewer's onNavigate, captured as a settle timer would hold it.
+  const next = screen.getByRole('button', { name: 'Next photograph' });
+  const writes = countWrites();
+  fireEvent.click(screen.getByRole('button', { name: 'Close photograph' }));
+  fireEvent.click(next);
+  await waitFor(() => expect(window.location.hash).toBe(''));
+  await pause(300);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(writes).toEqual([]);
+});
+
+test('thirty open and close sessions add one entry and leave the page unlocked', async () => {
+  const ordered = sortPhotographs(photographs);
+  render(<App />);
+  await screen.findAllByRole('link', { name: /^Open photograph:/ });
+  // Earlier tests may have left Forward entries; the first session's push drops them.
+  let entries;
+  for (let session = 0; session < 30; session += 1) {
+    fireEvent.click(screen.getByRole('link', { name: `Open photograph: ${ordered[session % 5].caption}` }));
+    fireEvent.keyDown(document, { key: 'ArrowRight' });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    entries ??= window.history.length;
+  }
+  expect(window.history.length).toBe(entries);
+  expect(document.querySelector('.photography-page')).not.toHaveAttribute('inert');
+  await waitFor(() => expect(document.documentElement).not.toHaveClass('overlay-open'));
+  expect(document.body.style.position).toBe('');
+}, 30000);

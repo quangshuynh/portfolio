@@ -37,7 +37,7 @@ import SiteNav, { homeHref } from '../sections/siteNav';
 import { ImageTrigger, InterestCard, InterestGalleryModal } from '../about/aboutGallery';
 import PhotoLightbox from '../ui/photoLightbox';
 import { photographs } from '../../data/photographs';
-import { appHref, navigate } from '../../util/navigation';
+import { appHref, currentState, navigate } from '../../util/navigation';
 import SpotifyDisc from '../ui/spotifyDisc';
 import { TopoField } from '../ui/terrain';
 
@@ -153,7 +153,7 @@ const interestGalleryKeys = { Photography: 'photography', Hiking: 'hiking', Musi
 
 function AboutPage() {
   const [activeGallery, setActiveGallery] = useState(() => {
-    if (window.history.state?.restorePhotographyModal) return null;
+    if (currentState()?.restorePhotographyModal) return null;
     if (window.location.hash === '#photography') return 'photography';
     return window.location.hash === '#music' ? 'music' : null;
   });
@@ -162,9 +162,9 @@ function AboutPage() {
   const lightboxTrigger = useRef(null);
 
   useLayoutEffect(() => {
-    const shouldRestore = Boolean(window.history.state?.restorePhotographyModal);
+    const shouldRestore = Boolean(currentState()?.restorePhotographyModal);
     if (!shouldRestore) return;
-    const sectionId = window.history.state?.returnSection ?? 'beyond-software';
+    const sectionId = currentState()?.returnSection ?? 'beyond-software';
     // Complete restoration before the modal locks the body. `auto` inherits the
     // document's smooth scrolling, which can continue into a quick View all exit.
     document.getElementById(sectionId)?.scrollIntoView({ block: 'start', behavior: 'instant' });
