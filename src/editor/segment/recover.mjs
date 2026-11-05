@@ -74,7 +74,35 @@ export function strokeRegion({ r, points }, x0, y0, w, h) {
   return { region, length };
 }
 
-const grow01 = (m, w, h, r) => { const b = boxMean(Float32Array.from(m), w, h, r); return Uint8Array.from(b, (v) => (v > 1e-7 ? 1 : 0)); };
+const BLOCK = 32; // px, blocks sharing one background model
+const NEAR = 40; // px around a block whose ring pixels form its background
+const CLUSTERS = 4;
+
+/** Up to CLUSTERS colour clusters of samples ([r, g, b] 0–1): k-means seeded at luminance quantiles (deterministic). */
+export function colourClusters(samples) {
+  const lum = (s) => 0.299 * s[0] + 0.587 * s[1] + 0.114 * s[2];
+  const sorted = [...samples].sort((a, b) => lum(a) - lum(b));
+  let means = Array.from({ length: CLUSTERS }, (_, k) => [...sorted[Math.floor(((k + 0.5) / CLUSTERS) * sorted.length)]]);
+  let assign = new Int32Array(samples.length);
+  for (let iter = 0; iter < 6; iter += 1) {
+    const sums = means.map(() => [0, 0, 0, 0]);
+    samples.forEach((s, j) => {
+      let best = Infinity; let k = 0;
+      means.forEach((m, q) => { const d = (s[0] - m[0]) ** 2 + (s[1] - m[1]) ** 2 + (s[2] - m[2]) ** 2; if (d < best) { best = d; k = q; } });
+      assign[j] = k;
+      sums[k][0] += s[0]; sums[k][1] += s[1]; sums[k][2] += s[2]; sums[k][3] += 1;
+    });
+    means = sums.map((s, k) => (s[3] ? [s[0] / s[3], s[1] / s[3], s[2] / s[3]] : means[k]));
+  }
+  const spread = means.map(() => [0, 0]);
+  samples.forEach((s, j) => { const m = means[assign[j]]; spread[assign[j]][0] += (s[0] - m[0]) ** 2 + (s[1] - m[1]) ** 2 + (s[2] - m[2]) ** 2; spread[assign[j]][1] += 1; });
+  assign = null;
+  // Clusters of a few samples (noise, a stray structure pixel in the ring) are not background.
+  return means.map((mean, k) => ({ mean, spread: Math.sqrt(spread[k][0] / Math.max(1, spread[k][1])), count: spread[k][1] }))
+    .filter((k) => k.count >= Math.max(4, 0.03 * samples.length));
+}
+
+const grow01 =(m, w, h, r) => { const b = boxMean(Float32Array.from(m), w, h, r); return Uint8Array.from(b, (v) => (v > 1e-7 ? 1 : 0)); };
 
 /**
  * Structure found in `region` of a window, over the coverage there.
@@ -90,18 +118,41 @@ export function recoverWindow(base, rgb, w, h, region, length) {
   const r2 = WIN >> 1;
   const tri = (a) => boxMean(boxMean(a, w, h, r2), w, h, r2);
   const weighted = (wgt) => rgb.map((ch) => { const o = new Float32Array(n); for (let i = 0; i < n; i += 1) o[i] = ch[i] * wgt[i]; return tri(o); });
-  const wB = tri(bw); const mB = weighted(bw);
-  const sq = new Float32Array(n);
-  for (let i = 0; i < n; i += 1) sq[i] = (rgb[0][i] ** 2 + rgb[1][i] ** 2 + rgb[2][i] ** 2) * bw[i];
-  const qB = tri(sq);
-  // Distance from the local background in units of its spread.
+  // Local background: the ring pixels near each block, as up to K colour clusters. A pixel's
+  // distance is to its nearest cluster, in units of that cluster's spread, so a sky, a white trim
+  // and a brown wall around a stroke each count as background, and an antenna unlike all of them
+  // does not (one mean and spread over them all made the antenna look like background).
   const z = new Float32Array(n);
   const B = [new Float32Array(n), new Float32Array(n), new Float32Array(n)];
-  for (let i = 0; i < n; i += 1) {
-    if (!region[i] || base[i] >= 0.5 || wB[i] < 1e-4) continue; // eslint-disable-line no-continue
-    let d2 = 0; let m2 = 0;
-    for (let c = 0; c < 3; c += 1) { B[c][i] = mB[c][i] / wB[i]; m2 += B[c][i] ** 2; d2 += (rgb[c][i] - B[c][i]) ** 2; }
-    z[i] = Math.sqrt(d2) / (Math.sqrt(Math.max(0, qB[i] / wB[i] - m2)) + 0.02);
+  for (let by = 0; by < h; by += BLOCK) {
+    for (let bx = 0; bx < w; bx += BLOCK) {
+      const bx1 = Math.min(w, bx + BLOCK); const by1 = Math.min(h, by + BLOCK);
+      let wanted = false;
+      for (let y = by; y < by1 && !wanted; y += 1) for (let x = bx; x < bx1; x += 1) if (region[y * w + x] && base[y * w + x] < 0.5) { wanted = true; break; }
+      if (!wanted) continue; // eslint-disable-line no-continue
+      const samples = [];
+      for (let y = Math.max(0, by - NEAR); y < Math.min(h, by1 + NEAR); y += 2) {
+        for (let x = Math.max(0, bx - NEAR); x < Math.min(w, bx1 + NEAR); x += 2) {
+          const i = y * w + x;
+          if (bw[i]) samples.push([rgb[0][i], rgb[1][i], rgb[2][i]]);
+        }
+      }
+      if (samples.length < 8) continue; // eslint-disable-line no-continue
+      const clusters = colourClusters(samples);
+      for (let y = by; y < by1; y += 1) {
+        for (let x = bx; x < bx1; x += 1) {
+          const i = y * w + x;
+          if (!region[i] || base[i] >= 0.5) continue; // eslint-disable-line no-continue
+          let best = Infinity; let pick = null;
+          for (const k of clusters) {
+            const d = Math.sqrt((rgb[0][i] - k.mean[0]) ** 2 + (rgb[1][i] - k.mean[1]) ** 2 + (rgb[2][i] - k.mean[2]) ** 2) / (k.spread + 0.02);
+            if (d < best) { best = d; pick = k; }
+          }
+          z[i] = best;
+          for (let c = 0; c < 3; c += 1) B[c][i] = pick.mean[c];
+        }
+      }
+    }
   }
   const core = Float32Array.from(z, (v) => (v > HI ? 1 : 0));
   const wF = tri(core); const mF = weighted(core);
