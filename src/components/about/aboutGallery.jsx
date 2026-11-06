@@ -61,33 +61,45 @@ export function ImageTrigger({ children, className, label, onOpen }) {
   );
 }
 
-export function InterestCard({ icon: Icon, title, copy, photos, gallery, galleryItems, hasNonPhotoContent = false, onOpen, onOpenImage, accessory = null }) {
+/** The short label a gallery's dialog opens with, reused as the interest card's kicker. */
+export const galleryEyebrow = (gallery) => galleryMetadata[gallery]?.[0];
+
+export function InterestCard({ icon: Icon, title, copy, photos, gallery, galleryItems, hasNonPhotoContent = false, onOpen, onOpenImage, accessory = null, className = '', kicker = null, extra = null }) {
   const visibleSources = new Set((photos ?? []).map(({ src }) => src));
   const hasAdditionalContent = hasNonPhotoContent || Boolean(
     gallery && galleryItems?.some(({ src }) => !visibleSources.has(src))
   );
   const featuredImage = photos?.[0];
+  // Photos are display-cropped only; `position` keeps the subject in frame and the viewer shows the whole image.
   const media = photos && (
-    <div className={`interest-card-media${photos.length > 1 ? ' interest-card-media-pair' : ''}${title === 'Photography' ? ' interest-card-media-photography' : ''}${title === 'Music' ? ' interest-card-media-music' : ''}${title === 'Hiking' ? ' interest-card-media-hiking' : ''}`}>
-      {photos.map(({ src, width, height, alt }) => <img src={src} width={width} height={height} alt={alt} key={src} />)}
+    <div className={`interest-card-media${photos.length > 1 ? ' interest-card-media-pair' : ''}`}>
+      {photos.map(({ src, width, height, alt, position }) => <img src={src} width={width} height={height} alt={alt} key={src} loading="lazy" decoding="async" style={position ? { objectPosition: position } : undefined} />)}
     </div>
   );
 
   return (
-    <article className="interest-card" data-reveal>
+    <article className={`interest-card${className ? ` ${className}` : ''}`} data-reveal>
       <div className="interest-card-top">
         {featuredImage
           ? <ImageTrigger className="interest-card-media-button" label={`Open featured ${title} image`} onOpen={(trigger) => onOpenImage(featuredImage, trigger)}>{media}</ImageTrigger>
           : media}
         {accessory}
       </div>
-      <h3><Icon aria-hidden="true" />{title}</h3>
-      <p>{copy}</p>
-      {hasAdditionalContent && (
-        <button className="interest-view-more" type="button" aria-haspopup="dialog" onClick={(event) => onOpen(gallery, event.currentTarget)}>
-          {gallery === 'music' ? 'View listening' : 'View more'}
-        </button>
-      )}
+      <div className="interest-card-body">
+        {kicker && <p className="interest-card-kicker">{kicker}</p>}
+        <h3><Icon aria-hidden="true" />{title}</h3>
+        <p>{copy}</p>
+        {(hasAdditionalContent || extra) && (
+          <div className="interest-card-actions">
+            {hasAdditionalContent && (
+              <button className="interest-view-more" type="button" aria-haspopup="dialog" onClick={(event) => onOpen(gallery, event.currentTarget)}>
+                {gallery === 'music' ? 'View listening' : 'View more'}
+              </button>
+            )}
+            {extra}
+          </div>
+        )}
+      </div>
     </article>
   );
 }
