@@ -85,7 +85,7 @@ A second pass kept the strongest parts of the revamp and restored parts of the o
 - **Nav links:** About goes to `/#about`. Photography left the primary nav and is linked from the footer, the About page Photography card and its gallery modal.
 - **Hero:** a full-viewport opening with the original horizontal Meet Quang card and the desk. Only "Drag to orbit" stays on the desk. Removed: the Spotify disc (it now lives on About → Music), figure labels, the legend, the stats grid and the coordinates.
 - **Metadata:** Experience and Featured Projects stacks use small rectangular outlined tags. Featured achievements use a square marker, and the decorative status field is gone.
-- **About page:** the original six-card Beyond Software grid is restored. How I approach engineering is kept.
+- **About page:** the original six-card Beyond Software grid is restored. How I approach engineering is kept. (Interval 26 replaced the grid with a mosaic of wide and narrow cards, the path with four chapters, and added an on-page index and a Currently + Keep exploring close; still no section numbers, mono eyebrows or Fig. labels.)
 - **Motifs:** removed the serif italic font (Newsreader), mono eyebrows, section index numbers, "Fig." labels, "Trailhead" and the coordinates. The palette, topographic lines, ridgelines and real photography stay.
 
 Screenshots: `docs/nature-revamp/reconciled/`.
