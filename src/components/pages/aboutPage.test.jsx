@@ -518,3 +518,66 @@ test('formats relative Spotify play times', () => {
     ),
   ).toBeNull();
 });
+
+test('the page index links to sections that exist on the page', () => {
+  renderAboutPage();
+
+  const index = screen.getByRole('navigation', { name: 'On this page' });
+  const links = within(index).getAllByRole('link');
+
+  expect(links).toHaveLength(4);
+  links.forEach((link) => {
+    const id = link.getAttribute('href').slice(1);
+    expect(document.getElementById(id)).not.toBeNull();
+  });
+});
+
+
+test('the path keeps the verified co-op, testimonial and team photo', () => {
+  renderAboutPage();
+
+  const path = document.getElementById('path');
+
+  expect(within(path).getByRole('heading', { name: 'IoT Software Engineering Co-op at KORE Wireless' })).toBeInTheDocument();
+  expect(within(path).getByText('Matt Telesky, Director of Software Engineering')).toBeInTheDocument();
+  expect(within(path).getByRole('button', { name: 'Open KORE Wireless team lunch photo' }).querySelector('img')).toHaveAttribute('width', '1200');
+  expect(path.querySelectorAll('time')).toHaveLength(2);
+});
+
+
+test('every interest keeps its featured image, kicker and a lazily loaded photo', () => {
+  renderAboutPage();
+
+  const cards = document.querySelectorAll('#beyond-software article.interest-card');
+
+  expect(cards).toHaveLength(6);
+  cards.forEach((card) => {
+    const image = card.querySelector('.interest-card-media img');
+    expect(image).toHaveAttribute('loading', 'lazy');
+    expect(image).toHaveAttribute('alt');
+    expect(image.getAttribute('width')).toMatch(/^\d+$/);
+    expect(card.querySelector('.interest-card-kicker')).not.toBeNull();
+  });
+});
+
+
+test('each principle pairs its idea with an example from real work', () => {
+  renderAboutPage();
+
+  const principles = within(document.getElementById('approach')).getAllByRole('listitem');
+
+  expect(principles.map((item) => within(item).getByRole('heading').textContent)).toEqual(['Curiosity', 'Reliability', 'Usefulness']);
+  principles.forEach((item) => expect(within(item).getByText('In practice')).toBeInTheDocument());
+});
+
+
+test('the closing links reach projects, GitHub, the résumé and the contact section', () => {
+  renderAboutPage();
+
+  const cta = screen.getByRole('heading', { name: 'Want to see what I’ve been building?' }).closest('section');
+  const hrefs = within(cta).getAllByRole('link').map((link) => link.getAttribute('href'));
+
+  expect(hrefs).toEqual(['/#projects', 'https://github.com/quangshuynh', '/Quang_Huynh_Resume.pdf', '#contact']);
+  expect(document.getElementById('contact')).not.toBeNull();
+  expect(screen.getByRole('heading', { name: 'Currently' })).toBeInTheDocument();
+});

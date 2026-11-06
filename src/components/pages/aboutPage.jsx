@@ -1,5 +1,5 @@
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { FaArrowRight, FaCamera, FaCar, FaDesktop, FaGamepad, FaMapMarkerAlt, FaMountain, FaMusic, FaGithub } from 'react-icons/fa';
+import { FaArrowDown, FaArrowRight, FaCamera, FaCar, FaDesktop, FaExternalLinkAlt, FaGamepad, FaImages, FaMapMarkerAlt, FaMountain, FaMusic } from 'react-icons/fa';
 import PersonalityButton from '../ui/personalityButton';
 import quangPhoto from '../../assets/about/quang/quang-about-portrait-web.jpg';
 import photographySunset from '../../assets/about/photography/quang-photography-sunset-web.jpg';
@@ -33,13 +33,22 @@ import quangWaterfront from '../../assets/about/quang/quang-waterfront-web.jpg';
 import musicPhoto from '../../assets/about/music/quang-guitar-web.jpg';
 import koreTeamLunch from '../../assets/about/kore/mission-bbq-kore-team-lunch-web.jpg';
 import Footer from '../sections/footer';
-import SiteNav, { homeHref } from '../sections/siteNav';
-import { ImageTrigger, InterestCard, InterestGalleryModal } from '../about/aboutGallery';
+import SiteNav, { homeHref, photographyPageHref } from '../sections/siteNav';
+import { galleryEyebrow, ImageTrigger, InterestCard, InterestGalleryModal } from '../about/aboutGallery';
 import PhotoLightbox from '../ui/photoLightbox';
 import { photographs } from '../../data/photographs';
 import { appHref, currentState, navigate } from '../../util/navigation';
 import SpotifyDisc from '../ui/spotifyDisc';
 import { TopoField } from '../ui/terrain';
+
+const resumeHref = `${import.meta.env.BASE_URL}Quang_Huynh_Resume.pdf`;
+
+const pageIndex = [
+  ['path', 'My path'],
+  ['beyond-software', 'Beyond software'],
+  ['approach', 'How I work'],
+  ['currently', 'Currently'],
+];
 
 const currently = [
   ['Studying', 'Accelerated BS/MS in Computer Science at RIT, graduating 2028'],
@@ -47,64 +56,78 @@ const currently = [
   ['Building', 'Production web apps for Rochester businesses, native Apple tools, and open-source backend work'],
 ];
 
-const interests = [
-  [
-    FaCamera,
-    'Photography',
-    'Photography gives me room to experiment with how composition, lighting, and perspective shape an image.'
-  ],
-  [
-    FaMountain,
-    'Hiking',
-    'Getting outside, exploring new places, and taking a break from screens helps me recharge.'
-  ],
-  [
-    FaMusic,
-    'Music',
-    'I like listening to music, discovering new artists, and playing guitar recreationally.'
-  ],
-  [
-    FaCar,
-    'Cars',
-    <>
-      I enjoy learning how cars work, from understanding what is happening under the hood to maintaining, upgrading, and documenting them. I also keep a{' '}
-      <a href="https://gc8quang.vercel.app/" target="_blank" rel="noreferrer">photo archive of my blue Subaru Impreza 2.5RS</a>.
-    </>
-  ],
-  [
-    FaGamepad,
-    'Gaming',
-    'I like games that reward exploration, strategy, progression, and building things over time.'
-  ],
-  [
-    FaDesktop,
-    'Technology',
-    'I enjoy understanding how technology works beyond the software, from building and upgrading PCs to experimenting with hardware and different devices.'
-  ]
-];
-
-const interestPhotos = {
-  Photography: [{ src: photographySunset, width: 1200, height: 1500, alt: 'Golden sunset clouds reflected across waves at the edge of a lake' }],
-  Hiking: [{ src: hikingOverlook, width: 1600, height: 1150, alt: 'Quang standing with arms outstretched at a scenic lake overlook' }],
-  Music: [{ src: musicPhoto, width: 1200, height: 1600, alt: 'Quang playing guitar' }],
-  Cars: [{ src: carsPhoto, width: 1400, height: 933, alt: 'A blue classic sports car displayed behind a fence' }],
-  Gaming: [{ src: minecraftWorld, width: 1600, height: 861, alt: 'A detailed Minecraft survival world with a castle, village, farms, and modern buildings at sunset' }],
-  Technology: [{ src: customPcGreen, width: 1050, height: 1400, alt: 'Computer hardware and a custom desktop PC during a hands-on build' }]
+const koreTeamPhoto = {
+  src: koreTeamLunch,
+  width: 1200,
+  height: 1600,
+  alt: 'Quang seated at lunch with members of the KORE Wireless engineering team',
+  caption: 'Team lunch near the end of my software engineering co-op at KORE Wireless',
 };
 
+// Display order is the mosaic order: one wide card and one narrow card per row, alternating sides.
+const interests = [
+  {
+    title: 'Photography',
+    icon: FaCamera,
+    layout: 'wide',
+    copy: 'Photography gives me room to experiment with how composition, lighting, and perspective shape an image.',
+    photo: { src: photographySunset, width: 1200, height: 1500, alt: 'Golden sunset clouds reflected across waves at the edge of a lake', position: 'center 67%' },
+  },
+  {
+    title: 'Music',
+    icon: FaMusic,
+    copy: 'I like listening to music, discovering new artists, and playing guitar recreationally.',
+    photo: { src: musicPhoto, width: 1200, height: 1600, alt: 'Quang playing guitar', position: 'center 28%' },
+  },
+  {
+    title: 'Hiking',
+    icon: FaMountain,
+    copy: 'Getting outside, exploring new places, and taking a break from screens helps me recharge.',
+    photo: { src: hikingOverlook, width: 1600, height: 1150, alt: 'Quang standing with arms outstretched at a scenic lake overlook', position: 'center 70%' },
+  },
+  {
+    title: 'Technology',
+    icon: FaDesktop,
+    layout: 'wide flip',
+    copy: 'I enjoy understanding how technology works beyond the software, from building and upgrading PCs to experimenting with hardware and different devices.',
+    photo: { src: customPcGreen, width: 1050, height: 1400, alt: 'Computer hardware and a custom desktop PC during a hands-on build' },
+  },
+  {
+    title: 'Cars',
+    icon: FaCar,
+    copy: (
+      <>
+        I enjoy learning how cars work, from understanding what is happening under the hood to maintaining, upgrading, and documenting them. I also keep a{' '}
+        <a href="https://gc8quang.vercel.app/" target="_blank" rel="noreferrer">photo archive of my blue Subaru Impreza 2.5RS</a>.
+      </>
+    ),
+    photo: { src: carsPhoto, width: 1400, height: 933, alt: 'A blue classic sports car displayed behind a fence' },
+  },
+  {
+    title: 'Gaming',
+    icon: FaGamepad,
+    layout: 'wide',
+    copy: 'I like games that reward exploration, strategy, progression, and building things over time.',
+    photo: { src: minecraftWorld, width: 1600, height: 861, alt: 'A detailed Minecraft survival world with a castle, village, farms, and modern buildings at sunset' },
+  },
+];
+
 const values = [
-  [
-    'Curiosity',
-    'I like understanding why a system behaves the way it does, especially when the obvious explanation is incomplete.'
-  ],
-  [
-    'Reliability',
-    'I care about software that behaves predictably, handles failure intentionally, and stays understandable over time.'
-  ],
-  [
-    'Usefulness',
-    'I like taking ideas beyond prototypes and turning them into practical tools someone could genuinely rely on.'
-  ]
+  {
+    title: 'Curiosity',
+    copy: 'I like understanding why a system behaves the way it does, especially when the obvious explanation is incomplete.',
+    example: 'At KORE Wireless, that meant reproducing production integration failures in QA before troubleshooting them.',
+  },
+  {
+    title: 'Reliability',
+    copy: 'I care about software that behaves predictably, handles failure intentionally, and stays understandable over time.',
+    example: 'Hymical Forms, my open-source form backend, signs every webhook delivery, retries within limits, and keeps a history of each attempt.',
+  },
+  {
+    title: 'Usefulness',
+    copy: 'I like taking ideas beyond prototypes and turning them into practical tools someone could genuinely rely on.',
+    example: '585Dashcam585 replaced a family-owned Rochester business’s hosted website with a custom application that takes live payments.',
+  },
 ];
 
 const personalGallery = [
@@ -200,10 +223,22 @@ function AboutPage() {
         <section className="about-hero" aria-labelledby="about-page-title">
           <TopoField variant="quiet" className="about-hero-topo" />
           <div className="section-inner about-hero-grid">
-            <div className="about-hero-copy">
+            <div className="about-hero-intro">
               <p className="eyebrow" style={{ '--i': 0 }}>A little more about me</p>
               <h1 id="about-page-title" style={{ '--i': 1 }}>Hi, I’m Quang.</h1>
               <p className="about-location" style={{ '--i': 2 }}><FaMapMarkerAlt aria-hidden="true" /> Rochester, New York, USA</p>
+            </div>
+            <figure className="about-portrait" style={{ '--i': 2 }}>
+              <div className="about-portrait-stack">
+                <div className="viewfinder about-portrait-frame">
+                  <button className="about-portrait-button" type="button" aria-label="View more photos of Quang" aria-haspopup="dialog" onClick={(event) => openGallery('personal', event.currentTarget)}>
+                    <img src={quangPhoto} width="1000" height="1000" alt="Quang seated on a bench outdoors" fetchPriority="high" />
+                    <span className="about-portrait-more"><FaImages aria-hidden="true" /> {personalGallery.length} more photos</span>
+                  </button>
+                </div>
+              </div>
+            </figure>
+            <div className="about-hero-body">
               <div className="about-prose" style={{ '--i': 3 }}>
                 <p className="about-prose__lead">
                   I’m a software developer and computer science student interested in
@@ -229,63 +264,95 @@ function AboutPage() {
                 <PersonalityButton secondary href={homeHref('#contact')} personality="auto" personalityKey="about-contact">Get in touch</PersonalityButton>
               </div>
             </div>
-            <figure className="about-portrait" style={{ '--i': 2 }}>
-              <div className="viewfinder about-portrait-frame">
-                <button className="about-portrait-button" type="button" aria-label="View more photos of Quang" aria-haspopup="dialog" onClick={(event) => openGallery('personal', event.currentTarget)}>
-                  <img src={quangPhoto} width="1000" height="1000" alt="Quang seated on a bench outdoors" />
-                  <span>View more photos</span>
-                </button>
-              </div>
-            </figure>
+          </div>
+          <div className="section-inner">
+            <nav className="about-index" aria-label="On this page" style={{ '--i': 5 }}>
+              <ol>
+                {pageIndex.map(([id, label]) => (
+                  <li key={id}><a href={`#${id}`}>{label} <FaArrowDown aria-hidden="true" /></a></li>
+                ))}
+              </ol>
+            </nav>
           </div>
         </section>
 
-        <section className="page-section about-path" aria-labelledby="path-title">
-          <div className="section-inner about-story">
-            <div className="about-story-intro" data-reveal>
-              <p className="eyebrow">My path into software</p>
-              <h2 id="path-title">From coursework to production software</h2>
-
-              <figure className="kore-team-photo viewfinder">
-                <ImageTrigger className="kore-team-photo-button" label="Open KORE Wireless team lunch photo" onOpen={(trigger) => openDirectLightbox({ src: koreTeamLunch, alt: 'Quang seated at lunch with members of the KORE Wireless engineering team', caption: 'Team lunch near the end of my software engineering co-op at KORE Wireless' }, trigger)}>
-                  <img src={koreTeamLunch} alt="Quang seated at lunch with members of the KORE Wireless engineering team" loading="lazy" />
-                </ImageTrigger>
-                <figcaption>
-                  Team lunch near the end of my software engineering co-op at KORE Wireless
-                </figcaption>
-              </figure>
+        <section id="path" className="page-section about-path" aria-labelledby="path-title">
+          <div className="section-inner">
+            <div className="section-heading" data-reveal>
+              <div><p className="eyebrow">My path into software</p><h2 id="path-title">From coursework to production software</h2></div>
+              <p>How experimenting with technology turned into studying it, and then into building software people rely on.</p>
             </div>
-            <div className="about-prose" data-reveal style={{ '--reveal-delay': '100ms' }}>
-              <p>
-                My first professional software engineering role was at KORE Wireless through
-                RIT’s co-op program. It was my first opportunity to move beyond coursework and
-                contribute to software used in real business operations.
-              </p>
 
-              <p>
-                During the co-op, I learned an unfamiliar enterprise codebase and integration
-                environment while contributing across application code, SQL, integrations, testing,
-                and production issue investigation.
-              </p>
+            <ol className="about-timeline">
+              <li className="about-chapter" data-reveal>
+                <div className="about-chapter__marker"><span className="about-chapter__num" aria-hidden="true">01</span><span className="about-chapter__when">Growing up</span></div>
+                <div className="about-chapter__body">
+                  <h3>Curiosity before code</h3>
+                  <p>
+                    Minecraft mods and servers, rooted and jailbroken devices, and PC builds and upgrades:
+                    experimenting was how I learned, and it is what made me want to build software of my own.
+                  </p>
+                </div>
+              </li>
 
-              <p>
-                That experience changed how I approach my own projects. I became much more interested in
-                reliability, failure handling, data correctness, and what happens outside the happy path.
-              </p>
+              <li className="about-chapter" data-reveal>
+                <div className="about-chapter__marker"><span className="about-chapter__num" aria-hidden="true">02</span><span className="about-chapter__when">Rochester Institute of Technology</span></div>
+                <div className="about-chapter__body">
+                  <h3>Studying computer science</h3>
+                  <p>
+                    I’m in RIT’s accelerated BS/MS program in Computer Science, expected to graduate in 2028.
+                  </p>
+                </div>
+              </li>
 
-              <p>
-                I have since designed, built, deployed, and maintained production web applications
-                for family-owned Rochester businesses, alongside my native Apple, backend, and
-                open-source engineering work.
-              </p>
+              <li className="about-chapter about-chapter--feature" data-reveal>
+                <div className="about-chapter__marker"><span className="about-chapter__num" aria-hidden="true">03</span><span className="about-chapter__when"><time dateTime="2025-01">Jan</time> – <time dateTime="2025-05">May 2025</time></span></div>
+                <div className="about-chapter__body">
+                  <h3>IoT Software Engineering Co-op at KORE Wireless</h3>
+                  <div className="about-chapter__prose">
+                    <p>
+                      My first professional software engineering role was at KORE Wireless through
+                      RIT’s co-op program. It was my first opportunity to move beyond coursework and
+                      contribute to software used in real business operations.
+                    </p>
+                    <p>
+                      During the co-op, I learned an unfamiliar enterprise codebase and integration
+                      environment while contributing across application code, SQL, integrations, testing,
+                      and production issue investigation.
+                    </p>
+                  </div>
+                  <figure className="kore-team-photo viewfinder">
+                    <ImageTrigger className="kore-team-photo-button" label="Open KORE Wireless team lunch photo" onOpen={(trigger) => openDirectLightbox(koreTeamPhoto, trigger)}>
+                      <img src={koreTeamPhoto.src} width={koreTeamPhoto.width} height={koreTeamPhoto.height} alt={koreTeamPhoto.alt} loading="lazy" decoding="async" />
+                    </ImageTrigger>
+                    <figcaption>{koreTeamPhoto.caption}</figcaption>
+                  </figure>
+                  <blockquote className="about-quote">
+                    <p>“He was able to work with greater independence than is expected of co-ops.”</p>
+                    <footer>
+                      <cite>Matt Telesky, Director of Software Engineering</cite>
+                    </footer>
+                  </blockquote>
+                </div>
+              </li>
 
-              <blockquote className="about-quote">
-                <p>“He was able to work with greater independence than is expected of co-ops.”</p>
-                <footer>
-                  <cite>Matt Telesky, Director of Software Engineering</cite>
-                </footer>
-              </blockquote>
-            </div>
+              <li className="about-chapter" data-reveal>
+                <div className="about-chapter__marker"><span className="about-chapter__num" aria-hidden="true">04</span><span className="about-chapter__when">Since then</span></div>
+                <div className="about-chapter__body">
+                  <h3>Outside the happy path</h3>
+                  <p>
+                    That experience changed how I approach my own projects. I became much more interested in
+                    reliability, failure handling, data correctness, and what happens outside the happy path.
+                  </p>
+                  <p>
+                    I have since designed, built, deployed, and maintained production web applications
+                    for family-owned Rochester businesses, alongside my native Apple, backend, and
+                    open-source engineering work.
+                  </p>
+                  <a className="text-link about-chapter__link" href={homeHref('#projects')}>See the featured projects <FaArrowRight aria-hidden="true" /></a>
+                </div>
+              </li>
+            </ol>
           </div>
         </section>
 
@@ -293,21 +360,28 @@ function AboutPage() {
           <div className="section-inner">
             <div className="section-heading" data-reveal><div><p className="eyebrow">Outside the editor</p><h2 id="beyond-title">Beyond software</h2></div><p>A few of the things I make time for away from work and school.</p></div>
             <div className="interest-grid">
-              {interests.map(([Icon, title, copy]) => (
-                <InterestCard
-                  key={title}
-                  icon={Icon}
-                  title={title}
-                  copy={copy}
-                  photos={interestPhotos[title]}
-                  gallery={interestGalleryKeys[title]}
-                  galleryItems={galleries[interestGalleryKeys[title]]}
-                  hasNonPhotoContent={interestGalleryKeys[title] === 'music'}
-                  onOpen={openGallery}
-                  onOpenImage={(image, trigger) => openDirectLightbox({ src: image.src, alt: image.alt, caption: image.caption ?? title }, trigger)}
-                  accessory={title === 'Music' ? <SpotifyDisc className="interest-card-disc" onClick={(event) => openGallery('music', event.currentTarget)} /> : null}
-                />
-              ))}
+              {interests.map(({ title, icon, copy, photo, layout }) => {
+                const gallery = interestGalleryKeys[title];
+                const modifiers = [`interest-card--${gallery}`, ...(layout ? layout.split(' ').map((name) => `interest-card--${name}`) : [])];
+                return (
+                  <InterestCard
+                    key={title}
+                    className={modifiers.join(' ')}
+                    kicker={galleryEyebrow(gallery)}
+                    icon={icon}
+                    title={title}
+                    copy={copy}
+                    photos={[photo]}
+                    gallery={gallery}
+                    galleryItems={galleries[gallery]}
+                    hasNonPhotoContent={gallery === 'music'}
+                    onOpen={openGallery}
+                    onOpenImage={(image, trigger) => openDirectLightbox({ src: image.src, alt: image.alt, caption: image.caption ?? title }, trigger)}
+                    accessory={gallery === 'music' ? <SpotifyDisc className="interest-card-disc" onClick={(event) => openGallery('music', event.currentTarget)} /> : null}
+                    extra={gallery === 'photography' ? <a className="interest-card-link" href={photographyPageHref}>Photography page <FaArrowRight aria-hidden="true" /></a> : null}
+                  />
+                );
+              })}
             </div>
             {activeGallery && (
               <InterestGalleryModal
@@ -319,29 +393,62 @@ function AboutPage() {
           </div>
         </section>
 
-        <section className="page-section about-values" aria-labelledby="values-title">
+        <section id="approach" className="page-section about-values" aria-labelledby="values-title">
           <div className="section-inner">
             <div className="section-heading" data-reveal><div><p className="eyebrow">How I like to work</p><h2 id="values-title">How I approach engineering</h2></div><p>Three principles I return to when I’m learning, building, and collaborating.</p></div>
-            <ol className="values-grid">{values.map(([title, copy], index) => <li className="value-card" key={title} data-reveal style={{ '--reveal-delay': `${index * 90}ms` }}><span>0{index + 1}</span><h3>{title}</h3><p>{copy}</p></li>)}</ol>
-            <div className="currently" data-reveal>
-              <p className="currently__title">Currently</p>
-              <dl>
-                {currently.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
-              </dl>
-            </div>
+            <ol className="values-list">
+              {values.map(({ title, copy, example }, index) => (
+                <li className="value-row" key={title} data-reveal style={{ '--reveal-delay': `${index * 90}ms` }}>
+                  <span className="value-row__num" aria-hidden="true">0{index + 1}</span>
+                  <div className="value-row__copy"><h3>{title}</h3><p>{copy}</p></div>
+                  <p className="value-row__example"><span>In practice</span>{example}</p>
+                </li>
+              ))}
+            </ol>
           </div>
         </section>
 
-        <section className="about-cta" aria-labelledby="about-cta-title">
-          <div className="section-inner" data-reveal>
-            <p className="eyebrow">Selected work</p>
-            <h2 id="about-cta-title">Want to see what I’ve been building?</h2>
-            <div className="hero-actions">
-              <PersonalityButton href={homeHref('#projects')} personality="auto" personalityKey="about-view-projects">View projects <FaArrowRight aria-hidden="true" /></PersonalityButton>
-              <a className="button button-secondary" href="https://github.com/quangshuynh" target="_blank" rel="noreferrer"><FaGithub aria-hidden="true" /> GitHub</a>
-            </div>
+        <div className="page-section about-closing">
+          <div className="section-inner about-closing-grid">
+            <section id="currently" className="currently" aria-labelledby="currently-title" data-reveal>
+              <h2 id="currently-title" className="currently__title">Currently</h2>
+              <dl>
+                {currently.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+              </dl>
+            </section>
+
+            <section className="about-cta" aria-labelledby="about-cta-title" data-reveal style={{ '--reveal-delay': '90ms' }}>
+              <p className="eyebrow">Keep exploring</p>
+              <h2 id="about-cta-title">Want to see what I’ve been building?</h2>
+              <ul className="about-next-links">
+                <li>
+                  <a href={homeHref('#projects')}>
+                    <strong>Featured projects</strong><small>Case files, screenshots, and what each one does</small>
+                    <FaArrowRight aria-hidden="true" />
+                  </a>
+                </li>
+                <li>
+                  <a href="https://github.com/quangshuynh" target="_blank" rel="noreferrer">
+                    <strong>GitHub</strong><small>Code, releases, and open-source work<span className="visually-hidden"> (opens in a new tab)</span></small>
+                    <FaExternalLinkAlt aria-hidden="true" />
+                  </a>
+                </li>
+                <li>
+                  <a href={resumeHref} target="_blank" rel="noreferrer">
+                    <strong>Résumé</strong><small>PDF, opens in a new tab</small>
+                    <FaExternalLinkAlt aria-hidden="true" />
+                  </a>
+                </li>
+                <li>
+                  <a href="#contact">
+                    <strong>Contact</strong><small>Email, GitHub, and LinkedIn, just below</small>
+                    <FaArrowDown aria-hidden="true" />
+                  </a>
+                </li>
+              </ul>
+            </section>
           </div>
-        </section>
+        </div>
       </main>
       {directLightbox && <PhotoLightbox image={directLightbox} onClose={closeDirectLightbox} />}
       <Footer />
