@@ -52,9 +52,19 @@ describe('RAW panel', () => {
     setup();
     const panel = screen.getByRole('button', { name: /^RAW/ }).closest('section');
     expect(within(panel).getByText('Sony ILCE-7M3')).toBeInTheDocument();
+    expect(within(panel).getByText(RAW.lens)).toBeInTheDocument();
     expect(within(panel).getByText('1/250 s · f/8 · ISO 100 · 50 mm')).toBeInTheDocument();
     expect(within(panel).getByText('Sony ARW · 4024×6024')).toBeInTheDocument();
     expect(exposureSummary({ shutter: 1.3, aperture: 4.5 })).toBe('1.3 s · f/4.5');
+  });
+
+  test('displays the Tamron alias for an imported RAW without changing its lens metadata', () => {
+    const lens = 'E 28-75mm F2.8 A063';
+    setup({ ...RAW, lens });
+    const panel = screen.getByRole('button', { name: /^RAW/ }).closest('section');
+
+    expect(within(panel).getByText('Tamron 28-75mm F/2.8 Di III VXD G2')).toBeInTheDocument();
+    expect(state.photos[0].raw.lens).toBe(lens);
   });
 
   test('profile: Camera Natural for a new import, labelled, switchable and undoable; Legacy only for edits that have it', () => {

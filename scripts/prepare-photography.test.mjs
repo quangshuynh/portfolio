@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import sharp from 'sharp';
+import { formatLensName } from '../src/util/lensNames.js';
 import { assetReport, serializeCatalog } from './photography-catalog.mjs';
 import { projectRoot } from './photography-catalog-files.mjs';
 
@@ -35,7 +36,7 @@ beforeAll(async () => {
   mkdirSync(paths.sources);
   for (const id of ['published-one', 'draft-one']) {
     await sharp({ create: { width: 3000, height: 2000, channels: 3, background: { r: 40, g: 90, b: 140 } } })
-      .withExif({ IFD0: { Make: 'SONY', Model: 'ILCE-7M3' }, IFD2: { DateTimeOriginal: '2026:10:17 16:00:00' } })
+      .withExif({ IFD0: { Make: 'SONY', Model: 'ILCE-7M3' }, IFD2: { DateTimeOriginal: '2026:10:17 16:00:00', LensModel: 'E 28-75mm F2.8 A063' } })
       .jpeg({ quality: 90 })
       .toFile(path.join(paths.sources, `${id}.jpg`));
   }
@@ -66,16 +67,20 @@ test('generates published photographs only, leaves originals untouched, and is d
     viewerWidth: 2200,
     viewerHeight: 1467,
     camera: 'SONY ILCE-7M3',
+    lens: 'E 28-75mm F2.8 A063',
     capturedAt: '2026-10-17T20:00:00.000Z',
   })]);
+  expect(formatLensName(manifest[0].lens)).toBe('Tamron 28-75mm F/2.8 Di III VXD G2');
   const catalog = JSON.parse(readFileSync(paths.catalog, 'utf8'));
   expect(assetReport(catalog, manifest, files).errors).toEqual([]);
   const viewer = await sharp(path.join(paths.output, 'published-one-viewer.jpg')).metadata();
   expect(viewer.exif).toBeUndefined();
 
   const firstBytes = files.map((name) => sha256(path.join(paths.output, name)));
-  await prepare();
-  expect(readFileSync(paths.manifest, 'utf8')).toBe(manifestText);
+  await prepare('--only', 'published-one');
+  const refreshed = readFileSync(paths.manifest, 'utf8');
+  expect(refreshed).toBe(manifestText);
+  expect(formatLensName(JSON.parse(refreshed)[0].lens)).toBe('Tamron 28-75mm F/2.8 Di III VXD G2');
   expect(files.map((name) => sha256(path.join(paths.output, name)))).toEqual(firstBytes);
 
   expect(readdirSync(paths.sources).map((name) => [name, sha256(path.join(paths.sources, name))])).toEqual(originals);

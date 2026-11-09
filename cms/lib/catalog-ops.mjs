@@ -79,7 +79,10 @@ export function updatePhotograph(catalog, id, patch, { base } = {}) {
   }
   if ('status' in patch || 'featured' in patch) throw new CatalogEditError('Use setStatus or setFeatured for status and featured changes.');
   const photographs = [...catalog.photographs];
-  photographs[index] = tidy({ ...photographs[index], ...patch });
+  const original = photographs[index];
+  const updated = tidy({ ...original, ...patch });
+  if (updated.category !== original.category) delete updated.collectionCover;
+  photographs[index] = updated;
   return withPhotographs(catalog, photographs);
 }
 
@@ -129,7 +132,7 @@ export function setHero(catalog, id) {
   return { ...catalog, hero: id };
 }
 
-/** Publishes or unpublishes photographs. Unpublishing drops them from Featured. */
+/** Publishes or unpublishes photographs. Unpublishing clears Featured and cover assignments. */
 export function setStatus(catalog, ids, status) {
   if (!['published', 'draft'].includes(status)) throw new CatalogEditError(`Unknown status "${status}".`);
   const targets = new Set(ids);
@@ -139,7 +142,7 @@ export function setStatus(catalog, ids, status) {
   }
   const photographs = catalog.photographs.map((record) => {
     if (!targets.has(record.id)) return record;
-    const { featured, ...rest } = record;
+    const { featured, collectionCover, ...rest } = record;
     return status === 'draft' ? { ...rest, status } : { ...record, status };
   });
   return withPhotographs(catalog, compactFeatured(photographs));
@@ -158,7 +161,11 @@ export function setCollection(catalog, ids, category) {
   if (!catalog.categories.includes(category)) throw new CatalogEditError(`Unknown collection "${category}".`);
   const targets = new Set(ids);
   for (const id of targets) indexOf(catalog, id);
-  return withPhotographs(catalog, catalog.photographs.map((record) => (targets.has(record.id) ? { ...record, category } : record)));
+  return withPhotographs(catalog, catalog.photographs.map((record) => {
+    if (!targets.has(record.id) || record.category === category) return record;
+    const { collectionCover, ...rest } = record;
+    return { ...rest, category };
+  }));
 }
 
 const cleanName = (name) => String(name ?? '').trim();

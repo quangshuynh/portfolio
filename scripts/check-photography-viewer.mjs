@@ -41,6 +41,8 @@ const records = (Array.isArray(generated) ? generated : generated.photographs).f
 const byRatio = [...records].sort((a, b) => a.viewerWidth / a.viewerHeight - b.viewerWidth / b.viewerHeight);
 const portrait = byRatio[0];
 const landscape = byRatio[byRatio.length - 1];
+// The swipe sequence needs a neighbour on each side, even if the widest image is at an end.
+const gesturePhoto = byRatio.findLast((record) => record !== records[0] && record !== records.at(-1));
 const substitute = byRatio[Math.floor(byRatio.length / 2)];
 const synthetic = async (width, height) => sharp({ create: { width, height, channels: 3, background: { r: 90, g: 120, b: 150 } } }).jpeg().toBuffer();
 const PHOTOS = [
@@ -134,9 +136,21 @@ async function runPhoto(page, run, photo) {
   if (!clampedY) assert.ok(near(after.y, before.y, 0.01), `${label}: pinch anchored at its midpoint (y ${before.y} → ${after.y})`);
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${run.key}-${photo.label}-zoom.png`) });
 
+  // Zoom can switch to a sharper file. Pan after the new source has decoded and refitted.
+  await page.waitForFunction(() => {
+    const image = document.querySelector('.photography-lightbox img[data-full]');
+    return image?.dataset.sharp === 'true' && image.complete && image.naturalWidth > 0;
+  });
+  await settled(page);
   // A long pan stops at the photo's edge: no gap between the photo and the viewport's edge.
   await touch(page, [['pointerdown', 3, cx, cy], ['pointermove', 3, cx + 5000, cy + 5000], ['pointerup', 3, cx + 5000, cy + 5000]]);
-  await page.waitForTimeout(150);
+  await page.waitForFunction(() => {
+    const stage = document.querySelector('.photography-lightbox-image-wrap');
+    const box = stage.getBoundingClientRect();
+    const image = stage.querySelector('img[data-full]').getBoundingClientRect();
+    return (image.width <= box.width || Math.abs(image.left - box.left) <= 1.5)
+      && (image.height <= box.height || Math.abs(image.top - box.top) <= 1.5);
+  }, null, { timeout: 3000 });
   m = await measure(page);
   if (m.image.width > m.stage.width) assert.ok(near(m.image.left, m.stage.left, 1.5), `${label}: pan bounded on the left (${m.image.left})`);
   else assert.ok(near(m.image.left + m.image.width / 2, cx, 1.5), `${label}: narrow zoomed photo stays centred`);
@@ -385,7 +399,7 @@ async function runEngine(run, fixtures) {
     // Rotation and resizing while zoomed refit the photo to the new viewport.
     page.currentSize = undefined;
     await page.goto('about:blank');
-    await page.goto(`http://localhost:${PORT}/photography/#${encodeURIComponent(slug(landscape))}`);
+    await page.goto(`http://localhost:${PORT}/photography/#${encodeURIComponent(slug(gesturePhoto))}`);
     await page.waitForFunction(() => document.querySelector('.photography-lightbox img')?.naturalWidth > 0);
     await page.getByRole('button', { name: 'Enter fullscreen' }).click();
     await page.waitForFunction(() => document.querySelector('.photography-lightbox-backdrop').classList.contains('is-fullscreen'));

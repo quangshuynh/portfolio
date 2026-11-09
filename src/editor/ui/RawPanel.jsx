@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { formatLensName } from '../../util/lensNames.js';
 import { adjustmentSpec } from '../model/adjustments.mjs';
 import { DAYLIGHT_KELVIN, multipliersToKelvinTint } from '../raw/rawColor.mjs';
 import { RAW_FORMATS } from '../raw/rawFormat.mjs';
@@ -120,7 +121,7 @@ export default function RawPanel({ raw, adjustments, disabled, dispatch, exposur
     <div className="pe-raw">
       <dl className="pe-raw__meta">
         <div><dt>Camera</dt><dd>{[raw.make, raw.model].filter(Boolean).join(' ') || 'Unknown'}</dd></div>
-        {raw.lens && <div><dt>Lens</dt><dd>{raw.lens}</dd></div>}
+        {raw.lens && <div><dt>Lens</dt><dd className="pe-raw__lens">{formatLensName(raw.lens)}</dd></div>}
         {exposure && <div><dt>Exposure</dt><dd className="mono">{exposure}</dd></div>}
         <div><dt>RAW</dt><dd className="mono">{RAW_FORMATS[raw.format]?.label ?? 'RAW'} · {raw.width}×{raw.height}</dd></div>
       </dl>

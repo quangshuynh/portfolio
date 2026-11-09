@@ -10,7 +10,7 @@ export const PHOTOGRAPH_SHAPES = Object.freeze(['landscape', 'portrait']);
 
 const CATALOG_KEYS = ['schemaVersion', 'captureTimeZone', 'hero', 'categories', 'photographs'];
 // Also the serialization order, so a CMS rewrite produces a minimal diff.
-const RECORD_KEYS = ['id', 'slug', 'status', 'sourceFilename', 'caption', 'alt', 'shape', 'category', 'tags', 'featured', 'metadata'];
+const RECORD_KEYS = ['id', 'slug', 'status', 'sourceFilename', 'caption', 'alt', 'shape', 'category', 'collectionCover', 'tags', 'featured', 'metadata'];
 const REQUIRED_RECORD_KEYS = ['id', 'slug', 'status', 'sourceFilename', 'caption', 'alt', 'shape', 'category'];
 const SAFE_NAME = /^[A-Za-z0-9_-]+$/;
 
@@ -57,6 +57,10 @@ function validateRecord(record, index, categories, errors) {
   }
   if ('category' in record && !categories.includes(record.category)) {
     errors.push(`${at}: unknown category "${record.category}"; declare it in "categories" first.`);
+  }
+  if ('collectionCover' in record) {
+    if (record.collectionCover !== true) errors.push(`${at}: "collectionCover" must be true when set.`);
+    else if (record.status === 'draft') errors.push(`${at}: a collection cover must be published.`);
   }
   if ('tags' in record) {
     const tags = record.tags;
@@ -130,6 +134,10 @@ export function catalogErrors(catalog) {
 
   // Featured ordinals order the editorial selection, so published ones must run 1..n.
   const published = records.filter((record) => isPlainObject(record) && record.status === 'published');
+  for (const category of Array.isArray(categories) ? categories : []) {
+    const covers = published.filter((record) => record.category === category && record.collectionCover === true);
+    if (covers.length > 1) errors.push(`Collection "${category}" has more than one cover: ${covers.map(({ id }) => id).join(', ')}.`);
+  }
   const ordinals = published.filter((record) => Number.isInteger(record.featured)).map((record) => record.featured);
   const repeated = [...new Set(ordinals.filter((ordinal, index) => ordinals.indexOf(ordinal) !== index))];
   for (const ordinal of repeated) {
@@ -174,6 +182,13 @@ export function serializeCatalog(catalog) {
 
 export function publishedRecords(catalog) {
   return catalog.photographs.filter(({ status }) => status === 'published');
+}
+
+/** Chooses a cover from a collection's published photographs in curated order. */
+export function selectCollectionCover(members) {
+  return members.find(({ collectionCover }) => collectionCover)
+    ?? members.find(({ featured }) => !featured)
+    ?? members[0];
 }
 
 /**

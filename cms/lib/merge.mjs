@@ -3,7 +3,7 @@
 // as it was in `base` yields to the side that changed it; both changing it differently
 // is a conflict. Nothing is guessed: any conflict means no merged catalog.
 const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-const FIELDS = ['slug', 'status', 'sourceFilename', 'caption', 'alt', 'shape', 'category', 'tags', 'featured', 'metadata'];
+const FIELDS = ['slug', 'status', 'sourceFilename', 'caption', 'alt', 'shape', 'category', 'collectionCover', 'tags', 'featured', 'metadata'];
 const TOP_LEVEL = ['captureTimeZone', 'hero', 'categories'];
 
 function pick(label, base, ours, theirs, conflicts) {

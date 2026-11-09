@@ -6,6 +6,7 @@ import {
   mergeGenerated,
   parseCatalog,
   publicPhotographs,
+  selectCollectionCover,
   serializeCatalog,
 } from './photography-catalog.mjs';
 
@@ -100,6 +101,20 @@ describe('parsing and validation', () => {
       'photographs[0] ("a"): a draft cannot be featured; remove "featured" or publish it.',
       '"hero" "a" is a draft; the hero must be published.',
     ]);
+  });
+
+  test('selects an assigned cover independently of Featured and curated order', () => {
+    const first = record('a');
+    const cover = record('b', { featured: 1, collectionCover: true });
+    const catalog = fixture([first, cover]);
+    expect(parseCatalog(serializeCatalog(catalog))).toEqual(catalog);
+    expect(selectCollectionCover(publicPhotographs(catalog)).id).toBe('b');
+    expect(selectCollectionCover([record('c', { featured: 1 }), first])).toBe(first);
+    expect(selectCollectionCover([record('c', { featured: 1 })]).id).toBe('c');
+    expect(catalogErrors(fixture([{ ...first, collectionCover: true }, cover])))
+      .toEqual(['Collection "Places" has more than one cover: a, b.']);
+    expect(catalogErrors(fixture([first, record('b', { status: 'draft', collectionCover: true })])))
+      .toEqual(['photographs[1] ("b"): a collection cover must be published.']);
   });
 
   test('rejects unknown top-level fields and time zones', () => {

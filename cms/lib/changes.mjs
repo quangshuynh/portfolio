@@ -2,7 +2,7 @@
 // started from. Drives the dashboard's "pending changes" and the pull request description.
 import { publishedRecords } from '../../scripts/photography-catalog.mjs';
 
-const DESCRIBED_FIELDS = ['caption', 'alt', 'shape', 'category', 'tags', 'metadata', 'slug', 'sourceFilename'];
+const DESCRIBED_FIELDS = ['caption', 'alt', 'shape', 'category', 'collectionCover', 'tags', 'metadata', 'slug', 'sourceFilename'];
 const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 // Items outside a longest increasing subsequence of old positions are the ones that moved.

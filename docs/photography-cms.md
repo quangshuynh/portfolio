@@ -85,9 +85,10 @@ publication code.
    - "No. 05" on a card is the number the public gallery will show (published
      photographs only).
 4. **Collections:** move photographs between collections (in the details panel
-   or with bulk actions), rename, reorder, add, and remove empty ones. A
-   collection's cover is its first published, non-featured photograph, as on
-   the public page.
+   or with bulk actions), rename, reorder, add, and remove empty ones. The cover
+   uses the catalog's `collectionCover` assignment when present. Otherwise it
+   uses the first published photograph outside Featured, or the first published
+   photograph when all are Featured.
 
    ![Collections](photography-cms/04-collections.webp)
 5. **Publish or unpublish:** in the details panel, or in bulk. Drafts never

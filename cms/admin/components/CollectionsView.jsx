@@ -1,15 +1,9 @@
 import { useState } from 'react';
+import { selectCollectionCover } from '../../../scripts/photography-catalog.mjs';
 import {
   addCollection, moveCollection, removeCollection, renameCollection,
 } from '../../lib/catalog-ops.mjs';
 import { imageUrl } from '../api.js';
-
-// Mirrors the public page: a collection's cover is its first published, non-featured
-// photograph in curated order (photographyPage.jsx), so order decides the cover.
-function coverOf(catalog, category) {
-  const published = catalog.photographs.filter((record) => record.status === 'published' && record.category === category);
-  return published.find((record) => !record.featured) ?? published[0] ?? null;
-}
 
 function Rename({ name, onRename }) {
   const [value, setValue] = useState(name);
@@ -27,17 +21,18 @@ export default function CollectionsView({ catalog, run, onFilter }) {
   return (
     <section className="cms-collections" aria-labelledby="collections-title">
       <h1 id="collections-title" className="cms-title">Collections</h1>
-      <p className="cms-lede">Each photograph belongs to one collection. Order here is the order of the collection cards and filters on the public page; a collection’s cover is its first published, non-featured photograph.</p>
+      <p className="cms-lede">This order controls the public collection cards and filters. A collection uses its assigned cover or the first published photograph outside Featured. If every photograph is Featured, it uses the first one.</p>
       <ol className="cms-collection-list">
         {catalog.categories.map((category, index) => {
           const members = catalog.photographs.filter((record) => record.category === category);
-          const cover = coverOf(catalog, category);
+          const published = members.filter(({ status }) => status === 'published');
+          const cover = selectCollectionCover(published);
           return (
             <li key={category} className="cms-collection">
               <span className="cms-collection-cover">{cover ? <img src={imageUrl(cover.id)} alt="" loading="lazy" decoding="async" /> : <span>No published cover</span>}</span>
               <div className="cms-collection-body">
                 <h2>{category}</h2>
-                <p className="mono">{members.length} photographs · {members.filter(({ status }) => status === 'published').length} published{cover ? ` · cover ${cover.id}` : ''}</p>
+                <p className="mono">{members.length} photographs · {published.length} published{cover ? ` · cover ${cover.id}` : ''}</p>
                 <Rename key={category} name={category} onRename={(value) => run((c) => renameCollection(c, category, value))} />
               </div>
               <div className="cms-collection-actions">

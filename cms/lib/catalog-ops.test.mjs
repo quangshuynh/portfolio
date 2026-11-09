@@ -86,6 +86,15 @@ describe('editing', () => {
     expect(() => setCollection(catalog, ['alpha'], 'Missing')).toThrow(/Unknown collection/);
     expect(catalogErrors(catalog)).toEqual([]);
   });
+
+  test('cover assignments follow a collection rename and clear when the photo leaves', () => {
+    const catalog = updatePhotograph(baseCatalog(), 'beta', { collectionCover: true });
+    const cover = (state) => state.photographs.find(({ id }) => id === 'beta').collectionCover;
+    expect(cover(renameCollection(catalog, 'Nature', 'Woods'))).toBe(true);
+    expect(cover(updatePhotograph(catalog, 'beta', { category: 'Places' }))).toBeUndefined();
+    expect(cover(setCollection(catalog, ['beta'], 'Places'))).toBeUndefined();
+    expect(cover(setStatus(catalog, ['beta'], 'draft'))).toBeUndefined();
+  });
 });
 
 describe('publication view', () => {

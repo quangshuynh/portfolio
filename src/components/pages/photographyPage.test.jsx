@@ -427,6 +427,16 @@ test('photography details handle partial metadata without placeholders', () => {
   ).not.toBeInTheDocument();
 });
 
+test('photography details display the Tamron alias while keeping the existing EXIF value', () => {
+  const photograph = photographs.find(({ lens }) => lens === 'E 28-75mm F2.8 A063');
+  expect(photograph).toBeDefined();
+  render(<PhotographyDetails photograph={photograph} />);
+
+  expect(screen.getByText('Tamron 28-75mm F/2.8 Di III VXD G2')).toBeInTheDocument();
+  expect(screen.queryByText('E 28-75mm F2.8 A063')).not.toBeInTheDocument();
+  expect(photograph.lens).toBe('E 28-75mm F2.8 A063');
+});
+
 
 test('photography details render available camera metadata', () => {
   render(
@@ -436,6 +446,7 @@ test('photography details render available camera metadata', () => {
         caption: 'Test photograph',
         capturedAt: '2026-10-02T10:39:26.000Z',
         camera: 'SONY ILCE-6400',
+        lens: 'FE 28-70mm F3.5-5.6 OSS',
         focalLength: 31,
         aperture: 10,
         shutterSpeed: 0.01,
@@ -447,6 +458,7 @@ test('photography details render available camera metadata', () => {
   expect(
     screen.getByText('Sony A6400'),
   ).toBeInTheDocument();
+  expect(screen.getByText('FE 28-70mm F3.5-5.6 OSS')).toBeInTheDocument();
 
   expect(
     screen.getByText('31 mm'),
@@ -620,15 +632,20 @@ test('collections index lists each category with its real count and opens it in 
 
   const automotive = photographs.filter(({ category }) => category === 'Automotive');
   const card = screen.getByRole('button', { name: `Automotive, ${automotive.length} photographs. Show in all photographs` });
-  const cover = card.querySelector('img');
-  expect(automotive.map(({ gallerySrc }) => gallerySrc)).toContain(cover.getAttribute('src'));
+  const covers = { Automotive: 'DSC09713', Places: 'pier-light', Landscape: 'IMGP0739', Nature: 'white-dahlia' };
+  for (const [category, id] of Object.entries(covers)) {
+    const members = photographs.filter((photo) => photo.category === category);
+    const coverCard = screen.getByRole('button', { name: `${category}, ${members.length} photographs. Show in all photographs` });
+    expect(coverCard.querySelector('img')).toHaveAttribute('src', members.find((photo) => photo.id === id).gallerySrc);
+  }
+  expect(featuredPhotographs.some(({ id }) => id === covers.Automotive)).toBe(true);
 
   fireEvent.click(card);
 
   const filters = screen.getByRole('group', { name: 'Filter photographs by category' });
   expect(within(filters).getByRole('button', { name: /^Automotive/ })).toHaveAttribute('aria-pressed', 'true');
   const shown = [...document.querySelectorAll('[data-photo-slug]')].map((item) => item.dataset.photoSlug);
-  expect(shown.sort()).toEqual(automotive.map(({ slug }) => slug).sort());
+  expect(shown).toEqual(automotive.map(({ slug }) => slug));
   expect(screen.getByRole('heading', { name: 'All photographs' })).toHaveFocus();
 });
 
