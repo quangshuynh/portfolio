@@ -427,6 +427,16 @@ test('photography details handle partial metadata without placeholders', () => {
   ).not.toBeInTheDocument();
 });
 
+test('photography details display the Tamron alias while keeping the existing EXIF value', () => {
+  const photograph = photographs.find(({ lens }) => lens === 'E 28-75mm F2.8 A063');
+  expect(photograph).toBeDefined();
+  render(<PhotographyDetails photograph={photograph} />);
+
+  expect(screen.getByText('Tamron 28-75mm F/2.8 Di III VXD G2')).toBeInTheDocument();
+  expect(screen.queryByText('E 28-75mm F2.8 A063')).not.toBeInTheDocument();
+  expect(photograph.lens).toBe('E 28-75mm F2.8 A063');
+});
+
 
 test('photography details render available camera metadata', () => {
   render(
@@ -436,6 +446,7 @@ test('photography details render available camera metadata', () => {
         caption: 'Test photograph',
         capturedAt: '2026-10-02T10:39:26.000Z',
         camera: 'SONY ILCE-6400',
+        lens: 'FE 28-70mm F3.5-5.6 OSS',
         focalLength: 31,
         aperture: 10,
         shutterSpeed: 0.01,
@@ -447,6 +458,7 @@ test('photography details render available camera metadata', () => {
   expect(
     screen.getByText('Sony A6400'),
   ).toBeInTheDocument();
+  expect(screen.getByText('FE 28-70mm F3.5-5.6 OSS')).toBeInTheDocument();
 
   expect(
     screen.getByText('31 mm'),

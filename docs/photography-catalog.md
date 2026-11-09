@@ -67,6 +67,9 @@ Interval 1 (2026-10-22).
 
 Unknown fields are errors, so a typo fails instead of being ignored.
 
+Lens display aliases live in `src/util/lensNames.js`. Imports and metadata
+refreshes keep the camera-reported value in the generated manifest.
+
 ### Publication
 
 - **Published** photographs appear in the gallery, lightbox, sitemap, JSON-LD

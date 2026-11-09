@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react';
+import { formatLensName } from '../../../src/util/lensNames.js';
 import {
   movePhotographBy, publishedIds, setFeatured, setHero, setStatus, updatePhotograph,
 } from '../../lib/catalog-ops.mjs';
@@ -57,6 +58,8 @@ function MetadataEditor({ record, extracted, run }) {
       <p className="cms-field-hint">Blank uses the value read from the photograph. “Hide” removes it from the public page.</p>
       {METADATA_FIELDS.map(([key, label, type]) => {
         const hidden = metadata[key] === null;
+        const extractedValue = extracted?.[key];
+        const defaultDisplay = key === 'lens' ? formatLensName(extractedValue) : extractedValue;
         return (
           <div key={key} className="cms-meta-row">
             <Field
@@ -64,7 +67,8 @@ function MetadataEditor({ record, extracted, run }) {
               type={type}
               value={hidden ? '' : metadata[key]?.toString()}
               readOnly={hidden}
-              hint={extracted?.[key] !== undefined ? `Extracted: ${extracted[key]}` : 'Not in the file'}
+              hint={defaultDisplay !== extractedValue ? `Default display: ${defaultDisplay}`
+                : extractedValue !== undefined ? `Extracted: ${extractedValue}` : 'Not in the file'}
               onCommit={(text) => update(key, text.trim() === '' ? undefined : type === 'number' ? Number(text) : text.trim())}
             />
             <label className="cms-check">

@@ -4,6 +4,7 @@ import { FaChevronLeft, FaChevronRight, FaCompress, FaExpand, FaInfoCircle, FaMi
 import useOverlayLock from '../utilities/overlayLock';
 import useFullscreen from '../utilities/useFullscreen';
 import { photographSources, photographTiers } from '../../data/photographs';
+import { formatLensName } from '../../util/lensNames';
 import { initialViewerSource, isWiderSource, prefetchPlan, upgradeDelay, viewerNetworkTier } from './viewerLoading';
 
 // Files the viewer has seen load: shown at once (from the browser's cache) as a placeholder
@@ -78,6 +79,7 @@ export function formatCameraName(camera) {
 function formatMetadataValue(field, value) {
   if (field === 'capturedAt') return formatCapturedAt(value);
   if (field === 'camera') return formatCameraName(value);
+  if (field === 'lens') return formatLensName(value);
   if (field === 'focalLength') return `${value} mm`;
   if (field === 'aperture') return `f/${value}`;
   if (field === 'shutterSpeed') {
