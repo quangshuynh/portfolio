@@ -10,6 +10,7 @@ import {
   sortPhotographs,
 } from '../../data/photographs';
 import { appHref, currentLocation, navigate, navigateBack, photographyHref } from '../../util/navigation';
+import { selectCollectionCover } from '../../../scripts/photography-catalog.mjs';
 import PhotographyLightbox, { formatCameraName } from '../photography/photographyLightbox';
 import SiteNav from '../sections/siteNav';
 import Footer from '../sections/footer';
@@ -165,11 +166,9 @@ const categoryCounts = Object.fromEntries(
 );
 const filters = [['All', photographs.length], ...PHOTOGRAPHY_CATEGORIES.map((category) => [category, categoryCounts[category]])];
 
-// Each collection is fronted by its first frame in curated order that isn't already in
-// Featured, so the index shows more of the work rather than repeating the sequence above.
 export const photographyCollections = PHOTOGRAPHY_CATEGORIES.map((category) => {
   const members = sortPhotographs(filterPhotographs(photographs, category));
-  const cover = members.find(({ featured }) => !featured) ?? members[0];
+  const cover = selectCollectionCover(members);
   return { category, count: members.length, cover };
 }).filter(({ count }) => count > 0);
 // The opening frame is the catalog's `hero`. The hero <img> srcSet/sizes are mirrored by the

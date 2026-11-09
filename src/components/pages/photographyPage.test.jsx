@@ -632,15 +632,20 @@ test('collections index lists each category with its real count and opens it in 
 
   const automotive = photographs.filter(({ category }) => category === 'Automotive');
   const card = screen.getByRole('button', { name: `Automotive, ${automotive.length} photographs. Show in all photographs` });
-  const cover = card.querySelector('img');
-  expect(automotive.map(({ gallerySrc }) => gallerySrc)).toContain(cover.getAttribute('src'));
+  const covers = { Automotive: 'DSC09713', Places: 'pier-light', Landscape: 'IMGP0739', Nature: 'white-dahlia' };
+  for (const [category, id] of Object.entries(covers)) {
+    const members = photographs.filter((photo) => photo.category === category);
+    const coverCard = screen.getByRole('button', { name: `${category}, ${members.length} photographs. Show in all photographs` });
+    expect(coverCard.querySelector('img')).toHaveAttribute('src', members.find((photo) => photo.id === id).gallerySrc);
+  }
+  expect(featuredPhotographs.some(({ id }) => id === covers.Automotive)).toBe(true);
 
   fireEvent.click(card);
 
   const filters = screen.getByRole('group', { name: 'Filter photographs by category' });
   expect(within(filters).getByRole('button', { name: /^Automotive/ })).toHaveAttribute('aria-pressed', 'true');
   const shown = [...document.querySelectorAll('[data-photo-slug]')].map((item) => item.dataset.photoSlug);
-  expect(shown.sort()).toEqual(automotive.map(({ slug }) => slug).sort());
+  expect(shown).toEqual(automotive.map(({ slug }) => slug));
   expect(screen.getByRole('heading', { name: 'All photographs' })).toHaveFocus();
 });
 

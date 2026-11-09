@@ -61,6 +61,7 @@ Interval 1 (2026-10-22).
 | `caption`, `alt` | yes | Non-empty, no surrounding spaces. Captions stay short and factual. |
 | `shape` | yes | `landscape` or `portrait` |
 | `category` | yes | One of `categories` |
+| `collectionCover` | no | `true` on one published photograph per collection. Without an assignment, the first published photograph outside Featured is the cover, or the first published photograph when all are Featured. |
 | `tags` | no | Non-empty list of distinct values; omit for none |
 | `featured` | no | Position in the Featured selection. Published ordinals must be unique and run 1..n without gaps. Drafts cannot be featured. |
 | `metadata` | no | Corrections to extracted EXIF: `capturedAt`, `camera`, `lens`, `focalLength`, `aperture`, `shutterSpeed`, `iso`, `location`. `null` hides the extracted value. |
