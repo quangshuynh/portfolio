@@ -209,6 +209,16 @@
       "category": "Nature"
     },
     {
+      "id": "DSC00323",
+      "slug": "painted-facades",
+      "status": "published",
+      "sourceFilename": "DSC00323.JPG",
+      "caption": "Facades",
+      "alt": "Three townhouse facades side by side, painted red, purple and blue, with white window surrounds and black balcony railings",
+      "shape": "landscape",
+      "category": "Places"
+    },
+    {
       "id": "red-sun",
       "slug": "red-sun",
       "status": "published",
