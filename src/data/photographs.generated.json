@@ -336,6 +336,27 @@
     "whiteBalance": "Auto"
   },
   {
+    "id": "DSC00323",
+    "sourceFilename": "DSC00323.JPG",
+    "galleryFilename": "DSC00323-gallery.jpg",
+    "viewerFilename": "DSC00323-viewer.jpg",
+    "galleryWidth": 900,
+    "galleryHeight": 600,
+    "viewerWidth": 2200,
+    "viewerHeight": 1467,
+    "capturedAt": "2026-11-13T20:12:41.000Z",
+    "camera": "SONY ILCE-7M3",
+    "lens": "E 28-75mm F2.8 A063",
+    "focalLength": 40,
+    "focalLength35mm": 40,
+    "aperture": 8,
+    "shutterSpeed": 0.003125,
+    "iso": 800,
+    "exposureCompensation": -0.7,
+    "flash": "Off",
+    "whiteBalance": "Auto"
+  },
+  {
     "id": "red-sun",
     "sourceFilename": "_DSC0012--3e197f2d.JPG",
     "galleryFilename": "red-sun-gallery.jpg",
