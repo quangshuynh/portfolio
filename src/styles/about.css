@@ -422,7 +422,7 @@
   .about-hero-grid { grid-template-columns: 1fr; grid-template-areas: 'intro' 'portrait' 'body'; }
   .about-location { margin-bottom: 1.75rem; }
   .about-portrait { justify-self: center; width: min(100% - 1.5rem, 21rem); margin-bottom: 2.25rem; }
-  .about-portrait-button img { aspect-ratio: 1; }
+  .about-portrait-button img { aspect-ratio: 1; object-position: top; }
   .about-index ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .about-index a { padding-top: .75rem; }
 
