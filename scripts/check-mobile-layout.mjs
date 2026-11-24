@@ -49,6 +49,8 @@ async function waitFor(expression) {
 }
 async function enter(path, ready) {
   await send('Page.navigate', { url: 'about:blank' });
+  // Headless shell drops a navigation sent while about:blank is still loading.
+  await waitFor("location.href === 'about:blank' && document.readyState === 'complete'");
   await send('Page.navigate', { url: `${origin}${path}` });
   await waitFor(ready);
   await evaluate('document.fonts.ready.then(() => true)');
@@ -61,7 +63,7 @@ async function viewport(width, height, mobile = true) {
 const ratioError = `(image) => { const box = image.getBoundingClientRect(); return Math.abs(box.width / box.height - image.naturalWidth / image.naturalHeight); }`;
 
 const phones = [[320, 740], [360, 800], [375, 812], [390, 844], [393, 852], [430, 932]];
-const phoneOrder = ['title', 'type', 'visual', 'purpose', 'takeaway', 'stack', 'actions'];
+const phoneOrder = ['type', 'title', 'visual', 'purpose', 'facts', 'takeaway', 'details', 'stack', 'actions'];
 
 try {
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
@@ -71,9 +73,11 @@ try {
 
     const measureCells = `(gallery) => [...gallery.querySelectorAll('figure')].map(figure => { const box = figure.getBoundingClientRect(); const image = figure.querySelector('img'); const caption = figure.querySelector('figcaption').getBoundingClientRect();
       return { portrait: figure.classList.contains('photography-gallery-portrait'), width: box.width, cellRatio: box.width / box.height, fit: getComputedStyle(image).objectFit, captionInside: caption.top >= box.top && caption.bottom <= box.bottom + .5, captionShare: caption.width * caption.height / (box.width * box.height) }; })`;
-    const assertCells = (cells, name) => cells.forEach((cell, index) => {
+    const galleryRatio = cell => cell.portrait ? [3, 4] : [4, 3];
+    const assertCells = (cells, name, ratioOf = galleryRatio) => cells.forEach((cell, index) => {
+      const [across, down] = ratioOf(cell);
       assert.ok(cell.width >= width * .35, `${label}: ${name} cell ${index} is ${cell.width}px wide`);
-      assert.ok(Math.abs(cell.cellRatio - (cell.portrait ? 3 / 4 : 4 / 3)) < .03, `${label}: ${name} cell ${index} is ${cell.portrait ? '3:4' : '4:3'}, not a narrow strip`);
+      assert.ok(Math.abs(cell.cellRatio - across / down) < .03, `${label}: ${name} cell ${index} is ${across}:${down}, not ${cell.cellRatio.toFixed(2)}`);
       assert.equal(cell.fit, 'cover', `${label}: ${name} image ${index} crops instead of stretching`);
       assert.ok(cell.captionInside, `${label}: ${name} caption ${index} stays inside its photo`);
       assert.ok(cell.captionShare < .5, `${label}: ${name} caption ${index} covers ${Math.round(cell.captionShare * 100)}%`);
@@ -106,18 +110,21 @@ try {
     await decodeImages("document.querySelector('#photography-modal-gallery')");
     const photoModal = await evaluate(`(() => { const gallery = document.querySelector('#photography-modal-gallery'); return { columns: getComputedStyle(gallery).gridTemplateColumns.split(' ').length, cells: (${measureCells})(gallery) }; })()`);
     assert.equal(photoModal.columns, 2, `${label}: photography modal uses two columns`);
-    assertCells(photoModal.cells, 'photography modal');
+    assertCells(photoModal.cells, 'photography modal', () => [1, 1]);
 
     await enter('/photography/', "!!document.querySelector('.photography-page-grid img')");
     await decodeImages('document');
     const gallery = await evaluate(`(() => { const ratio = ${ratioError}; const grid = document.querySelector('#photography-gallery'); const images = [...grid.querySelectorAll('img')];
-      return { columns: getComputedStyle(grid).gridTemplateColumns.split(' ').length, minWidth: Math.min(...images.map(image => image.getBoundingClientRect().width)), maxRatioError: Math.max(...images.map(ratio)), pageOverflow: document.documentElement.scrollWidth > innerWidth }; })()`);
-    assert.ok(gallery.columns <= 2, `${label}: Photography never uses three phone columns`);
+      const rows = Object.values(Object.groupBy(images, image => Math.round(image.getBoundingClientRect().top)));
+      return { perRow: Math.max(...rows.map(row => row.length)), minWidth: Math.min(...images.map(image => image.getBoundingClientRect().width)), maxRatioError: Math.max(...images.map(ratio)), pageOverflow: document.documentElement.scrollWidth > innerWidth }; })()`);
+    assert.ok(gallery.perRow <= 2, `${label}: Photography puts ${gallery.perRow} photographs in a phone row`);
     assert.ok(gallery.minWidth >= 160, `${label}: narrowest photograph is ${gallery.minWidth}px`);
     assert.ok(gallery.maxRatioError < .02, `${label}: gallery photographs keep their proportions`);
     assert.ok(!gallery.pageOverflow, `${label}: Photography has no horizontal page overflow`);
 
-    await evaluate("document.querySelector('[data-photo-slug=\"_DSC0023\"] a').click()");
+    // The archive's first portrait and the photograph after it, so curating the order never breaks the check.
+    const next = await evaluate(`(() => { const photographs = [...document.querySelectorAll('#photography-gallery [data-photo-slug]')]; const opened = photographs.findIndex(photograph => photograph.matches('.photo-frame--portrait'));
+      photographs[opened].querySelector('a').click(); return photographs[opened + 1].dataset.photoSlug; })()`);
     await waitFor("(() => { const image = document.querySelector('.photography-lightbox img'); return image?.complete && image.getBoundingClientRect().width > 10; })()");
     await delay(300);
     const viewer = await evaluate(`(() => { const ratio = ${ratioError}; const image = document.querySelector('.photography-lightbox img'); const box = image.getBoundingClientRect(); const toolbar = document.querySelector('.photography-lightbox-toolbar').getBoundingClientRect();
@@ -128,7 +135,7 @@ try {
     assert.ok(viewer.contained, `${label}: viewer photograph is fully visible`);
     assert.deepEqual(viewer.buttons, [true, true, true, true], `${label}: viewer controls are visible`);
     await evaluate("document.querySelector('[aria-label=\"Next photograph\"]').click()");
-    await waitFor("location.hash === '#DIBS2164'");
+    await waitFor(`decodeURIComponent(location.hash) === ${JSON.stringify(`#${next}`)}`);
     await evaluate("document.querySelector('[aria-label=\"Show photograph information\"]').click()");
     await waitFor("!!document.querySelector('.photography-lightbox-sheet')");
     await evaluate("document.querySelector('[aria-label=\"Close photograph information\"]').click()");
@@ -139,7 +146,7 @@ try {
     const projects = await evaluate(`(() => { const heading = document.querySelector('#projects-title'); const range = document.createRange(); range.selectNodeContents(heading);
       return { headingFits: [...range.getClientRects()].every(rect => rect.right <= innerWidth - 8), pageOverflow: document.documentElement.scrollWidth > innerWidth,
         articles: [...document.querySelectorAll('#projects .featured-project')].map(article => { const top = selector => article.querySelector(selector).getBoundingClientRect().top;
-          const parts = { title: top('h3'), type: top('.project-number'), visual: top('.case-file__visual'), purpose: top('.project-purpose'), takeaway: top('.project-takeaway'), stack: top('.project-stack'), actions: top('.project-actions') };
+          const parts = { title: top('h3'), type: top('.project-number'), visual: top('.case-file__visual'), purpose: top('.project-purpose'), facts: top('.project-facts'), takeaway: top('.project-takeaway'), details: top('.project-details'), stack: top('.project-stack'), actions: top('.project-actions') };
           const index = article.querySelector('.case-file__index'); const title = article.querySelector('h3');
           return { order: Object.keys(parts).sort((first, second) => parts[first] - parts[second]), indexDemoted: parseFloat(getComputedStyle(index).fontSize) < parseFloat(getComputedStyle(title).fontSize) / 2 }; }) }; })()`);
     assert.ok(projects.headingFits, `${label}: Featured projects heading fits`);
@@ -152,10 +159,12 @@ try {
 
   await viewport(1440, 900, false);
   await enter('/', "!!document.querySelector('#projects .featured-project')");
-  const desktop = await evaluate(`[...document.querySelectorAll('#projects .featured-project')].map(article => ({ display: getComputedStyle(article).display, rail: getComputedStyle(article.querySelector('.case-file__rail')).display }))`);
-  desktop.forEach(({ display, rail }, index) => {
+  const desktop = await evaluate(`[...document.querySelectorAll('#projects .featured-project')].map(article => { const copyElement = article.querySelector('.project-copy'); const visual = article.querySelector('.case-file__visual').getBoundingClientRect(); const copy = copyElement.getBoundingClientRect();
+    return { display: getComputedStyle(article).display, copyDisplay: getComputedStyle(copyElement).display, visualSide: visual.right <= copy.left ? 'left' : copy.right <= visual.left ? 'right' : 'overlapping' }; })`);
+  desktop.forEach(({ display, copyDisplay, visualSide }, index) => {
     assert.equal(display, 'grid', `desktop project ${index + 1} keeps its grid composition`);
-    assert.notEqual(rail, 'contents', `desktop project ${index + 1} keeps its rail`);
+    assert.notEqual(copyDisplay, 'contents', `desktop project ${index + 1} keeps its copy column`);
+    assert.equal(visualSide, index % 2 ? 'right' : 'left', `desktop project ${index + 1} alternates its visual beside the copy`);
   });
   await enter('/about', "!!document.querySelector('.about-portrait-button')");
   await evaluate("document.querySelector('.about-portrait-button').click()");
@@ -167,7 +176,7 @@ try {
       return { beside: box('.photo-stage-side').left >= mat.right, titleClear: box('.photography-modal-header').bottom <= box('.photo-stage-text').top, stripClear: mat.bottom <= box('.photo-stage-strip').top }; })()`);
     assert.deepEqual(stage, { beside: true, titleClear: true, stripClear: true }, `${width}x${height}: About stage keeps its label beside the photo and the strip below it`);
   }
-  console.log(`PASS: ${phones.length} phone viewports (About photo stage, Cars/Gaming/photography modal grids and captions, gallery columns, viewer containment and controls, project hierarchy, heading fit) and desktop composition.`);
+  console.log(`PASS: ${phones.length} phone viewports (About photo stage, Cars/Gaming/photography modal grids and captions, gallery rows, viewer containment and controls, project hierarchy, heading fit) and desktop composition.`);
 } finally {
   socket.close();
   await fetch(`${debuggerUrl}/json/close/${tab.id}`);
