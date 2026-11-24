@@ -40,6 +40,23 @@
   object-fit: cover;
 }
 
+.photography-gallery figcaption {
+  position: absolute;
+  right: .65rem;
+  bottom: .65rem;
+  left: .65rem;
+  padding: .65rem .75rem;
+  border-radius: .55rem;
+  background: linear-gradient(90deg, rgba(7, 12, 10, .88), rgba(7, 12, 10, .68));
+  color: #f5f7f6;
+  font-size: .78rem;
+  font-weight: 650;
+  line-height: 1.35;
+  opacity: .9;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+
 /* Featured photography modal */
 #photography-modal-gallery {
   grid-template-columns: 1.35fr 1fr 1fr;

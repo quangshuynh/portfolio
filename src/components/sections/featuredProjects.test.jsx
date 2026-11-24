@@ -71,6 +71,12 @@ test('phone modal galleries use two columns of 3:4 portrait and 4:3 landscape ce
   expect(phone).toMatch(/\.photography-gallery figcaption \{[^}]*-webkit-line-clamp: 2;/);
 });
 
+test('modal gallery captions are laid over their photo instead of being clipped below it', () => {
+  // Figures clip their overflow, so a caption in normal flow under a full-height photo is never visible.
+  const base = overlaysCss.slice(0, overlaysCss.indexOf('@media'));
+  expect(base).toMatch(/\.photography-gallery figcaption \{[^}]*position: absolute;/);
+});
+
 test('featured cards cannot be widened past the column by their gallery tabs', () => {
   // An implicit `auto` track let five gallery tabs stretch every card to ~460px on a 375px phone.
   expect(sectionsCss).toMatch(/\.featured-list \{[^}]*grid-template-columns: minmax\(0, 1fr\);/);
