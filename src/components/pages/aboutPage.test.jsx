@@ -581,3 +581,132 @@ test('the closing links reach projects, GitHub, the résumé and the contact sec
   expect(document.getElementById('contact')).not.toBeNull();
   expect(screen.getByRole('heading', { name: 'Currently' })).toBeInTheDocument();
 });
+
+
+function openPhotoStage() {
+  renderAboutPage();
+
+  const trigger = screen.getByRole('button', { name: 'View more photos of Quang' });
+
+  fireEvent.click(trigger);
+
+  return { trigger, dialog: screen.getByRole('dialog', { name: 'More about Quang' }) };
+}
+
+
+const stageImage = (dialog) => within(dialog).getByRole('button', { name: /^Open image:/ }).querySelector('img');
+const stageThumbs = (dialog) => within(dialog).getAllByRole('button', { name: /^Show photo/ });
+const currentThumbs = (dialog) => stageThumbs(dialog).map((thumb) => thumb.getAttribute('aria-current'));
+
+
+test('the portrait shows the cover and counts only the other photos', () => {
+  renderAboutPage();
+
+  const portrait = screen.getByRole('button', { name: 'View more photos of Quang' });
+  const cover = portrait.querySelector('img');
+
+  expect(cover).toHaveAttribute('alt', 'Quang laughing in a dark suit jacket and open-collared white shirt');
+  expect(Number(cover.getAttribute('width')) / Number(cover.getAttribute('height'))).toBeCloseTo(4 / 5, 3);
+  expect(portrait).toHaveTextContent('4 more photos');
+});
+
+
+test('the personal gallery opens on the photo used as the cover', () => {
+  const { dialog } = openPhotoStage();
+
+  expect(stageImage(dialog)).toHaveAttribute('alt', 'Quang laughing in a dark suit jacket and open-collared white shirt');
+  expect(within(dialog).getByText('Caught mid-laugh')).toBeInTheDocument();
+  expect(within(dialog).getByText('1 of 5')).toBeInTheDocument();
+  expect(currentThumbs(dialog)).toEqual(['true', null, null, null, null]);
+});
+
+
+test('the previous cover is part of the personal gallery', () => {
+  const { dialog } = openPhotoStage();
+
+  fireEvent.click(within(dialog).getByRole('button', { name: /^Show photo \d of 5: On the bench$/ }));
+
+  expect(stageImage(dialog)).toHaveAttribute('alt', 'Quang seated on a bench outdoors');
+});
+
+
+test('next and previous browse the stage and wrap at both ends', () => {
+  const { dialog } = openPhotoStage();
+
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Next photo' }));
+  expect(within(dialog).getByText('2 of 5')).toBeInTheDocument();
+  expect(currentThumbs(dialog)).toEqual([null, 'true', null, null, null]);
+
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Previous photo' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Previous photo' }));
+  expect(within(dialog).getByText('5 of 5')).toBeInTheDocument();
+
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Next photo' }));
+  expect(within(dialog).getByText('1 of 5')).toBeInTheDocument();
+});
+
+
+test('arrow keys browse the stage', () => {
+  const { dialog } = openPhotoStage();
+
+  fireEvent.keyDown(document, { key: 'ArrowRight' });
+  expect(within(dialog).getByText('2 of 5')).toBeInTheDocument();
+
+  fireEvent.keyDown(document, { key: 'ArrowLeft' });
+  expect(within(dialog).getByText('1 of 5')).toBeInTheDocument();
+});
+
+
+test('a horizontal swipe browses the stage, a vertical scroll or pinch does not', () => {
+  const { dialog } = openPhotoStage();
+  const photo = within(dialog).getByRole('button', { name: /^Open image:/ });
+  const swipe = (from, to, fingers = 1) => {
+    fireEvent.touchStart(photo, { touches: Array.from({ length: fingers }, () => ({ clientX: from[0], clientY: from[1] })) });
+    fireEvent.touchEnd(photo, { touches: [], changedTouches: [{ clientX: to[0], clientY: to[1] }] });
+  };
+
+  swipe([200, 100], [190, 220]);
+  swipe([200, 100], [185, 100]);
+  swipe([200, 100], [80, 100], 2);
+  expect(within(dialog).getByText('1 of 5')).toBeInTheDocument();
+
+  swipe([200, 100], [80, 110]);
+  expect(within(dialog).getByText('2 of 5')).toBeInTheDocument();
+
+  swipe([80, 100], [200, 110]);
+  expect(within(dialog).getByText('1 of 5')).toBeInTheDocument();
+});
+
+
+test('the viewer opened from the stage browses one photo per key and returns to the photo it showed last', async () => {
+  const { dialog } = openPhotoStage();
+  const photo = within(dialog).getByRole('button', { name: /^Open image:/ });
+
+  fireEvent.click(photo);
+
+  expect(screen.getByRole('dialog', { name: 'Image viewer: Caught mid-laugh' })).toBeInTheDocument();
+
+  fireEvent.keyDown(document, { key: 'ArrowRight' });
+
+  const viewer = screen.getByRole('dialog', { name: /^Image viewer:/ });
+  expect(within(viewer).getByText('2 of 5')).toBeInTheDocument();
+
+  fireEvent.click(within(viewer).getByRole('button', { name: 'Next image' }));
+  expect(within(viewer).getByText('3 of 5')).toBeInTheDocument();
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+
+  await waitFor(() => expect(photo).toHaveFocus());
+  expect(screen.queryByRole('dialog', { name: /^Image viewer:/ })).not.toBeInTheDocument();
+  expect(within(dialog).getByText('3 of 5')).toBeInTheDocument();
+});
+
+
+test('closing the stage returns focus to the portrait', async () => {
+  const { trigger } = openPhotoStage();
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+
+  await waitFor(() => expect(trigger).toHaveFocus());
+  expect(screen.queryByRole('dialog', { name: 'More about Quang' })).not.toBeInTheDocument();
+});

@@ -81,14 +81,17 @@ try {
 
     await enter('/about', "!!document.querySelector('.about-portrait-button')");
     await evaluate("document.querySelector('.about-portrait-button').click()");
-    await waitFor("!!document.querySelector('.personal-gallery')");
-    await decodeImages("document.querySelector('.personal-gallery')");
-    const about = await evaluate(`(() => { const gallery = document.querySelector('.personal-gallery'); const close = document.querySelector('.photography-modal-close').getBoundingClientRect();
-      return { columns: getComputedStyle(gallery).gridTemplateColumns.split(' ').length, cells: (${measureCells})(gallery),
+    await waitFor("!!document.querySelector('.photo-stage')");
+    await decodeImages("document.querySelector('.photo-stage')");
+    const about = await evaluate(`(() => { const box = selector => document.querySelector(selector).getBoundingClientRect(); const close = box('.photography-modal-close'); const image = document.querySelector('.photo-stage-photo img');
+      return { matWidth: box('.photo-stage-mat').width, fit: getComputedStyle(image).objectFit, stacked: box('.photo-stage-mat').bottom <= box('.photo-stage-side').top && box('.photo-stage-side').bottom <= box('.photo-stage-strip').top,
+        targets: [...document.querySelectorAll('.photo-stage-controls button, .photo-stage-strip button')].map(button => button.getBoundingClientRect()).map(({ width, height }) => Math.min(width, height)),
         closeVisible: close.top >= 0 && close.right <= innerWidth, pageOverflow: document.documentElement.scrollWidth > innerWidth, pageSnap: getComputedStyle(document.documentElement).scrollSnapType }; })()`);
-    assert.equal(about.columns, 2, `${label}: About modal uses two columns`);
+    assert.ok(about.matWidth >= width * .75, `${label}: About stage photo area is ${about.matWidth}px wide`);
+    assert.equal(about.fit, 'contain', `${label}: About stage never crops a photo`);
+    assert.ok(about.stacked, `${label}: About photo, caption row and strip stack without overlapping`);
+    assert.ok(Math.min(...about.targets) >= 44, `${label}: smallest About stage control is ${Math.min(...about.targets)}px`);
     assert.equal(about.pageSnap, 'none', `${label}: no page-level scroll snapping`);
-    assertCells(about.cells, 'About');
     assert.ok(about.closeVisible, `${label}: modal close button is reachable`);
     assert.ok(!about.pageOverflow, `${label}: About has no horizontal page overflow`);
 
@@ -156,9 +159,15 @@ try {
   });
   await enter('/about', "!!document.querySelector('.about-portrait-button')");
   await evaluate("document.querySelector('.about-portrait-button').click()");
-  await waitFor("!!document.querySelector('.personal-gallery')");
-  assert.equal(await evaluate("getComputedStyle(document.querySelector('.personal-gallery')).gridTemplateColumns.split(' ').length"), 3, 'desktop About modal keeps three cards');
-  console.log(`PASS: ${phones.length} phone viewports (About/Cars/Gaming/photography modal grids and captions, gallery columns, viewer containment and controls, project hierarchy, heading fit) and desktop composition.`);
+  await waitFor("!!document.querySelector('.photo-stage')");
+  for (const [width, height] of [[1440, 900], [768, 1024], [844, 390]]) {
+    await viewport(width, height, false);
+    await delay(200);
+    const stage = await evaluate(`(() => { const box = selector => document.querySelector(selector).getBoundingClientRect(); const mat = box('.photo-stage-mat');
+      return { beside: box('.photo-stage-side').left >= mat.right, titleClear: box('.photography-modal-header').bottom <= box('.photo-stage-text').top, stripClear: mat.bottom <= box('.photo-stage-strip').top }; })()`);
+    assert.deepEqual(stage, { beside: true, titleClear: true, stripClear: true }, `${width}x${height}: About stage keeps its label beside the photo and the strip below it`);
+  }
+  console.log(`PASS: ${phones.length} phone viewports (About photo stage, Cars/Gaming/photography modal grids and captions, gallery columns, viewer containment and controls, project hierarchy, heading fit) and desktop composition.`);
 } finally {
   socket.close();
   await fetch(`${debuggerUrl}/json/close/${tab.id}`);

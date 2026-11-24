@@ -1,7 +1,9 @@
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { FaArrowDown, FaArrowRight, FaCamera, FaCar, FaDesktop, FaExternalLinkAlt, FaGamepad, FaImages, FaMapMarkerAlt, FaMountain, FaMusic } from 'react-icons/fa';
 import PersonalityButton from '../ui/personalityButton';
-import quangPhoto from '../../assets/about/quang/quang-about-portrait-web.jpg';
+import quangCover from '../../assets/about/quang/quang-about-cover-web.jpg';
+import quangMidLaugh from '../../assets/about/quang/quang-mid-laugh-web.jpg';
+import quangBench from '../../assets/about/quang/quang-about-portrait-web.jpg';
 import photographySunset from '../../assets/about/photography/quang-photography-sunset-web.jpg';
 import hikingOverlook from '../../assets/about/hiking/quang-hiking-overlook-web.jpg';
 import hikingDuskOverlook from '../../assets/about/hiking/hiking-dusk-overlook.jpg';
@@ -130,10 +132,15 @@ const values = [
   },
 ];
 
+const coverAlt = 'Quang laughing in a dark suit jacket and open-collared white shirt';
+
+// The portrait's full frame comes first, so the gallery opens on the photo that was clicked.
 const personalGallery = [
-  { src: quangBeachSunset, width: 927, height: 1400, alt: 'Quang standing at the shoreline at sunset', caption: 'Sunset by the water', shape: 'portrait' },
-  { src: quangArtSpace, width: 927, height: 1400, alt: 'Quang seated on a large illuminated sphere in a modern interior', caption: 'Exploring Cornell architecture', shape: 'portrait' },
-  { src: quangWaterfront, width: 933, height: 1400, alt: 'Quang standing beside a wide body of water at dusk', caption: 'An evening at Webster Park', shape: 'portrait' }
+  { src: quangMidLaugh, width: 1050, height: 1400, alt: coverAlt, caption: 'Caught mid-laugh', position: 'center 12%' },
+  { src: quangBench, width: 1000, height: 1000, alt: 'Quang seated on a bench outdoors', caption: 'On the bench', position: '30% center' },
+  { src: quangBeachSunset, width: 927, height: 1400, alt: 'Quang standing at the shoreline at sunset', caption: 'Sunset by the water', position: 'center 65%' },
+  { src: quangArtSpace, width: 927, height: 1400, alt: 'Quang seated on a large illuminated sphere in a modern interior', caption: 'Exploring Cornell architecture' },
+  { src: quangWaterfront, width: 933, height: 1400, alt: 'Quang standing beside a wide body of water at dusk', caption: 'An evening at Webster Park', position: 'center 65%' }
 ];
 
 const hikingGallery = [
@@ -232,8 +239,8 @@ function AboutPage() {
               <div className="about-portrait-stack">
                 <div className="viewfinder about-portrait-frame">
                   <button className="about-portrait-button" type="button" aria-label="View more photos of Quang" aria-haspopup="dialog" onClick={(event) => openGallery('personal', event.currentTarget)}>
-                    <img src={quangPhoto} width="1000" height="1000" alt="Quang seated on a bench outdoors" fetchPriority="high" />
-                    <span className="about-portrait-more"><FaImages aria-hidden="true" /> {personalGallery.length} more photos</span>
+                    <img src={quangCover} width="1000" height="1250" alt={coverAlt} fetchPriority="high" />
+                    <span className="about-portrait-more"><FaImages aria-hidden="true" /> {personalGallery.length - 1} more photos</span>
                   </button>
                 </div>
               </div>

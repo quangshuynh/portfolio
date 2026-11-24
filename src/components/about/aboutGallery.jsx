@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { FaSearchPlus, FaTimes } from 'react-icons/fa';
 import useOverlayLock from '../utilities/overlayLock';
 import PhotoLightbox from '../ui/photoLightbox';
+import PhotoStage from './photoStage';
 import { navigate, photographyHref } from '../../util/navigation';
 import { clearSpotifyCache, getFreshSpotifyTracksCache, getSpotifyTracks, SPOTIFY_PROFILE } from '../../util/spotify';
 
@@ -233,11 +234,18 @@ export function SpotifyListening() {
 
 export function InterestGalleryModal({ activeGallery, galleries, onClose }) {
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [stageIndex, setStageIndex] = useState(0);
   const lightboxTrigger = useRef(null);
   const lightboxOpen = useRef(false);
   const closeButton = useRef(null);
   const [eyebrow, title, closeLabel] = galleryMetadata[activeGallery];
+  const stageItems = activeGallery === 'personal' ? galleries.personal : null;
+  const stageCount = stageItems?.length ?? 0;
   useOverlayLock();
+
+  const stepStage = useCallback((amount) => {
+    setStageIndex((current) => (current + amount + stageCount) % stageCount);
+  }, [stageCount]);
 
   const closeLightbox = useCallback(() => {
     lightboxOpen.current = false;
@@ -250,16 +258,24 @@ export function InterestGalleryModal({ activeGallery, galleries, onClose }) {
     const handleKeyDown = (event) => {
       if (lightboxOpen.current) return;
       if (event.key === 'Escape') { event.preventDefault(); onClose(); }
+      else if (stageCount && event.key === 'ArrowLeft') { event.preventDefault(); stepStage(-1); }
+      else if (stageCount && event.key === 'ArrowRight') { event.preventDefault(); stepStage(1); }
       else trapTabKey(event, closeButton.current?.closest('.photography-modal'));
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, stageCount, stepStage]);
 
   const openLightbox = (src, alt, caption, trigger) => { lightboxTrigger.current = trigger; lightboxOpen.current = true; setLightboxImage({ src, alt, caption }); };
+  // The stage and its viewer show the same photo, so browsing in one carries over to the other.
+  const stagePhoto = stageItems?.[stageIndex];
+  const viewerImage = lightboxImage && stagePhoto
+    ? { ...stagePhoto, gallery: stageItems, galleryIndex: stageIndex }
+    : lightboxImage;
   let content;
   if (activeGallery === 'music') content = <SpotifyListening />;
   else if (activeGallery === 'photography') content = <><PhotoGallery items={galleries.photography.slice(0, 4)} label="More photographs by Quang" className="photography-featured-gallery" onOpen={openLightbox} /><a className="button photography-view-all" href={photographyHref()} onClick={(event) => { event.preventDefault(); onClose(); const nextState = { ...(window.history.state ?? {}), restorePhotographyModal: true, returnSection: 'beyond-software' }; window.history.replaceState(nextState, '', window.location.pathname + window.location.hash); navigate(event.currentTarget.href); }}>View all</a></>;
+  else if (stageItems) content = <PhotoStage items={stageItems} index={stageIndex} label={galleryLabels.personal} onSelect={setStageIndex} onStep={stepStage} onOpen={(trigger) => openLightbox(stagePhoto.src, stagePhoto.alt, stagePhoto.caption, trigger)} />;
   else content = <PhotoGallery items={galleries[activeGallery]} label={galleryLabels[activeGallery]} className={`${activeGallery}-gallery`} onOpen={openLightbox} />;
 
   return createPortal(
@@ -272,7 +288,7 @@ export function InterestGalleryModal({ activeGallery, galleries, onClose }) {
       }}
     >
       <section
-        className="photography-modal"
+        className={`photography-modal${stageItems ? ' photography-modal--stage' : ''}`}
         role="dialog"
         aria-modal={lightboxImage ? undefined : "true"}
         aria-hidden={lightboxImage ? "true" : undefined}
@@ -301,8 +317,10 @@ export function InterestGalleryModal({ activeGallery, galleries, onClose }) {
 
       {lightboxImage && (
         <PhotoLightbox
-          image={lightboxImage}
+          image={viewerImage}
           onClose={closeLightbox}
+          onPrevious={stageItems ? () => stepStage(-1) : undefined}
+          onNext={stageItems ? () => stepStage(1) : undefined}
         />
       )}
     </div>,
