@@ -8,6 +8,8 @@ import {
 
 import AboutPage from './aboutPage';
 
+import aboutCss from '../../styles/about.css?raw';
+
 import { photographs } from '../../data/photographs';
 
 import {
@@ -608,6 +610,13 @@ test('the portrait shows the cover and counts only the other photos', () => {
   expect(cover).toHaveAttribute('alt', 'Quang laughing in a dark suit jacket and open-collared white shirt');
   expect(Number(cover.getAttribute('width')) / Number(cover.getAttribute('height'))).toBeCloseTo(4 / 5, 3);
   expect(portrait).toHaveTextContent('4 more photos');
+});
+
+
+test('the square phone portrait keeps the top of the cover, where the head is', () => {
+  const phone = aboutCss.slice(aboutCss.indexOf('@media (max-width: 760px)'));
+
+  expect(phone).toMatch(/\.about-portrait-button img \{ aspect-ratio: 1; object-position: top; \}/);
 });
 
 
